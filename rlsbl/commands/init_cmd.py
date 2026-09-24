@@ -109,9 +109,29 @@ def _skip_publish_scaffold(private, is_ws_root, project_root):
     error. An already-scaffolded ``publish.yml`` is removed by the normal
     orphan sweep, exactly as it is for ``publish_mode: "none"``.
     """
-    if private or is_ws_root:
-        return True
-    return _is_non_releasable_project(project_root)
+    return _publish_skip_reason(private, is_ws_root, project_root) is not None
+
+
+#: The publish workflow scaffold writes (and sweeps when it writes none).
+PUBLISH_WORKFLOW = os.path.join(".github", "workflows", "publish.yml")
+
+
+def _publish_skip_reason(private, is_ws_root, project_root):
+    """Why this project gets no publish workflow, or None when it gets one.
+
+    The reason is printed beside an already-scaffolded ``publish.yml`` the
+    orphan sweep removes: a bare "orphan" reads as a scaffold bug.
+    """
+    if private:
+        return 'publish_mode "none": this project publishes nothing'
+    if is_ws_root:
+        return "a workspace root is not a package"
+    if _is_non_releasable_project(project_root):
+        return (
+            "this member releases nothing (releasable = false), so it gets no "
+            "publish workflow"
+        )
+    return None
 
 
 def _is_releasable_member_project(project_root):
@@ -1296,10 +1316,16 @@ def _install_or_update_post_rewrite_hook():
     )
 
 
+def _publish_orphan_reasons(private, is_ws_root, project_root):
+    """``{publish.yml: reason}`` when this project gets no publish workflow."""
+    reason = _publish_skip_reason(private, is_ws_root, project_root)
+    return {} if reason is None else {PUBLISH_WORKFLOW: reason}
+
+
 def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
                        registry=None, flags=None, registries=None,
                        npm_lockfile_missing=False, target_paths=None,
-                       project_root, config):
+                       project_root, config, orphan_reasons=None):
     """Shared post-processing for scaffold: chmod, hooks, version marker, tagging, summary.
 
     all_hash_dicts is a list of dicts to merge for managed-files tracking.
@@ -1381,7 +1407,8 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
                     effects.removedirs(os.path.dirname(base_path))
                 except OSError:
                     pass
-            created.append((orphan_path, "removed (orphan)"))
+            reason = (orphan_reasons or {}).get(orphan_path, "orphan")
+            created.append((orphan_path, f"removed ({reason})"))
         else:
             print(
                 f"Warning: {orphan_path} has been modified — skipping orphan deletion. "
@@ -1954,6 +1981,7 @@ def run_cmd(registry, args, flags, ctx):
             target_paths={registry: target_path},
             project_root=project_root,
             config=ctx.config,
+            orphan_reasons=_publish_orphan_reasons(private, is_ws_root, project_root),
         )
 
         if private:
@@ -3092,6 +3120,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
             target_paths=target_paths,
             project_root=project_root,
             config=ctx.config,
+            orphan_reasons=_publish_orphan_reasons(private, is_ws_root, project_root),
         )
 
         if private:

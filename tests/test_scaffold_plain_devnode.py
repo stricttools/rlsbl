@@ -245,5 +245,14 @@ class TestDevNodeGetsNoPublishWorkflow:
         # member that releases nothing keeps its own, so the scaffold asks for
         # the directory before it heals the bases (the refusal's own remedy).
         (proj_dir / ".rlsbl" / "bases").mkdir()
+        capsys.readouterr()
         self._scaffold(proj_dir)
         assert not publish.exists()
+        # The removal says why: a bare "orphan" reads as a scaffold bug, and
+        # was once undone by hand for exactly that reason.
+        out = capsys.readouterr().out
+        assert (
+            ".github/workflows/publish.yml" in out
+            and "removed (this member releases nothing (releasable = false), "
+                "so it gets no publish workflow)" in out
+        ), out
