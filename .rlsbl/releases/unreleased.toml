@@ -2,11 +2,11 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "The test isolation floor follows the plugin's rename to testisolation: the testisolation-floor check and the TESTISOLATION_SANDBOX runner variable. Deprecate and yank notices, and the CI marker, now stay on GitHub Releases through a notes re-sync."
 # Optional context explaining why these changes were made
-context = ""
+context = "The pytest plugin, Go module, and npm package formerly named stricttest now ship as testisolation. rlsbl distributes the sandboxed runner that the plugin detects through an environment variable, so consumers that set testisolation_sandbox_required need this release before their sandboxed runs are recognized."
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
