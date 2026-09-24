@@ -103,9 +103,9 @@
     "schema_hash": "8ec11c80f2ba2db1ea6f1ccdb6d2f8aebce1c0386f499a42919083e4215beb23"
   },
   "en/cli-release.md": {
-    "content": "6bdfd747283b152147d57ffbd1ea116985befc68395124dc024e0f8d4a4a885a",
+    "content": "5656eef48c67d2893dbc26df5ad4267cf5064a7b54e362eec79e86e5bfb5c6f9",
     "description": "834f34d30bf5b3f057ba3ec1746a807f12f823ec51ce9fffb90286426a77b60e",
-    "schema_hash": "75aca0d2d21580255819fa714e264afd17ed03398f74265c72abe4a83d1f116a",
+    "schema_hash": "588f4644d9a10abcc72b0b957b8679677968b15644e3baf8ae2b58a0a988fed2",
     "seed_hash": "834f34d30bf5b3f057ba3ec1746a807f12f823ec51ce9fffb90286426a77b60e"
   },
   "en/cli-rewrite.md": {
