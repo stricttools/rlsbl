@@ -54,7 +54,7 @@ def _monorepo(root, remote, *, name="mylib", path="mylib"):
     member = root / path
     (member / ".rlsbl").mkdir(parents=True, exist_ok=True)
     (member / "package.json").write_text(
-        json.dumps({"name": name, "version": "1.0.0"}) + "\n"
+        json.dumps({"engines": {"node": ">=20"}, "name": name, "version": "1.0.0"}) + "\n"
     )
     (member / ".rlsbl" / "config.json").write_text(
         json.dumps({"targets": ["npm"], "publish_mode": "none"}, indent=2) + "\n"

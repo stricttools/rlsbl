@@ -59,7 +59,7 @@ class TestRootSingleTargetCanonical:
 
     @pytest.fixture
     def npm_root(self, mock_git_repo):
-        pkg = {
+        pkg = {"engines": {"node": ">=20"}, 
             "name": "root-pkg",
             "version": "0.1.0",
             "bin": {"root-pkg": "./bin/cli.js"},
@@ -148,7 +148,7 @@ class TestLoneSubdirStandalone:
     def npm_subdir(self, mock_git_repo):
         sub = mock_git_repo / "npmpkg"
         sub.mkdir()
-        pkg = {
+        pkg = {"engines": {"node": ">=20"}, 
             "name": "sub-pkg",
             "version": "0.1.0",
             "bin": {"sub-pkg": "./bin/cli.js"},
@@ -218,7 +218,7 @@ def _setup_root_publisher_subdir(root, *, name, sub, gate_regex):
     """Root (path='.') publisher whose npm target lives in subdir *sub*."""
     subdir = os.path.join(root, sub)
     os.makedirs(subdir, exist_ok=True)
-    pkg = {"name": name, "version": "1.2.3", "bin": {name: "./bin/cli.js"}}
+    pkg = {"engines": {"node": ">=20"}, "name": name, "version": "1.2.3", "bin": {name: "./bin/cli.js"}}
     with open(os.path.join(subdir, "package.json"), "w") as f:
         json.dump(pkg, f)
 

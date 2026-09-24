@@ -247,7 +247,7 @@ class TestMergeTemplateVarsSubdirectory:
         npm_dir.mkdir()
         pypi_dir = tmp_path / "pypi"
         pypi_dir.mkdir()
-        (npm_dir / "package.json").write_text('{"name": "test", "version": "1.0.0"}')
+        (npm_dir / "package.json").write_text('{"name": "test", "version": "1.0.0", "engines": {"node": ">=20"}}')
         (pypi_dir / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "1.0.0"\n'
             'requires-python = ">=3.11"\n'
@@ -265,7 +265,7 @@ class TestMergeTemplateVarsSubdirectory:
         npm_dir = tmp_path / "npm"
         npm_dir.mkdir()
         (npm_dir / "package.json").write_text(
-            '{"name": "subdir-pkg", "version": "1.0.0"}'
+            '{"name": "subdir-pkg", "version": "1.0.0", "engines": {"node": ">=20"}}'
         )
         target_paths = {"npm": str(npm_dir)}
         merged = _merge_template_vars(["npm"], "npm", target_paths, str(tmp_path))

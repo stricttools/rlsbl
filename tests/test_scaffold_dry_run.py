@@ -19,7 +19,7 @@ def _ctx(root="."):
 @pytest.fixture
 def npm_project(mock_git_repo):
     """Set up a minimal npm project."""
-    pkg = {"name": "dryrunpkg", "version": "0.1.0"}
+    pkg = {"engines": {"node": ">=20"}, "name": "dryrunpkg", "version": "0.1.0"}
     (mock_git_repo / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
     return mock_git_repo
 
@@ -27,7 +27,7 @@ def npm_project(mock_git_repo):
 @pytest.fixture
 def dual_registry_project(mock_git_repo):
     """Set up a project with both package.json and pyproject.toml."""
-    pkg = {"name": "my-dual-dry", "version": "0.2.0"}
+    pkg = {"engines": {"node": ">=20"}, "name": "my-dual-dry", "version": "0.2.0"}
     (mock_git_repo / "package.json").write_text(json.dumps(pkg, indent=2) + "\n")
     (mock_git_repo / "pyproject.toml").write_text(
         "[project]\nname = \"my-dual-dry\"\nversion = \"0.2.0\"\n"

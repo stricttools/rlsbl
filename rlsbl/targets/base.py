@@ -249,6 +249,17 @@ class BaseTarget:
         """Return template variables extracted from the project for scaffold rendering."""
         return TemplateVars(self.name, {})
 
+    def ci_template_vars(self, dir_path):
+        """Return the namespaced variables this target's CI templates need.
+
+        Called by scaffold alone, which renders those templates; read-only
+        commands that want a project's metadata call :meth:`template_vars`
+        instead and never pay for (or trip over) what only CI needs.  A target
+        whose CI cannot be derived from the project's own declarations raises
+        :class:`~rlsbl.errors.ConfigError` naming the remedy.
+        """
+        return {}
+
     def template_mappings(self, ctx):
         """Return the list of target-specific template-to-file mappings for scaffolding."""
         return []

@@ -215,7 +215,7 @@ class TestMergeTemplateVars:
     def test_merge_primary_unnamespaced(self, tmp_path):
         # Create both package.json and pyproject.toml
         (tmp_path / "package.json").write_text(
-            '{"name": "test", "version": "1.0.0"}'
+            '{"name": "test", "version": "1.0.0", "engines": {"node": ">=20"}}'
         )
         (tmp_path / "pyproject.toml").write_text(
             '[project]\nname = "test"\nversion = "1.0.0"\n'
@@ -232,7 +232,7 @@ class TestMergeTemplateVars:
 
     def test_merge_year_not_included(self, tmp_path):
         (tmp_path / "package.json").write_text(
-            '{"name": "test", "version": "1.0.0"}'
+            '{"name": "test", "version": "1.0.0", "engines": {"node": ">=20"}}'
         )
         target_paths = {"npm": str(tmp_path)}
         merged = _merge_template_vars(["npm"], "npm", target_paths, make_ctx(tmp_path))

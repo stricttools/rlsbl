@@ -51,7 +51,7 @@ def test_scaffold_never_writes_a_release_dispatch_workflow(mock_git_repo):
     from rlsbl.commands.init_cmd import run_cmd
 
     (mock_git_repo / "package.json").write_text(
-        _json.dumps({"name": "dispatchpkg", "version": "0.1.0"}, indent=2) + "\n"
+        _json.dumps({"engines": {"node": ">=20"}, "name": "dispatchpkg", "version": "0.1.0"}, indent=2) + "\n"
     )
     ctx = make_ctx(mock_git_repo, config={"remote_release": True})
     run_cmd("npm", [], {"auto-commit": False, "auto-tag": False}, ctx=ctx)

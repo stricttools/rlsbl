@@ -254,7 +254,7 @@ class TestLockUnderPreviewDispatch:
     ):
         """`scaffold --dry-run` flocks a real fd and cleans the lock file up."""
         (mock_git_repo / "package.json").write_text(
-            '{"name": "lockpkg", "version": "0.1.0"}\n'
+            '{"name": "lockpkg", "version": "0.1.0", "engines": {"node": ">=20"}}\n'
         )
 
         import rlsbl

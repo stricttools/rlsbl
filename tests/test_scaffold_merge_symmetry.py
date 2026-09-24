@@ -197,7 +197,7 @@ class TestConflictIsReportedNotCrashed:
 
 def _subdir_pypi_project(root):
     """npm at the root + a pypi target living in ``py/`` (subdirectory target)."""
-    (root / "package.json").write_text(json.dumps({
+    (root / "package.json").write_text(json.dumps({"engines": {"node": ">=20"}, 
         "name": "demo", "version": "0.1.0", "bin": {"demo": "./bin/cli.js"},
     }, indent=2) + "\n")
     py = root / "py"

@@ -5,7 +5,7 @@ import os
 import re
 
 from .base import BaseTarget, TemplateVars
-from ..errors import VersionError
+from ..errors import ConfigError, VersionError
 from ..scratch_dirs import RUNNER_CHOSEN_BY_PROJECT
 from .. import effects
 
@@ -227,6 +227,20 @@ class NpmTarget(BaseTarget):
                 result["minRequiredNode"] = m.group(1)
 
         return TemplateVars(self.name, result)
+
+    def ci_template_vars(self, dir_path):
+        """``npm.nodeMatrix``: every supported Node line ``engines.node`` admits.
+
+        A package with no ``engines.node`` is refused: it states no Node
+        support, and a matrix rlsbl picked would test versions nobody claimed.
+        """
+        from ..node_matrix import NodeMatrixError, project_node_matrix, render_matrix
+
+        try:
+            lines = project_node_matrix(dir_path)
+        except NodeMatrixError as exc:
+            raise ConfigError(str(exc)) from exc
+        return {"npm.nodeMatrix": render_matrix(lines)}
 
     def template_mappings(self, ctx):
         """Return CI and npmignore template mappings, selecting the CI template by package manager."""
