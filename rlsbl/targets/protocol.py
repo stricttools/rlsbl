@@ -170,6 +170,10 @@ class ReleaseTarget(Protocol):
     """
 
     claim_token_env_vars: tuple[str, ...]
+    """Environment variables, any one of which authenticates a name claim.
+
+    Empty for a target that cannot claim names at all.
+    """
 
     def claim_credentials(self) -> str:
         """Name where a name claim's credentials come from, or raise.
@@ -181,10 +185,6 @@ class ReleaseTarget(Protocol):
         an empty string.
         """
         return ""
-    """Environment variables, any one of which authenticates a name claim.
-
-    Empty for a target that cannot claim names at all.
-    """
 
     BUILD_TIMEOUT_DEFAULT: int
     """Seconds allowed for this target's build before it is a timeout."""
