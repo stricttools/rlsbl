@@ -1197,7 +1197,7 @@ _CHECK_NAME_PAYLOAD_SCHEMA = {
 }
 
 
-@app.command(name="check-name", help="Check whether one or more package names are usable. npm and PyPI are queried over the network for availability and for names that collide after normalization; go is an offline check of the Go package name a candidate implies. Each name gets a status of available, taken, invalid (go only), discouraged (go only), or error. Accepts multiple names as positional arguments and waits a configurable delay between networked checks. Exits 0 when every name is available, 2 when any check errored, and 1 otherwise: taken, invalid, and discouraged all exit 1, so a discouraged Go name exits 1 even though Go accepts it.", effect="read_only", payload_schema=_CHECK_NAME_PAYLOAD_SCHEMA)
+@app.command(name="check-name", help="Check whether one or more package names are usable. npm and PyPI are queried over the network for availability and for names that collide after normalization; go is an offline check of the Go package name a candidate implies. Each name gets a status of available, taken, invalid (go only), discouraged (go only), or error. Accepts multiple names as positional arguments and waits a configurable delay between networked checks. Exits 0 when every name is available, 2 when any check ended in an error, and 1 otherwise: taken, invalid, and discouraged all exit 1, so a discouraged Go name exits 1 even though Go accepts it.", effect="read_only", payload_schema=_CHECK_NAME_PAYLOAD_SCHEMA)
 @strictcli.flag(name="target", type=str, presence="required", repeatable=True, unique=True, choices=[
     strictcli.Choice("npm", help="the npm registry"),
     strictcli.Choice("pypi", help="the Python Package Index"),
