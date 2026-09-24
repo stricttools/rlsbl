@@ -2,11 +2,13 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "Source walks read only what git lists and survive any syntax-tree depth; scaffold fixes for monorepo members, npm, pgdesign, and scratch directories; a Go toolchain-line check; claim-name registry logins; monorepo cleanup --no-auto-commit"
 # Optional context explaining why these changes were made
-context = ""
+context = """
+A generated protobuf file in a gitignored third-party clone crashed `rlsbl rewrite go-module-path` with a RecursionError, which exposed two defects at once: every tree-sitter walker recursed once per syntax-tree level, and the source walk ignored .gitignore despite its docstring. Scaffolding a family of repositories then surfaced the rest: release state written into releasable monorepo members, a fixed npm Node matrix, a crash on an npm target with no package.json, silent tracking under ignore-everything scratch directories, and a pgdesign CI whose Go-version file nothing created. The new refusals (a package.json without engines.node, tracked files in a scratch directory) and the new release-blocking go-toolchain-declared check make this a minor release.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
