@@ -24,9 +24,9 @@
     "seed_hash": "e4afae5e858dc47720b3f170cf0ccf654c9bf83f4b77130b63dde72547b5ea58"
   },
   "en/cli-check-name.md": {
-    "content": "5c47d6959ce9e93dcb93f5dcb5d5324df5a0ddc8fa8afcc9421e3c2b537c6a76",
-    "description": "464a19e9df222d4047c9e03317033ccaf4fa1e93a805b53c4cab2706d5c00548",
-    "schema_hash": "a0fac73c2cae46df68e2beffa6f6462e481c076003f84c9d8201b7574fcf8f01"
+    "content": "9317afc6808a1de42be5ae81af1030b588ed21dd038c97a73a783aa8ffda2977",
+    "description": "079528211a62127530c0be9f21e5ca06c00c6e5cb02f33ef23f85a7abfc21331",
+    "schema_hash": "29e9295dc4fb2fcbb314f6a4312fdffc40ce431ce15f7c26b4198eeba74f6c89"
   },
   "en/cli-check.md": {
     "content": "b34d1b21bbc9bdde816253a3b46ed3f21a6289d9deea8e8a221899c2ed8f003a",
@@ -346,8 +346,8 @@
   },
   "en/rlsbl-commands-check.md": {
     "content": "26d86c03dd8681726816073407283f06d0f529ba1d20c5c44b40647165d7cccd",
-    "description": "6feac5d72302ee329cbe72df3144c92a4d47ee3f2263e8651f8fdb3455ebee4f",
-    "source_docstring": "6feac5d72302ee329cbe72df3144c92a4d47ee3f2263e8651f8fdb3455ebee4f"
+    "description": "17bd399de46ca8eefd605deb685c6d041316b0c6243c488c92863a8350ad5f9f",
+    "source_docstring": "17bd399de46ca8eefd605deb685c6d041316b0c6243c488c92863a8350ad5f9f"
   },
   "en/rlsbl-commands-claim_name.md": {
     "content": "5e8f3e8b7e059170ecb65737f32d5d1c3efd31edfddbb29c5b715d1277be2c3f",
