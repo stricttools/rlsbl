@@ -344,3 +344,123 @@ class TestClaimNameConfirmation:
             run_cmd("npm", ["my-pkg"], {"force-publish": True})
         mock_input.assert_not_called()
         mock_run.assert_called_once()
+
+
+_AVAILABLE = {"status": "available", "variants": None, "reason": None}
+
+
+def _home(monkeypatch, tmp_path, *, npmrc=None, pypirc=None):
+    """A home directory holding the given npm/PyPI config files, and no token
+    in the environment."""
+    home = tmp_path / "home"
+    home.mkdir()
+    if npmrc is not None:
+        (home / ".npmrc").write_text(npmrc)
+    if pypirc is not None:
+        (home / ".pypirc").write_text(pypirc)
+    monkeypatch.setenv("HOME", str(home))
+    for var in ("NPM_TOKEN", "UV_PUBLISH_TOKEN", "PYPI_TOKEN"):
+        monkeypatch.delenv(var, raising=False)
+    return home
+
+
+class TestClaimCredentials:
+    """Each registry's own login counts, not only an environment token.
+
+    npm: NPM_TOKEN when set, otherwise npm's own ~/.npmrc login. PyPI:
+    UV_PUBLISH_TOKEN (or PYPI_TOKEN) when set, otherwise the token in
+    ~/.pypirc. A claim is refused only when neither exists, and the refusal
+    names both places. No token is ever printed.
+    """
+
+    @patch("rlsbl.effects.run")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_npm_uses_its_own_npmrc_login_when_no_token_is_set(
+        self, mock_check, mock_run, real_tmpdir, monkeypatch, tmp_path,
+    ):
+        mock_check.return_value = {"name": "my-pkg", "registry": "npm", **_AVAILABLE}
+        mock_run.return_value = MagicMock(returncode=0)
+        _home(monkeypatch, tmp_path,
+              npmrc="//registry.npmjs.org/:_authToken=npm_secretvalue\n")
+
+        run_cmd("npm", ["my-pkg"], {"force-publish": False})
+
+        assert mock_run.call_args[0][0] == ["npm", "publish", "--access", "public"]
+        # npm reads ~/.npmrc itself: no staging .npmrc shadows it.
+        assert not (real_tmpdir / ".npmrc").exists()
+
+    @patch("rlsbl.effects.run")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_npm_token_reaches_npm_without_being_written_down(
+        self, mock_check, mock_run, real_tmpdir, monkeypatch, tmp_path,
+    ):
+        mock_check.return_value = {"name": "my-pkg", "registry": "npm", **_AVAILABLE}
+        mock_run.return_value = MagicMock(returncode=0)
+        _home(monkeypatch, tmp_path)
+        monkeypatch.setenv("NPM_TOKEN", "npm_envsecret")
+
+        run_cmd("npm", ["my-pkg"], {"force-publish": False})
+
+        npmrc = (real_tmpdir / ".npmrc").read_text()
+        assert "${NPM_TOKEN}" in npmrc
+        assert "npm_envsecret" not in npmrc
+
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_npm_with_neither_is_refused_naming_both_places(
+        self, mock_check, monkeypatch, tmp_path, capsys,
+    ):
+        mock_check.return_value = {"name": "my-pkg", "registry": "npm", **_AVAILABLE}
+        _home(monkeypatch, tmp_path, npmrc="registry=https://registry.npmjs.org/\n")
+
+        with pytest.raises(SystemExit) as exc:
+            run_cmd("npm", ["my-pkg"], {"force-publish": False})
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "NPM_TOKEN" in err and "~/.npmrc" in err
+
+    @patch("rlsbl.effects.run")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_pypi_reads_the_token_from_pypirc_and_never_prints_it(
+        self, mock_check, mock_run, real_tmpdir, monkeypatch, tmp_path, capsys,
+    ):
+        mock_check.return_value = {"name": "my-pkg", "registry": "pypi", **_AVAILABLE}
+        mock_run.return_value = MagicMock(returncode=0)
+        _home(monkeypatch, tmp_path, pypirc=(
+            "[distutils]\nindex-servers =\n    pypi\n\n"
+            "[pypi]\nusername = __token__\npassword = pypi-rcsecret\n"
+        ))
+
+        run_cmd("pypi", ["my-pkg"], {"force-publish": False})
+
+        publish_call = mock_run.call_args_list[1]
+        assert publish_call[0][0] == ["uv", "publish"]
+        assert publish_call[1]["env"]["UV_PUBLISH_TOKEN"] == "pypi-rcsecret"
+        out = capsys.readouterr()
+        assert "pypi-rcsecret" not in out.out and "pypi-rcsecret" not in out.err
+
+    @patch("rlsbl.effects.run")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_a_pypi_environment_token_wins_over_pypirc(
+        self, mock_check, mock_run, real_tmpdir, monkeypatch, tmp_path,
+    ):
+        mock_check.return_value = {"name": "my-pkg", "registry": "pypi", **_AVAILABLE}
+        mock_run.return_value = MagicMock(returncode=0)
+        _home(monkeypatch, tmp_path, pypirc="[pypi]\npassword = pypi-rcsecret\n")
+        monkeypatch.setenv("PYPI_TOKEN", "pypi-envsecret")
+
+        run_cmd("pypi", ["my-pkg"], {"force-publish": False})
+
+        assert mock_run.call_args_list[1][1]["env"]["UV_PUBLISH_TOKEN"] == "pypi-envsecret"
+
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_pypi_with_neither_is_refused_naming_both_places(
+        self, mock_check, monkeypatch, tmp_path, capsys,
+    ):
+        mock_check.return_value = {"name": "my-pkg", "registry": "pypi", **_AVAILABLE}
+        _home(monkeypatch, tmp_path)
+
+        with pytest.raises(SystemExit) as exc:
+            run_cmd("pypi", ["my-pkg"], {"force-publish": False})
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "UV_PUBLISH_TOKEN" in err and "PYPI_TOKEN" in err and "~/.pypirc" in err

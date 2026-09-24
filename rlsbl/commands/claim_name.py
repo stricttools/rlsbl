@@ -1,6 +1,5 @@
 """Claim a package name on npm or PyPI by publishing a minimal placeholder package with version 0.0.0 and an empty description."""
 
-import os
 import subprocess
 import sys
 
@@ -13,8 +12,10 @@ def run_cmd(target, args, flags):
 
     Checks availability first via check-name, then publishes a version 0.0.0
     placeholder package to reserve the name. Supports npm (via npm publish),
-    and PyPI (via uv build + uv publish). Requires NPM_TOKEN for npm, or
-    PYPI_TOKEN / UV_PUBLISH_TOKEN for PyPI.
+    and PyPI (via uv build + uv publish). npm authenticates with NPM_TOKEN
+    when set, otherwise npm's own ~/.npmrc login; PyPI with UV_PUBLISH_TOKEN
+    or PYPI_TOKEN when set, otherwise the token in ~/.pypirc. With neither,
+    the claim is refused naming both places.
     When --force-publish is passed, proceeds even if the name appears taken or
     the availability check returns an ambiguous status. That is a decision
     about the availability CHECK, deliberately not the framework's
@@ -63,21 +64,15 @@ def run_cmd(target, args, flags):
         else:
             sys.exit(1)
 
-    # Which environment variable authenticates a claim is the target's own
-    # knowledge, declared alongside the publish routine it feeds.
-    token_vars = target_obj.claim_token_env_vars
-    if token_vars and not any(var in os.environ for var in token_vars):
-        if len(token_vars) == 1:
-            print(
-                f"{token_vars[0]} environment variable is not set.",
-                file=sys.stderr,
-            )
-        else:
-            joined = " nor ".join(token_vars)
-            print(
-                f"Neither {joined} environment variable is set.",
-                file=sys.stderr,
-            )
+    # Where a claim's credentials come from is the target's own knowledge
+    # (an environment token, or the registry's own login file), declared
+    # alongside the publish routine it feeds. The secret is never printed.
+    from ..errors import ConfigError
+
+    try:
+        target_obj.claim_credentials()
+    except ConfigError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 
     # No hand-rolled preview and no hand-rolled prompt: `claim-name` declares

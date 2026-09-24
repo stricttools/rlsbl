@@ -8,10 +8,33 @@ import tomllib
 import tomlkit
 
 from .base import BaseTarget, TemplateVars
-from ..errors import VersionError
+from ..errors import ConfigError, VersionError
 from ..scratch_dirs import PYTEST_NORECURSEDIRS
 from ..utils import run
 from .. import effects
+
+
+def _pypirc_token(path):
+    """The password in the ``[pypi]`` section of the pypirc at *path*, or None.
+
+    Raises:
+        ConfigError: the file exists but cannot be parsed.
+    """
+    import configparser
+
+    if not os.path.isfile(path):
+        return None
+    parser = configparser.RawConfigParser()
+    try:
+        parser.read(path, encoding="utf-8")
+    except (configparser.Error, UnicodeDecodeError) as exc:
+        raise ConfigError(
+            f"~/.pypirc cannot be read as an INI file ({type(exc).__name__}); "
+            f"fix it, or set UV_PUBLISH_TOKEN."
+        ) from exc
+    if not parser.has_option("pypi", "password"):
+        return None
+    return parser.get("pypi", "password").strip() or None
 
 _MIN_VERSION_RE = re.compile(r">=\s*(\d+\.\d+(?:\.\d+)?)")
 
@@ -594,6 +617,25 @@ class PypiTarget(BaseTarget):
     # below prefers UV_PUBLISH_TOKEN when both are present.
     claim_token_env_vars = ("PYPI_TOKEN", "UV_PUBLISH_TOKEN")
 
+    def _claim_token(self):
+        """``(source label, token)`` for a claim; the token is never shown."""
+        for var in ("UV_PUBLISH_TOKEN", "PYPI_TOKEN"):
+            if os.environ.get(var):
+                return var, os.environ[var]
+        token = _pypirc_token(os.path.join(os.path.expanduser("~"), ".pypirc"))
+        if token:
+            return "~/.pypirc", token
+        raise ConfigError(
+            "no PyPI credentials to claim a name with: neither UV_PUBLISH_TOKEN "
+            "nor PYPI_TOKEN is set, and ~/.pypirc has no password in its [pypi] "
+            "section. Put an API token there (username = __token__, "
+            "password = pypi-...), or set UV_PUBLISH_TOKEN."
+        )
+
+    def claim_credentials(self):
+        """``UV_PUBLISH_TOKEN`` / ``PYPI_TOKEN`` when set, else ``~/.pypirc``."""
+        return self._claim_token()[0]
+
     def claim_placeholder(self, name, tmpdir):
         """Build and publish a version 0.0.0 sdist/wheel to reserve *name*."""
         name_underscored = name.replace("-", "_")
@@ -629,7 +671,7 @@ build-backend = "hatchling.build"
         # The token rides the environment, never argv: it must not reach a
         # process listing, and it must not reach the would-do log a preview
         # prints.
-        token = os.environ.get("UV_PUBLISH_TOKEN") or os.environ["PYPI_TOKEN"]
+        _source, token = self._claim_token()
 
         effects.run(
             ["uv", "publish"],

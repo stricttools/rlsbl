@@ -170,6 +170,17 @@ class ReleaseTarget(Protocol):
     """
 
     claim_token_env_vars: tuple[str, ...]
+
+    def claim_credentials(self) -> str:
+        """Name where a name claim's credentials come from, or raise.
+
+        Returns a short label for the source (an environment variable, or the
+        registry's own config file such as ``~/.npmrc``) and never the secret
+        itself. Raises :class:`~rlsbl.errors.ConfigError` naming every place
+        looked when there is none. A target that needs no credentials returns
+        an empty string.
+        """
+        return ""
     """Environment variables, any one of which authenticates a name claim.
 
     Empty for a target that cannot claim names at all.

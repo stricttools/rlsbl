@@ -311,6 +311,9 @@ AXIS_NAMES: tuple[str, ...] = tuple(axis.name for axis in TARGET_AXES)
 NON_AXIS_ATTRIBUTES: dict[str, str] = {
     "name": "the target's own identity -- the matrix's row key, not a cell.",
     "build": "operation: builds the artifact.",
+    "claim_credentials": "operation: resolves where one name claim's "
+                         "credentials come from on this machine (the fact is "
+                         "claim_token_env_vars).",
     "ensure_ci_inputs": "operation: creates the files one project's CI "
                         "templates read, when missing (the fact is "
                         "provides_ci_templates).",

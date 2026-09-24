@@ -540,8 +540,21 @@ class BaseTarget:
     claim_token_env_vars: ClassVar[tuple[str, ...]] = ()
     """Environment variables, any one of which authenticates a name claim.
 
-    Empty for a target that cannot claim names at all.
+    Empty for a target that cannot claim names at all. A target may also
+    accept its registry's own login file; :meth:`claim_credentials` says
+    which source a claim will use.
     """
+
+    def claim_credentials(self):
+        """Name where a name claim's credentials come from, or raise.
+
+        Returns a short label for the source (an environment variable, or the
+        registry's own config file such as ``~/.npmrc``) and never the secret
+        itself. Raises :class:`~rlsbl.errors.ConfigError` naming every place
+        looked when there is none. A target that needs no credentials returns
+        an empty string.
+        """
+        return ""
 
     @property
     def registry_display_name(self):

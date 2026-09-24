@@ -12,6 +12,23 @@ from .. import effects
 _MIN_VERSION_RE = re.compile(r">=\s*(\d+(?:\.\d+)*)")
 
 
+def _npmrc_has_login(path):
+    """Does the npm config file at *path* carry a registry login?"""
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except (OSError, UnicodeDecodeError):
+        return False
+    for raw in lines:
+        line = raw.strip()
+        if not line or line[0] in "#;":
+            continue
+        key, sep, value = line.partition("=")
+        if sep and value.strip() and key.strip().endswith(("_authToken", "_auth")):
+            return True
+    return False
+
+
 def _missing_package_json_message(pkg_path, ctx):
     """The refusal for an npm target directory holding no ``package.json``."""
     project_root = getattr(ctx, "project_root", None)
@@ -357,8 +374,26 @@ class NpmTarget(BaseTarget):
 
     claim_token_env_vars = ("NPM_TOKEN",)
 
+    def claim_credentials(self):
+        """``NPM_TOKEN`` when set, otherwise npm's own ``~/.npmrc`` login."""
+        if os.environ.get("NPM_TOKEN"):
+            return "NPM_TOKEN"
+        if _npmrc_has_login(os.path.join(os.path.expanduser("~"), ".npmrc")):
+            return "~/.npmrc"
+        raise ConfigError(
+            "no npm credentials to claim a name with: NPM_TOKEN is not set, and "
+            "~/.npmrc holds no registry login (the _authToken line `npm login` "
+            "writes). Log in with `npm login`, or set NPM_TOKEN."
+        )
+
     def claim_placeholder(self, name, tmpdir):
         """Publish a version 0.0.0 package.json to reserve *name* on npm."""
+        if self.claim_credentials() == "NPM_TOKEN":
+            # npm reads a token only from an .npmrc. This one names the
+            # variable, which npm expands at run time, so the secret is never
+            # written to disk; with no token set, npm's own ~/.npmrc is used.
+            with effects.open_write(os.path.join(tmpdir, ".npmrc"), "w") as f:
+                f.write("//registry.npmjs.org/:_authToken=${NPM_TOKEN}\n")
         package_json = {
             "name": name,
             "version": "0.0.0",
