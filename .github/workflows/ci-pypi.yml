@@ -37,16 +37,20 @@ jobs:
           # Pin uv (was unpinned-latest -- the least-controlled CI input). Keep
           # in lockstep with the dev-box uv (`uv --version`). Bump deliberately.
           version: "0.9.17"
-      # Pin a Go >= safegit's go.mod floor (currently go 1.25.7). scripts/test.sh
-      # runs with GOTOOLCHAIN=local (no toolchain auto-download), so the runner's
-      # OWN Go must already satisfy that floor -- otherwise the offline
-      # in-sandbox safegit build cannot fetch a newer toolchain and every
-      # Go-touching test fails. This installs Go into the hosted tool cache and
-      # puts it on PATH; scripts/test.sh resolves GOROOT dynamically and binds
-      # THIS toolchain into the sandbox (not the runner's older preinstalled Go).
+      # Install the Go declared in .go-version: the same Go as local development,
+      # declared once for this repository (rlsbl has no go.mod of its own).
+      # It must stay >= safegit's go.mod floor. scripts/test.sh runs with
+      # GOTOOLCHAIN=local (no toolchain auto-download), so the runner's OWN Go
+      # must already satisfy that floor -- otherwise the offline in-sandbox
+      # safegit build cannot fetch a newer toolchain and every Go-touching test
+      # fails. It must also be on the release line stamped in
+      # rlsbl/data/go-stdlib-packages.json, or the table's freshness test skips.
+      # This installs Go into the hosted tool cache and puts it on PATH;
+      # scripts/test.sh resolves GOROOT dynamically and binds THIS toolchain
+      # into the sandbox (not the runner's older preinstalled Go).
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.25.12'
+          go-version-file: .go-version
       - run: uv python install ${{ matrix.python-version }}
       # Warms the uv cache (network) so the in-sandbox offline `uv sync` succeeds.
       - run: uv sync --locked

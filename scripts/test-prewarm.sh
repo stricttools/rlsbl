@@ -33,8 +33,8 @@ if [ -z "${GO_VERSION}" ] || \
     echo "  Building the pinned safegit needs Go >= ${GO_MIN_VERSION}, and the"
     echo "  sandbox pins GOTOOLCHAIN=local (no toolchain auto-download), so an"
     echo "  older toolchain cannot be silently upgraded."
-    echo "  Fix: install Go >= ${GO_MIN_VERSION} (CI: actions/setup-go with a"
-    echo "  pinned go-version) before running the suite."
+    echo "  Fix: install Go >= ${GO_MIN_VERSION} (CI: actions/setup-go reads the"
+    echo "  repository's .go-version) before running the suite."
     echo "  go: $(command -v go) ($(go version 2>/dev/null || echo unavailable))"
   } >&2
   exit 1
