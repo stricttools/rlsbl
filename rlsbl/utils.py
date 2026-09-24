@@ -1037,7 +1037,9 @@ def commit_files(
                 cwd=cwd,
             )
         else:
-            addable = _git_addable(files, cwd=cwd)
+            # A preview writes nothing, so a named file's absence says nothing
+            # about the index; the recorded add names every file.
+            addable = files if effects.previewing() else _git_addable(files, cwd=cwd)
             if addable:
                 run("git", ["add", "--", *addable], cwd=cwd)
             result = run("git", ["commit", *trailer_args, "-m", message], cwd=cwd)
