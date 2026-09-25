@@ -1,6 +1,7 @@
 """Base class for release targets providing shared defaults for version reading, writing, detection, scaffolding, and publish configuration."""
 
 import os
+from dataclasses import dataclass
 from typing import ClassVar
 
 from ..scratch_dirs import NO_TEST_RUNNER_RECURSION
@@ -19,6 +20,40 @@ MATERIALIZATION_POLICIES = (
     MATERIALIZE_ALWAYS,
     MATERIALIZE_UNLESS_IDENTITY_CHANGED,
 )
+
+# The closed vocabulary of ``package_rename``: how a project's package name
+# is renamed for this target. ``rlsbl rewrite project-name`` reads it.
+#
+# - ``manifest-field``: the name is one field of the target's own manifest,
+#   and the target rewrites it itself (:meth:`BaseTarget.package_rename_plan`).
+# - ``go-module-path``: the name is the last element of the Go module path, so
+#   renaming it IS a module-path move, performed by the module-path rewrite.
+# - ``unsupported``: rlsbl does not rename it. The operator edits the field
+#   ``package_name_field`` names by hand.
+PACKAGE_RENAME_MANIFEST_FIELD = "manifest-field"
+PACKAGE_RENAME_GO_MODULE_PATH = "go-module-path"
+PACKAGE_RENAME_UNSUPPORTED = "unsupported"
+PACKAGE_RENAME_POLICIES = (
+    PACKAGE_RENAME_MANIFEST_FIELD,
+    PACKAGE_RENAME_GO_MODULE_PATH,
+    PACKAGE_RENAME_UNSUPPORTED,
+)
+
+
+@dataclass(frozen=True)
+class ManifestRenamePlan:
+    """One manifest's pending package-name rewrite, as observed.
+
+    ``occurrences`` is 1 when the manifest's name field holds the old name and
+    0 when it does not; ``new_text`` is the whole file with the field rewritten
+    (the file's current text when there is nothing to rewrite).
+    """
+
+    path: str
+    current_name: str | None
+    occurrences: int
+    new_text: str
+
 
 # A path that is deliberately no ecosystem's project directory, and that never
 # exists. Anything asking a target for its GENERIC shape -- the support axes,
@@ -158,6 +193,21 @@ class BaseTarget:
     runner discovers tests, not something the target's methods reveal.
     """
 
+    # ``package_rename`` and ``package_name_field`` are annotated here and
+    # given NO value on purpose: every target class declares both itself, so a
+    # new target cannot answer them by inheriting a default nobody chose. The
+    # import-time assertion that every target answers every axis
+    # (:mod:`rlsbl.targets.introspect`) fails for a class that does not.
+    package_rename: ClassVar[str]
+    """How this target's package name is renamed: one of ``PACKAGE_RENAME_POLICIES``."""
+
+    package_name_field: ClassVar[str]
+    """Where the package name is declared, in the words an operator edits by.
+
+    For example ``package.json "name"``. Empty for a target that declares no
+    package name at all.
+    """
+
     release_materialization_policy: ClassVar[str] = MATERIALIZE_ALWAYS
     """Whether a released version's MISSING refs may simply be recreated.
 
@@ -233,6 +283,47 @@ class BaseTarget:
     def read_name(self, dir_path, ctx):
         """Read the project name from the target's manifest file."""
         return None
+
+    def package_rename_plan(self, dir_path, old, new):
+        """Plan renaming the package from *old* to *new* in this target's manifest.
+
+        Returns a :class:`ManifestRenamePlan`. Only a target whose
+        ``package_rename`` is ``manifest-field`` implements it.
+        """
+        raise NotImplementedError(
+            f"target '{self.name}' does not rename its package name itself "
+            f"(package_rename = {self.package_rename!r})"
+        )
+
+    def package_command_names(self, dir_path, name):
+        """Command-name entries in this target's manifest that spell *name*.
+
+        Returns ``[(manifest_path, entry)]``, e.g. ``(".../package.json",
+        'bin "widget"')``. A package rename leaves these alone -- a command
+        name is a separate decision -- so the rename lists them instead. Empty
+        for a manifest that declares no command names.
+        """
+        return []
+
+    def package_source_dirs(self, dir_path, name):
+        """Source directories under *dir_path* named after the package *name*.
+
+        The directories a package rename leaves in place and lists as a step
+        to take. Empty for a target whose sources are not laid out by the
+        package name.
+        """
+        return []
+
+    def package_name_problems(self, name):
+        """Why *name* cannot be this target's package name: a list of sentences.
+
+        Empty when the name is acceptable. Only a target that rlsbl renames
+        (``package_rename`` other than ``unsupported``) implements it.
+        """
+        raise NotImplementedError(
+            f"target '{self.name}' does not judge package names "
+            f"(package_rename = {self.package_rename!r})"
+        )
 
     def read_metadata(self, dir_path):
         """Read project metadata (license, description) from the manifest file.

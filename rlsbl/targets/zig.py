@@ -3,6 +3,7 @@
 import os
 import re
 
+from .base import PACKAGE_RENAME_UNSUPPORTED
 from .base import BaseTarget, TemplateVars
 from .zig_version import read_zig_version, write_zig_version
 from ..npm_wrapper import (
@@ -50,6 +51,10 @@ class ZigTarget(BaseTarget):
 
     detection_files = ("build.zig.zon", "build.zig")
     ecosystem = "Zig"
+
+    # rlsbl does not rename this target's package name; the operator edits it by hand.
+    package_rename = PACKAGE_RENAME_UNSUPPORTED
+    package_name_field = 'build.zig.zon ".name"'
 
     @property
     def name(self):

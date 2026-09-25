@@ -4,6 +4,7 @@ import json
 import os
 import re
 
+from .base import PACKAGE_RENAME_UNSUPPORTED
 from .base import BaseTarget, TemplateVars
 from .utils import _get_git_author
 from ..errors import VersionError
@@ -16,6 +17,10 @@ class DenoTarget(BaseTarget):
 
     detection_files = ("deno.json", "deno.jsonc")
     ecosystem = "Deno / JSR"
+
+    # rlsbl does not rename this target's package name; the operator edits it by hand.
+    package_rename = PACKAGE_RENAME_UNSUPPORTED
+    package_name_field = 'deno.json "name" (deno.jsonc "name" when that is the config file)'
 
     # `deno test` walks the whole project, and the top-level "exclude" array in
     # the Deno configuration file is what keeps it out of a directory.

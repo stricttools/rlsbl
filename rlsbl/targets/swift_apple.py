@@ -2,6 +2,7 @@
 
 import os
 
+from .base import PACKAGE_RENAME_UNSUPPORTED
 from .swift import SwiftTarget
 
 
@@ -16,6 +17,10 @@ class SwiftAppleTarget(SwiftTarget):
     # Opt-in only; shares Package.swift with swift target.
     detection_files = ()
     ecosystem = "Swift (Apple)"
+
+    # rlsbl does not rename this target's package name; the operator edits it by hand.
+    package_rename = PACKAGE_RENAME_UNSUPPORTED
+    package_name_field = 'Package.swift "name:"'
     auto_detectable = "no"
 
     @property

@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 
 import tomlkit
 
+from .base import PACKAGE_RENAME_UNSUPPORTED
 from .base import BaseTarget, TemplateVars
 from ..errors import VersionError
 from .. import effects
@@ -19,6 +20,10 @@ class MavenTarget(BaseTarget):
     lint_language = "maven"
     BUILD_TIMEOUT_DEFAULT = 300
     ecosystem = "Java / Maven"
+
+    # rlsbl does not rename this target's package name; the operator edits it by hand.
+    package_rename = PACKAGE_RENAME_UNSUPPORTED
+    package_name_field = "pom.xml <groupId>:<artifactId> (or the Gradle build file's group)"
 
     @property
     def name(self):

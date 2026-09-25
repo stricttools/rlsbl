@@ -3,6 +3,7 @@
 import os
 import re
 
+from .base import PACKAGE_RENAME_UNSUPPORTED
 from .base import BaseTarget, TemplateVars
 from .utils import _get_git_author
 from ..errors import VersionError
@@ -14,6 +15,10 @@ class HexTarget(BaseTarget):
 
     detection_files = ("mix.exs",)
     ecosystem = "Elixir / Hex"
+
+    # rlsbl does not rename this target's package name; the operator edits it by hand.
+    package_rename = PACKAGE_RENAME_UNSUPPORTED
+    package_name_field = 'mix.exs project "app:"'
 
     @property
     def name(self):

@@ -7,6 +7,7 @@ import re
 
 from .base import (
     MATERIALIZE_UNLESS_IDENTITY_CHANGED,
+    PACKAGE_RENAME_GO_MODULE_PATH,
     BaseTarget,
     TemplateVars,
 )
@@ -76,6 +77,12 @@ class GoTarget(BaseTarget):
     # current identity for the first time, unwithdrawably -- so the reconciler
     # refuses instead, and the operator decides.
     release_materialization_policy = MATERIALIZE_UNLESS_IDENTITY_CHANGED
+
+    # The package name a Go consumer resolves by is the module path's last
+    # element, so renaming it is a module-path move: `rlsbl rewrite
+    # project-name` performs it through the module-path rewrite.
+    package_rename = PACKAGE_RENAME_GO_MODULE_PATH
+    package_name_field = "go.mod module directive (its last path element)"
 
     # go.mod's ``module`` directive IS the fetch URL, so a mirrored Go package
     # whose go.mod still names the monorepo cannot be fetched from the mirror.
@@ -665,6 +672,30 @@ class GoTarget(BaseTarget):
     # No find_circular_dependencies: the Go compiler rejects circular imports
     # outright, so a checker here could only ever agree with it. The absence
     # is what makes supports_circular_dep_analysis False for this target.
+
+    def package_name_problems(self, name):
+        """Refuse anything the offline Go package-name check does not call available.
+
+        A discouraged name is refused too, naming the clean spelling when
+        lowercasing it and dropping its underscores yields an available one.
+        """
+        from ..go_package_name import (
+            STATUS_AVAILABLE,
+            STATUS_DISCOURAGED,
+            check_go_package_name,
+        )
+
+        verdict = check_go_package_name(name)
+        if verdict["status"] == STATUS_AVAILABLE:
+            return []
+        if verdict["status"] != STATUS_DISCOURAGED:
+            return [f"'{name}' as a Go package name: {verdict['note']}"]
+        clean = name.lower().replace("_", "")
+        if clean and check_go_package_name(clean)["status"] == STATUS_AVAILABLE:
+            fix = f"use the clean spelling instead: --to {clean}"
+        else:
+            fix = "choose a lowercase name without underscores that is not predeclared"
+        return [f"'{name}' as a Go package name is {verdict['note']}; {fix}"]
 
     def normalize_package_name(self, raw_name):
         """Go compares the last segment of a module path, lowercased."""

@@ -3,6 +3,7 @@
 import os
 import re
 
+from .base import PACKAGE_RENAME_UNSUPPORTED
 from .base import BaseTarget
 from ..errors import VersionError
 from .. import effects
@@ -14,6 +15,10 @@ class NativeAndroidTarget(BaseTarget):
     # Content-based detection — no manifest conflicts with maven's detection_files.
     detection_files = ()
     ecosystem = "Android"
+
+    # rlsbl does not rename this target's package name; the operator edits it by hand.
+    package_rename = PACKAGE_RENAME_UNSUPPORTED
+    package_name_field = 'build.gradle "applicationId" (the project directory name when it is unset)'
     auto_detectable = "yes"
 
     @property

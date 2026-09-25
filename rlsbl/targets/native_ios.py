@@ -4,6 +4,7 @@ import glob
 import os
 import re
 
+from .base import PACKAGE_RENAME_UNSUPPORTED
 from .base import BaseTarget
 from ..errors import VersionError
 from .. import effects
@@ -14,6 +15,10 @@ class NativeIosTarget(BaseTarget):
 
     detection_files = ()  # Content-based detection
     ecosystem = "iOS"
+
+    # rlsbl does not rename this target's package name; the operator edits it by hand.
+    package_rename = PACKAGE_RENAME_UNSUPPORTED
+    package_name_field = 'the .xcodeproj bundle name (the project directory name when there is none)'
     auto_detectable = "yes"
 
     @property

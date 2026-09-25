@@ -88,11 +88,15 @@ EXPECTED_EFFECTS = {
     "dev.install": "mutating",
     "dev.sync": "mutating",
     "dev.status": "read_only",
-    # Both rewrite commands change files in the CURRENT working tree and
+    # These rewrite commands change files in the CURRENT working tree and
     # nothing else -- no push, no tag, no registry. Mutating, previewable,
     # and revertible with git, so neither is consequential.
     "rewrite.go-module-path": "mutating",
     "rewrite.uv-path-sources": "mutating",
+    # Rewrites manifests and the module path, then commits the rename and
+    # its identity-transition events. Mutating, previewable, and
+    # consequential -- a published identity change is a human's call.
+    "rewrite.project-name": "mutating",
     # Appends one line to the committed transition record and commits it.
     # Mutating, previewable, and consequential -- what a repository's history
     # IS is a human's call, not an agent's.

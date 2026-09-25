@@ -1,6 +1,6 @@
 """``rlsbl rewrite ... --dry-run``, driven through the real CLI.
 
-The unit tests for both rewrite commands call their ``cmd_*`` entry points
+The unit tests for go-module-path and uv-path-sources call their ``cmd_*`` entry points
 directly. That bypasses strictcli's dispatch, so no effects handle is minted,
 the preview machinery's observe screen is not in the loop, and the
 ``no_writes`` guard around observation is never actually exercised.

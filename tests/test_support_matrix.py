@@ -16,7 +16,7 @@ from strictcli import ErrorReporter, WarnReporter
 
 from rlsbl.checks import CHECK_TARGETS
 from rlsbl.targets import TARGETS
-from rlsbl.targets.base import BaseTarget
+from rlsbl.targets.base import PACKAGE_RENAME_UNSUPPORTED, BaseTarget
 from rlsbl.targets.introspect import (
     AXIS_NAMES,
     MATRIX_FORMAT_VERSION,
@@ -102,11 +102,26 @@ class TestWriteMatrix:
 
 
 class _MinimalTarget(BaseTarget):
-    """A well-formed target: inherits every axis answer from the base."""
+    """A well-formed target: inherits every axis answer the base gives one for.
+
+    The package-rename pair has no base answer on purpose -- every target
+    declares it itself -- so a minimal target declares it too.
+    """
+
+    package_rename = PACKAGE_RENAME_UNSUPPORTED
+    package_name_field = ""
 
     @property
     def name(self):
         return "minimal"
+
+
+class _UndeclaredRenameTarget(BaseTarget):
+    """Declares nothing of its own, so it cannot answer ``package_rename``."""
+
+    @property
+    def name(self):
+        return "undeclared"
 
 
 class _AxisBlindTarget:
@@ -125,6 +140,12 @@ class TestCompletenessOfTheTargetDirection:
 
     def test_a_well_formed_synthetic_target_is_accepted(self):
         assert_every_target_answers_every_axis(registry={"minimal": _MinimalTarget()})
+
+    def test_a_target_that_does_not_declare_its_package_rename_is_an_error(self):
+        with pytest.raises(RuntimeError, match="'package_rename' support axis"):
+            assert_every_target_answers_every_axis(
+                registry={"undeclared": _UndeclaredRenameTarget()}
+            )
 
     def test_a_target_that_cannot_answer_an_axis_is_an_error(self):
         with pytest.raises(RuntimeError) as exc:
