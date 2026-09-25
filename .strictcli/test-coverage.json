@@ -48,6 +48,7 @@
   "release.undo",
   "release.yank",
   "rewrite.go-module-path",
+  "rewrite.project-name",
   "rewrite.uv-path-sources",
   "scaffold",
   "status",
