@@ -5,6 +5,7 @@ import sys
 
 import tomlkit
 
+from .base import PACKAGE_RENAME_UNSUPPORTED
 from .base import BaseTarget, TemplateVars
 from ..errors import ConfigError, VersionError
 from .. import effects
@@ -59,6 +60,10 @@ class PgdesignTarget(BaseTarget):
     detection_files = ("pgdesign.toml",)
     BUILD_TIMEOUT_DEFAULT = 60
     ecosystem = "PostgreSQL"
+
+    # rlsbl does not rename this target's package name; the operator edits it by hand.
+    package_rename = PACKAGE_RENAME_UNSUPPORTED
+    package_name_field = 'the project directory name'
 
     @property
     def name(self):

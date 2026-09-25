@@ -4,6 +4,7 @@ import os
 
 from ruamel.yaml import YAML
 
+from .base import PACKAGE_RENAME_UNSUPPORTED
 from .dart import DartTarget
 
 
@@ -13,6 +14,10 @@ class FlutterTarget(DartTarget):
     # Shares pubspec.yaml with dart; no unique detection files.
     detection_files = ()
     ecosystem = "Flutter"
+
+    # rlsbl does not rename this target's package name; the operator edits it by hand.
+    package_rename = PACKAGE_RENAME_UNSUPPORTED
+    package_name_field = 'pubspec.yaml "name"'
 
     # A Flutter app IS Dart sources, so the inherited Dart import analysers
     # answer for it -- flutter is in scope for import analysis and cycle

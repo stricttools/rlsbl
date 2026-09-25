@@ -18,8 +18,11 @@ share one contract, and it is the reason they live together:
   them (see :mod:`rlsbl.commands.rewrite.abort`) and says that a re-run
   re-plans from the tree as it is now.
 
-Both commands are classified ``mutating`` but NOT ``consequential``: the writes
-are local, fully previewable, and revertible with git.
+Every command here is classified ``mutating``. The working-tree sweeps
+(``go-module-path``, ``uv-path-sources``) are NOT ``consequential``: the writes
+are local, fully previewable, and revertible with git. ``project-name`` IS
+consequential: beyond its sweep it commits ``identity-transition`` events, and
+declaring that a project's published identity changed is a human's call.
 
 This package deliberately re-exports nothing.  Each command's handler in
 ``rlsbl/__init__.py`` imports its own submodule, so the group's modules stay

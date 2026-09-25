@@ -58,6 +58,22 @@ class ReleaseTarget(Protocol):
         """
         ...
 
+    package_rename: str
+    """How this target's package name is renamed.
+
+    ``"manifest-field"`` -- the target rewrites the name in its own manifest
+    (:meth:`package_rename_plan`). ``"go-module-path"`` -- the name is the
+    module path's last element, renamed by the module-path rewrite.
+    ``"unsupported"`` -- rlsbl does not rename it; ``package_name_field`` names
+    what the operator edits by hand.
+    """
+
+    package_name_field: str
+    """Where the package name is declared, e.g. ``package.json "name"``.
+
+    Empty for a target that declares no package name.
+    """
+
     @property
     def supports_read_name(self) -> bool:
         """Whether ``read_name`` reads a real name for this target."""
@@ -200,6 +216,22 @@ class ReleaseTarget(Protocol):
     def read_name(self, dir_path: str, ctx) -> str | None:
         """Read the project's package name from the manifest, or None."""
         return None
+
+    def package_rename_plan(self, dir_path: str, old: str, new: str):
+        """Plan renaming the package in the manifest (``manifest-field`` targets only)."""
+        ...
+
+    def package_command_names(self, dir_path: str, name: str) -> list[tuple[str, str]]:
+        """Command-name entries in the manifest that spell *name*."""
+        return []
+
+    def package_source_dirs(self, dir_path: str, name: str) -> list[str]:
+        """Source directories named after the package *name*."""
+        return []
+
+    def package_name_problems(self, name: str) -> list[str]:
+        """Why *name* cannot be this target's package name; empty when it can."""
+        ...
 
     def read_metadata(self, dir_path: str) -> dict[str, str]:
         """Read optional metadata (license, description) from the manifest."""

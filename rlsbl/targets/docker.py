@@ -2,6 +2,7 @@
 
 import os
 
+from .base import PACKAGE_RENAME_UNSUPPORTED
 from .base import BaseTarget, TemplateVars
 from .. import effects
 
@@ -13,6 +14,10 @@ class DockerTarget(BaseTarget):
 
     detection_files = ("Dockerfile",)
     ecosystem = "Docker"
+
+    # rlsbl does not rename this target's package name; the operator edits it by hand.
+    package_rename = PACKAGE_RENAME_UNSUPPORTED
+    package_name_field = '.rlsbl/config.json "docker.image" (the project directory name when it is unset)'
 
     @property
     def name(self):

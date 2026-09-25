@@ -117,12 +117,13 @@ def _write_project(root, *, version, module, targets):
         ) + "\n")
 
 
-def _write_release_file(root, *, bump="minor"):
+def _write_release_file(root, *, targets, bump="minor"):
+    include = ", ".join(f'"{t}"' for t in targets)
     _write(root, ".rlsbl/releases/unreleased.toml", (
         "format_version = 1\n"
         f'bump = "{bump}"\n'
         'description = "the next release"\n'
-        'include = ["go", "npm", "pypi"]\n'
+        f"include = [{include}]\n"
         "exclude = []\n"
     ))
 
@@ -142,7 +143,7 @@ def build_released(root, *, targets=ALL_TARGETS, current_module=MOVED_MODULE):
     if "go" in targets and current_module != PUBLISHED_MODULE:
         _move_module(root, PUBLISHED_MODULE, current_module)
     archive_release(root / ".rlsbl" / "releases", "0.27.1", release_sha)
-    _write_release_file(root)
+    _write_release_file(root, targets=targets)
     _commit_all(root, "move on after the release")
     return root
 
@@ -150,7 +151,7 @@ def build_released(root, *, targets=ALL_TARGETS, current_module=MOVED_MODULE):
 def build_never_released(root, *, targets=ALL_TARGETS):
     init_repo(root)
     _write_project(root, version="0.1.0", module=MOVED_MODULE, targets=targets)
-    _write_release_file(root)
+    _write_release_file(root, targets=targets)
     _commit_all(root, "initial")
     return root
 
@@ -337,8 +338,8 @@ class TestRerun:
 
         with monkeypatch.context() as m:
             m.setattr(project_name, "record_identity_transitions", crash)
-            crashed = rename(released, monkeypatch)
-        assert crashed.exit_code != 0
+            with pytest.raises(RuntimeError, match="simulated crash"):
+                rename(released, monkeypatch)
         assert commit_count(released) == before + 1
         assert identity_events(released) == []
         assert json.loads(

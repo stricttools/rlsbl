@@ -4,7 +4,12 @@ import json
 import os
 import re
 
-from .base import BaseTarget, TemplateVars
+from .base import (
+    PACKAGE_RENAME_MANIFEST_FIELD,
+    BaseTarget,
+    ManifestRenamePlan,
+    TemplateVars,
+)
 from ..errors import ConfigError, VersionError
 from ..scratch_dirs import RUNNER_CHOSEN_BY_PROJECT
 from .. import effects
@@ -66,6 +71,9 @@ class NpmTarget(BaseTarget):
     # own and cannot merge into safely. It writes nothing instead.
     scratch_test_exclusion = RUNNER_CHOSEN_BY_PROJECT
 
+    package_rename = PACKAGE_RENAME_MANIFEST_FIELD
+    package_name_field = 'package.json "name"'
+
     @property
     def name(self):
         return "npm"
@@ -78,6 +86,37 @@ class NpmTarget(BaseTarget):
         with open(pkg_path, "r", encoding="utf-8") as f:
             pkg = json.load(f)
         return pkg.get("name")
+
+    def package_rename_plan(self, dir_path, old, new):
+        """Rename package.json's ``name``, formatted as ``write_version`` writes it."""
+        pkg_path = os.path.join(dir_path, "package.json")
+        with open(pkg_path, "r", encoding="utf-8") as f:
+            raw = f.read()
+        pkg = json.loads(raw)
+        current = pkg.get("name")
+        if current != old:
+            return ManifestRenamePlan(pkg_path, current, 0, raw)
+        indent_match = re.search(r'^( +|\t+)"', raw, re.MULTILINE)
+        indent = indent_match.group(1) if indent_match else "  "
+        pkg["name"] = new
+        trailing_newline = "\n" if raw.endswith("\n") else ""
+        new_text = json.dumps(pkg, indent=indent, ensure_ascii=False) + trailing_newline
+        return ManifestRenamePlan(pkg_path, current, 1, new_text)
+
+    def package_command_names(self, dir_path, name):
+        """``bin`` entries named *name* (an object ``bin``; a string one follows the package name)."""
+        pkg_path = os.path.join(dir_path, "package.json")
+        with open(pkg_path, "r", encoding="utf-8") as f:
+            bins = json.load(f).get("bin")
+        if isinstance(bins, dict) and name in bins:
+            return [(pkg_path, f'bin "{name}"')]
+        return []
+
+    def package_name_problems(self, name):
+        """npm's rules for a new package's name."""
+        from ..package_names import npm_name_problems
+
+        return npm_name_problems(name)
 
     def read_metadata(self, dir_path):
         """Read license and description from package.json."""

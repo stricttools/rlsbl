@@ -610,6 +610,43 @@ def _releasable_tag_glob(releasable_tag_format, releasable_name):
     return releasable_tag_glob(releasable_tag_format, releasable_name)
 
 
+def is_first_release(released_before, tag_state):
+    """Is the release about to be made this project's first?
+
+    It is when no archive records the current version as released and its tag
+    is not present locally. An unanswerable tag read is not "present", so it
+    does not by itself make a release a repeat (see
+    :class:`~rlsbl.utils.LocalTagState`).
+    """
+    from ...utils import LocalTagState
+
+    return not released_before and tag_state is not LocalTagState.PRESENT
+
+
+def next_release_version(current_version, bump_arg, preid, *, first_release):
+    """The version the next release ships, and the bump type it applies.
+
+    A first release ships the current version as-is and applies no bump (the
+    declared bump is ignored). Every later release applies the declared bump,
+    ``patch`` when none is declared. This is the one decision the release flow
+    makes and ``rlsbl rewrite project-name`` records as an identity
+    transition's effective version, so the two always agree.
+
+    Returns ``(new_version, bump_type)``; ``bump_type`` is None for a first
+    release. Raises :class:`ReleaseValidationError` on an unknown bump type.
+    """
+    from . import bump_version
+
+    if first_release:
+        return current_version, None
+    bump_type = bump_arg if bump_arg else "patch"
+    if bump_type not in VALID_BUMP_TYPES:
+        raise ReleaseValidationError(
+            f'invalid bump type "{bump_type}". Use: {", ".join(VALID_BUMP_TYPES)}'
+        )
+    return bump_version(current_version, bump_type, preid=preid), bump_type
+
+
 def compute_release_version(target, primary_path, bump_arg, monorepo_name,
                             monorepo_project_path, log, *,
                             workspace_root=None, releasable_name=None,
@@ -646,7 +683,7 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
     Returns (current_version, new_version, bump_type, tag).
     Raises ReleaseValidationError on invalid bump type or duplicate tag.
     """
-    from . import bump_version, tag_exists_locally
+    from . import tag_exists_locally
     from ...release_record import (
         require_checkout_contains_latest,
         version_is_archived,
@@ -707,7 +744,7 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
             releasable_name=releasable_name, workspace_root=workspace_root,
         )
 
-    first_release = not released_before and tag_state is not LocalTagState.PRESENT
+    first_release = is_first_release(released_before, tag_state)
     if first_release:
         # No archive and no tag. One more record can still contradict "never
         # released": a finalized, immutable <version>.jsonl, which a repository
@@ -717,20 +754,18 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
                 _guard_project_dir, current_version, current_tag,
                 releasable_name=releasable_name, workspace_root=workspace_root,
             )
-        new_version = current_version
-        bump_type = None
+        new_version, bump_type = next_release_version(
+            current_version, bump_arg, preid, first_release=True,
+        )
         tag = current_tag
         if bump_arg:
             log(f"First release: releasing {new_version} as-is (bump type ignored)")
         else:
             log(f"First release: {new_version}")
     else:
-        bump_type = bump_arg if bump_arg else "patch"
-        if bump_type not in VALID_BUMP_TYPES:
-            raise ReleaseValidationError(
-                f'invalid bump type "{bump_type}". Use: {", ".join(VALID_BUMP_TYPES)}'
-            )
-        new_version = bump_version(current_version, bump_type, preid=preid)
+        new_version, bump_type = next_release_version(
+            current_version, bump_arg, preid, first_release=False,
+        )
         tag = _make_tag(new_version)
         log(f"New version: {new_version} ({bump_type})")
 

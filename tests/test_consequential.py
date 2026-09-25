@@ -58,6 +58,7 @@ CONSEQUENTIAL = {
     "monorepo release run":       "release run, once per package, in one sweep",
     "monorepo rename-releasable": "declares a repository-history fact, pushes an alias tag to origin, and changes the tag scheme every future release of the releasable uses",
     "transition record":          "declares what this repository's history IS, silencing a reader that would otherwise keep reporting the divergence",
+    "rewrite project-name":       "renames the project's published identity and records it, after which reconcile refuses to recreate an earlier version's refs under the new identity",
 }
 
 # Everyday commands that must NEVER prompt. These are the ones the old
@@ -93,7 +94,7 @@ MUST_NOT_PROMPT = [
     "monorepo remove", "monorepo graph",
     "monorepo release init",
     "dev install", "dev sync", "dev status",
-    # The rewrite group sweeps the working tree and nothing else. Renaming a
+    # These rewrite commands sweep the working tree and nothing else. Renaming a
     # module path or flooring a dependency is the operator's own edit, made in
     # their own checkout, which they are already performing by typing the
     # command -- there is no second decision here that only a human may make.

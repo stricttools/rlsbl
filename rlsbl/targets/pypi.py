@@ -7,7 +7,12 @@ import tomllib
 
 import tomlkit
 
-from .base import BaseTarget, TemplateVars
+from .base import (
+    PACKAGE_RENAME_MANIFEST_FIELD,
+    BaseTarget,
+    ManifestRenamePlan,
+    TemplateVars,
+)
 from ..errors import ConfigError, VersionError
 from ..scratch_dirs import PYTEST_NORECURSEDIRS
 from ..utils import run
@@ -125,6 +130,9 @@ class PypiTarget(BaseTarget):
     # so the scratch directories are named in the norecursedirs ini option.
     scratch_test_exclusion = PYTEST_NORECURSEDIRS
 
+    package_rename = PACKAGE_RENAME_MANIFEST_FIELD
+    package_name_field = "pyproject.toml [project].name"
+
     # Trusted Publishing authorizes a specific repository and workflow to
     # publish this project, so the authorization does not follow the code to a
     # new repository: a pending publisher has to be registered for the new one
@@ -153,6 +161,47 @@ class PypiTarget(BaseTarget):
         with open(toml_path, "rb") as f:
             data = tomllib.load(f)
         return data.get("project", {}).get("name")
+
+    def package_rename_plan(self, dir_path, old, new):
+        """Rename ``[project].name`` in pyproject.toml, preserving the file around it."""
+        path = os.path.join(dir_path, "pyproject.toml")
+        with open(path, "r", encoding="utf-8") as f:
+            raw = f.read()
+        doc = tomlkit.parse(raw)
+        project = doc.get("project")
+        current = project.get("name") if project is not None else None
+        if current != old:
+            return ManifestRenamePlan(path, current, 0, raw)
+        project["name"] = new
+        return ManifestRenamePlan(path, current, 1, tomlkit.dumps(doc))
+
+    def package_command_names(self, dir_path, name):
+        """``[project.scripts]`` and ``[project.gui-scripts]`` entries named *name*."""
+        path = os.path.join(dir_path, "pyproject.toml")
+        with open(path, "rb") as f:
+            project = tomllib.load(f).get("project") or {}
+        return [
+            (path, f'[project.{table}] "{name}"')
+            for table in ("scripts", "gui-scripts")
+            if name in (project.get(table) or {})
+        ]
+
+    def package_source_dirs(self, dir_path, name):
+        """The import package directory, flat or ``src/`` layout, for *name*."""
+        module = name.replace("-", "_").replace(".", "_")
+        return [
+            full for full in (
+                os.path.join(dir_path, module),
+                os.path.join(dir_path, "src", module),
+            )
+            if os.path.isdir(full)
+        ]
+
+    def package_name_problems(self, name):
+        """PEP 508's name grammar, which PyPI enforces on upload."""
+        from ..package_names import pypi_name_problems
+
+        return pypi_name_problems(name)
 
     def read_metadata(self, dir_path):
         """Read license and description from pyproject.toml."""

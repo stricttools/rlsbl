@@ -3,6 +3,7 @@
 import os
 import re
 
+from .base import PACKAGE_RENAME_UNSUPPORTED
 from .base import BaseTarget, TemplateVars
 from .. import effects
 
@@ -14,6 +15,10 @@ class SwiftTarget(BaseTarget):
 
     detection_files = ("Package.swift",)
     ecosystem = "Swift (SPM)"
+
+    # rlsbl does not rename this target's package name; the operator edits it by hand.
+    package_rename = PACKAGE_RENAME_UNSUPPORTED
+    package_name_field = 'Package.swift "name:"'
 
     # SPM has no registry: a consumer writes the package's git URL and a
     # version requirement, and the resolver reads plain vX.Y.Z tags off that

@@ -196,6 +196,19 @@ TARGET_AXES: tuple[TargetAxis, ...] = (
         "Reads license and description from its manifest (overrides read_metadata).",
         _prop("supports_read_metadata"),
     ),
+    TargetAxis(
+        "package_rename",
+        "How rlsbl rewrite project-name renames the package: manifest-field "
+        "(the target rewrites its manifest), go-module-path (through the "
+        "module-path rewrite), or unsupported (edited by hand).",
+        _prop("package_rename"),
+    ),
+    TargetAxis(
+        "package_name_field",
+        "Where the package name is declared, which is what an operator edits "
+        "by hand when rlsbl does not rename it; empty when there is none.",
+        _prop("package_name_field"),
+    ),
     # --- registries ---
     TargetAxis(
         "supports_publication_probe",
@@ -343,6 +356,16 @@ NON_AXIS_ATTRIBUTES: dict[str, str] = {
                          "(the fact is supports_publication_probe).",
     "query_latest_version": "operation: asks the registry for the latest "
                             "version (the fact is supports_version_query).",
+    "package_rename_plan": "operation: computes one project's manifest "
+                           "rewrite for a package rename (the fact is "
+                           "package_rename).",
+    "package_command_names": "operation: lists the command-name entries one "
+                             "project's manifest declares under a given name.",
+    "package_source_dirs": "operation: lists one project's source "
+                           "directories named after a given package name.",
+    "package_name_problems": "operation: judges one candidate package name "
+                             "against the registry's naming rules; a function "
+                             "of its input.",
     "read_metadata": "operation: reads one project's manifest "
                      "(the fact is supports_read_metadata).",
     "read_name": "operation: reads one project's manifest "
