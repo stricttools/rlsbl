@@ -108,6 +108,11 @@
     ],
     [
       "git",
+      "archive",
+      "--format=tar"
+    ],
+    [
+      "git",
       "describe"
     ],
     [
@@ -1485,7 +1490,7 @@
         },
         "backfill": {
           "name": "backfill",
-          "help": "Bring this repository's release archives into the three-fate model from its real history: record each version's release commit from the tag (or the historical spelling its archive names in shipped_as, or its version-bump commit), complete an archive whose required fields are missing or unanswered (a present but empty bump or description is unanswered), materialize an archive for a released version that never got one, and adopt a version tag no store records as the release it is evidence of. A reconstructed description comes from the first source that yields one -- an operator-reviewed --overrides file, the version's GitHub Release body, its CHANGELOG.md section, the commit subjects in its tag range -- and the archive names the source it came from. Every tag the repository cannot account for is listed first and refuses the whole apply; --dry-run prints the plan and writes nothing.",
+          "help": "Bring this repository's release archives into the three-fate model from its real history: record each version's release commit from the tag (or the historical spelling its archive names in shipped_as, or its version-bump commit), complete an archive whose required fields are missing or unanswered (a present but empty bump or description is unanswered), materialize an archive for a released version that never got one, and adopt a version tag no store records as the release it is evidence of. A reconstructed description comes from the first source that yields one -- an operator-reviewed --overrides file, the version's GitHub Release body, its CHANGELOG.md section, the commit subjects in its tag range -- and the archive names the source it came from. Every tag the repository cannot account for is listed first and refuses the whole apply; --dry-run prints the plan and writes nothing. With --version and --commit it does one thing instead: it records the commit a version shipped from on that version's archive marked unrecoverable (no tag and no version-bump commit named it), after verifying that the commit is an ancestor of HEAD and that every target in the release's scope declares the version at that commit (a workspace releasable: its .rlsbl-monorepo/releasables/<name>/version file). The mark is cleared and the commit and its tree hashes recorded exactly as the pass records a commit it found; an archive that is not marked unrecoverable is refused, so a recorded commit is never overwritten.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
@@ -1505,6 +1510,54 @@
               },
               "presence": "optional",
               "negatable": true
+            },
+            {
+              "name": "version",
+              "help": "The version whose archive is marked unrecoverable and whose release commit --commit supplies (e.g. 0.4.2, with or without a leading v). Only together with --commit; the whole-repository pass does not run.",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            },
+            {
+              "name": "commit",
+              "help": "The commit --version shipped from, as any spelling git resolves (a full or abbreviated hash). It must be an ancestor of HEAD, and every target in the release's scope must declare --version at it. Only together with --version.",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            },
+            {
+              "name": "releasable",
+              "help": "Which releasable's archive --commit is recorded in. Required with --commit at a monorepo workspace root, where the directory names the whole workspace rather than one releasable; rejected anywhere else, since the directory already names it, and rejected without --commit.",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            }
+          ],
+          "constraints": [
+            {
+              "type": "all_or_none",
+              "name": "supplied-release-commit",
+              "members": [
+                {
+                  "kind": "flag",
+                  "name": "version",
+                  "when": "present"
+                },
+                {
+                  "kind": "flag",
+                  "name": "commit",
+                  "when": "present"
+                }
+              ]
+            },
+            {
+              "type": "requires",
+              "name": "releasable-selects-a-supplied-commit",
+              "flag": "releasable",
+              "depends_on": "commit"
             }
           ]
         },
@@ -2789,7 +2842,7 @@
         },
         "project-name": {
           "name": "project-name",
-          "help": "Rename a standalone project's published identity. Rewrites the package name in every target manifest whose target renames it (npm package.json \"name\", PyPI pyproject.toml [project].name), located through the targets' configured paths, and for a Go target moves the module path to one whose last element is --to, through the same rewrite as `rlsbl rewrite go-module-path`. Records one identity-transition event per changed identity in .rlsbl/transitions.jsonl: package-name from --from to --to, and go-module-path from the module path the latest release published (read from go.mod at that release's commit) to the new one. The effective version is the version the next release ships: the current version plus the bump in .rlsbl/releases/unreleased.toml, or the current version as-is for a project that has never released. The rename and the record are committed separately, so a crash between them is completed by re-running; the record commit carries the Autogenerated trailer, and the rename commit does not, so changelog coverage asks for the breaking entry the closing message prints. Nothing else is touched: no source directory is moved, no command name (npm bin, PyPI [project.scripts]) is renamed, no registry is contacted, and no repository is renamed; the closing message lists those remaining steps in order. Refuses, before writing anything, inside a monorepo workspace, when --from is not the name the manifests declare, when --from equals --to or --to is not a valid package name for a target it renames, when a target rlsbl does not rename still declares --from, when the release file is missing, and on a dirty working tree. Use --dry-run to print the per-file plan with occurrence counts and the events it would record.",
+          "help": "Rename a standalone project's published identity. Rewrites the package name in every target manifest whose target renames it (npm package.json \"name\", PyPI pyproject.toml [project].name), located through the targets' configured paths, and for a Go target moves the module path to one whose last element is --to, through the same rewrite as `rlsbl rewrite go-module-path`. Records one identity-transition event per changed identity in .rlsbl/transitions.jsonl: package-name from --from to --to, and go-module-path from the module path the latest release published (read from go.mod at that release's commit) to the new one. The effective version is the version the next release ships: the current version plus the bump in .rlsbl/releases/unreleased.toml, or the current version as-is for a project that has never released. The rename and the record are committed separately, so a crash between them is completed by re-running; the record commit carries the Autogenerated trailer, and the rename commit does not, so changelog coverage asks for the breaking entry the closing message prints. Nothing else is touched: no source directory is moved, no command name (npm bin, PyPI [project.scripts]) is renamed, no registry is contacted, and no repository is renamed; the closing message lists those remaining steps in order. Refuses, before writing anything, inside a monorepo workspace, when --from is not the name the manifests declare, when --from equals --to or --to is not a valid package name for a target it renames, when a target rlsbl does not rename still declares --from, when the release file is missing, when there is a Go target and the latest release's archive is marked unrecoverable (no recorded commit to read the published module path at; `rlsbl release backfill --version <v> --commit <sha>` records it), and on a dirty working tree. Use --dry-run to print the per-file plan with occurrence counts and the events it would record.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
