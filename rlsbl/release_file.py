@@ -923,6 +923,45 @@ def write_unrecoverable_marker(path: str) -> None:
     effects.atomic_write_text(path, tomlkit.dumps(doc))
 
 
+def write_shipped_as(path: str, tag: str) -> bool:
+    """Record on an already-written archive the tag its version shipped under.
+
+    For ``rlsbl monorepo rename-releasable``: a version released before the
+    rename shipped under the old name's spelling, and the archive has to say
+    so, because the ref authority otherwise names the current scheme's
+    spelling -- a tag and a GitHub Release the version never had. The caller
+    unlocks the file (:func:`writable_release_file`).
+
+    Returns False, writing nothing, when the archive already records *tag*.
+    Refuses a never-released archive (it shipped under no name) and one that
+    already records a DIFFERENT spelling: a version ships under one tag, and
+    which of two statements about it is true is not this writer's to decide.
+    """
+    if not isinstance(tag, str) or not tag.strip():
+        raise ReleaseFileError(f"refusing to record an empty {SHIPPED_AS_FIELD} in {path}")
+    with open(path, "r", encoding="utf-8") as f:
+        doc = tomlkit.loads(f.read())
+    if NEVER_RELEASED_FIELD in doc:
+        raise ReleaseFileError(
+            f"refusing to record {SHIPPED_AS_FIELD} = {tag!r} in {path}: it "
+            f"records {NEVER_RELEASED_FIELD} = true, and a version no release "
+            f"ever used shipped under no tag."
+        )
+    existing = doc.get(SHIPPED_AS_FIELD)
+    if existing is not None:
+        if str(existing) == tag:
+            return False
+        raise ReleaseFileError(
+            f"refusing to record {SHIPPED_AS_FIELD} = {tag!r} in {path}: it "
+            f"already records {SHIPPED_AS_FIELD} = {str(existing)!r}. A version "
+            f"ships under one tag; correct the archive by hand if the recorded "
+            f"one is wrong."
+        )
+    doc.add(SHIPPED_AS_FIELD, tag)
+    effects.atomic_write_text(path, tomlkit.dumps(doc))
+    return True
+
+
 def write_release_notice(path: str, notice: str) -> None:
     """Record a deprecate or yank *notice* on an already-written archive.
 

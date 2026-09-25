@@ -182,7 +182,7 @@ class TestFullRename:
         assert result["tag"]["status"] == "created"
 
         # The unmanaged-history note is emitted.
-        assert "no longer managed" in result["note"]
+        assert "keep the tags they shipped under" in result["note"]
 
         # Working tree is clean after the operation.
         assert rr._blocking_dirty_paths(str(root)) == []
@@ -633,3 +633,227 @@ class TestAliasTagPushHygiene:
 
         _args, kwargs = self._capture_push(root, monkeypatch)
         assert kwargs.get("timeout") == DEFAULT_PUSH_TIMEOUT
+
+
+# ---------------------------------------------------------------------------
+# Past releases keep the tag they shipped under
+# ---------------------------------------------------------------------------
+
+
+def _release(root, releasable, version, *, tag_format="{name}@v{version}"):
+    """Release *version* of *releasable*: bump, tag, archive, push.
+
+    The archive records the tagged commit as its release commit and every
+    member path's tree at it, which is what the release flow writes.
+    """
+    from rlsbl.release_file import get_releases_dir, write_archived_release_file
+
+    write_releasable_version(str(root), releasable, version)
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "--allow-empty", "-m", f"{releasable} v{version}")
+    tag = tag_format.format(name=releasable, version=version)
+    _git(root, "tag", tag)
+    sha = _git(root, "rev-parse", "HEAD").strip()
+    trees = {
+        path: _git(root, "rev-parse", f"HEAD:{path}").strip()
+        for path in ("libs/beta-api", "apps/beta-cli")
+    }
+    write_archived_release_file(
+        get_releases_dir(str(root), releasable_dir=get_releasable_dir(str(root), releasable)),
+        version, bump="minor", include=["pypi"],
+        description=f"Version {version}.", candidate_sha=sha, tree_hashes=trees,
+    )
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", f"archive {tag}")
+    _git(root, "push", "-q", "origin", "main", tag)
+    return tag
+
+
+def _preview(root, releasable, *, released_tags):
+    """The reconcile preview for *releasable*, with GitHub Releases on *released_tags*."""
+    from rlsbl.check_context import WorkspaceCheckContext
+    from rlsbl.commands import release_reconcile as recon
+
+    projects = load_workspace(str(root))
+    ctx = WorkspaceCheckContext(
+        project_root=root / "libs" / "beta-api", workspace_root=root, config={},
+        projects=projects, releasables=load_releasables(str(root), projects),
+    )
+    target, ref_ctx, releases_dir = recon._resolve_identity(ctx)
+    with patch.object(recon, "check_gh_installed", return_value=True), \
+         patch.object(recon, "check_gh_auth", return_value=True), \
+         patch.object(recon, "run_gh", return_value="\n".join(released_tags)):
+        observation = recon.observe_world(ctx=ctx)
+    explanations = recon.collect_explanations(
+        [releases_dir], ref_ctx.transition_record_paths,
+    )
+    preview = recon.build_preview(
+        observation=observation, explanations=explanations, target=target,
+        ref_ctx=ref_ctx, releases_dir=releases_dir,
+    )
+    return preview, target, ref_ctx
+
+
+def _to_do(preview):
+    from rlsbl.commands.release_reconcile import STATE_ALREADY_CORRECT
+
+    return sorted(
+        f"{item.key}: {item.state}" for item in preview.items
+        if item.state != STATE_ALREADY_CORRECT
+    )
+
+
+def _shipped_as(root, releasable, version):
+    from rlsbl.release_file import (
+        archived_release_path,
+        get_releases_dir,
+        read_release_file,
+    )
+
+    return read_release_file(archived_release_path(
+        get_releases_dir(str(root), releasable_dir=get_releasable_dir(str(root), releasable)),
+        version,
+    )).shipped_as
+
+
+class TestPastReleasesKeepTheirTags:
+    """A renamed releasable's past versions are owed nothing under the new name.
+
+    The rename's own rule: historical releases stay under the old prefix. Every
+    version released before the rename shipped under the old spelling, its
+    GitHub Release hangs off that tag, and consumers resolve it there. The
+    reconcile must therefore find nothing to create for them -- no new-spelling
+    tag and no second GitHub Release under the new name.
+    """
+
+    def _renamed(self, tmp_path, monkeypatch):
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        _build_monorepo(root, create_tag=False)
+        _release(root, "beta", "0.1.0")
+        _release(root, "beta", "0.2.0")
+        rr.rename_releasable(str(root), "beta", "gamma")
+        return root
+
+    def test_the_rename_records_the_spelling_each_past_version_shipped_under(
+            self, tmp_path, monkeypatch, _gh_ok):
+        root = self._renamed(tmp_path, monkeypatch)
+
+        assert _shipped_as(root, "gamma", "0.1.0") == "beta@v0.1.0"
+        assert _shipped_as(root, "gamma", "0.2.0") == "beta@v0.2.0"
+        assert rr._blocking_dirty_paths(str(root)) == []
+
+    def test_a_past_versions_primary_ref_is_the_tag_it_shipped_under(
+            self, tmp_path, monkeypatch, _gh_ok):
+        root = self._renamed(tmp_path, monkeypatch)
+        _preview_, target, ref_ctx = _preview(
+            root, "gamma", released_tags=["beta@v0.1.0", "beta@v0.2.0"],
+        )
+
+        first = target.expected_refs("0.1.0", ref_ctx)
+        assert first.primary == "beta@v0.1.0"
+        assert first.tags == ("beta@v0.1.0",)
+        # The boundary version also carries the alias the rename pushed.
+        boundary = target.expected_refs("0.2.0", ref_ctx)
+        assert boundary.primary == "beta@v0.2.0"
+        assert set(boundary.tags) == {"beta@v0.2.0", "gamma@v0.2.0"}
+
+    def test_the_reconcile_creates_nothing_that_exists_under_the_old_name(
+            self, tmp_path, monkeypatch, _gh_ok):
+        root = self._renamed(tmp_path, monkeypatch)
+        preview, _target, _ctx = _preview(
+            root, "gamma", released_tags=["beta@v0.1.0", "beta@v0.2.0"],
+        )
+
+        assert _to_do(preview) == []
+
+    def test_the_unpublished_refs_check_passes(self, tmp_path, monkeypatch, _gh_ok):
+        from rlsbl import app
+        from rlsbl.check_context import WorkspaceCheckContext
+
+        root = self._renamed(tmp_path, monkeypatch)
+        projects = load_workspace(str(root))
+        ctx = WorkspaceCheckContext(
+            project_root=root / "libs" / "beta-api", workspace_root=root,
+            config={}, projects=projects,
+            releasables=load_releasables(str(root), projects),
+        )
+        released = frozenset({"beta@v0.1.0", "beta@v0.2.0"})
+        with patch("rlsbl.utils.get_github_repo", return_value="o/r"), \
+             patch("rlsbl.commands.release_reconcile.list_releases",
+                   return_value=(released, True)):
+            result = app._check_defs["unpublished-refs"].impl(ctx)
+
+        assert result.status == "pass", [p.text for p in result.problems]
+
+    def test_a_release_after_the_rename_is_owed_under_the_new_name(
+            self, tmp_path, monkeypatch, _gh_ok):
+        root = self._renamed(tmp_path, monkeypatch)
+        _release(root, "gamma", "0.3.0")
+        preview, target, ref_ctx = _preview(
+            root, "gamma", released_tags=["beta@v0.1.0", "beta@v0.2.0"],
+        )
+
+        assert target.expected_refs("0.3.0", ref_ctx).primary == "gamma@v0.3.0"
+        assert _to_do(preview) == ["release:gamma@v0.3.0: materialize"]
+
+
+class TestAnAlreadyRenamedReleasableIsRepaired:
+    """A releasable renamed before the rename recorded ``shipped_as``.
+
+    Re-running the rename is its documented heal, and it records the spelling
+    on every version that shipped under the old name -- judged by the old tag
+    standing at the version's own release commit, so a version released after
+    the rename is left alone.
+    """
+
+    def _renamed_the_old_way(self, tmp_path, monkeypatch):
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        _build_monorepo(root, create_tag=False)
+        _release(root, "beta", "0.1.0")
+        _release(root, "beta", "0.2.0")
+        # What a rename did before it recorded shipped_as.
+        rr._apply_local_rename(str(root), "beta", "gamma")
+        rr._record_rename_in_transition_record(str(root), "beta", "gamma")
+        rr._finish_alias_tag(
+            str(root), "beta@v0.2.0", "gamma@v0.2.0", "origin",
+            push_timeout=30, releasable_name="gamma",
+        )
+        _release(root, "gamma", "0.3.0")
+        return root
+
+    def test_the_re_run_records_the_old_spelling_on_pre_rename_versions_only(
+            self, tmp_path, monkeypatch, _gh_ok):
+        root = self._renamed_the_old_way(tmp_path, monkeypatch)
+        assert _shipped_as(root, "gamma", "0.1.0") is None, "precondition"
+
+        result = rr.rename_releasable(str(root), "beta", "gamma")
+
+        assert result["mode"] == "resume"
+        assert _shipped_as(root, "gamma", "0.1.0") == "beta@v0.1.0"
+        assert _shipped_as(root, "gamma", "0.2.0") == "beta@v0.2.0"
+        assert _shipped_as(root, "gamma", "0.3.0") is None
+        assert rr._blocking_dirty_paths(str(root)) == []
+
+    def test_after_the_repair_the_reconcile_owes_only_what_is_missing(
+            self, tmp_path, monkeypatch, _gh_ok):
+        root = self._renamed_the_old_way(tmp_path, monkeypatch)
+        rr.rename_releasable(str(root), "beta", "gamma")
+
+        preview, _target, _ctx = _preview(
+            root, "gamma",
+            released_tags=["beta@v0.1.0", "beta@v0.2.0", "gamma@v0.3.0"],
+        )
+        assert _to_do(preview) == []
+
+    def test_a_second_re_run_changes_nothing(self, tmp_path, monkeypatch, _gh_ok):
+        root = self._renamed_the_old_way(tmp_path, monkeypatch)
+        rr.rename_releasable(str(root), "beta", "gamma")
+        head = _git(root, "rev-parse", "HEAD").strip()
+
+        rr.rename_releasable(str(root), "beta", "gamma")
+
+        assert _git(root, "rev-parse", "HEAD").strip() == head

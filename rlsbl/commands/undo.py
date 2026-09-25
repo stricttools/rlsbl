@@ -825,7 +825,7 @@ def _plan_companion_tags(uc, tag, version):
                 releasable_config_dir=rel_cfg_dir,
             ),
         )
-        historical = set(expected.shipped_as_aliases)
+        historical = {expected.shipped_as} if expected.shipped_as else set()
         return [t for t in expected.tags if t != tag and t not in historical]
     except Exception:
         traceback.print_exc()

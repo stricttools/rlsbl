@@ -27,11 +27,16 @@ The three sources, and why each is where it is:
   other side -- that spelling is the one it actually shipped under -- and it is
   the only source for a version tagged before any alias event was written.
 
-  The version's expected PRIMARY ref stays the CURRENT scheme's spelling in
-  both cases. That is what makes a renamed releasable's past versions
-  repairable: ``rlsbl release reconcile`` sees the current spelling missing and
-  mints it at the archive's release commit through its ordinary materialize
-  path, while the old spelling is an explained ref that stands where it is.
+  A version that SHIPPED under a historical spelling keeps it: the archive's
+  ``shipped_as`` is that version's PRIMARY ref, because it is the tag the
+  release created, the tag its GitHub Release hangs off, and the tag consumers
+  resolve. Past releases keep the tag they shipped under, so ``rlsbl release
+  reconcile`` never mints the current scheme's spelling for them, and never a
+  second GitHub Release under it. The current scheme's spelling of such a
+  version is still a name of that version -- the boundary alias a rename pushes
+  is one, and a reconcile run before this rule minted others -- so it is kept
+  on :attr:`ExpectedRefs.scheme_spelling`: explained wherever it exists, owed
+  nowhere.
 
   When both sources cover one version and name DIFFERENT spellings, neither
   outranks the other and :class:`ExpectedRefsError` names both. A precedence
@@ -113,21 +118,30 @@ class ExpectedRefs:
     fact has no ref behind it. :attr:`tags` is the flat, deduplicated,
     primary-first order anything that creates or pushes them uses.
 
-    :attr:`shipped_as_aliases` is the SUBSET of :attr:`aliases` that came from
-    an archive's ``shipped_as`` field rather than from a ``boundary-alias``
-    event -- the spelling a version ACTUALLY shipped under, from before a
-    rename or a repository boundary moved. It is stated here so a caller that
-    treats the ref set as "what this release created" can tell the two apart:
-    ``rlsbl release undo`` deletes the refs the release it is undoing created,
-    and a historical spelling predates that release. It stands where it is,
-    neither moved nor deleted.
+    :attr:`shipped_as` is the spelling the version's archive records in its
+    ``shipped_as`` field -- the tag it ACTUALLY shipped under, from before a
+    rename or a repository boundary moved -- and when it is set it is also
+    :attr:`primary`. It is stated separately so a caller that treats the ref
+    set as "what this release created" can tell it apart: ``rlsbl release
+    undo`` deletes the refs the release it is undoing created, and a
+    historical spelling predates that release. It stands where it is, neither
+    moved nor deleted.
+
+    :attr:`scheme_spelling` is the current scheme's spelling of a version that
+    shipped under a different one, when no other group already names it. It is
+    NOT in :attr:`tags`: nothing is owed under it, so nothing creates it and no
+    check reports it missing. It is a name of the version all the same, so a
+    tag of that spelling is explained, and where one exists it is judged
+    against the version's release commit like any other ref of the version.
+    :attr:`spellings` is :attr:`tags` plus it.
     """
 
     version: str
     primary: str
     companions: tuple[str, ...] = ()
     aliases: tuple[str, ...] = ()
-    shipped_as_aliases: tuple[str, ...] = ()
+    shipped_as: str | None = None
+    scheme_spelling: str | None = None
 
     @property
     def tags(self) -> tuple[str, ...]:
@@ -139,6 +153,13 @@ class ExpectedRefs:
                 seen.add(tag)
                 ordered.append(tag)
         return tuple(ordered)
+
+    @property
+    def spellings(self) -> tuple[str, ...]:
+        """Every tag name this version is addressable under: :attr:`tags`, then :attr:`scheme_spelling`."""
+        if self.scheme_spelling and self.scheme_spelling not in self.tags:
+            return (*self.tags, self.scheme_spelling)
+        return self.tags
 
 
 def ref_context(
@@ -247,7 +268,7 @@ def _event_aliases(context: RefContext, version: str) -> list[tuple[str, str]]:
     return found
 
 
-def _shipped_as_aliases(context: RefContext, version: str) -> list[tuple[str, str]]:
+def _shipped_as(context: RefContext, version: str) -> list[tuple[str, str]]:
     """``(tag, archive_path)`` for *version*'s recorded historical spelling.
 
     At most one entry: a version has one archive, and an archive records one
@@ -267,30 +288,46 @@ def _shipped_as_aliases(context: RefContext, version: str) -> list[tuple[str, st
     return found
 
 
-def recorded_alias_groups(context: RefContext, version: str):
-    """``(every recorded alias, the shipped_as-derived ones)`` for *version*.
+def shipped_tag(context: RefContext, version: str) -> str | None:
+    """The tag *version* shipped under, when its archive records one in ``shipped_as``.
 
-    The full answer :func:`recorded_aliases` returns, plus which of those tags
-    came from an archive's ``shipped_as`` rather than from a ``boundary-alias``
-    event. Both groups are aliases and both belong to the version's ref set;
-    the split exists because a caller asking "which of these did the release I
-    am undoing CREATE?" must not count a spelling that predates it.
+    That spelling is the version's primary ref (see the module docstring).
     """
-    aliases = recorded_aliases(context, version)
-    shipped = tuple(
-        tag for tag, _path in _shipped_as_aliases(context, version)
-        if tag in aliases
+    found = _shipped_as(context, version)
+    return found[0][0] if found else None
+
+
+def tag_as_shipped(scheme_tag: str, version: str, *, project_dir: str,
+                   releasable_config_dir: str | None = None) -> str:
+    """*version*'s tag: its archive's ``shipped_as`` when recorded, else *scheme_tag*.
+
+    For the commands that name one past version's tag without building a full
+    :class:`RefContext` -- the GitHub Release ``release edit``, ``deprecate``,
+    ``yank``, ``retry`` and ``undo --version`` act on -- so a version released
+    under a historical spelling resolves to the tag its Release hangs off, as
+    it does in :meth:`~rlsbl.targets.base.BaseTarget.expected_refs`.
+    *scheme_tag* is the current scheme's spelling the caller rendered.
+    """
+    from ..release_file import get_releases_dir
+
+    context = RefContext(
+        repo_root=str(project_dir),
+        releases_dirs=(get_releases_dir(
+            str(project_dir), releasable_dir=releasable_config_dir,
+        ),),
     )
-    return aliases, shipped
+    return shipped_tag(context, version) or scheme_tag
 
 
 def recorded_aliases(context: RefContext, version: str) -> tuple[str, ...]:
-    """Alias tags this repository's own records attribute to *version*.
+    """Every tag spelling this repository's own records attribute to *version*.
 
     Two sources, read together: the ``boundary-alias`` events in the project's
     transition record, and the ``shipped_as`` field of the version's own
     release archive. Both state which spelling a version is addressable under
-    besides the current scheme's, so both contribute to the same group.
+    besides the current scheme's, so both contribute to the same answer; the
+    caller (:meth:`~rlsbl.targets.base.BaseTarget.expected_refs`) also makes
+    the ``shipped_as`` spelling the primary ref.
 
     They may agree, and either may be the only one present -- an archive
     predating alias events carries only ``shipped_as``, a boundary alias
@@ -301,7 +338,7 @@ def recorded_aliases(context: RefContext, version: str) -> tuple[str, ...]:
     a precedence rule would silently pick one of them.
     """
     events = _event_aliases(context, version)
-    shipped = _shipped_as_aliases(context, version)
+    shipped = _shipped_as(context, version)
 
     if events and shipped:
         event_tags = {tag for tag, _ in events}

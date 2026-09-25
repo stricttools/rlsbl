@@ -314,7 +314,7 @@ class TestUndoLeavesAHistoricalSpellingAlone:
             releasable_config_dir=rel_dir,
         ))
         assert "widget@v1.0.1" in expected.aliases
-        assert expected.shipped_as_aliases == ("widget@v1.0.1",)
+        assert expected.shipped_as == "widget@v1.0.1"
 
 
 class TestNonLatestAuditFailureRefusesTheUndo:

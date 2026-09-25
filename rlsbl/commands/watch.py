@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import monotonic as _monotonic
 
 from ..ci_checks import PASSING_CONCLUSION, verify_project_ci_ran
-from ..release_record import release_at_commit, tag_for_version
+from ..release_record import release_at_commit
 from ..utils import require_tool, run, run_gh
 from .. import effects
 
@@ -1280,7 +1280,7 @@ def run_cmd(registry, args, flags):
             # workflows ran, suggest `rlsbl release retry`.
             released_here = _release_at(commit_sha)
             if released_here is not None:
-                release_tag = tag_for_version(None, released_here.version)
+                release_tag = released_here.tag(None)
                 try:
                     run_gh(["release", "view", release_tag])
                     print(
@@ -1344,7 +1344,7 @@ def run_cmd(registry, args, flags):
             if repo_slug and released is not None:
                 success_url = (
                     f"https://github.com/{repo_slug}/releases/tag/"
-                    f"{tag_for_version(None, released.version)}"
+                    f"{released.tag(None)}"
                 )
             else:
                 success_url = _release_url(repo_slug)

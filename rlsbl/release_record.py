@@ -151,6 +151,14 @@ class ReleaseRecordEntry:
     def recorded(self) -> bool:
         return self.candidate_sha is not None
 
+    def tag(self, tag_glob: str | None) -> str:
+        """The tag this release carries: ``shipped_as`` when recorded, else *tag_glob*'s spelling.
+
+        A version that shipped under a historical spelling keeps it, so that is
+        the tag its Release hangs off and the one to name.
+        """
+        return self.shipped_as or tag_for_version(tag_glob, self.version)
+
 
 @dataclass(frozen=True)
 class LatestReleaseFact:
@@ -429,7 +437,7 @@ def read_entry(releases_dir: str, version: str, *, tag_glob: str | None = None,
     if not sha or not _HASH_RE.match(sha):
         raise _missing_release_commit_error(version, path, tag_glob, cwd)
 
-    tag = tag_for_version(tag_glob, version)
+    tag = cfg.shipped_as or tag_for_version(tag_glob, version)
     tag_commit = _resolve_ref(tag, cwd)
     if tag_commit is not None and not _same_commit(tag_commit, sha):
         raise ReleaseRecordError(

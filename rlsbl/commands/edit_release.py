@@ -107,6 +107,11 @@ def run_cmd(args, flags, project_root):
         tag = target.monorepo_tag_format(monorepo_name, version, path=monorepo_project_path)
     else:
         tag = target.tag_format(version)
+    from ..targets.refs import tag_as_shipped
+    tag = tag_as_shipped(
+        tag, version, project_dir=project_dir,
+        releasable_config_dir=releasable_config_dir,
+    )
 
     # Extract release notes from CHANGELOG.md. For explicit-mode releasables
     # the canonical changelog lives in the releasable state dir, not the

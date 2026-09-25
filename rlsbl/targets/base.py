@@ -417,16 +417,24 @@ class BaseTarget:
         (``tag_format``, ``monorepo_tag_format``, ``companion_tags``) are the
         axes, and this is the assembly of them.
         """
-        from .refs import ExpectedRefs, recorded_alias_groups
+        from .refs import ExpectedRefs, recorded_aliases, shipped_tag
 
-        primary = self._primary_ref(version, context)
-        aliases, shipped_as = recorded_alias_groups(context, version)
+        scheme = self._primary_ref(version, context)
+        recorded = recorded_aliases(context, version)
+        # A version that shipped under a historical spelling keeps it as its
+        # primary ref: that is the tag its release created and its GitHub
+        # Release hangs off (see rlsbl.targets.refs).
+        shipped_as = shipped_tag(context, version)
+        primary = shipped_as or scheme
+        companions = self._companion_refs(version, context, primary)
+        named = {primary, *companions, *recorded}
         return ExpectedRefs(
             version=version,
             primary=primary,
-            companions=self._companion_refs(version, context, primary),
-            aliases=aliases,
-            shipped_as_aliases=shipped_as,
+            companions=companions,
+            aliases=recorded,
+            shipped_as=shipped_as,
+            scheme_spelling=None if scheme in named else scheme,
         )
 
     def _primary_ref(self, version, context):
