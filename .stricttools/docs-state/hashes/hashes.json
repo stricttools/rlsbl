@@ -10,8 +10,8 @@
     "source_docstring": "4fff13535641ef3e9f7c8663fb4854a94edccb3e370b2f4d2721a69393f06594"
   },
   "en/checks.md": {
-    "content": "7760e57a90f48ab74c3e5e066eaff2b0d7dfcc272fe704448d2004574ff0a562",
-    "description": "a47dc41a0f7c453a1c2bf9dcfe84fc216fb068211ace5d604bcc31b34d2be99a"
+    "content": "1f904ff152892cecb7cb1a7b507b8617be36f9298b7d813107908abc067d9d22",
+    "description": "46a4ede3893bcecf1f51fb0bbc5e082e0d7da9d43b44867af8c7fe9a26c23e65"
   },
   "en/ci-customization.md": {
     "content": "6ca3fe39c2f1a77fdfc2220fb8b8ff2d983c5a0fcc023414b10b669c063f9857",
@@ -75,9 +75,9 @@
     "schema_hash": "6bf61b345615538d2a83180e7b498ab5eea7397122e629c8925c2d84f3d867ce"
   },
   "en/cli-monorepo.md": {
-    "content": "5dc6fc9dafcd5f2ef6339e29271fb55aef614a18e4b374c26ec657581c6c192f",
+    "content": "4f4df647aca843b5d860aacefa40be7229610367b0bc31c9be346b32445e140c",
     "description": "651df98c12c7c974b36d4da3b1746d0cead7cc6e5b0df5c15b392584aad74cff",
-    "schema_hash": "37a3c97ede51109cd03db5d3afe86d74b8798304105175f0c4ee4a2c524f0450",
+    "schema_hash": "6662a4d7f74f3d3b08200e4c0d9b4cc56f7e17b8af960d09b34fb30f825a5978",
     "seed_hash": "651df98c12c7c974b36d4da3b1746d0cead7cc6e5b0df5c15b392584aad74cff"
   },
   "en/cli-pre-push-check.md": {
@@ -205,8 +205,8 @@
     "description": "727c3d26e4914bb2c004338b669b08be349a97c6c8038645e6f9b598a50f3094"
   },
   "en/release-workflow.md": {
-    "content": "7d72c2118d869a5e1b4bd2a5aed1f126a1f9cdf57c197dd371bacbda23cada93",
-    "description": "ef4312589fc727e9646ad6f67fb65fa9b99519fa184799ee15c5ecaea509a6c6",
+    "content": "798c83a34f55bc39f1bd4e285092b6efa74913b0659d3098a4b176a3d3a7607f",
+    "description": "1c0d527d93b6f9602f3a579643d8b4cf96c216a7f8af32bf708c111f8beedf6d",
     "source_docstring": "0998f186e8a9850589e938859db694b132aaeacda3864775a912477466446a4b"
   },
   "en/rlsbl-__main__.md": {
@@ -456,8 +456,8 @@
   },
   "en/rlsbl-commands-monorepo-releasable_rename.md": {
     "content": "1eb9feece6b5d0fbeff3edbfc380549db01f80242c383c21ca7b2bd5e3431a2a",
-    "description": "bb4b6755a05715b9f798d5e5a4fe19a5cef8087717807b3674626ad03ba44471",
-    "source_docstring": "6dde8fe609eedbaad6e050a1f6cb3e387c90412adf98acc3a6de7fc77974fb02"
+    "description": "6dd9f775e9ae0b1b3f510281cc598137e6eac71ea748470fbbb6af7106c7d894",
+    "source_docstring": "d5e53b653ded86f3fedbfe6de005cabcf5c95613f1f024357d8cfddf0a66e8a9"
   },
   "en/rlsbl-commands-monorepo-snapshot_cmd.md": {
     "content": "0c38a14a550bc23292e618fcb28b610d4bfa7051934e9df1cd5dc1fa26a8c8dc",
@@ -1165,8 +1165,8 @@
   },
   "en/rlsbl-targets-refs.md": {
     "content": "943ee6ee1a885f3a9912db4aef1b0ea974f6cfeb4deb24675c5e0f23cc246aae",
-    "description": "cac037d434f8addc0ba1a558ad51911ad0ed261453927d3f8a7fb4fc83fdd535",
-    "source_docstring": "49aa3c50537f2667b2eee4f58805ad6839ddde7a34e79688181e160149595cdc"
+    "description": "899e0bc980d7b0f0db0cfc94c50449cec4ef04d4b85a0772b79dfaa4f2db2764",
+    "source_docstring": "3b3447e749b161a721ee297fdee953ca9ade67fee41147929798881160dd6daa"
   },
   "en/rlsbl-targets-spec.md": {
     "content": "72ae90d8ed4784d112c6996c7dd650113b02f1914e9ba9f2add8d333e0e09e01",
