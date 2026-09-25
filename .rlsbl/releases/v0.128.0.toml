@@ -30,3 +30,7 @@ name, and where that name is declared.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "6f7668756ccf0f2545eea6482a698b6aecaae1f1"
+
+[tree_hashes]
+"." = "184c80d7af45bc06ef5b59b1533f05a2445cfff4"
