@@ -224,7 +224,7 @@ Remove per-package release-state residue from releasable member packages: .rlsbl
 
 ## monorepo rename-releasable
 
-Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the state directory, drops the stale changelog validation cache, re-runs monorepo sync, and commits it all as one commit. When tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix. Idempotent: re-running heals a crash between the commit and the tag push.
+Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the state directory, drops the stale changelog validation cache, re-runs monorepo sync, and commits it all as one commit. When tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix, and each one's archive records that tag in shipped_as so reconcile and release edit/deprecate/yank resolve it there. Idempotent: re-running heals a crash between the commit and the tag push, and records shipped_as on the past releases of a releasable renamed before the rename recorded it.
 
 **Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
