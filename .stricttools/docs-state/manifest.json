@@ -1098,6 +1098,11 @@
           "anchor": "flags-7"
         },
         {
+          "level": 3,
+          "text": "Constraints",
+          "anchor": "constraints"
+        },
+        {
           "level": 2,
           "text": "release reconcile",
           "anchor": "release-reconcile"
@@ -3715,6 +3720,11 @@
           "level": 3,
           "text": "`temp_file`",
           "anchor": "temp_file"
+        },
+        {
+          "level": 3,
+          "text": "`extract_tar_files`",
+          "anchor": "extract_tar_files"
         },
         {
           "level": 3,
@@ -9095,6 +9105,11 @@
           "level": 3,
           "text": "`run_cmd`",
           "anchor": "run_cmd"
+        },
+        {
+          "level": 3,
+          "text": "`_run_supplied_commit`",
+          "anchor": "_run_supplied_commit"
         }
       ]
     },
@@ -11232,6 +11247,11 @@
           "level": 3,
           "text": "`observe_scratch_files`",
           "anchor": "observe_scratch_files"
+        },
+        {
+          "level": 3,
+          "text": "`observe_commit_files`",
+          "anchor": "observe_commit_files"
         },
         {
           "level": 3,
@@ -14736,6 +14756,56 @@
           "level": 3,
           "text": "`run`",
           "anchor": "run"
+        },
+        {
+          "level": 3,
+          "text": "`SuppliedCommit`",
+          "anchor": "suppliedcommit"
+        },
+        {
+          "level": 3,
+          "text": "`_scope_for_supplied_commit`",
+          "anchor": "_scope_for_supplied_commit"
+        },
+        {
+          "level": 3,
+          "text": "`_require_unrecoverable_archive`",
+          "anchor": "_require_unrecoverable_archive"
+        },
+        {
+          "level": 3,
+          "text": "`_resolve_supplied_commit`",
+          "anchor": "_resolve_supplied_commit"
+        },
+        {
+          "level": 3,
+          "text": "`_declared_versions_at`",
+          "anchor": "_declared_versions_at"
+        },
+        {
+          "level": 3,
+          "text": "`_require_version_at`",
+          "anchor": "_require_version_at"
+        },
+        {
+          "level": 3,
+          "text": "`plan_supplied_commit`",
+          "anchor": "plan_supplied_commit"
+        },
+        {
+          "level": 3,
+          "text": "`describe_supplied_commit`",
+          "anchor": "describe_supplied_commit"
+        },
+        {
+          "level": 3,
+          "text": "`apply_supplied_commit`",
+          "anchor": "apply_supplied_commit"
+        },
+        {
+          "level": 3,
+          "text": "`supplied_commit_message`",
+          "anchor": "supplied_commit_message"
         }
       ]
     },
@@ -14935,6 +15005,16 @@
           "level": 3,
           "text": "`write_release_commit`",
           "anchor": "write_release_commit"
+        },
+        {
+          "level": 3,
+          "text": "`_author_release_commit`",
+          "anchor": "_author_release_commit"
+        },
+        {
+          "level": 3,
+          "text": "`replace_unrecoverable_with_release_commit`",
+          "anchor": "replace_unrecoverable_with_release_commit"
         },
         {
           "level": 3,
@@ -21887,6 +21967,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-25T21:57:44.486465+00:00",
+  "last_gen": "2026-09-25T22:18:00.775231+00:00",
   "theme": "minimal"
 }
