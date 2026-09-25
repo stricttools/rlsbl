@@ -268,7 +268,7 @@ def release_context_env(ctx):
     if cached is not None:
         return cached
 
-    from .release_record import nearest_release_commit, tag_for_version
+    from .release_record import nearest_release_commit
     from .checks._common import _resolve_release_record_dir, _resolve_tag_glob
 
     project_root = str(ctx.project_root)
@@ -290,7 +290,7 @@ def release_context_env(ctx):
         env["RLSBL_LAST_TAG"] = ""
         env["RLSBL_UNRELEASED_RANGE"] = "HEAD"
     else:
-        env["RLSBL_LAST_TAG"] = tag_for_version(tag_glob, release_commit.version)
+        env["RLSBL_LAST_TAG"] = release_commit.tag(tag_glob)
         env["RLSBL_UNRELEASED_RANGE"] = f"{release_commit.candidate_sha}..HEAD"
     try:
         setattr(ctx, _ENV_CACHE_ATTR, env)

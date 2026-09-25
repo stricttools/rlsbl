@@ -367,7 +367,7 @@ class Scope:
         from dataclasses import replace
 
         try:
-            return self.target.expected_refs(version, self.ref_ctx).tags
+            return self.target.expected_refs(version, self.ref_ctx).spellings
         except RlsblError as exc:
             reason = (
                 f"{self.label}: the companion tags its members' ecosystems "
@@ -377,7 +377,7 @@ class Scope:
                 self.undecidable.append(reason)
             return self.target.expected_refs(
                 version, replace(self.ref_ctx, member_package_paths=None),
-            ).tags
+            ).spellings
 
     def tag_spellings(self):
         """The scope's ref set rendered as format strings, for the plan header.
@@ -1025,9 +1025,9 @@ def build_plan(repo, *, use_gh=True, gh=None, overrides=None):
         for version in versions:
             state = states.get(version)
             # EVERY spelling that resolves, not just the first. A version can
-            # stand under several live spellings at once -- reconcile's own
-            # repair MINTS the current scheme's tag beside the historical one an
-            # archive names in shipped_as, and a Go member's companion tag
+            # stand under several live spellings at once -- a rename's boundary
+            # alias stands beside the historical tag an archive names in
+            # shipped_as, and a Go member's companion tag
             # stands beside its releasable's primary -- and a spelling this pass
             # stops at is a spelling nothing explains on the next run.
             for candidate in _probe_order(scope, version, state):

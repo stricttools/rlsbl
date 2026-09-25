@@ -257,3 +257,33 @@ class TestCmdReleaseDeprecateDelegation:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDeprecateAVersionThatShippedUnderAnOldSpelling(unittest.TestCase):
+    """A version whose archive records ``shipped_as`` is deprecated where its Release is."""
+
+    @patch("rlsbl.commands.deprecate.check_gh_auth", return_value=True)
+    @patch("rlsbl.commands.deprecate.check_gh_installed", return_value=True)
+    @patch("rlsbl.commands.deprecate.find_workspace_root", return_value=None)
+    @patch("rlsbl.commands.deprecate.resolve_member_context", return_value=MagicMock(targets=[]))
+    def test_the_release_under_the_shipped_tag_is_edited(self, *_mocks):
+        archive = Path(".rlsbl") / "releases" / "v0.9.1.toml"
+        archive.write_text(
+            archive.read_text(encoding="utf-8") + 'shipped_as = "widget@v0.9.1"\n',
+            encoding="utf-8",
+        )
+        calls = []
+        forge = _forge([])
+
+        def gh(args, **kwargs):
+            calls.append(list(args))
+            return forge(args, **kwargs)
+
+        with patch("rlsbl.commands.deprecate.run_gh", side_effect=gh), \
+             patch("sys.stdout", new_callable=StringIO):
+            run_cmd(["0.9.1"], {}, project_root=".")
+
+        views = [c for c in calls if c[:2] == ["release", "view"]]
+        edits = [c for c in calls if c[:2] == ["release", "edit"]]
+        self.assertTrue(views and all(c[2] == "widget@v0.9.1" for c in views), views)
+        self.assertEqual([c[2] for c in edits], ["widget@v0.9.1"])

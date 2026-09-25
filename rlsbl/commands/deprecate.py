@@ -80,6 +80,11 @@ def run_cmd(args, flags, project_root):
             tag = target.tag_format(version)
     else:
         tag = f"v{version}"
+    from ..targets.refs import tag_as_shipped
+    tag = tag_as_shipped(
+        tag, version, project_dir=project_dir,
+        releasable_config_dir=releasable_config_dir,
+    )
 
     if not check_gh_installed():
         print("Error: gh CLI is not installed.", file=sys.stderr)

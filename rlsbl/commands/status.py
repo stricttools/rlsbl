@@ -9,7 +9,6 @@ from ..release_record import (
     latest_release_fact,
     nearest_release_commit,
     releases_dir_for_changes_dir,
-    tag_for_version,
 )
 from ..changelog.validate import filter_exempt_commits
 from ..ci_router import discover_project_ci_sources
@@ -133,7 +132,7 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
     all_unreleased = None
     exempted_count = 0
     release_commit = nearest_release_commit(release_record_dir, tag_glob=tag_glob, cwd=root_str)
-    scoped_tag = tag_for_version(tag_glob, release_commit.version) if release_commit else None
+    scoped_tag = release_commit.tag(tag_glob) if release_commit else None
     try:
         range_spec = f"{release_commit.candidate_sha}..HEAD" if release_commit else "HEAD"
         result = effects.run(

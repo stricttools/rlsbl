@@ -21,12 +21,23 @@ Renaming a releasable is a coordinated, idempotent operation:
    the rename the releasable's state directory exists only under the NEW name,
    while the old name is the spelling a reader with an old tag in hand has.
 
-Then, last, when the releasable's ``tag_format`` contains ``{name}`` (so the
-tag prefix actually changes), a boundary alias tag for the current version is
-created at the commit the old current-version tag points to, RECORDED as a
-``boundary-alias`` event in the releasable's transition record, and pushed. The
-push is the single sanctioned remote action. Historical releases stay under the
-old prefix and are no longer managed by ``rlsbl release edit/deprecate/yank``.
+7. When the releasable's ``tag_format`` contains ``{name}`` (so the tag
+   prefix actually changes), record on every archived version that shipped
+   under the old spelling the tag it shipped under, as ``shipped_as``, and
+   commit that. Past releases keep the tag they shipped under: ``shipped_as``
+   makes that tag the version's primary ref, so ``rlsbl release reconcile``
+   owes nothing under the new spelling for them, and ``rlsbl release
+   edit/deprecate/yank`` find their GitHub Releases where they are. A version
+   counts as shipped under the old spelling when that tag stands at the
+   version's own release commit, so a re-run long after the rename -- the
+   repair for a releasable renamed before this step existed -- leaves every
+   version released since the rename alone.
+
+Then, last, when the releasable's ``tag_format`` contains ``{name}``, a
+boundary alias tag for the current version is created at the commit the old
+current-version tag points to, RECORDED as a ``boundary-alias`` event in the
+releasable's transition record, and pushed. The push is the single sanctioned
+remote action. Only the current version is aliased forward.
 
 The transition record is what makes the alias discoverable: ``expected_refs``
 (the single authority for a version's full ref set) reads recorded aliases from
@@ -41,6 +52,7 @@ never duplicates the record.
 import os
 import re
 import subprocess
+import sys
 
 import tomlkit
 from tomlkit.items import AoT
@@ -339,6 +351,76 @@ def _record_rename_in_transition_record(root, old_name, new_name):
     return True
 
 
+def _record_shipped_as_on_past_releases(root, old_name, new_name, tag_format, *,
+                                        dry_run=False):
+    """Stamp ``shipped_as`` on every archive that shipped under the old spelling, and commit.
+
+    Evidence, not position: an archive is stamped when the tag spelled with
+    *old_name* exists and stands at the archive's own release commit (for an
+    unrecoverable archive, which has no release commit, when the tag exists at
+    all). That is the same answer at rename time, when every archived version
+    is a pre-rename one, and on a re-run after later releases, whose archives
+    carry no old-spelling tag. An archive already recording ``shipped_as``
+    shipped under an even older spelling and keeps it; a never-released one
+    shipped under nothing.
+
+    Returns ``(stamped, unstamped)``: the versions stamped now (under
+    *dry_run*, the ones that would be, with nothing written), and the released
+    versions left without one because no old-spelling tag stands at their
+    release commit (each with the reason), which the caller prints.
+    """
+    from ...release_file import (
+        archived_release_path,
+        get_releases_dir,
+        list_archived_versions,
+        read_release_file,
+        writable_release_file,
+        write_shipped_as,
+    )
+
+    releases_dir = get_releases_dir(
+        root, releasable_dir=get_releasable_dir(root, new_name),
+    )
+    stamped, unstamped, paths = [], [], []
+    for version in list_archived_versions(releases_dir):
+        path = archived_release_path(releases_dir, version)
+        archive = read_release_file(path)
+        if archive.never_released or archive.shipped_as:
+            continue
+        old_tag = tag_format.format(name=old_name, version=version)
+        tag_commit = _resolve_tag_commit(root, old_tag)
+        if tag_commit is None:
+            if not _tag_exists_local(root, tag_format.format(name=new_name, version=version)):
+                unstamped.append((version, f"no tag {old_tag} exists locally"))
+            continue
+        release_commit = (archive.candidate_sha or "").strip()
+        n = min(len(release_commit), len(tag_commit))
+        if release_commit and tag_commit[:n] != release_commit[:n]:
+            unstamped.append((
+                version,
+                f"{old_tag} points at {tag_commit[:12]}, not at the release "
+                f"commit {release_commit[:12]}",
+            ))
+            continue
+        if dry_run:
+            stamped.append(version)
+            continue
+        with writable_release_file(path):
+            if write_shipped_as(path, old_tag):
+                stamped.append(version)
+                paths.append(os.path.relpath(path, root))
+
+    if paths:
+        commit_files_if_changed(
+            f"monorepo: record the {old_name} tags {new_name}'s past releases "
+            f"shipped under",
+            paths,
+            skip_message="shipped_as already committed; nothing to commit.",
+            cwd=root,
+        )
+    return stamped, unstamped
+
+
 def _finish_alias_tag(root, old_tag, new_tag, remote, *, push_timeout,
                       releasable_name=None):
     """Create the boundary alias tag, record it, and push it, idempotently.
@@ -377,14 +459,29 @@ def _finish_alias_tag(root, old_tag, new_tag, remote, *, push_timeout,
     return {"status": "created", "tag": new_tag}
 
 
-def _unmanaged_history_note(old_prefix, new_prefix):
+def _history_note(old_prefix, new_prefix):
     """Return the note printed after a prefix-changing rename."""
     return (
-        f"Note: historical releases remain tagged under the old prefix "
-        f"'{old_prefix}'. They are no longer managed by rlsbl release "
-        f"edit/deprecate/yank, which now operate on the new prefix "
-        f"'{new_prefix}'. Only the current version was aliased forward."
+        f"Note: past releases keep the tags they shipped under, prefixed "
+        f"'{old_prefix}'; each one's archive records its tag in shipped_as, so "
+        f"rlsbl release reconcile, edit, deprecate, and yank resolve it there. "
+        f"Releases from now on are tagged '{new_prefix}'. Only the current "
+        f"version was aliased forward."
     )
+
+
+def _report_shipped_as(result, stamped, unstamped):
+    """Put the ``shipped_as`` outcome on *result*, and print what was left unstamped."""
+    result["shipped_as_recorded"] = stamped
+    result["shipped_as_unrecorded"] = [v for v, _reason in unstamped]
+    if stamped:
+        print(f"Recorded shipped_as on {len(stamped)} past release(s): {', '.join(stamped)}")
+    for version, reason in unstamped:
+        print(
+            f"Warning: {version} was left without shipped_as ({reason}); its "
+            f"expected tag stays the new spelling.",
+            file=sys.stderr,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -483,13 +580,30 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
             "tag": None,
         }
         if name_in_format:
-            result["note"] = _unmanaged_history_note(
+            result["note"] = _history_note(
                 tag_format.format(name=old_name, version=""),
                 tag_format.format(name=new_name, version=""),
             )
 
         if dry_run:
             if name_in_format:
+                stamped, unstamped = _record_shipped_as_on_past_releases(
+                    root, old_name, new_name, tag_format, dry_run=True,
+                )
+                result["plan"] = [
+                    "1. finish the local rename and commit anything pending",
+                    (
+                        f"2. record shipped_as on the archives of "
+                        f"{', '.join(stamped)} (their "
+                        f"{tag_format.format(name=old_name, version='')} tags), "
+                        f"and commit"
+                        if stamped else
+                        "2. no archive needs shipped_as recorded"
+                    ),
+                    *(f"   {v} left without shipped_as: {why}" for v, why in unstamped),
+                    f"3. alias tag '{new_tag}' at the commit of '{old_tag}', "
+                    f"pushed unless origin already has it",
+                ]
                 result["planned_tag"] = new_tag
                 result["planned_push"] = f"git push {remote} {new_tag}"
             return result
@@ -507,6 +621,9 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
         _apply_local_rename(root, old_name, new_name)
         _record_rename_in_transition_record(root, old_name, new_name)
         if name_in_format:
+            _report_shipped_as(result, *_record_shipped_as_on_past_releases(
+                root, old_name, new_name, tag_format,
+            ))
             result["tag"] = _finish_alias_tag(
                 root, old_tag, new_tag, remote,
                 push_timeout=_push_timeout_for(root, new_name),
@@ -588,10 +705,16 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
         ]
         if name_in_format:
             plan.append(
-                f"6. create alias tag '{new_tag}' at the commit of '{old_tag}'"
+                f"6. record shipped_as = "
+                f"'{tag_format.format(name=old_name, version='<version>')}' on "
+                f"the archive of every past release whose tag of that spelling "
+                f"stands at its release commit, and commit"
             )
-            plan.append(f"7. git push {remote} {new_tag}")
-            result["note"] = _unmanaged_history_note(
+            plan.append(
+                f"7. create alias tag '{new_tag}' at the commit of '{old_tag}'"
+            )
+            plan.append(f"8. git push {remote} {new_tag}")
+            result["note"] = _history_note(
                 tag_format.format(name=old_name, version=""),
                 tag_format.format(name=new_name, version=""),
             )
@@ -621,15 +744,18 @@ def rename_releasable(workspace_root, old_name, new_name, *, dry_run=False,
     # in the repository states.
     _record_rename_in_transition_record(root, old_name, new_name)
 
-    # ---- alias tag + push (last) ----
+    # ---- past releases keep their tags, then the alias tag + push (last) ----
     if name_in_format:
+        _report_shipped_as(result, *_record_shipped_as_on_past_releases(
+            root, old_name, new_name, tag_format,
+        ))
         tag_result = _finish_alias_tag(
             root, old_tag, new_tag, remote,
             push_timeout=_push_timeout_for(root, new_name),
             releasable_name=new_name,
         )
         result["tag"] = tag_result
-        result["note"] = _unmanaged_history_note(
+        result["note"] = _history_note(
             tag_format.format(name=old_name, version=""),
             tag_format.format(name=new_name, version=""),
         )

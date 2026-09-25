@@ -1168,15 +1168,24 @@ def _ref_verdict(*, refname, tag, version, release_commit, observation, explanat
     )
 
 
-def _release_verdict(*, tag, version, release_commit, observation):
-    """Classify one version's GitHub Release. Presence only, from the listing."""
+def _release_verdict(*, tag, version, release_commit, observation,
+                     also_under=None):
+    """Classify one version's GitHub Release. Presence only, from the listing.
+
+    *tag* is the version's primary ref, where a missing Release is created.
+    *also_under* is the current scheme's spelling of a version that shipped
+    under a historical one: a Release already standing there is this version's
+    Release too, so none is owed.
+    """
     key = f"release:{tag}"
-    if tag in observation.releases:
-        return VerdictItem(
-            key=key, state=STATE_ALREADY_CORRECT,
-            summary="the GitHub Release exists",
-            facts=(f"version {version}",),
-        )
+    for present in (tag, also_under):
+        if present and present in observation.releases:
+            return VerdictItem(
+                key=key, state=STATE_ALREADY_CORRECT,
+                summary="the GitHub Release exists",
+                facts=(f"version {version}",)
+                + ((f"published under {present}",) if present != tag else ()),
+            )
     return VerdictItem(
         key=key, state=STATE_MATERIALIZE,
         summary="released, but no GitHub Release exists for its tag",
@@ -1280,7 +1289,7 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
             # phantom tag to the unarchived-tag pass, where a divergence is
             # refuse-foreign and aborts everything.
             try:
-                for tag in target.expected_refs(version, ref_ctx).tags:
+                for tag in target.expected_refs(version, ref_ctx).spellings:
                     claimed.add(f"refs/tags/{tag}")
             except RlsblError:
                 # The ref names could not be derived. Nothing is owed for this
@@ -1324,10 +1333,25 @@ def build_preview(*, observation, explanations, target, ref_ctx, releases_dir,
                 observation=observation, explanations=explanations,
                 target=target, archived=True,
             ))
+        # The current scheme's spelling of a version that shipped under a
+        # historical one is owed nowhere, so neither its absence nor a
+        # local-only copy is anything to publish. Where origin holds it, it is
+        # still this version's ref, and is judged against the release commit
+        # like one.
+        scheme = expected.scheme_spelling
+        if scheme:
+            refname = f"refs/tags/{scheme}"
+            claimed.add(refname)
+            if refname in observation.remote_refs:
+                items.append(_ref_verdict(
+                    refname=refname, tag=scheme, version=version,
+                    release_commit=release_commit, observation=observation,
+                    explanations=explanations, target=target, archived=True,
+                ))
         if observation.releases_known:
             items.append(_release_verdict(
                 tag=expected.primary, version=version, release_commit=release_commit,
-                observation=observation,
+                observation=observation, also_under=scheme,
             ))
 
     for refname in sorted(observation.local_refs):

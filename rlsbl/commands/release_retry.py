@@ -57,6 +57,7 @@ def _scaffold_retry_file(
     retry_path, primary, log, *,
     monorepo_name=None, monorepo_project_path=None,
     releasable_name=None, releasable_tag_fmt=None,
+    project_dir=".", releasable_config_dir=None,
 ):
     """Auto-scaffold retry.toml from project state.
 
@@ -81,6 +82,11 @@ def _scaffold_retry_file(
         tag = tgt.monorepo_tag_format(monorepo_name, version, path=monorepo_project_path)
     else:
         tag = tgt.tag_format(version)
+    from ..targets.refs import tag_as_shipped
+    tag = tag_as_shipped(
+        tag, version, project_dir=project_dir,
+        releasable_config_dir=releasable_config_dir,
+    )
 
     # Write retry.toml
     doc = tomlkit.document()
@@ -214,6 +220,8 @@ def run_cmd(retry_config, flags, project_root):
                     monorepo_project_path=monorepo_project_path,
                     releasable_name=releasable_name,
                     releasable_tag_fmt=releasable_tag_fmt,
+                    project_dir=project_dir,
+                    releasable_config_dir=releasable_config_dir,
                 )
             except ReleaseFileError as e:
                 # Clean up the auto-scaffolded file -- it's untracked and
@@ -241,6 +249,11 @@ def run_cmd(retry_config, flags, project_root):
         tag = target.monorepo_tag_format(monorepo_name, version, path=monorepo_project_path)
     else:
         tag = target.tag_format(version)
+    from ..targets.refs import tag_as_shipped
+    tag = tag_as_shipped(
+        tag, version, project_dir=project_dir,
+        releasable_config_dir=releasable_config_dir,
+    )
 
     # Verify the GitHub Release exists
     try:

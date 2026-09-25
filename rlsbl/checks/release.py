@@ -225,6 +225,11 @@ def register_release_checks(app):
                 continue
             if primary in releases:
                 continue
+            # A version that shipped under a historical spelling may carry its
+            # Release under the current scheme's spelling instead, which is
+            # this version's Release all the same (the reconcile judges it so).
+            if expected.scheme_spelling and expected.scheme_spelling in releases:
+                continue
             if release_commit is None:
                 unrecoverable_release += 1
                 continue
