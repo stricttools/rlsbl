@@ -2,11 +2,13 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "patch"
 # Short description of this release (required)
-description = ""
+description = "Re-running rename-releasable repairs a renamed releasable without failing"
 # Optional context explaining why these changes were made
-context = ""
+context = """
+0.127.2 made re-running rlsbl monorepo rename-releasable the repair that records shipped_as on a releasable renamed before the rename did. On a real repository the re-run failed: it staged the removal of the tracked publish cache, sync rewrote it unchanged, and the rename commit was refused as empty. Its alias step could also record and push an alias for a version released after the rename.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
