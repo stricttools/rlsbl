@@ -204,6 +204,16 @@ class TestTheFlagsGoTogether:
         assert result.exit_code != 0
         assert "--commit" in result.stdout + result.stderr
 
+    def test_overrides_with_commit_is_refused_until_dropped(
+        self, standalone, monkeypatch,
+    ):
+        root, sha, _later = standalone
+        overrides = root.parent / "overrides.toml"
+        overrides.write_text('[versions."0.1.0"]\ndescription = "reviewed"\n')
+        result = supply(root, monkeypatch, sha, "--overrides", str(overrides))
+        _refused(result, "--overrides", "Drop one")
+        assert supply(root, monkeypatch, sha).exit_code == 0
+
     def test_releasable_in_a_standalone_repository_is_refused(
         self, standalone, monkeypatch,
     ):

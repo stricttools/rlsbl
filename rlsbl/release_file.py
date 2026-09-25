@@ -43,10 +43,11 @@ RELEASE_COMMIT_FIELDS = ("candidate_sha", "tree_hashes")
 # "exactly one" half belongs to the archive readers, because the same schema
 # validates the editable unreleased.toml, whose correct state is none of them.
 
-# The permanent record that recovering a SHIPPED version's release commit FAILED:
-# no tag under any recognized scheme, no version-bump commit in history. Written
-# by the backfill pass, never by the release flow -- the flow always knows its
-# own candidate.
+# The record that recovering a SHIPPED version's release commit FAILED: no tag
+# under any recognized scheme, no version-bump commit in history. Written by the
+# backfill pass, never by the release flow -- the flow always knows its own
+# candidate -- and cleared only when an operator supplies the commit
+# (:func:`replace_unrecoverable_with_release_commit`).
 UNRECOVERABLE_FIELD = "unrecoverable"
 
 # The record that a version NUMBER exists but no release does -- a phantom tag's
@@ -845,6 +846,12 @@ def write_release_commit(path: str, *, candidate_sha: str, tree_hashes: dict) ->
             f"marker first: unlock the file (chmod 644), delete the "
             f"{markers[0]} line, relock it (chmod 444), and re-run."
         )
+    _author_release_commit(doc, candidate_sha, tree_hashes)
+    effects.atomic_write_text(path, tomlkit.dumps(doc))
+
+
+def _author_release_commit(doc, candidate_sha: str, tree_hashes: dict) -> None:
+    """Replace the release-commit fields of the parsed document *doc*."""
     for f_name in RELEASE_COMMIT_FIELDS:
         if f_name in doc:
             del doc[f_name]
@@ -854,6 +861,43 @@ def write_release_commit(path: str, *, candidate_sha: str, tree_hashes: dict) ->
     # -- the schema field descriptions and docs/release-workflow.md.
     doc.add("candidate_sha", candidate_sha)
     doc.add("tree_hashes", _release_commit_tree_table(tree_hashes))
+
+
+def replace_unrecoverable_with_release_commit(
+    path: str, *, candidate_sha: str, tree_hashes: dict,
+) -> None:
+    """Record a release commit on an archive marked unrecoverable, in one write.
+
+    For ``rlsbl release backfill --version --commit``: the operator names the
+    commit a version shipped from after the pass could not, so the archive's
+    fate changes from ``unrecoverable`` to a recorded release commit. The mark
+    is removed and the commit authored in the same document, so the file is
+    never observable with two fates or with none.
+
+    Refuses an archive that is not marked unrecoverable, and one that already
+    carries a release commit or ``never_released`` beside the mark: a recorded
+    release commit is never overwritten.
+    """
+    _check_release_commit(candidate_sha, tree_hashes)
+    with open(path, "r", encoding="utf-8") as f:
+        doc = tomlkit.loads(f.read())
+    if UNRECOVERABLE_FIELD not in doc:
+        raise ReleaseFileError(
+            f"refusing to record a release commit in {path}: it is not marked "
+            f"{UNRECOVERABLE_FIELD}."
+        )
+    conflicting = [
+        name for name in (*RELEASE_COMMIT_FIELDS, NEVER_RELEASED_FIELD)
+        if name in doc
+    ]
+    if conflicting:
+        raise ReleaseFileError(
+            f"refusing to record a release commit in {path}: beside "
+            f"{UNRECOVERABLE_FIELD} it already carries "
+            f"{', '.join(conflicting)}, and a recorded fate is never overwritten."
+        )
+    del doc[UNRECOVERABLE_FIELD]
+    _author_release_commit(doc, candidate_sha, tree_hashes)
     effects.atomic_write_text(path, tomlkit.dumps(doc))
 
 
@@ -887,8 +931,8 @@ def write_unrecoverable_marker(path: str) -> None:
 
     The counterpart to :func:`write_release_commit` for the backfill pass: a
     released version with no tag under any recognized scheme and no version-bump
-    commit in history cannot be recorded, and the archive says so permanently
-    rather than being passed over in silence.
+    commit in history cannot be recorded, and the archive says so rather than
+    being passed over in silence, until an operator supplies the commit.
 
     Refuses an archive whose fate is already settled the other way: one
     carrying a release commit (a recorded version is by definition not

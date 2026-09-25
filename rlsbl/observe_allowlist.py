@@ -178,6 +178,10 @@ OBSERVE_ALLOWLIST = (
     ),
     ObserveEntry(("git", "log"), "local-read", "reads commit history"),
     ObserveEntry(("git", "show"), "local-read", "reads an object"),
+    ObserveEntry(
+        ("git", "archive", "--format=tar"), "local-read",
+        "streams a commit's tree to stdout; writes no file, ref or index",
+    ),
     ObserveEntry(("git", "describe"), "local-read", "names a commit from tags"),
     ObserveEntry(
         ("git", "fetch", "origin", "--quiet"), "network-read",
