@@ -857,3 +857,82 @@ class TestAnAlreadyRenamedReleasableIsRepaired:
         rr.rename_releasable(str(root), "beta", "gamma")
 
         assert _git(root, "rev-parse", "HEAD").strip() == head
+
+
+class TestAReRunWithTheRealSaferm:
+    """saferm stages the removal of a tracked file (``git rm --cached``).
+
+    The suite's saferm stand-in only unlinks, so a re-run over a completed
+    rename never saw the staged removal of the publish cache that sync then
+    regenerates byte-identically: the index held a deletion the tree did not,
+    and the rename commit was refused as empty.
+    """
+
+    def test_a_re_run_after_a_completed_rename_succeeds(
+            self, tmp_path, monkeypatch, _gh_ok):
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        _build_monorepo(root)
+        rr.rename_releasable(str(root), "beta", "beta2")
+        # A first re-run settles the cache: it records the hash of the router
+        # the rename regenerated, so from here on sync rewrites it unchanged.
+        rr.rename_releasable(str(root), "beta", "beta2")
+        cache = root / WORKSPACE_DIR / "publish-cache.json"
+        assert _git(root, "ls-files", str(cache.relative_to(root))), "precondition"
+
+        def real_saferm(path, **_kwargs):
+            if _git(root, "ls-files", "--", str(path), check=False):
+                _git(root, "rm", "-q", "--cached", "--", str(path))
+            if os.path.exists(path):
+                os.unlink(path)
+
+        monkeypatch.setattr(rr, "saferm_delete", real_saferm)
+        result = rr.rename_releasable(str(root), "beta", "beta2")
+
+        assert result["mode"] == "resume"
+        assert rr._blocking_dirty_paths(str(root)) == []
+        assert _git(root, "ls-files", str(cache.relative_to(root))), (
+            "the publish cache is still tracked"
+        )
+
+
+class TestAReRunAfterALaterRelease:
+    """The current version on a re-run long after the rename is a post-rename one.
+
+    Its tag is spelled with the new name only, and it is its own release's to
+    publish: the re-run neither pushes it as an alias nor records an alias of
+    it to an old-spelling tag that never existed.
+    """
+
+    def test_no_alias_is_recorded_or_pushed_for_it(self, tmp_path, monkeypatch, _gh_ok):
+        from rlsbl.transition_record import (
+            KIND_BOUNDARY_ALIAS,
+            get_transition_record_path,
+            read_events,
+        )
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        monkeypatch.chdir(root)
+        _build_monorepo(root, create_tag=False)
+        _release(root, "beta", "0.1.0")
+        rr.rename_releasable(str(root), "beta", "gamma")
+        # A later release whose tag reached only the local repository.
+        write_releasable_version(str(root), "gamma", "0.2.0")
+        _git(root, "add", "-A")
+        _git(root, "commit", "-q", "-m", "gamma v0.2.0")
+        _git(root, "tag", "gamma@v0.2.0")
+
+        result = rr.rename_releasable(str(root), "beta", "gamma")
+
+        assert result["tag"]["status"] == "no_source_tag"
+        assert not rr._tag_exists_remote(str(root), "origin", "gamma@v0.2.0")
+        record = get_transition_record_path(
+            str(root), releasable_dir=get_releasable_dir(str(root), "gamma"),
+        )
+        aliased = [
+            a.aliased_tag for e in read_events(record, kinds=[KIND_BOUNDARY_ALIAS])
+            for a in e.aliases
+        ]
+        assert "beta@v0.2.0" not in aliased

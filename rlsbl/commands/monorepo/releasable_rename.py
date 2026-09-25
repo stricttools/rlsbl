@@ -205,6 +205,18 @@ def _apply_workspace_rename(root, old, new):
 # ---------------------------------------------------------------------------
 
 
+def _rename_committed(root, old, new):
+    """Does HEAD's workspace.toml already declare *new* and no longer *old*?"""
+    path = f"{WORKSPACE_DIR}/{WORKSPACE_FILE}"
+    try:
+        text = run("git", ["show", f"HEAD:{path}"], cwd=root)
+    except subprocess.CalledProcessError:
+        return False
+    rels = tomlkit.loads(text).get("releasables")
+    names = {t.get("name") for t in rels} if isinstance(rels, AoT) else set()
+    return new in names and old not in names
+
+
 def _apply_local_rename(root, old, new):
     """Perform the local mutations (steps 1-5) and commit them as one commit.
 
@@ -221,9 +233,16 @@ def _apply_local_rename(root, old, new):
     if os.path.isdir(old_dir) and not os.path.isdir(new_dir):
         effects.rename(old_dir, new_dir)
 
+    # Steps 3 and 3b drop caches the rename makes stale. Once the rename is
+    # committed they were already dropped and regenerated for the new name, so
+    # a re-run leaves them alone: saferm stages the removal of a tracked file,
+    # and a cache sync then rewrites byte-identically would leave the index
+    # holding a deletion the tree does not, which no commit can carry.
+    committed = _rename_committed(root, old, new)
+
     # Step 3: drop the moved changes/.validated cache (stale after prefix change).
     validated = os.path.join(get_releasable_changes_dir(root, new), ".validated")
-    if os.path.exists(validated):
+    if not committed and os.path.exists(validated):
         _saferm_file(validated)
 
     # Step 3b: invalidate the publish-router cache. Its hash keys on project
@@ -233,7 +252,7 @@ def _apply_local_rename(root, old, new):
     # router with the new prefix.
     from .publish_inline import PUBLISH_CACHE_FILENAME
     publish_cache = os.path.join(root, WORKSPACE_DIR, PUBLISH_CACHE_FILENAME)
-    if os.path.exists(publish_cache):
+    if not committed and os.path.exists(publish_cache):
         _saferm_file(publish_cache)
 
     # Step 4: re-run sync (no auto-commit -- we commit everything once below).
@@ -433,12 +452,14 @@ def _finish_alias_tag(root, old_tag, new_tag, remote, *, push_timeout,
     if local and remote_has:
         return {"status": "already_done", "tag": new_tag}
 
+    commit = _resolve_tag_commit(root, old_tag)
+    if commit is None:
+        # No current-version tag to alias -- releasable was never released at
+        # this version under the old name (never released, or, on a re-run
+        # after later releases, a version released under the NEW name, whose
+        # tag is its own release's to publish). Nothing to carry forward.
+        return {"status": "no_source_tag", "old_tag": old_tag, "tag": new_tag}
     if not local:
-        commit = _resolve_tag_commit(root, old_tag)
-        if commit is None:
-            # No current-version tag to alias -- releasable was never released
-            # at this version. Nothing to carry forward.
-            return {"status": "no_source_tag", "old_tag": old_tag, "tag": new_tag}
         run("git", ["tag", new_tag, commit], cwd=root)
 
     # Record the alias BEFORE the push: a crash between the two leaves a
