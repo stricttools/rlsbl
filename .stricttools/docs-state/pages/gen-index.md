@@ -1,6 +1,6 @@
 +++
 title = "API Reference"
-description = "API reference index for rlsbl covering 195 modules"
+description = "API reference index for rlsbl covering 197 modules"
 generated = true
 seeded = true
 nav_group = "API Reference"
@@ -81,6 +81,7 @@ nav_order = 90
 - [rlsbl.commands.rewrite](../rlsbl-commands-rewrite/)
 - [rlsbl.commands.rewrite.abort](../rlsbl-commands-rewrite-abort/)
 - [rlsbl.commands.rewrite.go_module_path](../rlsbl-commands-rewrite-go_module_path/)
+- [rlsbl.commands.rewrite.project_name](../rlsbl-commands-rewrite-project_name/)
 - [rlsbl.commands.rewrite.uv_path_sources](../rlsbl-commands-rewrite-uv_path_sources/)
 - [rlsbl.commands.status](../rlsbl-commands-status/)
 - [rlsbl.commands.targets_cmd](../rlsbl-commands-targets_cmd/)
@@ -134,6 +135,7 @@ nav_order = 90
 - [rlsbl.observe_allowlist](../rlsbl-observe_allowlist/)
 - [rlsbl.overlay_state](../rlsbl-overlay_state/)
 - [rlsbl.ownership](../rlsbl-ownership/)
+- [rlsbl.package_names](../rlsbl-package_names/)
 - [rlsbl.pipelines](../rlsbl-pipelines/)
 - [rlsbl.pipelines.base](../rlsbl-pipelines-base/)
 - [rlsbl.pipelines.build](../rlsbl-pipelines-build/)
