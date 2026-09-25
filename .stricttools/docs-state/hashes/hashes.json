@@ -75,9 +75,9 @@
     "schema_hash": "6bf61b345615538d2a83180e7b498ab5eea7397122e629c8925c2d84f3d867ce"
   },
   "en/cli-monorepo.md": {
-    "content": "e6934b7fad6f2b68b82800fd892b8a706356b2f47ac201dfd5f6b91bb382cefa",
+    "content": "0aa2765f0bd1e59c030e7dcf7324286dcea61bef60d9f853f0daccdae1b3d054",
     "description": "651df98c12c7c974b36d4da3b1746d0cead7cc6e5b0df5c15b392584aad74cff",
-    "schema_hash": "20b9e1ccccd8e22a300d7092e57a6d51b70465ec290deaee71043ae04a1bf0c2",
+    "schema_hash": "f2341d8513d9793423375e848fd7dc8b0e78e0ac4d879d913035089237c83cd3",
     "seed_hash": "651df98c12c7c974b36d4da3b1746d0cead7cc6e5b0df5c15b392584aad74cff"
   },
   "en/cli-pre-push-check.md": {
@@ -103,15 +103,15 @@
     "schema_hash": "8ec11c80f2ba2db1ea6f1ccdb6d2f8aebce1c0386f499a42919083e4215beb23"
   },
   "en/cli-release.md": {
-    "content": "c807ed78ea5d3f8809a495308ed7e40ce9afd7004bf8a88b08b4441348911a2a",
+    "content": "5656eef48c67d2893dbc26df5ad4267cf5064a7b54e362eec79e86e5bfb5c6f9",
     "description": "834f34d30bf5b3f057ba3ec1746a807f12f823ec51ce9fffb90286426a77b60e",
-    "schema_hash": "e5eecfd28b8b7a57e5d6c93504ae7bb7593a8553ac38135f25104c720ee5483a",
+    "schema_hash": "588f4644d9a10abcc72b0b957b8679677968b15644e3baf8ae2b58a0a988fed2",
     "seed_hash": "834f34d30bf5b3f057ba3ec1746a807f12f823ec51ce9fffb90286426a77b60e"
   },
   "en/cli-rewrite.md": {
-    "content": "7fe267d0c8b7dc3984506c9a06b5d461892a6ec9aae3882fc23784dc767aad7c",
+    "content": "07045c3f528637d35fef7260ab30f1837b47b95815a4061ecedbb60c0c921c3d",
     "description": "10cbade59f0391bbb170f13eb2eede251075ef56638157d66bb556a2b56bb189",
-    "schema_hash": "b01635a827c7cc955f3d52b7592102977057163acdc408683edb89983a10a779",
+    "schema_hash": "5e307012c94f1a9d54928584edb9c088dcbae8c2f17fb085dd0c616f6b3e071b",
     "seed_hash": "10cbade59f0391bbb170f13eb2eede251075ef56638157d66bb556a2b56bb189"
   },
   "en/cli-scaffold.md": {
