@@ -299,6 +299,11 @@
         },
         {
           "level": 3,
+          "text": "`commits_needing_entries`",
+          "anchor": "commits_needing_entries"
+        },
+        {
+          "level": 3,
           "text": "`_cache_path`",
           "anchor": "_cache_path"
         },
@@ -3723,11 +3728,6 @@
         },
         {
           "level": 3,
-          "text": "`extract_tar_files`",
-          "anchor": "extract_tar_files"
-        },
-        {
-          "level": 3,
           "text": "`makedirs`",
           "anchor": "makedirs"
         },
@@ -4276,6 +4276,11 @@
           "level": 3,
           "text": "`filter_exempt_commits`",
           "anchor": "filter_exempt_commits"
+        },
+        {
+          "level": 3,
+          "text": "`commits_needing_entries`",
+          "anchor": "commits_needing_entries"
         },
         {
           "level": 3,
@@ -7645,6 +7650,11 @@
         },
         {
           "level": 3,
+          "text": "`_needs_entry`",
+          "anchor": "_needs_entry"
+        },
+        {
+          "level": 3,
           "text": "`changelog_add_line`",
           "anchor": "changelog_add_line"
         },
@@ -9105,11 +9115,6 @@
           "level": 3,
           "text": "`run_cmd`",
           "anchor": "run_cmd"
-        },
-        {
-          "level": 3,
-          "text": "`_run_supplied_commit`",
-          "anchor": "_run_supplied_commit"
         }
       ]
     },
@@ -9704,6 +9709,11 @@
           "level": 3,
           "text": "`_rename_commit`",
           "anchor": "_rename_commit"
+        },
+        {
+          "level": 3,
+          "text": "`_needs_entry`",
+          "anchor": "_needs_entry"
         },
         {
           "level": 3,
@@ -11247,11 +11257,6 @@
           "level": 3,
           "text": "`observe_scratch_files`",
           "anchor": "observe_scratch_files"
-        },
-        {
-          "level": 3,
-          "text": "`observe_commit_files`",
-          "anchor": "observe_commit_files"
         },
         {
           "level": 3,
@@ -14756,56 +14761,6 @@
           "level": 3,
           "text": "`run`",
           "anchor": "run"
-        },
-        {
-          "level": 3,
-          "text": "`SuppliedCommit`",
-          "anchor": "suppliedcommit"
-        },
-        {
-          "level": 3,
-          "text": "`_scope_for_supplied_commit`",
-          "anchor": "_scope_for_supplied_commit"
-        },
-        {
-          "level": 3,
-          "text": "`_require_unrecoverable_archive`",
-          "anchor": "_require_unrecoverable_archive"
-        },
-        {
-          "level": 3,
-          "text": "`_resolve_supplied_commit`",
-          "anchor": "_resolve_supplied_commit"
-        },
-        {
-          "level": 3,
-          "text": "`_declared_versions_at`",
-          "anchor": "_declared_versions_at"
-        },
-        {
-          "level": 3,
-          "text": "`_require_version_at`",
-          "anchor": "_require_version_at"
-        },
-        {
-          "level": 3,
-          "text": "`plan_supplied_commit`",
-          "anchor": "plan_supplied_commit"
-        },
-        {
-          "level": 3,
-          "text": "`describe_supplied_commit`",
-          "anchor": "describe_supplied_commit"
-        },
-        {
-          "level": 3,
-          "text": "`apply_supplied_commit`",
-          "anchor": "apply_supplied_commit"
-        },
-        {
-          "level": 3,
-          "text": "`supplied_commit_message`",
-          "anchor": "supplied_commit_message"
         }
       ]
     },
@@ -15005,16 +14960,6 @@
           "level": 3,
           "text": "`write_release_commit`",
           "anchor": "write_release_commit"
-        },
-        {
-          "level": 3,
-          "text": "`_author_release_commit`",
-          "anchor": "_author_release_commit"
-        },
-        {
-          "level": 3,
-          "text": "`replace_unrecoverable_with_release_commit`",
-          "anchor": "replace_unrecoverable_with_release_commit"
         },
         {
           "level": 3,
@@ -21967,6 +21912,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-25T22:18:00.775231+00:00",
+  "last_gen": "2026-09-25T22:56:42.825695+00:00",
   "theme": "minimal"
 }
