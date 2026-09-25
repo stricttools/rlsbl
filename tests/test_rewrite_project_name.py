@@ -555,49 +555,39 @@ class TestRefusals:
 
 
 def build_unrecoverable(root, *, targets=ALL_TARGETS):
-    """Released 0.27.1 under PUBLISHED_MODULE from ``release_sha``, but the
-    archive is marked unrecoverable: no tag and no version-bump commit named
-    that commit when the archives were backfilled."""
+    """Released 0.27.1 under PUBLISHED_MODULE, but the archive is marked
+    unrecoverable: no tag and no version-bump commit named the commit it
+    shipped from when the archives were backfilled."""
     init_repo(root)
     _write_project(root, version="0.27.1", module=PUBLISHED_MODULE, targets=targets)
-    release_sha = _commit_all(root, "the work 0.27.1 shipped")
+    _commit_all(root, "the work 0.27.1 shipped")
     if "go" in targets:
         _move_module(root, PUBLISHED_MODULE, MOVED_MODULE)
     archive_release(root / ".rlsbl" / "releases", "0.27.1", None, unrecoverable=True)
     _write_release_file(root, targets=targets)
     _commit_all(root, "move on after the release")
-    return release_sha
 
 
 class TestUnrecoverableLatestRelease:
-    def test_a_go_target_refuses_until_the_release_commit_is_backfilled(
+    def test_a_go_target_is_refused_naming_no_command(
         self, tmp_path, monkeypatch,
     ):
+        # No command can honestly establish the commit an unrecoverable
+        # release shipped from, so the refusal names none.
         root = tmp_path / "widget"
-        release_sha = build_unrecoverable(root)
+        build_unrecoverable(root)
         before = snapshot(root)
         count = commit_count(root)
         result = rename(root, monkeypatch)
         _refused(
-            result, "0.27.1", "unrecoverable",
-            "rlsbl release backfill --version 0.27.1 --commit <sha>",
-            "the commit 0.27.1 shipped from",
+            result, "0.27.1", "marked unrecoverable in its archive",
+            "Go module path", "go-module-path event",
         )
+        assert "rlsbl " not in result.stderr, result.stderr
+        assert "`" not in result.stderr, result.stderr
         assert snapshot(root) == before
         assert commit_count(root) == count
-
-        # The fix it names, performed.
-        monkeypatch.chdir(root)
-        filled = rlsbl.app.test([
-            "release", "backfill", "--version", "0.27.1", "--commit", release_sha,
-            "--approve-consequential",
-        ])
-        assert filled.exit_code == 0, filled.stdout + filled.stderr
-
-        result = rename(root, monkeypatch)
-        assert result.exit_code == 0, result.stdout + result.stderr
-        assert ("go-module-path", PUBLISHED_MODULE, RENAMED_MODULE, "0.28.0") in (
-            identity_events(root))
+        assert identity_events(root) == []
 
     def test_a_project_without_a_go_target_is_not_refused(
         self, tmp_path, monkeypatch,
