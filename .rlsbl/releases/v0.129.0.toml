@@ -32,3 +32,7 @@ establish that honestly, so the refusal names none.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "5c5400a2b13b35500da88eb3116a5d767cb22b28"
+
+[tree_hashes]
+"." = "f88c55bc79ae19dc4112fff4c35d6f95813e58ec"
