@@ -2,11 +2,15 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "patch"
 # Short description of this release (required)
-description = ""
+description = "A renamed releasable's past releases keep the tags they shipped under"
 # Optional context explaining why these changes were made
-context = ""
+context = """
+rlsbl monorepo rename-releasable's own rule is that historical releases stay under the old prefix, but the ref authority made the current scheme's spelling every archived version's primary ref, and the rename never recorded the spelling its past releases shipped under. In a renamed workspace, rlsbl release reconcile therefore planned to push new-name tags and create a second GitHub Release for every version whose Release already stands under its old tag.
+
+The archive's shipped_as field now decides a version's primary ref, rename-releasable writes it, and re-running rename-releasable repairs a workspace renamed before it did. This reverses the earlier rule under which reconcile minted the current spelling for such versions; a tag or GitHub Release it already minted stays explained and counts as the version's own.
+"""
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
