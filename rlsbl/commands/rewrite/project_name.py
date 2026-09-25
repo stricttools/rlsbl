@@ -284,14 +284,13 @@ def _published_module_path(root, rel_dir, plan):
         )
         return None
     if fact.unrecoverable:
+        # The refusal names no command: nothing can establish honestly which
+        # commit an unrecoverable release shipped from.
         raise ProjectRenameError(
-            f"the latest release, {fact.version}, is marked unrecoverable: its "
-            f"archive records no release commit, so the Go module path it "
-            f"published cannot be read from go.mod at that commit, and the "
-            f"go-module-path event this rename records needs it. Record the "
-            f"commit with `rlsbl release backfill --version {fact.version} "
-            f"--commit <sha>`, where <sha> is the commit {fact.version} shipped "
-            f"from, and re-run."
+            f"the latest release, {fact.version}, is marked unrecoverable in "
+            f"its archive, so rlsbl's record cannot establish the Go module "
+            f"path that release published, and the go-module-path event this "
+            f"rename must record cannot be written."
         )
     entry = read_entry(releases_dir, fact.version, cwd=root)
     go_mod = "go.mod" if rel_dir in ("", ".") else f"{rel_dir}/go.mod"
