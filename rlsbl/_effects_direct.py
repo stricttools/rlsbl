@@ -23,9 +23,7 @@ import os
 import shutil
 import socket
 import stat
-import io
 import subprocess
-import tarfile
 import tempfile
 import urllib.request
 
@@ -228,30 +226,6 @@ def temp_file(content, *, prefix=None, suffix=None, dir=None, encoding="utf-8"):
     with os.fdopen(fd, "w", encoding=encoding) as f:
         f.write(content)
     return path
-
-
-def extract_tar_files(data, dest):
-    """Write the regular files of the tar stream *data* under *dest*.
-
-    Only regular files and directories are materialized; links and special
-    entries are skipped, and a member whose name is absolute or climbs out of
-    *dest* is refused, so an archive can never write outside the directory it
-    is extracted into.
-    """
-    root = os.path.realpath(dest)
-    with tarfile.open(fileobj=io.BytesIO(data), mode="r:") as archive:
-        for member in archive:
-            target = os.path.realpath(os.path.join(root, member.name))
-            if os.path.isabs(member.name) or not (
-                    target == root or target.startswith(root + os.sep)):
-                raise ValueError(f"refusing tar member outside {dest}: {member.name!r}")
-            if member.isdir():
-                os.makedirs(target, exist_ok=True)
-            elif member.isfile():
-                os.makedirs(os.path.dirname(target), exist_ok=True)
-                source = archive.extractfile(member)
-                with open(target, "wb") as f:
-                    f.write(source.read())
 
 
 # ---------------------------------------------------------------------------

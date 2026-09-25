@@ -178,8 +178,8 @@ def register_release_checks(app):
                 if local_commit is None:
                     if release_commit is None:
                         # The archive records this version as UNRECOVERABLE:
-                        # no commit is recorded, so there is nothing to
-                        # recreate the ref at and no repair to name.
+                        # its commit is permanently unrecoverable, so there is
+                        # nothing to recreate the ref at and no repair to name.
                         # Counted and surfaced rather than passed over silently,
                         # but not reported as a fixable error -- a check that
                         # can never go green is a check people stop reading.
