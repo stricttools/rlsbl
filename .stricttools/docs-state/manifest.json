@@ -1103,11 +1103,6 @@
           "anchor": "flags-7"
         },
         {
-          "level": 3,
-          "text": "Constraints",
-          "anchor": "constraints"
-        },
-        {
           "level": 2,
           "text": "release reconcile",
           "anchor": "release-reconcile"
@@ -21912,6 +21907,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-25T22:56:42.825695+00:00",
+  "last_gen": "2026-09-25T22:58:42.342790+00:00",
   "theme": "minimal"
 }
