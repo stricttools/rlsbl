@@ -110,7 +110,7 @@ def validate_no_authored_release_commit(release_config):
     direction -- each states something about a version whose fate is already
     settled, which a file describing the NEXT release cannot know:
 
-    * ``unrecoverable`` is the backfill pass's record that an ALREADY
+    * ``unrecoverable`` is the backfill pass's permanent record that an ALREADY
       SHIPPED version's commit could not be recovered. The candidate has not
       been created here, let alone lost.
     * ``never_released`` says a version NUMBER exists that no release ever used.
