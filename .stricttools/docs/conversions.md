@@ -1,5 +1,5 @@
 +++
-description = "Moving a releasable between repositories: extract's two engines and absorb, tag policy, tree and release commit verification, splitting a releasable, and the transition record with every event kind it holds and the ones an operator declares."
+description = "Moving a releasable between repositories: extract's two engines and absorb, tag policy, tree and release commit verification, splitting a releasable, renaming a standalone project's published identity, and the transition record with every event kind it holds and the ones an operator declares."
 +++
 
 # Repository conversions
@@ -235,7 +235,7 @@ Every remedy that applies is printed, because one edge can be declared in more t
 | --------- | ------------------------------ |
 | Python | `rlsbl rewrite uv-path-sources` deletes the `[tool.uv.sources]` entry and floors the dependency at the version the lock resolves. It reads the lock beside the manifest, or the uv-workspace lock of the nearest ancestor declaring `[tool.uv.workspace]` whose globs claim the directory; when neither exists it says so and the edit is by hand. See [rlsbl rewrite](cli-rewrite.md). |
 | Go | `rlsbl rewrite go-module-path --from-module <old> --to-module <new>`, run at the repository root **before** extracting, since the module path moves with the code. |
-| npm | A hand edit: replace the workspace spec with a published range and drop the member from any `workspaces` array. No rewrite command owns `package.json`. |
+| npm | A hand edit: replace the workspace spec with a published range and drop the member from any `workspaces` array. No rewrite command edits the dependency entries of `package.json`. |
 | Declared | Remove the name from `depends_on` in `.rlsbl-monorepo/workspace.toml`. |
 
 Edges in the other direction -- from a departing member to one that stays -- are reported in the plan, not refused. That reference becomes an ordinary registry dependency, which is resolvable; the inbound direction is refused because it would leave a repository that stays behind pointing at nothing.
@@ -325,6 +325,40 @@ Extract has no state file and no resume, because everything before its last step
 - **A failure inside the source-side edit** is the one case that needs a hand. That step appends the departure record, declares the floors, deletes the departed directories, rewrites `workspace.toml`, re-runs sync, regenerates the snapshot and commits all of it as one commit. A crash part-way leaves those edits uncommitted in the source's working tree, and the completed destination beside it. The deletions went through `saferm` unless `--delete-with-rm` was passed, so they are recoverable; the rest is ordinary uncommitted work. Finish or revert it by hand -- a re-run will refuse anyway, because the target path now exists and the source tree is dirty.
 - **A leftover dirty tree after the commit** is reported rather than swept up: each step commits the files it wrote, so anything left belongs to something else.
 
+## Renaming a standalone project
+
+A conversion moves a releasable and keeps its name. Renaming a standalone project's **published identity** -- the package name consumers install and the Go module path they import -- is `rlsbl rewrite project-name`:
+
+```
+rlsbl rewrite project-name --from widget --to gadget --dry-run
+rlsbl rewrite project-name --from widget --to gadget --approve-consequential
+```
+
+It renames only the identities rlsbl owns:
+
+- **The package name** in the manifest of every target whose `package_rename` support axis is `manifest-field` (see [Release targets](targets.md)), found through the targets' configured paths: `package.json` `"name"` for npm and `pyproject.toml` `[project].name` for PyPI. Repository, homepage, and issue URLs are left alone, and so are command names -- npm `bin` and PyPI `[project.scripts]` entries.
+- **The Go module path**, for a Go target: the current path's last element is replaced by `--to`, through the same sweep as `rlsbl rewrite go-module-path`. The new path is derived only when that last element is `--from`; otherwise the command refuses and names the `rlsbl rewrite go-module-path` invocation to run by hand first.
+- **The transition record**: one `identity-transition` event per changed identity, in `.rlsbl/transitions.jsonl`. A `package-name` event from `--from` to `--to`, and a `go-module-path` event from the module path the **latest release published** -- read from `go.mod` at that release's commit, which the release archives record, not from the working tree -- to the new path. A project that has never released gets no `go-module-path` event, and says so.
+
+The effective version of every event is the version the next release ships, decided by the release flow's own rule: the current version plus the bump in `.rlsbl/releases/unreleased.toml`, or the current version as-is for a first release. From that version on, `rlsbl release reconcile` refuses to recreate an earlier version's Go refs under the new identity.
+
+The rename is committed as one commit and the record as a second. A crash between them is completed by re-running: a manifest that already declares `--to` counts as renamed, and an event already recorded is not appended again.
+
+Every refusal comes before anything is written, and each names what to do instead:
+
+| Refusal | What to do |
+| ------- | ---------- |
+| The project is inside a monorepo workspace | Rename the releasable with `rlsbl monorepo rename-releasable` |
+| `--from` is not the name the manifests declare | Re-run with the declared name |
+| `--from` equals `--to` | Pass the new name as `--to` |
+| `--to` is not a valid package name for a target it is written to (npm's rules for a new package, PEP 508 for PyPI, or a Go package name that is invalid, taken by the standard library, or discouraged) | Re-run with a name every target accepts; a discouraged Go name is answered with its clean spelling |
+| A target rlsbl does not rename still declares `--from` | Edit the field its `package_name_field` names by hand, commit, and re-run |
+| The Go module path's last element is not `--from` | Move the module with `rlsbl rewrite go-module-path`, commit, and re-run |
+| `.rlsbl/releases/unreleased.toml` is missing | Run `rlsbl release init`, set its bump and description, commit, and re-run |
+| The working tree is dirty | Commit or remove the changes, and re-run |
+
+It moves no source directory, contacts no registry, renames no repository, deprecates nothing, and writes no changelog entry. Its closing message lists what remains, in order: the source directories whose paths carry the old name (an `install_paths` entry, a Python package directory) and the code that imports them, the `install_paths` entries to update, `rlsbl scaffold` to regenerate what follows the source layout and the module path, each command name still spelling the old name, the GitHub repository, and the `rlsbl changelog add --type breaking` entry for the rename.
+
 ## Transition records
 
 A transition record is an append-only JSONL file, one event per line, recording what a conversion actually did. It **records history and never drives it** -- nothing in rlsbl branches on a transition record event. A reader consults the record to explain a divergence it has already observed, which is what makes it useful to later repair machinery, and what keeps it from becoming a hidden switch that changes behavior depending on a file's contents.
@@ -348,7 +382,7 @@ The workspace-scoped home exists because a departure is a fact about the source 
 | `release-commit-remap` | Release commits moved: the rewrite that moved them, and every old-SHA-to-new-SHA pair |
 | `boundary-alias` | An alias tag was created: the post-conversion name, the pre-conversion name it aliases, and the commit |
 | `departed-globs` | Written in the **source** of an extract: the tag globs that stopped belonging here, and where they went |
-| `identity-transition` | A published identity changed (a Go module path, a package name), effective from a stated version |
+| `identity-transition` | A published identity changed (a Go module path, a package name), effective from a stated version. Written by `rlsbl rewrite project-name` -- see [Renaming a standalone project](#renaming-a-standalone-project) |
 | `promotion-split-map` | A mirror was promoted: the subtree-split correspondence it produced |
 | `release-history-closed` | A member's or releasable's release history is deliberately closed: the subject and an operator reason. Not written by a conversion — an operator declares it with `rlsbl transition record` |
 | `non-version-tag` | One tag stands deliberately outside the version model: its name and an operator reason. Not written by a conversion — an operator declares it with `rlsbl transition record` |
