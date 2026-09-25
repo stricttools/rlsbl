@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.127.2",
+  "version": "0.127.3",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
   "language": "python",
   "base_url": "https://smmh.dev/rlsbl",
@@ -1619,6 +1619,11 @@
           "level": 3,
           "text": "Extract has no resume",
           "anchor": "extract-has-no-resume"
+        },
+        {
+          "level": 2,
+          "text": "Renaming a standalone project",
+          "anchor": "renaming-a-standalone-project"
         },
         {
           "level": 2,
@@ -8884,6 +8889,16 @@
         },
         {
           "level": 3,
+          "text": "`is_first_release`",
+          "anchor": "is_first_release"
+        },
+        {
+          "level": 3,
+          "text": "`next_release_version`",
+          "anchor": "next_release_version"
+        },
+        {
+          "level": 3,
           "text": "`compute_release_version`",
           "anchor": "compute_release_version"
         },
@@ -9557,6 +9572,108 @@
           "level": 3,
           "text": "`cmd_go_module_path`",
           "anchor": "cmd_go_module_path"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-commands-rewrite-project_name.md",
+      "title": "rlsbl.commands.rewrite.project_name",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.commands.rewrite.project_name",
+          "anchor": "rlsblcommandsrewriteproject_name"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.commands.rewrite.project_name`",
+          "anchor": "rlsblcommandsrewriteproject_name"
+        },
+        {
+          "level": 3,
+          "text": "`ProjectRenameError`",
+          "anchor": "projectrenameerror"
+        },
+        {
+          "level": 3,
+          "text": "`ManifestStep`",
+          "anchor": "manifeststep"
+        },
+        {
+          "level": 3,
+          "text": "`GoStep`",
+          "anchor": "gostep"
+        },
+        {
+          "level": 4,
+          "text": "`needed`",
+          "anchor": "needed"
+        },
+        {
+          "level": 3,
+          "text": "`RenamePlan`",
+          "anchor": "renameplan"
+        },
+        {
+          "level": 3,
+          "text": "`rename_commit_message`",
+          "anchor": "rename_commit_message"
+        },
+        {
+          "level": 3,
+          "text": "`_observe_names`",
+          "anchor": "_observe_names"
+        },
+        {
+          "level": 3,
+          "text": "`_effective_version`",
+          "anchor": "_effective_version"
+        },
+        {
+          "level": 3,
+          "text": "`_published_module_path`",
+          "anchor": "_published_module_path"
+        },
+        {
+          "level": 3,
+          "text": "`_plan_remaining_steps`",
+          "anchor": "_plan_remaining_steps"
+        },
+        {
+          "level": 3,
+          "text": "`prepare`",
+          "anchor": "prepare"
+        },
+        {
+          "level": 3,
+          "text": "`observe`",
+          "anchor": "observe"
+        },
+        {
+          "level": 3,
+          "text": "`record_identity_transitions`",
+          "anchor": "record_identity_transitions"
+        },
+        {
+          "level": 3,
+          "text": "`apply_item`",
+          "anchor": "apply_item"
+        },
+        {
+          "level": 3,
+          "text": "`_rename_commit`",
+          "anchor": "_rename_commit"
+        },
+        {
+          "level": 3,
+          "text": "`remaining_steps`",
+          "anchor": "remaining_steps"
+        },
+        {
+          "level": 3,
+          "text": "`cmd_project_name`",
+          "anchor": "cmd_project_name"
         }
       ]
     },
@@ -13306,6 +13423,33 @@
       ]
     },
     {
+      "path": "rlsbl-package_names.md",
+      "title": "rlsbl.package_names",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.package_names",
+          "anchor": "rlsblpackage_names"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.package_names`",
+          "anchor": "rlsblpackage_names"
+        },
+        {
+          "level": 3,
+          "text": "`npm_name_problems`",
+          "anchor": "npm_name_problems"
+        },
+        {
+          "level": 3,
+          "text": "`pypi_name_problems`",
+          "anchor": "pypi_name_problems"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-pipelines-base.md",
       "title": "rlsbl.pipelines.base",
       "type": "doc",
@@ -15789,6 +15933,11 @@
         },
         {
           "level": 3,
+          "text": "`ManifestRenamePlan`",
+          "anchor": "manifestrenameplan"
+        },
+        {
+          "level": 3,
           "text": "`TemplateVars`",
           "anchor": "templatevars"
         },
@@ -15841,6 +15990,26 @@
           "level": 4,
           "text": "`read_name`",
           "anchor": "read_name"
+        },
+        {
+          "level": 4,
+          "text": "`package_rename_plan`",
+          "anchor": "package_rename_plan"
+        },
+        {
+          "level": 4,
+          "text": "`package_command_names`",
+          "anchor": "package_command_names"
+        },
+        {
+          "level": 4,
+          "text": "`package_source_dirs`",
+          "anchor": "package_source_dirs"
+        },
+        {
+          "level": 4,
+          "text": "`package_name_problems`",
+          "anchor": "package_name_problems"
         },
         {
           "level": 4,
@@ -16529,6 +16698,11 @@
         },
         {
           "level": 4,
+          "text": "`package_name_problems`",
+          "anchor": "package_name_problems"
+        },
+        {
+          "level": 4,
           "text": "`normalize_package_name`",
           "anchor": "normalize_package_name"
         },
@@ -17088,6 +17262,21 @@
         },
         {
           "level": 4,
+          "text": "`package_rename_plan`",
+          "anchor": "package_rename_plan"
+        },
+        {
+          "level": 4,
+          "text": "`package_command_names`",
+          "anchor": "package_command_names"
+        },
+        {
+          "level": 4,
+          "text": "`package_name_problems`",
+          "anchor": "package_name_problems"
+        },
+        {
+          "level": 4,
           "text": "`read_metadata`",
           "anchor": "read_metadata"
         },
@@ -17531,6 +17720,26 @@
         },
         {
           "level": 4,
+          "text": "`package_rename_plan`",
+          "anchor": "package_rename_plan"
+        },
+        {
+          "level": 4,
+          "text": "`package_command_names`",
+          "anchor": "package_command_names"
+        },
+        {
+          "level": 4,
+          "text": "`package_source_dirs`",
+          "anchor": "package_source_dirs"
+        },
+        {
+          "level": 4,
+          "text": "`package_name_problems`",
+          "anchor": "package_name_problems"
+        },
+        {
+          "level": 4,
           "text": "`read_metadata`",
           "anchor": "read_metadata"
         },
@@ -17740,6 +17949,26 @@
           "level": 4,
           "text": "`read_name`",
           "anchor": "read_name"
+        },
+        {
+          "level": 4,
+          "text": "`package_rename_plan`",
+          "anchor": "package_rename_plan"
+        },
+        {
+          "level": 4,
+          "text": "`package_command_names`",
+          "anchor": "package_command_names"
+        },
+        {
+          "level": 4,
+          "text": "`package_source_dirs`",
+          "anchor": "package_source_dirs"
+        },
+        {
+          "level": 4,
+          "text": "`package_name_problems`",
+          "anchor": "package_name_problems"
         },
         {
           "level": 4,
@@ -20204,6 +20433,11 @@
         },
         {
           "level": 3,
+          "text": "`cmd_rewrite_project_name`",
+          "anchor": "cmd_rewrite_project_name"
+        },
+        {
+          "level": 3,
           "text": "`cmd_rewrite_uv_path_sources`",
           "anchor": "cmd_rewrite_uv_path_sources"
         },
@@ -20543,6 +20777,26 @@
         },
         {
           "level": 4,
+          "text": "`package_rename_plan`",
+          "anchor": "package_rename_plan"
+        },
+        {
+          "level": 4,
+          "text": "`package_command_names`",
+          "anchor": "package_command_names"
+        },
+        {
+          "level": 4,
+          "text": "`package_source_dirs`",
+          "anchor": "package_source_dirs"
+        },
+        {
+          "level": 4,
+          "text": "`package_name_problems`",
+          "anchor": "package_name_problems"
+        },
+        {
+          "level": 4,
           "text": "`read_metadata`",
           "anchor": "read_metadata"
         },
@@ -20713,6 +20967,11 @@
         },
         {
           "level": 3,
+          "text": "`ManifestRenamePlan`",
+          "anchor": "manifestrenameplan"
+        },
+        {
+          "level": 3,
           "text": "`TemplateVars`",
           "anchor": "templatevars"
         },
@@ -20765,6 +21024,26 @@
           "level": 4,
           "text": "`read_name`",
           "anchor": "read_name-1"
+        },
+        {
+          "level": 4,
+          "text": "`package_rename_plan`",
+          "anchor": "package_rename_plan-1"
+        },
+        {
+          "level": 4,
+          "text": "`package_command_names`",
+          "anchor": "package_command_names-1"
+        },
+        {
+          "level": 4,
+          "text": "`package_source_dirs`",
+          "anchor": "package_source_dirs-1"
+        },
+        {
+          "level": 4,
+          "text": "`package_name_problems`",
+          "anchor": "package_name_problems-1"
         },
         {
           "level": 4,
@@ -21113,6 +21392,11 @@
         },
         {
           "level": 3,
+          "text": "`ManifestRenamePlan`",
+          "anchor": "manifestrenameplan-1"
+        },
+        {
+          "level": 3,
           "text": "`TemplateVars`",
           "anchor": "templatevars-1"
         },
@@ -21165,6 +21449,26 @@
           "level": 4,
           "text": "`read_name`",
           "anchor": "read_name-2"
+        },
+        {
+          "level": 4,
+          "text": "`package_rename_plan`",
+          "anchor": "package_rename_plan-2"
+        },
+        {
+          "level": 4,
+          "text": "`package_command_names`",
+          "anchor": "package_command_names-2"
+        },
+        {
+          "level": 4,
+          "text": "`package_source_dirs`",
+          "anchor": "package_source_dirs-2"
+        },
+        {
+          "level": 4,
+          "text": "`package_name_problems`",
+          "anchor": "package_name_problems-2"
         },
         {
           "level": 4,
@@ -21558,6 +21862,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-25T18:44:40.207133+00:00",
+  "last_gen": "2026-09-25T21:13:31.870826+00:00",
   "theme": "minimal"
 }

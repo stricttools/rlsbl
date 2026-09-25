@@ -156,8 +156,8 @@
     "source_docstring": "f63ecdc06d0960176c03f8e153c8f9ac925ae3dc16a8edba4ae41c09c5c57e8c"
   },
   "en/conversions.md": {
-    "content": "fc2c9f295580ed0423479180206c03e621828cc32b20914288ee7474a441ca8b",
-    "description": "b65117359f86fd82f031e460dd6d5cea3335d45396c8dcbbe94a5cdf9a7ed1bb"
+    "content": "a07c35cc7f0d46e6c6ff2b3d7b21740840a319dff06794297da44495264ffefa",
+    "description": "e8ba9c0c688803847f59d40f169e841757a8b25de723c66373f939916f867c54"
   },
   "en/dep-validation.md": {
     "content": "c0e4a4797a13500b0018062a807b5496ec7c523775e3d5f13134c0a59284bfd6",
@@ -174,9 +174,9 @@
     "description": "b752744a8a9ef0f190d20a5fefbd532e5ed046ed8c483544de1248a6f28bdbc6"
   },
   "en/gen-index.md": {
-    "content": "aaa9c62e30b52e2e4100599220261f1a7855c06ff23f5bd34b39f1723673a9f4",
-    "description": "9bec20a8dc4123a614260dfabfbbabb5cdf13e248b6931eece4b3d3ee8ca8104",
-    "seed_hash": "9bec20a8dc4123a614260dfabfbbabb5cdf13e248b6931eece4b3d3ee8ca8104"
+    "content": "2d01fc31c3019d6781d1e157108a43bc9e0034807832ee85a28074f9a261d8a2",
+    "description": "098b65880d9af7f6f68cac0b9493324d219df70208b753e7b0020b46255f29df",
+    "seed_hash": "098b65880d9af7f6f68cac0b9493324d219df70208b753e7b0020b46255f29df"
   },
   "en/import-scanning.md": {
     "content": "378896c356195ea11b911835db2d64c72bd6a5eda61bb09f6d0c1ded59258a57",
@@ -569,6 +569,11 @@
     "description": "c4b998482a8c6ebcb64223df0e0d42052de62e8d687d6dd9f4f031b842bff0b3",
     "source_docstring": "9a13b90da14a0cdb150f0d2c64605cf6e360ba737189b703ec09fc924581dbd4"
   },
+  "en/rlsbl-commands-rewrite-project_name.md": {
+    "content": "1a4e24e85e69c70cd3ec1e57b0525d922a1e80aecbba59aaeac0af1d47d96a6b",
+    "description": "2a9bdbea399640a27ef8adced6eff389fed0eb5d30cf9fcc0c21ac68274c5099",
+    "seed_hash": "2a9bdbea399640a27ef8adced6eff389fed0eb5d30cf9fcc0c21ac68274c5099"
+  },
   "en/rlsbl-commands-rewrite-uv_path_sources.md": {
     "content": "0043ad5f49363706a655b10e1074720f49998dd8eba05759957056b265f7e9cc",
     "description": "bef8b9d7bbb0919bfee1267ec5dca1e43f02434266a3287713dc77598432bf35",
@@ -862,6 +867,11 @@
     "content": "7f3331aa33ec5a56671c783ccf4a8b11c3b110186f06043ec079682ed2573eb0",
     "description": "13bd94bc0b30c00a93fe6c7dc31ac6692248d7ea2c49c599d299b82dfd82007c",
     "source_docstring": "b1e72efdbc7745a9e678d69305632a5f0b7463c0d257e08600f02bfaa1238832"
+  },
+  "en/rlsbl-package_names.md": {
+    "content": "e65aebae2d6bacbe104398d594f402b1e9fea2146960a4369ab26034ac51eeb0",
+    "description": "96646c7511472b4fabbb6f3a2e3906d1a23709994cf87127f316be45ef55cbcf",
+    "seed_hash": "96646c7511472b4fabbb6f3a2e3906d1a23709994cf87127f316be45ef55cbcf"
   },
   "en/rlsbl-pipelines-base.md": {
     "content": "eebe18746f145b494b9070ad7013191bb52d87dfb430d1dae0d23ad1497e6243",
