@@ -1,5 +1,5 @@
 +++
-description = "Every check rlsbl runs, grouped by tag, with its severity, the targets it applies to, the command a test-suite run invokes, and how a workspace run is scoped."
+description = "Every check rlsbl runs, grouped by tag, with its severity, the targets it applies to, the command a test-suite run invokes, how a workspace run is scoped, and which tags and GitHub Releases the unpublished-refs check demands of each released version."
 +++
 
 # Check system
