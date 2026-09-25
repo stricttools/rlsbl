@@ -21,3 +21,7 @@ The archive's shipped_as field now decides a version's primary ref, rename-relea
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "eb1848dc6939aadd1dfb5469c4a14288f01a4284"
+
+[tree_hashes]
+"." = "e3680a6565ee5d1a6cd3e1ebb65be7cc85c58bad"
