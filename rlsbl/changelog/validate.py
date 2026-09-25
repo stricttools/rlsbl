@@ -120,6 +120,32 @@ def filter_exempt_commits(commits: list[str], *,
     return registry.filter_commits(commits, cwd=cwd)
 
 
+def commits_needing_entries(commits, scope=None, *, covered=frozenset(),
+                            cwd: str | None = None):
+    """Which of *commits* changelog coverage asks an entry for.
+
+    The composition coverage applies, in its order: keep the commits touching
+    a file *scope* claims (every commit when *scope* is ``None``, a standalone
+    project), drop the ones *covered* already names, then drop the exempt ones
+    (:func:`filter_exempt_commits`). :func:`check_coverage` answers through it,
+    and so does a command asking whether a commit it just made needs an entry.
+
+    ``cwd`` names the repository holding *commits*, for both the scope and the
+    exemption halves.
+
+    Returns ``(needing, exempt_stats, skipped_outside_scope)``: the commits
+    that need an entry, sorted; the per-rule exemption counts; and how many of
+    *commits* the scope filtered out.
+    """
+    commits = set(commits)
+    in_scope = filter_commits_for_scope(
+        commits, scope, operation="changelog coverage check", cwd=cwd,
+    )
+    uncovered = sorted(c for c in in_scope if c not in covered)
+    needing, exempt_stats = filter_exempt_commits(uncovered, cwd=cwd)
+    return needing, exempt_stats, len(commits) - len(in_scope)
+
+
 # ---------------------------------------------------------------------------
 # Validation cache
 # ---------------------------------------------------------------------------
@@ -375,15 +401,6 @@ def check_coverage(entries: list[ChangelogEntry], releases_dir: str,
     unreleased_commits = set(_git_log_hashes(
         unreleased_range(releases_dir, tag_glob=tag_glob)))
 
-    # In monorepo mode, filter to commits touching files this scope owns
-    skipped_outside_project = 0
-    if scope is not None:
-        project_commits = filter_commits_for_scope(
-            unreleased_commits, scope, operation="changelog coverage check",
-        )
-        skipped_outside_project = len(unreleased_commits) - len(project_commits)
-        unreleased_commits = project_commits
-
     # Collect all resolved hashes from entries
     all_hashes: list[str] = []
     for entry in entries:
@@ -391,9 +408,9 @@ def check_coverage(entries: list[ChangelogEntry], releases_dir: str,
     resolved = resolve_hashes(all_hashes)
     covered = {full for full in resolved.values() if full is not None}
 
-    # Filter exempt commits from the uncovered set only
-    uncovered_commits = sorted(c for c in unreleased_commits if c not in covered)
-    non_exempt, exempt_stats = filter_exempt_commits(uncovered_commits)
+    non_exempt, exempt_stats, skipped_outside_project = commits_needing_entries(
+        unreleased_commits, scope, covered=covered,
+    )
 
     uncovered = 0
     for commit in non_exempt:

@@ -264,7 +264,7 @@ def refuse_present_stash(cwd=None, *, operation, detail, error=StashError):
         ))
 
 
-def commit_files(sha, *, operation):
+def commit_files(sha, *, operation, cwd=None):
     """Return the files a commit changed, or raise naming the commit.
 
     :func:`get_commit_files` answers ``None`` when git could not say -- a
@@ -272,8 +272,9 @@ def commit_files(sha, *, operation):
     turn that into a guess (include the commit "to be safe", or drop it), so a
     broken read silently changed which member a commit was charged to.  It is
     a hard error instead, naming the commit and the operation that asked.
+    ``cwd`` names the repository to ask, as for :func:`get_commit_files`.
     """
-    files = get_commit_files(sha)
+    files = get_commit_files(sha, cwd=cwd)
     if files is None:
         raise OwnershipError(
             f"cannot determine the files changed by commit {sha} "
@@ -294,7 +295,7 @@ def commit_owner_names(sha, members, *, operation) -> set:
     return owner_names_of_files(commit_files(sha, operation=operation), members)
 
 
-def filter_commits_for_scope(commits, scope, *, operation):
+def filter_commits_for_scope(commits, scope, *, operation, cwd=None):
     """Filter *commits* to those touching a file owned by a member in *scope*.
 
     *scope* is an :class:`~rlsbl.ownership.OwnershipScope`, which carries the
@@ -302,13 +303,14 @@ def filter_commits_for_scope(commits, scope, *, operation):
     both, because a file's owner is decided against every member, not just the
     ones the caller cares about.  A releasable's scope additionally claims its
     own state directory, which no member's declared path covers.  ``None``
-    means "no workspace" and returns *commits* unchanged.
+    means "no workspace" and returns *commits* unchanged.  ``cwd`` names the
+    repository holding *commits*, as for :func:`get_commit_files`.
     """
     if scope is None:
         return set(commits)
     filtered = set()
     for sha in commits:
-        if scope.claims_any(commit_files(sha, operation=operation)):
+        if scope.claims_any(commit_files(sha, operation=operation, cwd=cwd)):
             filtered.add(sha)
     return filtered
 

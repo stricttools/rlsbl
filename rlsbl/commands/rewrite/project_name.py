@@ -573,8 +573,20 @@ def _rename_commit(root, old, new):
     return out.strip() or None
 
 
+def _needs_entry(root, sha):
+    """Does changelog coverage ask an entry for the commit *sha*?"""
+    from ...changelog.validate import commits_needing_entries
+
+    needing, _stats, _skipped = commits_needing_entries([sha], cwd=root)
+    return bool(needing)
+
+
 def remaining_steps(plan, rename_sha):
-    """What the caller does next, in order."""
+    """What the caller does next, in order.
+
+    The changelog step is listed unless the rename commit exists and changelog
+    coverage asks no entry for it.
+    """
     steps = []
     if plan.source_dirs:
         steps.append(
@@ -609,6 +621,8 @@ def remaining_steps(plan, rename_sha):
     )
     if plan.go is not None:
         description += f", and the Go module path is {plan.go.new}"
+    if rename_sha and not _needs_entry(plan.root, rename_sha):
+        return steps
     commits = rename_sha[:12] if rename_sha else "<the rename commit>"
     steps.append(
         "Add a breaking changelog entry for the rename: rlsbl changelog add "
