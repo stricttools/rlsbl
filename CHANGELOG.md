@@ -2,6 +2,21 @@
 
 # Changelog
 
+## 0.127.3
+
+Re-running rename-releasable repairs a renamed releasable without failing
+
+<details>
+<summary>Context</summary>
+
+0.127.2 made re-running rlsbl monorepo rename-releasable the repair that records shipped_as on a releasable renamed before the rename did. On a real repository the re-run failed: it staged the removal of the tracked publish cache, sync rewrote it unchanged, and the rename commit was refused as empty. Its alias step could also record and push an alias for a version released after the rename.
+
+</details>
+
+### Fixes
+
+- **Re-running `rlsbl monorepo rename-releasable` works on a completed rename.** The re-run that records `shipped_as` on an already-renamed releasable no longer fails with an empty commit after dropping and regenerating the publish cache, and no longer records or pushes an alias for a version released after the rename.
+
 ## 0.127.2
 
 A renamed releasable's past releases keep the tags they shipped under
