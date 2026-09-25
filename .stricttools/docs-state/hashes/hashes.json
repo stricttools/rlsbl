@@ -571,7 +571,7 @@
   },
   "en/rlsbl-commands-rewrite-project_name.md": {
     "content": "1a4e24e85e69c70cd3ec1e57b0525d922a1e80aecbba59aaeac0af1d47d96a6b",
-    "description": "2a9bdbea399640a27ef8adced6eff389fed0eb5d30cf9fcc0c21ac68274c5099",
+    "description": "27ece3de477150ff3d697f1cbb20e3a79ef9d988be951a60fa686e159ea8c3bc",
     "seed_hash": "2a9bdbea399640a27ef8adced6eff389fed0eb5d30cf9fcc0c21ac68274c5099",
     "source_docstring": "5b4b2072221571eaaa9d50b76937d1a1d284bb2eb6609650e0ca1120fe8ad8e3"
   },
@@ -871,7 +871,7 @@
   },
   "en/rlsbl-package_names.md": {
     "content": "e65aebae2d6bacbe104398d594f402b1e9fea2146960a4369ab26034ac51eeb0",
-    "description": "96646c7511472b4fabbb6f3a2e3906d1a23709994cf87127f316be45ef55cbcf",
+    "description": "9c48d05d2160fbfa4f4e5544a1fe7adb09375896b89409cea38eac0f97e6f156",
     "seed_hash": "96646c7511472b4fabbb6f3a2e3906d1a23709994cf87127f316be45ef55cbcf",
     "source_docstring": "d0832bacbbd9741d6556b607cb39f5121864494cb387cc9ca44a3f2ad87c1fd0"
   },
