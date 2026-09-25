@@ -2,11 +2,24 @@
 format_version = 1
 # Version bump type: patch, minor, major, infra, or prerelease
 #   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
-bump = ""
+bump = "minor"
 # Short description of this release (required)
-description = ""
+description = "New `rlsbl rewrite project-name` command renames a standalone project's published identity: npm and PyPI package names, the Go module path, and the identity-transition record."
 # Optional context explaining why these changes were made
-context = ""
+context = '''
+A standalone project could not rename its published identity through rlsbl:
+monorepo rename-releasable covers releasables and rewrite go-module-path covers
+a Go module path, but nothing renamed the package names in the manifests or
+recorded the change. The new command renames the package name in every target
+manifest whose target renames it, moves the Go module path to one ending in the
+new name, and records one identity-transition event per changed identity. The
+Go event starts from the module path the latest release published, read from
+go.mod at that release's commit. Every event's effective version is the version
+the next release ships, decided by the same rule the release flow applies. The
+rename and the record are two commits, so a re-run completes an interrupted
+rename. Every release target now declares whether rlsbl renames its package
+name, and where that name is declared.
+'''
 # Pre-release channel: alpha, beta, rc, or stable (ordered;
 # demotion is an error). With patch/minor/major it ENTERS the
 # channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
