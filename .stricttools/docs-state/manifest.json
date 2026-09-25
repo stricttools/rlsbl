@@ -1131,6 +1131,16 @@
         },
         {
           "level": 2,
+          "text": "rewrite project-name",
+          "anchor": "rewrite-project-name"
+        },
+        {
+          "level": 3,
+          "text": "Flags",
+          "anchor": "flags-1"
+        },
+        {
+          "level": 2,
           "text": "rewrite uv-path-sources",
           "anchor": "rewrite-uv-path-sources"
         }
@@ -21862,6 +21872,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-25T21:13:31.870826+00:00",
+  "last_gen": "2026-09-25T21:13:51.617057+00:00",
   "theme": "minimal"
 }

@@ -25,6 +25,19 @@ Rename a Go module path across the repository. Rewrites the module-path tokens i
 | `--from-module` |  | str | required |  | The Go module path being renamed away from. It need not be DECLARED here: a repository that only references the module is a consumer following an upstream move, and the plan reports that as a fact while rewriting the references. What is required is that something references it -- a path with zero occurrences anywhere in the repository is a hard error, because the overwhelmingly likely cause is a typo. |
 | `--to-module` |  | str | required |  | The Go module path to rename to. It is written into every go.mod token naming the old path and into every import site under it, so it must be the module path consumers will resolve after the move -- not a directory, and not a package path inside the module. |
 
+## rewrite project-name
+
+Rename a standalone project's published identity. Rewrites the package name in every target manifest whose target renames it (npm package.json "name", PyPI pyproject.toml [project].name), located through the targets' configured paths, and for a Go target moves the module path to one whose last element is --to, through the same rewrite as `rlsbl rewrite go-module-path`. Records one identity-transition event per changed identity in .rlsbl/transitions.jsonl: package-name from --from to --to, and go-module-path from the module path the latest release published (read from go.mod at that release's commit) to the new one. The effective version is the version the next release ships: the current version plus the bump in .rlsbl/releases/unreleased.toml, or the current version as-is for a project that has never released. The rename and the record are committed separately, so a crash between them is completed by re-running. Nothing else is touched: no source directory is moved, no command name (npm bin, PyPI [project.scripts]) is renamed, no registry is contacted, and no repository is renamed; the closing message lists those remaining steps in order. Refuses, before writing anything, inside a monorepo workspace, when --from is not the name the manifests declare, when --from equals --to or --to is not a valid package name for a target it renames, when a target rlsbl does not rename still declares --from, when the release file is missing, and on a dirty working tree. Use --dry-run to print the per-file plan with occurrence counts and the events it would record.
+
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+
+### Flags
+
+| Name | Short | Type | Presence | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--from` |  | str | required |  | The package name being renamed away from. It must be the name every renamed manifest declares (a manifest that already declares --to counts as renamed), and the last element of the Go module path when there is a Go target. |
+| `--to` |  | str | required |  | The new package name. It must be a valid package name for every target it is written to: npm's rules for a new package, PEP 508 for PyPI, and an available, non-discouraged Go package name for a Go module path's last element. |
+
 ## rewrite uv-path-sources
 
 Convert path- and workspace-sourced Python dependencies into registry constraints floored at the version uv.lock resolves. Covers [project].dependencies, every [project.optional-dependencies] extra and every PEP 735 [dependency-groups] group, and deletes the matching [tool.uv.sources] entry so it stops overriding the new constraint. Each converted name is added to internal_dep_floors in .rlsbl/config.json. A locked version that is not published on PyPI is a hard error naming the remedy (release that dependency first), and so is a registry probe that fails to answer. Use --dry-run to print the per-dependency plan with entry counts.
