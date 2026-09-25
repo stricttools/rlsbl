@@ -2,7 +2,7 @@
   "schema_version": 1,
   "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.127.0",
+  "version": "0.127.1",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
   "language": "python",
   "base_url": "https://smmh.dev/rlsbl",
@@ -7620,13 +7620,23 @@
         },
         {
           "level": 3,
+          "text": "`_record_shipped_as_on_past_releases`",
+          "anchor": "_record_shipped_as_on_past_releases"
+        },
+        {
+          "level": 3,
           "text": "`_finish_alias_tag`",
           "anchor": "_finish_alias_tag"
         },
         {
           "level": 3,
-          "text": "`_unmanaged_history_note`",
-          "anchor": "_unmanaged_history_note"
+          "text": "`_history_note`",
+          "anchor": "_history_note"
+        },
+        {
+          "level": 3,
+          "text": "`_report_shipped_as`",
+          "anchor": "_report_shipped_as"
         },
         {
           "level": 3,
@@ -14764,6 +14774,11 @@
         },
         {
           "level": 3,
+          "text": "`write_shipped_as`",
+          "anchor": "write_shipped_as"
+        },
+        {
+          "level": 3,
           "text": "`write_release_notice`",
           "anchor": "write_release_notice"
         },
@@ -15005,6 +15020,11 @@
           "level": 4,
           "text": "`recorded`",
           "anchor": "recorded"
+        },
+        {
+          "level": 4,
+          "text": "`tag`",
+          "anchor": "tag"
         },
         {
           "level": 3,
@@ -17894,6 +17914,11 @@
           "anchor": "tags"
         },
         {
+          "level": 4,
+          "text": "`spellings`",
+          "anchor": "spellings"
+        },
+        {
           "level": 3,
           "text": "`ref_context`",
           "anchor": "ref_context"
@@ -17905,13 +17930,18 @@
         },
         {
           "level": 3,
-          "text": "`_shipped_as_aliases`",
-          "anchor": "_shipped_as_aliases"
+          "text": "`_shipped_as`",
+          "anchor": "_shipped_as"
         },
         {
           "level": 3,
-          "text": "`recorded_alias_groups`",
-          "anchor": "recorded_alias_groups"
+          "text": "`shipped_tag`",
+          "anchor": "shipped_tag"
+        },
+        {
+          "level": 3,
+          "text": "`tag_as_shipped`",
+          "anchor": "tag_as_shipped"
         },
         {
           "level": 3,
@@ -21523,6 +21553,6 @@
       ]
     }
   ],
-  "last_gen": "2026-09-24T22:58:10.668320+00:00",
+  "last_gen": "2026-09-25T18:29:45.372287+00:00",
   "theme": "minimal"
 }
