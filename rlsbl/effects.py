@@ -73,6 +73,11 @@ below is the whole set:
   :func:`observe_scratch_dirs` -- same reason as ``observe_scratch_files``,
   for the directory an allowlisted observe writes into rather than for the
   files it reads.  Outside that block both record as usual.
+* :func:`observe_commit_files` -- a commit's files materialized in a scratch
+  directory so a reader that only reads from disk (a target's
+  ``read_version``) can be asked what that commit declared.  The read is the
+  point of the call and a preview must perform it for real; the directory is
+  created, filled and deleted inside the call, and nothing about it survives.
 
 Everything else, including :func:`mkdtemp` and :func:`temp_file` in every
 other context, records.
@@ -670,6 +675,36 @@ def observe_scratch_files(items, *, dir=None):
                 _direct.remove(path)
             except OSError:
                 pass
+
+
+@contextmanager
+def observe_commit_files(repo, sha, paths, *, timeout=60):
+    """Yield a scratch directory holding the files *paths* carry at *sha*.
+
+    Real in every mode, like :func:`observe_scratch_files` and for the same
+    reason: the consumer only reads, and under --dry-run a recorded stand-in
+    would leave it reading absent paths and reporting a failure that is about
+    the preview rather than about the commit.  The files come from ``git
+    archive`` (an allowlisted observe), are written into a directory this call
+    creates, and are deleted when the block exits.
+
+    Raises :class:`subprocess.CalledProcessError` when git cannot archive the
+    commit or a path.
+    """
+    scratch = _direct.mkdtemp(prefix="rlsbl-commit-")
+    try:
+        result = run(
+            ["git", "archive", "--format=tar", sha, "--", *paths],
+            cwd=repo, capture_output=True, timeout=timeout,
+        )
+        if result.returncode != 0:
+            raise subprocess.CalledProcessError(
+                result.returncode, result.args, result.stdout, result.stderr,
+            )
+        _direct.extract_tar_files(result.stdout, scratch)
+        yield scratch
+    finally:
+        _direct.rmtree(scratch, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------
