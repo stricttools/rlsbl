@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.commands.rewrite"
-description = "The rlsbl rewrite command group: working-tree rewrites previewed per file, whose occurrence counts are the contract an apply re-derives before it writes."
+description = "The rlsbl rewrite command group: working-tree rewrites previewed per file, whose occurrence counts an apply re-derives before it writes; project-name also commits identity transitions."
 generated = true
 nav_group = "API Reference"
 nav_order = 69
