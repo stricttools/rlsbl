@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.commands.rewrite.project_name"
-description = "Rename a standalone project's published identity."
+description = "Renames a standalone project's package names and Go module path, and records identity-transition events effective from the next release."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 72
 +++

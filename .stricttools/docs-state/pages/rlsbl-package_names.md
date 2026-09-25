@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.package_names"
-description = "Offline judgement of a package name against a registry's published naming rules."
+description = "Judges a candidate package name offline against npm's rules for a new package and PEP 508's name grammar for PyPI."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 126
 +++
