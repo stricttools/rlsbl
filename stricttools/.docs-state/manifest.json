@@ -1054,6 +1054,11 @@
         },
         {
           "level": 2,
+          "text": "release abandon",
+          "anchor": "release-abandon"
+        },
+        {
+          "level": 2,
           "text": "release deprecate",
           "anchor": "release-deprecate"
         },
@@ -3456,6 +3461,11 @@
           "level": 3,
           "text": "Release state and resume",
           "anchor": "release-state-and-resume"
+        },
+        {
+          "level": 3,
+          "text": "Abandoning an attempt",
+          "anchor": "abandoning-an-attempt"
         },
         {
           "level": 3,
@@ -8083,6 +8093,11 @@
         },
         {
           "level": 3,
+          "text": "`refuse_never_released_archive`",
+          "anchor": "refuse_never_released_archive"
+        },
+        {
+          "level": 3,
           "text": "`require_recorded_candidate`",
           "anchor": "require_recorded_candidate"
         },
@@ -8929,13 +8944,23 @@
         },
         {
           "level": 3,
-          "text": "`is_first_release`",
-          "anchor": "is_first_release"
+          "text": "`ReleaseVersionDecision`",
+          "anchor": "releaseversiondecision"
         },
         {
           "level": 3,
-          "text": "`next_release_version`",
-          "anchor": "next_release_version"
+          "text": "`_bumped`",
+          "anchor": "_bumped"
+        },
+        {
+          "level": 3,
+          "text": "`_refuse_never_released_reuse`",
+          "anchor": "_refuse_never_released_reuse"
+        },
+        {
+          "level": 3,
+          "text": "`decide_release_version`",
+          "anchor": "decide_release_version"
         },
         {
           "level": 3,
@@ -9088,6 +9113,58 @@
           "level": 3,
           "text": "`_run_cmd_inner`",
           "anchor": "_run_cmd_inner"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-commands-release_abandon.md",
+      "title": "rlsbl.commands.release_abandon",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.commands.release_abandon",
+          "anchor": "rlsblcommandsrelease_abandon"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.commands.release_abandon`",
+          "anchor": "rlsblcommandsrelease_abandon"
+        },
+        {
+          "level": 3,
+          "text": "`AbandonError`",
+          "anchor": "abandonerror"
+        },
+        {
+          "level": 3,
+          "text": "`abandon_remedy`",
+          "anchor": "abandon_remedy"
+        },
+        {
+          "level": 3,
+          "text": "`leftover_state_remedy`",
+          "anchor": "leftover_state_remedy"
+        },
+        {
+          "level": 3,
+          "text": "`_github_release_exists`",
+          "anchor": "_github_release_exists"
+        },
+        {
+          "level": 3,
+          "text": "`_version_files_version`",
+          "anchor": "_version_files_version"
+        },
+        {
+          "level": 3,
+          "text": "`_latest_released_below`",
+          "anchor": "_latest_released_below"
+        },
+        {
+          "level": 3,
+          "text": "`run_cmd`",
+          "anchor": "run_cmd"
         }
       ]
     },
@@ -15272,8 +15349,23 @@
         },
         {
           "level": 3,
-          "text": "`version_is_archived`",
-          "anchor": "version_is_archived"
+          "text": "`VersionFate`",
+          "anchor": "versionfate"
+        },
+        {
+          "level": 4,
+          "text": "`released`",
+          "anchor": "released"
+        },
+        {
+          "level": 3,
+          "text": "`_archive_fate`",
+          "anchor": "_archive_fate"
+        },
+        {
+          "level": 3,
+          "text": "`read_version_fate`",
+          "anchor": "read_version_fate"
         },
         {
           "level": 3,
@@ -20208,6 +20300,11 @@
         },
         {
           "level": 3,
+          "text": "`cmd_release_abandon`",
+          "anchor": "cmd_release_abandon"
+        },
+        {
+          "level": 3,
           "text": "`cmd_release_deprecate`",
           "anchor": "cmd_release_deprecate"
         },
@@ -21907,10 +22004,47 @@
       ]
     }
   ],
-  "last_gen": "2026-09-26T20:16:29.533046+00:00",
+  "last_gen": "2026-09-26T22:54:04.118107+00:00",
   "theme": "minimal",
   "vocabulary": {
-    "accepted": [],
+    "accepted": [
+      {
+        "word": "pgdesign",
+        "aliases": []
+      },
+      {
+        "word": "prs",
+        "aliases": []
+      },
+      {
+        "word": "rdeps",
+        "aliases": []
+      },
+      {
+        "word": "releasables",
+        "aliases": []
+      },
+      {
+        "word": "rlsbl",
+        "aliases": []
+      },
+      {
+        "word": "safegit",
+        "aliases": []
+      },
+      {
+        "word": "saferm",
+        "aliases": []
+      },
+      {
+        "word": "strictspec",
+        "aliases": []
+      },
+      {
+        "word": "testisolation",
+        "aliases": []
+      }
+    ],
     "rejected": []
   }
 }

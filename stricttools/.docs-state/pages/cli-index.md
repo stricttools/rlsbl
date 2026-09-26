@@ -10,7 +10,7 @@ nav_order = 91
 
 # rlsbl CLI Reference
 
-Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding. Ships 57 commands organized into 13 top-level commands and 6 command groups (release, changelog, monorepo, dev, rewrite, transition). Covers 17 release targets: npm, pypi, go, swift, swift-apple, spec, hex, deno, dart, docker, flutter, maven, native-android, native-ios, zig, pgdesign, plain.
+Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding. Ships 58 commands organized into 13 top-level commands and 6 command groups (release, changelog, monorepo, dev, rewrite, transition). Covers 17 release targets: npm, pypi, go, swift, swift-apple, spec, hex, deno, dart, docker, flutter, maven, native-android, native-ios, zig, pgdesign, plain.
 
 Version: :-: var key="project.version"
 
@@ -32,7 +32,7 @@ Version: :-: var key="project.version"
 
 ## Command Groups
 
-- [release](../cli-release/) -- Release orchestration commands covering the full release lifecycle. Provides 11 subcommands: run, resume, init, retry, edit, undo, deprecate, yank, scrub, backfill, reconcile.
+- [release](../cli-release/) -- Release orchestration commands covering the full release lifecycle. Provides 12 subcommands: run, resume, init, retry, edit, undo, abandon, deprecate, yank, scrub, backfill, reconcile.
 - [changelog](../cli-changelog/) -- Structured changelog management using JSONL entries, each typed feature, fix or breaking. Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.
 - [monorepo](../cli-monorepo/) -- Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 17 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, snapshot-check, mirror, graph, impact, extract, absorb, cleanup, rename-releasable. Plus 1 subgroup: release. Supports all 17 release targets in a single workspace.toml (the app help enumerates them).
 - [dev](../cli-dev/) -- Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install -e, npm -> npm link, go -> go install).
