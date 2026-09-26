@@ -228,7 +228,7 @@ These 4 checks have no tag assignment and run only when explicitly requested via
 
 ## Framework checks
 
-Every check above is declared in rlsbl's own `checks.toml`, and so are the counts on this page. The checks below are not: [strictcli](https://github.com/smm-h/strictcli) registers them into the same registry when rlsbl builds its CLI, so they run under `rlsbl check --all` and under the tags they carry, but no rlsbl-side count includes them. They carry the framework's own tags (`test`, `effects`), and the three effects lints also carry `quality`, so `rlsbl check --tag quality` runs them.
+Every check above is declared in rlsbl's own `checks.toml`, and so are the counts on this page. The checks below are not: [strictcli](https://github.com/stricttools/strictcli) registers them into the same registry when rlsbl builds its CLI, so they run under `rlsbl check --all` and under the tags they carry, but no rlsbl-side count includes them. They carry the framework's own tags (`test`, `effects`), and the three effects lints also carry `quality`, so `rlsbl check --tag quality` runs them.
 
 | Check | Severity | Tags | Description |
 | --- | --- | --- | --- |
