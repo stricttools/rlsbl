@@ -68,7 +68,7 @@ mode, is in [stricttools/docs/release-workflow.md](stricttools/docs/release-work
 
 Use `--dry-run` to preview without changes: mutating operations are recorded and printed as a
 would-do log rather than performed. A small set of commands declares itself `consequential`
-(`release run`/`resume`/`retry`/`undo`/`deprecate`/`yank`/`scrub`/`reconcile`/`backfill`,
+(`release run`/`resume`/`retry`/`undo`/`abandon`/`deprecate`/`yank`/`scrub`/`reconcile`/`backfill`,
 `claim-name`, `deploy`, `transition record`, `rewrite project-name`,
 `monorepo release run`/`mirror`/`absorb`/`extract`/`rename-releasable`) and asks
 for confirmation before running; pass `--approve-consequential` in non-interactive contexts
@@ -77,7 +77,7 @@ asking.
 
 Create the release file with `rlsbl release init`, which auto-detects project targets and scaffolds the TOML file.
 
-First release: if the current version has never been tagged, `release` publishes it as-is (bump type is ignored).
+First release: if the release record holds no released version at all, `release` publishes the current version as-is (bump type is ignored). Once a release exists, version files naming a number the record holds nothing for (no archive, no tag) are refused -- that is what an abandoned attempt leaves behind -- and `rlsbl release abandon` records that number as never released, after which the next release bumps from it.
 
 Pre-release versions (e.g. `1.0.0-beta.1`) are supported.
 
