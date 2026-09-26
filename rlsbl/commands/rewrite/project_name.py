@@ -19,7 +19,7 @@ rlsbl owns, and only those:
   record -- to the new one. A latest release whose archive is marked
   unrecoverable records no commit to read it at, and is refused. The effective version is the version the next
   release ships, decided by the release flow's own
-  :func:`~rlsbl.commands.release.validate.next_release_version`.
+  :func:`~rlsbl.commands.release.validate.decide_release_version`.
 
 It moves no source directory and rewrites no source code beyond the Go import
 sites the module-path rewrite owns. It contacts no registry, renames no
@@ -245,11 +245,16 @@ def _read_release_file(root):
 
 
 def _effective_version(root, targets, release_config):
-    """The version the next release ships: the release flow's own decision."""
-    from ..release.validate import is_first_release, next_release_version
+    """The version the next release ships: the release flow's own decision.
+
+    Asked through :func:`~rlsbl.commands.release.validate.decide_release_version`,
+    so a state the release flow refuses (version files naming a number the
+    record holds nothing for, a never-released number about to be reused) is
+    refused here too, before anything is written.
+    """
+    from ..release.validate import decide_release_version
     from ...release_file import get_releases_dir
-    from ...release_record import version_is_archived
-    from ...utils import local_tag_state
+    from ...release_record import latest_release_fact
 
     registry = release_config.include[0] if release_config.include else None
     if registry not in targets:
@@ -259,14 +264,16 @@ def _effective_version(root, targets, release_config):
             f"Fix include in .rlsbl/releases/unreleased.toml and re-run."
         )
     target, path = targets[registry]
-    current = target.read_version(path)
-    released_before = version_is_archived(get_releases_dir(root), current)
-    tag_state = local_tag_state(target.tag_format(current), cwd=root)
-    version, _bump = next_release_version(
-        current, release_config.bump, release_config.preid,
-        first_release=is_first_release(released_before, tag_state),
+    releases_dir = get_releases_dir(root)
+    decision = decide_release_version(
+        releases_dir=releases_dir,
+        current_version=target.read_version(path),
+        bump_arg=release_config.bump, preid=release_config.preid,
+        make_tag=target.tag_format,
+        latest=latest_release_fact(releases_dir, cwd=root),
+        cwd=root, project_dir=root,
     )
-    return version
+    return decision.new_version
 
 
 def _published_module_path(root, rel_dir, plan):

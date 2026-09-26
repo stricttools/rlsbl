@@ -38,6 +38,15 @@ def _mock_target(version):
     return target
 
 
+def _absent(root):
+    """The guard's record arguments for a version with no archive."""
+    from rlsbl.release_record import VersionFate
+    return {
+        "releases_dir": str(root / ".rlsbl" / "releases"),
+        "fate": VersionFate.ABSENT,
+    }
+
+
 def _write_finalized_jsonl(changes_dir, version):
     """Write a finalized (chmod 444) per-version JSONL file."""
     changes_dir.mkdir(parents=True, exist_ok=True)
@@ -99,9 +108,10 @@ class TestDestroyedTagStandalone:
         # Recovery option 1: restore the tag.
         assert "restore" in msg.lower()
         assert f"git tag v1.2.3" in msg
-        # Recovery option 2: move the version forward.
-        assert "forward" in msg.lower()
-        # Recovery option 3: a changed tag format lands here too -- the message
+        # "Move the version forward" is no longer offered: version files
+        # naming an unrecorded number are refused once anything has released.
+        assert "forward" not in msg.lower()
+        # Recovery option 2: a changed tag format lands here too -- the message
         # names tag_format and where it is configured.
         assert "tag_format" in msg
         assert "workspace.toml" in msg
@@ -364,12 +374,14 @@ class TestDestroyedTagGuardUnit:
         changes = tmp_path / ".rlsbl" / "changes"
         _write_finalized_jsonl(changes, "3.4.5")
         with pytest.raises(ReleaseValidationError) as exc:
-            _abort_on_destroyed_tag(str(tmp_path), "3.4.5", "v3.4.5")
+            _abort_on_destroyed_tag(
+                str(tmp_path), "3.4.5", "v3.4.5", **_absent(tmp_path),
+            )
         msg = str(exc.value)
         assert "v3.4.5" in msg
         assert "restore" in msg.lower()
-        assert "forward" in msg.lower()
-        # Third possibility: a tag_format change is diagnosed as well.
+        assert "forward" not in msg.lower()
+        # Second possibility: a tag_format change is diagnosed as well.
         assert "tag_format" in msg
         assert "tag format" in msg.lower()
 
@@ -378,7 +390,9 @@ class TestDestroyedTagGuardUnit:
         changes.mkdir(parents=True)
         (changes / "unreleased.jsonl").write_text("")
         # Must not raise.
-        _abort_on_destroyed_tag(str(tmp_path), "3.4.5", "v3.4.5")
+        _abort_on_destroyed_tag(
+            str(tmp_path), "3.4.5", "v3.4.5", **_absent(tmp_path),
+        )
 
     def test_releasable_finalized_file_aborts(self, tmp_path):
         """Releasable mode resolves the changes dir under
@@ -390,7 +404,7 @@ class TestDestroyedTagGuardUnit:
         with pytest.raises(ReleaseValidationError) as exc:
             _abort_on_destroyed_tag(
                 str(ws / "packages" / "www"), "2.0.0", "www@v2.0.0",
-                releasable_name="www", workspace_root=str(ws),
+                releasable_name="www", workspace_root=str(ws), **_absent(ws),
             )
         msg = str(exc.value)
         assert "www@v2.0.0" in msg
@@ -403,5 +417,5 @@ class TestDestroyedTagGuardUnit:
         (changes / "unreleased.jsonl").write_text("")
         _abort_on_destroyed_tag(
             str(ws / "packages" / "www"), "2.0.0", "www@v2.0.0",
-            releasable_name="www", workspace_root=str(ws),
+            releasable_name="www", workspace_root=str(ws), **_absent(ws),
         )
