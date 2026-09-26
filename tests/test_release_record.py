@@ -78,8 +78,9 @@ being deleted anyway.
 Release preparation -- MIGRATED to the release record:
 
 * ``rlsbl/commands/release/validate.py`` ``compute_release_version`` decided
-  "first release vs bump" from ``tag_exists_locally``; it now decides from
-  ``release_record.version_is_archived``, and consults the tag only as corroboration
+  "first release vs bump" from ``tag_exists_locally``; it now decides, through
+  ``decide_release_version``, from the version's fate
+  (``release_record.read_version_fate``), and consults the tag only as corroboration
   through the new tri-state ``rlsbl.utils.local_tag_state`` -- whose UNKNOWN
   answer (a preview past its first recorded mutation) may no longer be read as
   "not released". ``_abort_on_destroyed_tag`` names the archive as its

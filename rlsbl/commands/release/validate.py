@@ -9,6 +9,7 @@ import json
 import os
 import re
 import sys
+from dataclasses import dataclass
 
 from ...strictcli_detect import detect_strictcli
 from ...utils import run_gh, working_tree_paths
@@ -610,41 +611,171 @@ def _releasable_tag_glob(releasable_tag_format, releasable_name):
     return releasable_tag_glob(releasable_tag_format, releasable_name)
 
 
-def is_first_release(released_before, tag_state):
-    """Is the release about to be made this project's first?
+@dataclass(frozen=True)
+class ReleaseVersionDecision:
+    """What the next release ships, decided from the release record.
 
-    It is when no archive records the current version as released and its tag
-    is not present locally. An unanswerable tag read is not "present", so it
-    does not by itself make a release a repeat (see
-    :class:`~rlsbl.utils.LocalTagState`).
+    ``first_release`` is True only when the record holds no released version
+    at all; then ``new_version`` is the current version as-is and
+    ``bump_type`` is None. Otherwise the declared bump applies to the current
+    version.
     """
-    from ...utils import LocalTagState
 
-    return not released_before and tag_state is not LocalTagState.PRESENT
+    first_release: bool
+    new_version: str
+    bump_type: str | None
+    tag: str
 
 
-def next_release_version(current_version, bump_arg, preid, *, first_release):
-    """The version the next release ships, and the bump type it applies.
-
-    A first release ships the current version as-is and applies no bump (the
-    declared bump is ignored). Every later release applies the declared bump,
-    ``patch`` when none is declared. This is the one decision the release flow
-    makes and ``rlsbl rewrite project-name`` records as an identity
-    transition's effective version, so the two always agree.
-
-    Returns ``(new_version, bump_type)``; ``bump_type`` is None for a first
-    release. Raises :class:`ReleaseValidationError` on an unknown bump type.
-    """
+def _bumped(current_version, bump_arg, preid):
+    """Apply the declared bump (``patch`` when none is declared)."""
     from . import bump_version
 
-    if first_release:
-        return current_version, None
     bump_type = bump_arg if bump_arg else "patch"
     if bump_type not in VALID_BUMP_TYPES:
         raise ReleaseValidationError(
             f'invalid bump type "{bump_type}". Use: {", ".join(VALID_BUMP_TYPES)}'
         )
     return bump_version(current_version, bump_type, preid=preid), bump_type
+
+
+def _unrecorded_version_error(current_version, latest_version, current_tag,
+                              tag_state, archive_path):
+    from ...utils import LocalTagState
+
+    if tag_state is LocalTagState.ABSENT:
+        tag_clause = f'no tag "{current_tag}"'
+    else:
+        tag_clause = f'and its tag "{current_tag}" could not be read'
+    return ReleaseValidationError(
+        f"the version files say {current_version}, but the latest release is "
+        f"{latest_version}, and the release record holds nothing for "
+        f"{current_version}: no archive {archive_path}, {tag_clause}.\n"
+        f"  That is the state an abandoned release attempt leaves behind: the "
+        f"version files were bumped, and the attempt never reached the step "
+        f"that records a release. rlsbl will not release {current_version} "
+        f"as-is, and will not guess a version to bump from. Nothing was "
+        f"changed.\n"
+        f"  Record {current_version} as never released, then re-run the "
+        f"release, which bumps from {current_version}: "
+        f"`rlsbl release abandon --approve-consequential`"
+    )
+
+
+def _refuse_never_released_reuse(releases_dir, current_version, new_version,
+                                 bump_type, preid, *, tag_glob, cwd):
+    """Refuse a new version the record holds as never released.
+
+    The refusal names the version-files value that bumps past it: the highest
+    never-released number the same bump walks through, and the version the
+    bump then gives.
+    """
+    from ...release_record import VersionFate, archived_release_path, read_version_fate
+    from . import bump_version
+
+    def never_released(version):
+        return read_version_fate(
+            releases_dir, version, tag_glob=tag_glob, cwd=cwd,
+        ) is VersionFate.NEVER_RELEASED
+
+    if not never_released(new_version):
+        return
+    base, candidate = new_version, bump_version(new_version, bump_type, preid=preid)
+    while never_released(candidate):
+        base, candidate = candidate, bump_version(candidate, bump_type, preid=preid)
+    raise ReleaseValidationError(
+        f"the {bump_type} bump from {current_version} gives {new_version}, which "
+        f"the release record holds as never released: "
+        f"{archived_release_path(releases_dir, new_version)}\n"
+        f"  That number was claimed by an abandoned attempt, and rlsbl never "
+        f"releases under a never-released number. Nothing was changed.\n"
+        f"  Bump past it: set the version files to {base}, which is recorded as "
+        f"never released, and the {bump_type} bump then gives {candidate}."
+    )
+
+
+def decide_release_version(*, releases_dir, current_version, bump_arg, preid,
+                           make_tag, latest, cwd, project_dir,
+                           releasable_name=None, workspace_root=None,
+                           tag_glob=None):
+    """Decide what the next release ships: the one first-release decision.
+
+    Every caller that needs the next version asks here -- ``release run``
+    (through :func:`compute_release_version`), batch planning, and ``rlsbl
+    rewrite project-name`` recording an identity transition's effective
+    version -- so they cannot disagree.
+
+    The current version's FATE decides (see
+    :func:`~rlsbl.release_record.read_version_fate`), with its local tag read
+    as corroboration only:
+
+    * **released** (recorded or unrecoverable): bump from it. A recorded
+      version whose tag is genuinely absent has lost its tag, and is refused
+      (:func:`_abort_on_destroyed_tag`). An unrecoverable one is not: that fate
+      is written exactly when no tag and no version-bump commit could be
+      found, so its absent tag is part of what the record already says.
+    * **never released**: bump from it. The version files name a number an
+      abandoned attempt claimed, and that is where the next release starts.
+    * **no archive, tag present**: bump from it, as before.
+    * **no archive, no tag**: a first release when the record holds no
+      released version at all (*latest* names none) -- the current version
+      ships as-is, the declared bump ignored. Once any release exists it is
+      REFUSED: that is the state an abandoned attempt leaves behind, and
+      ``rlsbl release abandon`` is how it is recorded.
+
+    A bumped version the record holds as never released is refused too: a
+    never-released number is never reused.
+
+    *latest* is the :class:`~rlsbl.release_record.LatestReleaseFact` of the
+    same record, which the release flow has already computed.
+
+    Raises :class:`ReleaseValidationError` for every refusal.
+    """
+    from ...release_record import VersionFate, archived_release_path, read_version_fate
+    from ...utils import LocalTagState, local_tag_state
+
+    fate = read_version_fate(
+        releases_dir, current_version, tag_glob=tag_glob, cwd=cwd,
+    )
+    current_tag = make_tag(current_version)
+    tag_state = local_tag_state(current_tag, cwd)
+
+    if fate is VersionFate.RECORDED and tag_state is LocalTagState.ABSENT:
+        _abort_on_destroyed_tag(
+            project_dir, current_version, current_tag, releases_dir=releases_dir,
+            fate=fate, releasable_name=releasable_name,
+            workspace_root=workspace_root,
+        )
+
+    if fate is VersionFate.ABSENT and tag_state is not LocalTagState.PRESENT:
+        if latest.version is not None:
+            raise _unrecorded_version_error(
+                current_version, latest.version, current_tag, tag_state,
+                archived_release_path(releases_dir, current_version),
+            )
+        # No release anywhere in the record. One more record can still
+        # contradict a first release: a finalized, immutable <version>.jsonl,
+        # which a repository whose releases predate archiving still has.
+        if tag_state is LocalTagState.ABSENT:
+            _abort_on_destroyed_tag(
+                project_dir, current_version, current_tag,
+                releases_dir=releases_dir, fate=fate,
+                releasable_name=releasable_name, workspace_root=workspace_root,
+            )
+        return ReleaseVersionDecision(
+            first_release=True, new_version=current_version, bump_type=None,
+            tag=current_tag,
+        )
+
+    new_version, bump_type = _bumped(current_version, bump_arg, preid)
+    _refuse_never_released_reuse(
+        releases_dir, current_version, new_version, bump_type, preid,
+        tag_glob=tag_glob, cwd=cwd,
+    )
+    return ReleaseVersionDecision(
+        first_release=False, new_version=new_version, bump_type=bump_type,
+        tag=make_tag(new_version),
+    )
 
 
 def compute_release_version(target, primary_path, bump_arg, monorepo_name,
@@ -673,22 +804,20 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
     ``primary_path``, which coincides with the project root for standalone
     repos.
 
-    Whether this is a first release is decided by the RELEASE RECORD, not by the tag
-    namespace. A tag read is still consulted, but only as corroboration, and
-    its third answer is respected: under ``--dry-run`` past the first recorded
-    mutation the tag read is UNANSWERABLE, and reading that as "no tag" is what
-    made every preview of an already-released project abort with a
-    destroyed-tag diagnosis (see :class:`~rlsbl.utils.LocalTagState`).
+    What the release ships is decided by :func:`decide_release_version`, from
+    the RELEASE RECORD's fates, not from the tag namespace. A tag read is still
+    consulted, but only as corroboration, and its third answer is respected:
+    under ``--dry-run`` past the first recorded mutation the tag read is
+    UNANSWERABLE, and reading that as "no tag" is what made every preview of an
+    already-released project abort with a destroyed-tag diagnosis (see
+    :class:`~rlsbl.utils.LocalTagState`).
 
     Returns (current_version, new_version, bump_type, tag).
-    Raises ReleaseValidationError on invalid bump type or duplicate tag.
+    Raises ReleaseValidationError on invalid bump type, duplicate tag, and
+    every refusal of the decision.
     """
     from . import tag_exists_locally
-    from ...release_record import (
-        require_checkout_contains_latest,
-        version_is_archived,
-    )
-    from ...utils import LocalTagState, local_tag_state
+    from ...release_record import require_checkout_contains_latest
 
     if workspace_root is not None and releasable_name is not None:
         from ...workspace import read_releasable_version
@@ -727,46 +856,26 @@ def compute_release_version(target, primary_path, bump_arg, monorepo_name,
     # The ancestry question is asked IN the project's own directory: git
     # answers it from any path inside the repository, and the process cwd is
     # not something this function should depend on.
-    require_checkout_contains_latest(
+    latest = require_checkout_contains_latest(
         releases_dir, tag_glob=tag_glob, cwd=_guard_project_dir,
     )
 
-    current_tag = _make_tag(current_version)
-    released_before = version_is_archived(releases_dir, current_version)
-    tag_state = local_tag_state(current_tag, _guard_project_dir)
-
-    if released_before and tag_state is LocalTagState.ABSENT:
-        # The release record says this version shipped and the tag is genuinely gone
-        # (not merely unanswerable): a destroyed tag. Abort PRE-MUTATION
-        # rather than run the whole pipeline and crash at finalization.
-        _abort_on_destroyed_tag(
-            _guard_project_dir, current_version, current_tag,
-            releasable_name=releasable_name, workspace_root=workspace_root,
-        )
-
-    first_release = is_first_release(released_before, tag_state)
-    if first_release:
-        # No archive and no tag. One more record can still contradict "never
-        # released": a finalized, immutable <version>.jsonl, which a repository
-        # whose archives predate release-commit recording still has.
-        if tag_state is LocalTagState.ABSENT:
-            _abort_on_destroyed_tag(
-                _guard_project_dir, current_version, current_tag,
-                releasable_name=releasable_name, workspace_root=workspace_root,
-            )
-        new_version, bump_type = next_release_version(
-            current_version, bump_arg, preid, first_release=True,
-        )
-        tag = current_tag
+    decision = decide_release_version(
+        releases_dir=releases_dir, current_version=current_version,
+        bump_arg=bump_arg, preid=preid, make_tag=_make_tag, latest=latest,
+        cwd=_guard_project_dir, project_dir=_guard_project_dir,
+        releasable_name=releasable_name, workspace_root=workspace_root,
+        tag_glob=tag_glob,
+    )
+    new_version, bump_type, tag = (
+        decision.new_version, decision.bump_type, decision.tag,
+    )
+    if decision.first_release:
         if bump_arg:
             log(f"First release: releasing {new_version} as-is (bump type ignored)")
         else:
             log(f"First release: {new_version}")
     else:
-        new_version, bump_type = next_release_version(
-            current_version, bump_arg, preid, first_release=False,
-        )
-        tag = _make_tag(new_version)
         log(f"New version: {new_version} ({bump_type})")
 
     # Check tag doesn't already exist. Read in the project's own directory,
@@ -852,8 +961,8 @@ def _resolve_releases_dir(project_dir, *, releasable_name=None,
     return releases_dir_for_changes_dir(changes_dir)
 
 
-def _abort_on_destroyed_tag(project_dir, current_version, tag, *,
-                            releasable_name=None, workspace_root=None):
+def _abort_on_destroyed_tag(project_dir, current_version, tag, *, releases_dir,
+                            fate, releasable_name=None, workspace_root=None):
     """Abort a release of a version the record says already shipped, untagged.
 
     "Never released", "released and the tag was later destroyed" (an
@@ -861,9 +970,12 @@ def _abort_on_destroyed_tag(project_dir, current_version, tag, *,
     indistinguishable from the tag alone. Two records can tell them apart, and
     either one is enough:
 
-    * the RELEASE RECORD -- ``.rlsbl/releases/v<version>.toml``, written by the release
-      at its archive step and rewritten by rlsbl only through its own
-      documented unlock paths. This is the authority, and it is checked first.
+    * the RELEASE RECORD -- ``.rlsbl/releases/v<version>.toml`` -- when its
+      FATE is recorded: it names the commit the tag belongs on. This is the authority,
+      and *fate* is its answer, read once by :func:`decide_release_version`.
+      A never-released archive is not a release: a version files number an
+      abandoned attempt claimed has no tag by construction, and the release
+      bumps from it instead of reaching here.
     * the finalized, immutable ``.rlsbl/changes/<version>.jsonl``, locked at
       release time. Still consulted, because a repository whose releases
       predate archiving has that record and no archive.
@@ -879,15 +991,16 @@ def _abort_on_destroyed_tag(project_dir, current_version, tag, *,
     project with neither record is a genuine first release and the guard is a
     no-op.
     """
-    from ...release_record import archived_release_path, version_is_archived
+    from ...release_file import read_release_file
+    from ...release_record import archived_release_path
 
-    releases_dir = _resolve_releases_dir(
-        project_dir, releasable_name=releasable_name,
-        workspace_root=workspace_root,
-    )
-    if version_is_archived(releases_dir, current_version):
+    from ...release_record import VersionFate
+
+    release_commit = None
+    if fate is VersionFate.RECORDED:
         record = archived_release_path(releases_dir, current_version)
         record_kind = "release archive"
+        release_commit = read_release_file(record).candidate_sha
     else:
         try:
             changes_dir = resolve_changes_dir(
@@ -905,19 +1018,18 @@ def _abort_on_destroyed_tag(project_dir, current_version, tag, *,
         record_kind = "finalized changelog"
 
     raise ReleaseValidationError(
-        f"version {current_version} appears to have been released before: its "
-        f"{record_kind} {record} exists, but no tag \"{tag}\" is "
-        f"present. This happens when the tag was deleted (e.g. by an "
-        f"interrupted or undone release), OR when the tag format changed since "
-        f"this version was released -- the version was tagged under an "
-        f"old-format name, so the current-format tag \"{tag}\" does not exist. "
-        f"Either way this looks like a first release when it is not.\n"
+        f"version {current_version} was released before: its {record_kind} "
+        f"{record} exists, but no tag \"{tag}\" is present. This happens when "
+        f"the tag was deleted (e.g. by an interrupted or undone release), OR "
+        f"when the tag format changed since this version was released -- the "
+        f"version was tagged under an old-format name, so the current-format "
+        f"tag \"{tag}\" does not exist. Either way this looks like a first "
+        f"release when it is not.\n"
         f"Recover by either:\n"
-        f"  (1) restore the tag \"{tag}\" pointing at the original release "
-        f"commit (git tag {tag} <release-commit>), then re-run the release; or\n"
-        f"  (2) move the version forward -- bump {current_version} to a new "
-        f"version and release anew; or\n"
-        f"  (3) if the tag format changed, check tag_format in workspace.toml / "
+        f"  (1) restore the tag \"{tag}\" at the commit {current_version} was "
+        f"released from (git tag {tag} {release_commit or '<release-commit>'}), "
+        f"then re-run the release; or\n"
+        f"  (2) if the tag format changed, check tag_format in workspace.toml / "
         f"the releasable config -- if {current_version} was released under a "
         f"different tag name, restore/create the current-format tag \"{tag}\" "
         f"pointing at that release commit."

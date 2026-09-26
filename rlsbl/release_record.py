@@ -107,6 +107,7 @@ import os
 import re
 import subprocess
 from dataclasses import dataclass
+from enum import Enum
 
 from . import effects
 from .errors import ReleaseRecordError
@@ -401,14 +402,59 @@ def _require_backfilled_release_record(releases_dir: str, versions: list[str],
     raise _unbackfilled_release_record_error(releases_dir, tag_glob, tags)
 
 
-def version_is_archived(releases_dir: str, version: str) -> bool:
-    """Does the release record record *version* as released?
+class VersionFate(Enum):
+    """What the release record says about one version number.
 
-    A scan, not a read: the archive's mere existence is the record that the
-    release completed, and answering it opens no file. The read errors belong
-    to the callers that go on to USE the entry.
+    ``ABSENT`` means there is no archive for it at all; the other three are the
+    archive's fate. Only ``RECORDED`` and ``UNRECOVERABLE`` are releases: an
+    archive's existence alone is not, because a ``NEVER_RELEASED`` archive is a
+    version number no release ever used.
     """
-    return os.path.isfile(archived_release_path(releases_dir, version))
+
+    ABSENT = "absent"
+    RECORDED = "recorded"
+    UNRECOVERABLE = "unrecoverable"
+    NEVER_RELEASED = "never_released"
+
+    @property
+    def released(self) -> bool:
+        """Was a release published under this version? The released-before question."""
+        return self in (VersionFate.RECORDED, VersionFate.UNRECOVERABLE)
+
+
+def _archive_fate(cfg, version: str, path: str, tag_glob: str | None,
+                  cwd: str | None) -> VersionFate:
+    """The fate one read archive records, or the missing-fate error."""
+    if cfg.never_released:
+        return VersionFate.NEVER_RELEASED
+    if cfg.unrecoverable:
+        return VersionFate.UNRECOVERABLE
+    sha = cfg.candidate_sha
+    if not sha or not _HASH_RE.match(sha):
+        raise _missing_release_commit_error(version, path, tag_glob, cwd)
+    return VersionFate.RECORDED
+
+
+def read_version_fate(releases_dir: str, version: str, *,
+                      tag_glob: str | None = None,
+                      cwd: str | None = None) -> VersionFate:
+    """What the release record says about *version*: the one fate read.
+
+    ``ABSENT`` when no archive exists for it. Otherwise the archive is opened
+    and its fate returned, so a never-released archive is never mistaken for a
+    release. An archive recording no fate at all raises the missing-fate
+    :class:`~rlsbl.errors.ReleaseRecordError` (``tag_glob`` and ``cwd`` only
+    shape that error's evidence).
+
+    Every question of the form "was this version released?" -- the release
+    flow's first-release decision, the in-flight refusals of ``release run``
+    and ``release undo``, the executor's remedies and its archive step, and
+    ``release abandon`` -- goes through here.
+    """
+    path = archived_release_path(releases_dir, version)
+    if not os.path.isfile(path):
+        return VersionFate.ABSENT
+    return _archive_fate(read_release_file(path), version, path, tag_glob, cwd)
 
 
 def read_entry(releases_dir: str, version: str, *, tag_glob: str | None = None,
@@ -424,18 +470,17 @@ def read_entry(releases_dir: str, version: str, *, tag_glob: str | None = None,
     """
     path = archived_release_path(releases_dir, version)
     cfg = read_release_file(path)
+    fate = _archive_fate(cfg, version, path, tag_glob, cwd)
 
-    if cfg.never_released:
+    if fate is VersionFate.NEVER_RELEASED:
         return ReleaseRecordEntry(version=version, path=path, candidate_sha=None,
                                   unrecoverable=False, never_released=True)
 
-    if cfg.unrecoverable:
+    if fate is VersionFate.UNRECOVERABLE:
         return ReleaseRecordEntry(version=version, path=path, candidate_sha=None,
                            unrecoverable=True, shipped_as=cfg.shipped_as)
 
     sha = cfg.candidate_sha
-    if not sha or not _HASH_RE.match(sha):
-        raise _missing_release_commit_error(version, path, tag_glob, cwd)
 
     tag = cfg.shipped_as or tag_for_version(tag_glob, version)
     tag_commit = _resolve_ref(tag, cwd)
@@ -594,7 +639,7 @@ def latest_release_fact(releases_dir: str, *, tag_glob: str | None = None,
 def require_checkout_contains_latest(releases_dir: str, *,
                                      tag_glob: str | None = None,
                                      cwd: str | None = None,
-                                     head: str = "HEAD") -> None:
+                                     head: str = "HEAD") -> LatestReleaseFact:
     """Refuse to prepare a release on a history missing the latest release.
 
     Releasing from a checkout that does not contain the latest release's
@@ -607,10 +652,13 @@ def require_checkout_contains_latest(releases_dir: str, *,
     ``never_released`` is not the latest release at all, so it never reaches
     here: requiring a checkout to contain a release that never happened would
     refuse every release forever.
+
+    Returns the latest-release fact it judged, so the release flow's
+    first-release decision reads the same fact rather than asking again.
     """
     fact = latest_release_fact(releases_dir, tag_glob=tag_glob, cwd=cwd, head=head)
     if fact.version is None or fact.in_checkout is not False:
-        return
+        return fact
     entry = read_entry(releases_dir, fact.version, tag_glob=tag_glob, cwd=cwd)
     raise ReleaseRecordError(
         f"this checkout does not contain the latest release, {fact.version}.\n"
