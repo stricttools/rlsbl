@@ -77,7 +77,7 @@ asking.
 
 Create the release file with `rlsbl release init`, which auto-detects project targets and scaffolds the TOML file.
 
-First release: if the release record holds no released version at all, `release` publishes the current version as-is (bump type is ignored). Once a release exists, version files naming a number the record holds nothing for (no archive, no tag) are refused -- that is what an abandoned attempt leaves behind -- and `rlsbl release abandon` records that number as never released, after which the next release bumps from it.
+First release: if the release record holds no released version at all, `release` publishes the current version as-is (bump type is ignored). Once a release exists, version files naming a number above the latest release that the record holds nothing for (no archive, no tag) are refused -- that is what an abandoned attempt leaves behind -- and `rlsbl release abandon` records that number as never released, after which the next release bumps from it. Such a number below the latest release is refused as behind it: the version files must name at least the latest release.
 
 Pre-release versions (e.g. `1.0.0-beta.1`) are supported.
 
