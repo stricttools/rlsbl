@@ -8,7 +8,7 @@ The README used to hand-type this table. Every count in it had drifted below
 what the registry held, and its per-row descriptions enumerated checks that had
 since been renamed, merged or retired. Counts derived from the registry cannot
 do that; what each tag's checks actually are stays in
-``.stricttools/docs/checks.md``, whose
+``stricttools/docs/checks.md``, whose
 per-tag tables are verified against this same file by
 ``tests/test_docs_check_tables.py``.
 
