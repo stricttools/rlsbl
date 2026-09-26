@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "name": "rlsbl",
   "slug": "rlsbl",
   "version": "0.128.0",
@@ -21908,5 +21908,9 @@
     }
   ],
   "last_gen": "2026-09-25T22:58:42.342790+00:00",
-  "theme": "minimal"
+  "theme": "minimal",
+  "vocabulary": {
+    "accepted": [],
+    "rejected": []
+  }
 }
