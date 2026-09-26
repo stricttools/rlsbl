@@ -36,8 +36,6 @@ import sys
 KEY = "coverage_unit"
 PROJECTS = os.path.expanduser("~/Projects")
 SKIP_DIR_NAMES = {".git", "node_modules", ".venv", "__pycache__", "dist", "build", ".archive"}
-# Another session's dirty tree -- never entered by this sweep.
-SKIP_REPO_PATHS = {os.path.join(PROJECTS, "predraw")}
 
 
 def find_config_files(base):
@@ -167,7 +165,7 @@ def main():
     by_repo = {}
     for path in configs:
         repo = repo_root_for(path)
-        if repo is None or repo in SKIP_REPO_PATHS:
+        if repo is None:
             continue
         if has_key(path):
             by_repo.setdefault(repo, []).append(path)
