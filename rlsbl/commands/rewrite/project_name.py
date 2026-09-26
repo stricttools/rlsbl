@@ -19,7 +19,10 @@ rlsbl owns, and only those:
   record -- to the new one. A latest release whose archive is marked
   unrecoverable records no commit to read it at, and is refused. The effective version is the version the next
   release ships, decided by the release flow's own
-  :func:`~rlsbl.commands.release.validate.decide_release_version`.
+  :func:`~rlsbl.commands.release.validate.decide_release_version`; for version
+  files naming an unrecoverable version, which the release refuses until the
+  version's tag is restored, it is the declared bump from that version (see
+  ``_effective_version``).
 
 It moves no source directory and rewrites no source code beyond the Go import
 sites the module-path rewrite owns. It contacts no registry, renames no
@@ -249,12 +252,22 @@ def _effective_version(root, targets, release_config):
 
     Asked through :func:`~rlsbl.commands.release.validate.decide_release_version`,
     so a state the release flow refuses (version files naming a number the
-    record holds nothing for, a never-released number about to be reused) is
-    refused here too, before anything is written.
+    record holds nothing for, version files behind the latest release, a
+    never-released number about to be reused) is refused here too, before
+    anything is written.
+
+    One state is answered differently: version files naming an unrecoverable
+    version. The release refuses to run from it while its tag is absent, until
+    the operator restores the tag at the commit it shipped from; that refusal
+    is about the release's history, which a rename does not read. The version
+    the release then ships is the declared bump from it, so that is what the
+    rename records, through the same
+    :func:`~rlsbl.commands.release.validate.bumped_release_version` the
+    release uses.
     """
-    from ..release.validate import decide_release_version
+    from ..release.validate import bumped_release_version, decide_release_version
     from ...release_file import get_releases_dir
-    from ...release_record import latest_release_fact
+    from ...release_record import VersionFate, latest_release_fact, read_version_fate
 
     registry = release_config.include[0] if release_config.include else None
     if registry not in targets:
@@ -265,9 +278,16 @@ def _effective_version(root, targets, release_config):
         )
     target, path = targets[registry]
     releases_dir = get_releases_dir(root)
+    current = target.read_version(path)
+    if read_version_fate(releases_dir, current, cwd=root) is VersionFate.UNRECOVERABLE:
+        return bumped_release_version(
+            releases_dir=releases_dir, current_version=current,
+            bump_arg=release_config.bump, preid=release_config.preid,
+            make_tag=target.tag_format, cwd=root,
+        ).new_version
     decision = decide_release_version(
         releases_dir=releases_dir,
-        current_version=target.read_version(path),
+        current_version=current,
         bump_arg=release_config.bump, preid=release_config.preid,
         make_tag=target.tag_format,
         latest=latest_release_fact(releases_dir, cwd=root),

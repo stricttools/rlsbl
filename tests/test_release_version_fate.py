@@ -16,10 +16,16 @@ The rules pinned here:
 * version files naming a number recorded never released are bumped from;
 * a computed new version recorded never released is refused, naming the
   version files' value that bumps past it;
-* the destroyed-tag guard no longer fires for a never-released current version.
+* the destroyed-tag guard no longer fires for a never-released current version;
+* version files naming an unrecoverable version whose tag is absent are refused,
+  and restoring the tag clears it, while ``rlsbl rewrite project-name`` records
+  the version the release ships once it is cleared;
+* version files naming an unrecorded version below the latest release are
+  refused as behind it, never pointed at ``rlsbl release abandon``.
 """
 
 import json
+from contextlib import ExitStack
 from unittest.mock import patch
 
 import pytest
@@ -51,6 +57,28 @@ def _commit_all(repo, message):
     return git(repo, "rev-parse", "HEAD")
 
 
+def _init_project(tmp_path, version, *, tag):
+    """A standalone npm project at *version*, committed, with a bare origin.
+
+    *tag* tags that commit ``v<version>`` before the origin is created, so the
+    origin holds the tag too.
+    """
+    repo = tmp_path / "repo"
+    init_repo(repo)
+    _write_version(repo, version)
+    (repo / ".rlsbl" / "changes").mkdir(parents=True)
+    (repo / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
+    (repo / ".rlsbl" / "config.json").write_text(json.dumps(
+        {"publish_mode": "ci", "targets": ["npm"]}, indent=2,
+    ) + "\n")
+    (repo / ".gitignore").write_text(".rlsbl/releases/in-progress.json\n")
+    sha = _commit_all(repo, f"v{version}")
+    if tag:
+        git(repo, "tag", f"v{version}")
+    add_remote(repo, tmp_path / "origin.git")
+    return repo, sha
+
+
 def build(tmp_path, *, released="0.29.3", files=None, never_released=()):
     """A standalone npm project that released *released* (archived and tagged).
 
@@ -58,18 +86,7 @@ def build(tmp_path, *, released="0.29.3", files=None, never_released=()):
     the version files are then set to *files* (default: the released version).
     The origin is a local bare repository, so the remote tag probe answers.
     """
-    repo = tmp_path / "repo"
-    init_repo(repo)
-    _write_version(repo, released)
-    (repo / ".rlsbl" / "changes").mkdir(parents=True)
-    (repo / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
-    (repo / ".rlsbl" / "config.json").write_text(json.dumps(
-        {"publish_mode": "ci", "targets": ["npm"]}, indent=2,
-    ) + "\n")
-    (repo / ".gitignore").write_text(".rlsbl/releases/in-progress.json\n")
-    sha = _commit_all(repo, f"v{released}")
-    git(repo, "tag", f"v{released}")
-    add_remote(repo, tmp_path / "origin.git")
+    repo, sha = _init_project(tmp_path, released, tag=True)
     archive_release(release_record_dir(repo), released, sha,
                     tree=git(repo, "rev-parse", "HEAD^{tree}"))
     for version in never_released:
@@ -80,6 +97,20 @@ def build(tmp_path, *, released="0.29.3", files=None, never_released=()):
         _write_version(repo, files)
         _commit_all(repo, f"v{files}")
     return repo
+
+
+def build_unrecoverable(tmp_path, *, version="0.27.1"):
+    """A project whose one release, *version*, is archived unrecoverable.
+
+    The version files name it, and no tag exists: the state the backfill
+    records when neither a tag nor a version-bump commit names the commit the
+    version shipped from. Returns the repository and the commit it shipped from,
+    which only the operator knows.
+    """
+    repo, sha = _init_project(tmp_path, version, tag=False)
+    archive_release(release_record_dir(repo), version, None, unrecoverable=True)
+    _commit_all(repo, "chore: archive the release record")
+    return repo, sha
 
 
 def compute(repo, bump, logs=None):
@@ -291,6 +322,98 @@ class TestFirstReleases:
 
 
 # --------------------------------------------------------------------------- #
+# Version files behind the latest release
+# --------------------------------------------------------------------------- #
+
+class TestVersionFilesBehindTheLatestRelease:
+
+    def test_it_is_refused_naming_both_numbers(self, tmp_path, monkeypatch):
+        repo = build(tmp_path, files="0.29.1")
+        monkeypatch.chdir(repo)
+        head = git(repo, "rev-parse", "HEAD")
+
+        message = refusal(repo, "patch")
+
+        assert "behind the latest release" in message, message
+        assert "0.29.1" in message and "0.29.3" in message, message
+        assert "at least 0.29.3" in message, message
+        assert "abandon" not in message, message
+        assert git(repo, "rev-parse", "HEAD") == head
+        assert git(repo, "status", "--porcelain") == ""
+
+    def test_following_the_fix_clears_the_refusal(self, tmp_path, monkeypatch):
+        repo = build(tmp_path, files="0.29.1")
+        monkeypatch.chdir(repo)
+        refusal(repo, "patch")
+
+        # The named fix: set the version files to the latest release.
+        _write_version(repo, "0.29.3")
+        _commit_all(repo, "0.29.3")
+
+        assert compute(repo, "patch") == ("0.29.3", "0.29.4", "patch", "v0.29.4")
+
+    def test_an_unorderable_version_is_refused_and_fixing_it_clears(
+        self, tmp_path, monkeypatch,
+    ):
+        repo = build(tmp_path, files="0.29")
+        monkeypatch.chdir(repo)
+
+        message = refusal(repo, "patch")
+
+        assert "0.29 is not a version the release record can hold" in message
+        assert "Fix the version files" in message, message
+
+        _write_version(repo, "0.29.3")
+        _commit_all(repo, "0.29.3")
+        assert compute(repo, "patch")[1] == "0.29.4"
+
+    def test_a_version_above_the_latest_release_still_names_abandon(
+        self, tmp_path, monkeypatch,
+    ):
+        repo = build(tmp_path, files="0.29.4")
+        monkeypatch.chdir(repo)
+
+        message = refusal(repo, "patch")
+
+        assert "behind the latest release" not in message, message
+        assert "rlsbl release abandon" in message, message
+
+
+# --------------------------------------------------------------------------- #
+# An unrecoverable current version
+# --------------------------------------------------------------------------- #
+
+class TestAnUnrecoverableCurrentVersionIsRefused:
+
+    def test_it_is_refused_before_anything_changes(self, tmp_path, monkeypatch):
+        repo, _sha = build_unrecoverable(tmp_path)
+        monkeypatch.chdir(repo)
+        head = git(repo, "rev-parse", "HEAD")
+        logs = []
+
+        with pytest.raises(ReleaseValidationError) as exc:
+            compute(repo, "minor", logs)
+
+        message = str(exc.value)
+        assert "0.27.1" in message and "unrecoverable" in message, message
+        assert "git tag v0.27.1 <" in message, message
+        assert "abandon" not in message, message
+        assert not any("New version" in line for line in logs), logs
+        assert git(repo, "rev-parse", "HEAD") == head
+        assert git(repo, "status", "--porcelain") == ""
+
+    def test_restoring_the_tag_clears_the_refusal(self, tmp_path, monkeypatch):
+        repo, shipped_from = build_unrecoverable(tmp_path)
+        monkeypatch.chdir(repo)
+        refusal(repo, "minor")
+
+        # The named fix: tag the commit the operator knows it shipped from.
+        git(repo, "tag", "v0.27.1", shipped_from)
+
+        assert compute(repo, "minor") == ("0.27.1", "0.28.0", "minor", "v0.28.0")
+
+
+# --------------------------------------------------------------------------- #
 # The destroyed-tag guard
 # --------------------------------------------------------------------------- #
 
@@ -360,6 +483,32 @@ class TestTheProjectRenameDecision:
         assert result.exit_code == 0, result.stderr + result.stdout
         assert "effective 0.30.0" in result.stdout, result.stdout
 
+    def test_version_files_behind_the_latest_release_are_refused(
+        self, tmp_path, monkeypatch,
+    ):
+        repo = build(tmp_path, files="0.29.1")
+
+        result = self._rename(repo, monkeypatch)
+
+        assert result.exit_code != 0, result.stdout
+        text = result.stderr + result.stdout
+        assert "behind the latest release" in text, text
+
+    def test_an_unrecoverable_current_version_is_bumped_from(
+        self, tmp_path, monkeypatch,
+    ):
+        """The release refuses until the tag is restored; the rename does not.
+
+        What the rename records is the version the next release ships, and once
+        the tag is restored that release bumps from the unrecoverable version.
+        """
+        repo, _sha = build_unrecoverable(tmp_path)
+
+        result = self._rename(repo, monkeypatch)
+
+        assert result.exit_code == 0, result.stderr + result.stdout
+        assert "effective 0.28.0" in result.stdout, result.stdout
+
 
 # --------------------------------------------------------------------------- #
 # The archive step never writes over a never-released archive
@@ -380,6 +529,61 @@ class TestTheArchiveStepBackstop:
 
         assert "never released" in str(exc.value)
         assert (tmp_path / ".rlsbl/releases/v0.29.4.toml").read_bytes() == before
+
+    def test_the_executor_stops_at_the_archive_step(self, tmp_project, capsys):
+        """End to end: the record changes under a running release.
+
+        The release decides 1.0.1 before anything changes, and a never-released
+        archive for 1.0.1 appears before the archive step (written here from the
+        step just before it). The executor stops there: the archive is neither
+        renamed over nor written into, the release file is not consumed, and no
+        tag is created.
+        """
+        from pathlib import Path
+
+        import rlsbl.config as config_module
+        from rlsbl.commands.release import run_cmd
+        from rlsbl.release_file import read_release_file
+        from test_release_file_relocation import (
+            _make_ctx,
+            _rc,
+            _release_patches,
+            _setup_releasable_workspace,
+            _write_releasable_release_file,
+        )
+
+        core = _setup_releasable_workspace(tmp_project)
+        release_file = Path(_write_releasable_release_file(tmp_project))
+        releases = str(release_file.parent)
+        archive = release_file.parent / "v1.0.1.toml"
+        written = {}
+        real_clean = config_module.clean_stale_exclusions
+
+        def the_record_changes(path):
+            archive_release(releases, "1.0.1", None, never_released=True)
+            written["bytes"] = archive.read_bytes()
+            return real_clean(path)
+
+        with ExitStack() as stack:
+            for active in _release_patches():
+                stack.enter_context(active)
+            stack.enter_context(patch(
+                "rlsbl.config.clean_stale_exclusions",
+                side_effect=the_record_changes,
+            ))
+            with pytest.raises(SystemExit):
+                run_cmd(_rc(), {"quiet": True, "skip-lock": True},
+                        ctx=_make_ctx(core, tmp_project))
+
+        stderr = capsys.readouterr().err
+        assert "refusing to archive the release of 1.0.1" in stderr, stderr
+        assert written, "the release never reached the step before the archive"
+        assert archive.read_bytes() == written["bytes"]
+        assert read_release_file(str(archive)).never_released is True
+        assert release_file.exists()
+        assert "alpha@v1.0.1" not in git(tmp_project, "tag", "-l").split()
+        log = git(tmp_project, "log", "--format=%s")
+        assert "finalize release file" not in log, log
 
     def test_no_archive_or_a_released_one_passes(self, tmp_path):
         from rlsbl.commands.release.execute import refuse_never_released_archive
