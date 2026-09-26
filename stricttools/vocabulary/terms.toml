@@ -1,1 +1,37 @@
 format_version = 1
+
+[[accepted]]
+word = "pgdesign"
+meaning = "The pgdesign release target: a PostgreSQL schema-design project detected by its pgdesign.toml, whose version rlsbl bumps without a registry publish."
+
+[[accepted]]
+word = "prs"
+meaning = "The 'rlsbl prs' command, which lists the repository's open pull requests (PRs) before a release."
+
+[[accepted]]
+word = "rdeps"
+meaning = "Reverse dependencies: the workspace members that depend on a given member, as the monorepo snapshot reports them."
+
+[[accepted]]
+word = "releasables"
+meaning = "Plural of releasable: a monorepo's unit of versioning, grouping member packages under one version, changelog, and tag scheme."
+
+[[accepted]]
+word = "rlsbl"
+meaning = "This tool: the release manager that versions, checks, changelogs, tags, and publishes projects and monorepo workspaces."
+
+[[accepted]]
+word = "safegit"
+meaning = "The concurrency-safe git wrapper rlsbl commits through and whose history rewriting 'rlsbl release scrub' wraps."
+
+[[accepted]]
+word = "saferm"
+meaning = "The auditable, undoable file-deletion tool rlsbl uses to remove files."
+
+[[accepted]]
+word = "strictspec"
+meaning = "The schema tool whose generated validators define the shape of rlsbl's documents, such as changelog lines and release files."
+
+[[accepted]]
+word = "testisolation"
+meaning = "The sandboxed test-runner tool whose adoption the testisolation-floor check verifies."
