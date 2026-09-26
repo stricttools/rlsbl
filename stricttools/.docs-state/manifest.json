@@ -8954,6 +8954,16 @@
         },
         {
           "level": 3,
+          "text": "`behind_latest_release_text`",
+          "anchor": "behind_latest_release_text"
+        },
+        {
+          "level": 3,
+          "text": "`is_behind`",
+          "anchor": "is_behind"
+        },
+        {
+          "level": 3,
           "text": "`_refuse_never_released_reuse`",
           "anchor": "_refuse_never_released_reuse"
         },
@@ -8961,6 +8971,11 @@
           "level": 3,
           "text": "`decide_release_version`",
           "anchor": "decide_release_version"
+        },
+        {
+          "level": 3,
+          "text": "`bumped_release_version`",
+          "anchor": "bumped_release_version"
         },
         {
           "level": 3,
@@ -9158,8 +9173,13 @@
         },
         {
           "level": 3,
-          "text": "`_latest_released_below`",
-          "anchor": "_latest_released_below"
+          "text": "`_latest_release`",
+          "anchor": "_latest_release"
+        },
+        {
+          "level": 3,
+          "text": "`_adopt_with_backfill`",
+          "anchor": "_adopt_with_backfill"
         },
         {
           "level": 3,
@@ -22004,7 +22024,7 @@
       ]
     }
   ],
-  "last_gen": "2026-09-26T22:54:04.118107+00:00",
+  "last_gen": "2026-09-26T23:31:45.245501+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
