@@ -13,7 +13,7 @@ Built in Python 3.11+ with ruamel-yaml, tomlkit, strictcli, and tree-sitter. Als
 
 ## Release workflow
 
-This project uses [rlsbl](https://github.com/smm-h/rlsbl) for release orchestration.
+This project uses [rlsbl](https://github.com/stricttools/rlsbl) for release orchestration.
 
 - Run `rlsbl release init` to scaffold `.rlsbl/releases/unreleased.toml`
 - Edit the release file: set bump type (patch/minor/major), include/exclude targets

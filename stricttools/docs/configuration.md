@@ -37,7 +37,7 @@ Configuration precedence for tagging: CLI flag (`--no-tag`) > project config > u
 
 ### strictspec_gate
 
-The `strictspec_gate` object opts a project into the strictspec **certificate deploy gate**, a built-in preflight check (`strictspec-certificate-gate`) that consumes a [`strictspec diff`](https://github.com/smm-h/strictspec) certificate as a `format_version` deploy gate. Projects without this section are untouched — the check skips.
+The `strictspec_gate` object opts a project into the strictspec **certificate deploy gate**, a built-in preflight check (`strictspec-certificate-gate`) that consumes a [`strictspec diff`](https://github.com/stricttools/strictspec) certificate as a `format_version` deploy gate. Projects without this section are untouched — the check skips.
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -452,6 +452,6 @@ Writing is policed too. `save_workspace` strips the bookkeeping keys a caller at
 
 ## selfdoc.json
 
-When present in the project root, this file configures documentation builds via selfdoc. It specifies the source directories to scan, the output path for generated pages, the base URL for the published site, and an optional deploy provider such as Cloudflare Pages. Documentation deployment is handled via a `cloudflare-pages` pipeline in `.rlsbl/config.json`, not as a release target. See the [selfdoc documentation](https://github.com/smm-h/selfdoc) for the full schema.
+When present in the project root, this file configures documentation builds via selfdoc. It specifies the source directories to scan, the output path for generated pages, the base URL for the published site, and an optional deploy provider such as Cloudflare Pages. Documentation deployment is handled via a `cloudflare-pages` pipeline in `.rlsbl/config.json`, not as a release target. See the [selfdoc documentation](https://github.com/stricttools/selfdoc) for the full schema.
 
 :-: table-schema path="selfdoc.json" exclude="version,versions"
