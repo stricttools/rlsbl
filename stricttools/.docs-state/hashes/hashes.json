@@ -174,9 +174,9 @@
     "description": "b752744a8a9ef0f190d20a5fefbd532e5ed046ed8c483544de1248a6f28bdbc6"
   },
   "en/gen-index.md": {
-    "content": "2d01fc31c3019d6781d1e157108a43bc9e0034807832ee85a28074f9a261d8a2",
-    "description": "098b65880d9af7f6f68cac0b9493324d219df70208b753e7b0020b46255f29df",
-    "seed_hash": "098b65880d9af7f6f68cac0b9493324d219df70208b753e7b0020b46255f29df"
+    "content": "12d50e2d29c60f984623ae08f8542e95cf1bcd7829214f1a897da01b19254359",
+    "description": "4a3cca3dbcebc6884a4a869153e72992a9048b00ed0c7be69dd77b8748d26ece",
+    "seed_hash": "4a3cca3dbcebc6884a4a869153e72992a9048b00ed0c7be69dd77b8748d26ece"
   },
   "en/import-scanning.md": {
     "content": "378896c356195ea11b911835db2d64c72bd6a5eda61bb09f6d0c1ded59258a57",
@@ -533,6 +533,11 @@
     "content": "105975070bda63d4bdec5d76726f0c5563dd37441e8d7a8c9bbae979a8c89868",
     "description": "510751c25eb305660274f92ac76b49dc04cf49e9453da1fb929fe0e91c479ad1",
     "source_docstring": "0998f186e8a9850589e938859db694b132aaeacda3864775a912477466446a4b"
+  },
+  "en/rlsbl-commands-release_abandon.md": {
+    "content": "6f4fb1d2a934553457fb833edaa571c6cb3bb644ae2d32f90bed12ad543241ba",
+    "description": "daf8c232dae652cb17ede3b52000d946766e230b0d1bf40da2c089f3877da41f",
+    "seed_hash": "daf8c232dae652cb17ede3b52000d946766e230b0d1bf40da2c089f3877da41f"
   },
   "en/rlsbl-commands-release_backfill.md": {
     "content": "bb4fb006c637162dacea772a62e8bc481c8e02a41e4a78831eef084dcdb34392",
