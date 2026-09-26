@@ -17,13 +17,21 @@ anything else it pushed) stays where it is -- the version files naming a
 never-released number is exactly the state the next release bumps from.
 
 The version comes from the in-progress state file when there is one, and from
-the version files when it is gone. It refuses, before anything is written:
+the version files when it is gone. A re-run after an abandon that committed its
+archive but stopped before deleting the state file finishes it: when the state
+file names a version already recorded never released, the archive is committed
+if the earlier run had not committed it, and the state file is deleted. It refuses, before anything is written:
 
 * when there is nothing to abandon -- no in-progress state, and the version
   files name a version the record already holds (released or never released);
-* when the version it would abandon is already archived;
-* when the attempt's tag exists (locally or on origin) or its GitHub Release
-  does: that is a recorded release, and ``rlsbl release undo`` applies.
+* when the version it would abandon is already archived as a release;
+* when that version is below the latest release: a number below it is never
+  recorded as never released;
+* when the attempt's tag exists (locally or on origin) with no archive: the
+  tag is evidence of a release, and ``rlsbl release backfill`` adopts it as
+  that release (a tag only on origin is fetched first);
+* when the attempt's GitHub Release exists with no tag anywhere: that is a
+  published release, and ``rlsbl release undo`` applies.
 
 Every probe that cannot answer is a hard error, never read as "absent".
 """
@@ -139,23 +147,50 @@ def _version_files_version(uc):
     return distinct[0]
 
 
-def _latest_released_below(releases_dir, version):
-    """The highest archived version below *version* that was released, or None."""
-    from ..release_file import archive_sort_key, list_archived_versions
+def _latest_release(releases_dir):
+    """The highest archived version that was released, or None."""
+    from ..release_file import list_archived_versions
     from ..release_record import read_version_fate
 
-    key = archive_sort_key(version)
     for candidate in list_archived_versions(releases_dir):
-        if archive_sort_key(candidate) >= key:
-            continue
         if read_version_fate(releases_dir, candidate).released:
             return candidate
     return None
 
 
+def _adopt_with_backfill(version, archive_path, *, fetch_tag=None):
+    """The remedy for a tag that stands with no archive: backfill adopts it."""
+    lines = [
+        f"  The release record holds no archive for {version} ({archive_path}), "
+        f"and a tag is evidence of a release, so {version} is not recorded as "
+        f"never released. Nothing was changed.",
+    ]
+    if fetch_tag:
+        lines.append(
+            "  Fetch the tag, then record the release it is evidence of: "
+            "`rlsbl release backfill` adopts a version tag no archive records "
+            "as released from the commit it names. Preview first, then write:"
+        )
+        lines.append(f"    git fetch origin tag {fetch_tag}")
+    else:
+        lines.append(
+            "  Record the release the tag is evidence of: `rlsbl release "
+            "backfill` adopts a version tag no archive records as released "
+            "from the commit it names. Preview first, then write:"
+        )
+    lines.append("    rlsbl release backfill --dry-run")
+    lines.append("    rlsbl release backfill --approve-consequential")
+    return lines
+
+
 def run_cmd(flags, *, ctx):
     """Record the abandoned attempt's version as never released."""
     from .release.release_state import clear_release_state, load_release_state
+    from .release.validate import (
+        ReleaseValidationError,
+        behind_latest_release_text,
+        is_behind,
+    )
     from .undo import (
         _build_tag_from_version,
         _in_progress_state_path,
@@ -171,6 +206,7 @@ def run_cmd(flags, *, ctx):
         commit_files,
         local_tag_state,
         remote_tag_commit,
+        working_tree_paths,
     )
     from .. import effects
 
@@ -202,6 +238,31 @@ def run_cmd(flags, *, ctx):
 
     archive_path = archived_release_path(releases_dir, version)
     fate = read_version_fate(releases_dir, version, cwd=uc.project_path)
+    if state is not None and fate is VersionFate.NEVER_RELEASED:
+        # An earlier abandon wrote the archive and stopped before its commit,
+        # or after it and before deleting the state file. The archive is
+        # already the record; finish whichever part is left.
+        uncommitted = working_tree_paths(
+            uc.project_path, paths=[archive_path], untracked="all",
+        )
+        if uncommitted:
+            commit_files(
+                f"chore: record {version} as never released (abandoned release attempt)",
+                [archive_path],
+                cwd=uc.project_path,
+            )
+        clear_release_state(state_path)
+        verb = "would complete" if dry_run else "completed"
+        print(
+            f"This run {verb} the earlier abandon of {version}: the release "
+            f"record already holds {version} as never released ({archive_path})."
+        )
+        if uncommitted:
+            verb = "Would commit" if dry_run else "Committed"
+            print(f"{verb} that archive, which the earlier run had not committed.")
+        verb = "Would delete" if dry_run else "Deleted"
+        print(f"{verb} the in-progress release state: {state_path}")
+        return
     if state is None and fate is not VersionFate.ABSENT:
         held = "released" if fate.released else "never released"
         _die(
@@ -212,28 +273,40 @@ def run_cmd(flags, *, ctx):
             "  Nothing was changed.",
         )
     if fate is not VersionFate.ABSENT:
-        held = "a release" if fate.released else "never released"
-        lines = [
-            f"Error: {version} is already archived, as {held}: {archive_path}",
+        _die(
+            f"Error: {version} is already archived, as a release: {archive_path}",
             "  Abandoning writes that archive, so there is nothing left for it "
             "to record. Nothing was changed.",
-        ]
-        if fate is VersionFate.NEVER_RELEASED:
-            lines.append("  " + leftover_state_remedy(
-                version, archive_path, state_path,
-            ))
-        _die(*lines)
+        )
+
+    latest = _latest_release(releases_dir)
+    try:
+        behind = latest is not None and is_behind(version, latest)
+    except ReleaseValidationError as exc:
+        _die(f"Error: {exc}")
+    if behind:
+        if state is None:
+            _die(
+                "Error: " + behind_latest_release_text(
+                    version, latest, named_by="the version files say",
+                ),
+                f"  Set the version files to {latest}: they then name the "
+                f"latest release, and there is no abandoned version for them "
+                f"to name.",
+            )
+        _die(
+            "Error: " + behind_latest_release_text(
+                version, latest, named_by="the in-progress release state names",
+            ),
+            f"  The state file: {state_path}",
+        )
 
     tag = str((state or {}).get("tag") or "").strip() or _build_tag_from_version(
         uc, version,
     )
-    undo_applies = (
-        "  That is a recorded release, and `rlsbl release undo` reverts it. "
-        "Nothing was changed."
-    )
     if local_tag_state(tag, uc.project_path) is LocalTagState.PRESENT:
         _die(f"Error: the attempt's tag {tag} exists in this repository.",
-             undo_applies)
+             *_adopt_with_backfill(version, archive_path))
     remote = remote_tag_commit(tag, cwd=uc.project_path)
     if remote.state is RemoteTagState.INCONCLUSIVE:
         _die(
@@ -244,18 +317,20 @@ def run_cmd(flags, *, ctx):
         )
     if remote.state is RemoteTagState.PRESENT:
         _die(f"Error: the attempt's tag {tag} exists on origin at "
-             f"{remote.commit}.", undo_applies)
+             f"{remote.commit}.",
+             *_adopt_with_backfill(version, archive_path, fetch_tag=tag))
     try:
         release_exists = _github_release_exists(tag, ctx.config)
     except AbandonError as exc:
         _die(f"Error: {exc}", "  Nothing was changed.")
     if release_exists:
         _die(f"Error: a GitHub Release exists for the attempt's tag {tag}.",
-             undo_applies)
+             "  That is a published release, and `rlsbl release undo` reverts "
+             "it. Nothing was changed.")
 
     write_archived_release_file(
         releases_dir, version,
-        bump=derive_bump(version, _latest_released_below(releases_dir, version)),
+        bump=derive_bump(version, latest),
         include=[],
         description=f"Abandoned release attempt: {version} was never released.",
         candidate_sha=None,
@@ -270,8 +345,8 @@ def run_cmd(flags, *, ctx):
             cwd=uc.project_path,
         )
     except Exception:
-        # The archive and its commit are one operation: an uncommitted archive
-        # left behind would make a re-run refuse as "already archived".
+        # The archive and its commit are one operation: an archive left behind
+        # uncommitted would stand in the tree as a record no commit carries.
         effects.chmod(archive_path, 0o644)
         effects.remove(archive_path, missing_ok=True)
         raise
