@@ -54,6 +54,7 @@ EXPECTED_EFFECTS = {
     "release.retry": "mutating",
     "release.edit": "mutating",
     "release.undo": "mutating",
+    "release.abandon": "mutating",
     "release.deprecate": "mutating",
     "release.yank": "mutating",
     "release.scrub": "mutating",

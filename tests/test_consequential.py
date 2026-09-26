@@ -47,6 +47,7 @@ CONSEQUENTIAL = {
     "release resume":             "finishes that same push/tag/publish",
     "release retry":              "dispatches the publish workflows",
     "release undo":               "deletes the GitHub Release and the remote tag",
+    "release abandon":            "declares a version number permanently never released, deciding where every later release bumps from",
     "release deprecate":          "makes a public statement about a shipped version",
     "release yank":               "removes a published version from public registries",
     "release scrub":              "rewrites history and force-pushes it",
