@@ -662,6 +662,44 @@ def _unrecorded_version_error(current_version, latest_version, current_tag,
     )
 
 
+def behind_latest_release_text(version, latest_version, *, named_by):
+    """The explanation shared by every refusal of a version below the latest release.
+
+    *named_by* says where *version* was read, completing "<named_by> <version>":
+    ``"the version files say"`` or ``"the in-progress release state names"``.
+    ``release run`` (through :func:`decide_release_version`) and ``release
+    abandon`` both print it, so the two cannot explain the state differently.
+    """
+    return (
+        f"{named_by} {version}, which is behind the latest release, "
+        f"{latest_version}. The version files must name at least "
+        f"{latest_version}: rlsbl never releases a version below the latest "
+        f"release, and never records one as never released. Nothing was "
+        f"changed."
+    )
+
+
+def is_behind(version, latest_version):
+    """Is *version* ordered below *latest_version* (the archives' one ordering)?
+
+    Raises :class:`ReleaseValidationError` when *version* is not a version the
+    release record can hold, since then no ordering against it exists.
+    """
+    from ...release_file import archive_sort_key
+
+    try:
+        key = archive_sort_key(version)
+    except ValueError as exc:
+        raise ReleaseValidationError(
+            f"{version} is not a version the release record can hold "
+            f"(MAJOR.MINOR.PATCH, optionally -alpha.N, -beta.N or -rc.N), so "
+            f"it cannot be ordered against the latest release, "
+            f"{latest_version}. Nothing was changed. Fix the version files, "
+            f"then re-run."
+        ) from exc
+    return key < archive_sort_key(latest_version)
+
+
 def _refuse_never_released_reuse(releases_dir, current_version, new_version,
                                  bump_type, preid, *, tag_glob, cwd):
     """Refuse a new version the record holds as never released.
@@ -700,31 +738,37 @@ def decide_release_version(*, releases_dir, current_version, bump_arg, preid,
                            tag_glob=None):
     """Decide what the next release ships: the one first-release decision.
 
-    Every caller that needs the next version asks here -- ``release run``
-    (through :func:`compute_release_version`), batch planning, and ``rlsbl
-    rewrite project-name`` recording an identity transition's effective
-    version -- so they cannot disagree.
+    ``release run`` (through :func:`compute_release_version`), batch
+    planning, and ``rlsbl rewrite project-name`` recording an identity
+    transition's effective version all ask here, so they cannot disagree. The
+    rename differs in one state, an unrecoverable current version, where it
+    asks :func:`bumped_release_version` directly for what the release ships
+    once this decision's refusal is cleared.
 
     The current version's FATE decides (see
     :func:`~rlsbl.release_record.read_version_fate`), with its local tag read
     as corroboration only:
 
-    * **released** (recorded or unrecoverable): bump from it. A recorded
-      version whose tag is genuinely absent has lost its tag, and is refused
-      (:func:`_abort_on_destroyed_tag`). An unrecoverable one is not: that fate
-      is written exactly when no tag and no version-bump commit could be
-      found, so its absent tag is part of what the record already says.
+    * **released** (recorded or unrecoverable): bump from it. A released
+      version whose tag is genuinely absent is refused
+      (:func:`_abort_on_destroyed_tag`). For a recorded version the tag was
+      lost; for an unrecoverable one the archive says the version shipped
+      but cannot name the commit, so the release cannot tell where the
+      history it ships from begins. Either way, restoring the tag at the
+      commit it shipped from clears it.
     * **never released**: bump from it. The version files name a number an
       abandoned attempt claimed, and that is where the next release starts.
     * **no archive, tag present**: bump from it, as before.
     * **no archive, no tag**: a first release when the record holds no
       released version at all (*latest* names none) -- the current version
       ships as-is, the declared bump ignored. Once any release exists it is
-      REFUSED: that is the state an abandoned attempt leaves behind, and
-      ``rlsbl release abandon`` is how it is recorded.
+      REFUSED. Above the latest release that is the state an abandoned attempt
+      leaves behind, and ``rlsbl release abandon`` is how it is recorded.
+      Below it, the version files are behind the latest release
+      (:func:`behind_latest_release_text`), and abandoning is never offered.
 
     A bumped version the record holds as never released is refused too: a
-    never-released number is never reused.
+    never-released number is never reused (:func:`bumped_release_version`).
 
     *latest* is the :class:`~rlsbl.release_record.LatestReleaseFact` of the
     same record, which the release flow has already computed.
@@ -740,7 +784,7 @@ def decide_release_version(*, releases_dir, current_version, bump_arg, preid,
     current_tag = make_tag(current_version)
     tag_state = local_tag_state(current_tag, cwd)
 
-    if fate is VersionFate.RECORDED and tag_state is LocalTagState.ABSENT:
+    if fate.released and tag_state is LocalTagState.ABSENT:
         _abort_on_destroyed_tag(
             project_dir, current_version, current_tag, releases_dir=releases_dir,
             fate=fate, releasable_name=releasable_name,
@@ -748,6 +792,15 @@ def decide_release_version(*, releases_dir, current_version, bump_arg, preid,
         )
 
     if fate is VersionFate.ABSENT and tag_state is not LocalTagState.PRESENT:
+        if latest.version is not None and is_behind(current_version, latest.version):
+            raise ReleaseValidationError(
+                behind_latest_release_text(
+                    current_version, latest.version,
+                    named_by="the version files say",
+                )
+                + f"\n  Set the version files to {latest.version}, then re-run "
+                f"the release, which bumps from {latest.version}."
+            )
         if latest.version is not None:
             raise _unrecorded_version_error(
                 current_version, latest.version, current_tag, tag_state,
@@ -767,6 +820,25 @@ def decide_release_version(*, releases_dir, current_version, bump_arg, preid,
             tag=current_tag,
         )
 
+    return bumped_release_version(
+        releases_dir=releases_dir, current_version=current_version,
+        bump_arg=bump_arg, preid=preid, make_tag=make_tag, cwd=cwd,
+        tag_glob=tag_glob,
+    )
+
+
+def bumped_release_version(*, releases_dir, current_version, bump_arg, preid,
+                           make_tag, cwd, tag_glob=None):
+    """The release that applies the declared bump to *current_version*.
+
+    The last step of :func:`decide_release_version`, for every state it bumps
+    from. ``rlsbl rewrite project-name`` also asks it directly for an
+    unrecoverable current version, which the release refuses until its tag is
+    restored: the rename records the version that release then ships.
+
+    Raises :class:`ReleaseValidationError` on an unknown bump type, and when
+    the bumped version is one the record holds as never released.
+    """
     new_version, bump_type = _bumped(current_version, bump_arg, preid)
     _refuse_never_released_reuse(
         releases_dir, current_version, new_version, bump_type, preid,
@@ -971,8 +1043,10 @@ def _abort_on_destroyed_tag(project_dir, current_version, tag, *, releases_dir,
     either one is enough:
 
     * the RELEASE RECORD -- ``.rlsbl/releases/v<version>.toml`` -- when its
-      FATE is recorded: it names the commit the tag belongs on. This is the authority,
-      and *fate* is its answer, read once by :func:`decide_release_version`.
+      FATE is a release: recorded names the commit the tag belongs on, and
+      unrecoverable says it shipped from a commit the record cannot name, which
+      the refusal says so the operator supplies it. This is the authority, and
+      *fate* is its answer, read once by :func:`decide_release_version`.
       A never-released archive is not a release: a version files number an
       abandoned attempt claimed has no tag by construction, and the release
       bumps from it instead of reaching here.
@@ -997,10 +1071,20 @@ def _abort_on_destroyed_tag(project_dir, current_version, tag, *, releases_dir,
     from ...release_record import VersionFate
 
     release_commit = None
+    unrecoverable_note = ""
     if fate is VersionFate.RECORDED:
         record = archived_release_path(releases_dir, current_version)
         record_kind = "release archive"
         release_commit = read_release_file(record).candidate_sha
+    elif fate is VersionFate.UNRECOVERABLE:
+        record = archived_release_path(releases_dir, current_version)
+        record_kind = "release archive"
+        unrecoverable_note = (
+            f" The archive is marked unrecoverable: the release record cannot "
+            f"name the commit {current_version} shipped from, so the release "
+            f"cannot tell where the history it ships from begins. Only you "
+            f"know that commit."
+        )
     else:
         try:
             changes_dir = resolve_changes_dir(
@@ -1024,7 +1108,7 @@ def _abort_on_destroyed_tag(project_dir, current_version, tag, *, releases_dir,
         f"when the tag format changed since this version was released -- the "
         f"version was tagged under an old-format name, so the current-format "
         f"tag \"{tag}\" does not exist. Either way this looks like a first "
-        f"release when it is not.\n"
+        f"release when it is not.{unrecoverable_note}\n"
         f"Recover by either:\n"
         f"  (1) restore the tag \"{tag}\" at the commit {current_version} was "
         f"released from (git tag {tag} {release_commit or '<release-commit>'}), "
