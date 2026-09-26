@@ -271,7 +271,7 @@ A reconstructed description comes from the first source that yields one, and the
 
 A version with **no tag** is not passed over: the pass looks for the version-bump commit — whose whole message is what a release of that scope writes, the releasable's `{name}: release v{version}` or the release's own tag string — and records the release commit from it, saying so. The message is matched whole, so one releasable's bump commit is never mistaken for another's. Only when that also fails does the archive get `unrecoverable = true` — a permanent record that the commit is unrecoverable, not a temporary gap.
 
-**The one fate the pass will not derive is `never_released`.** A version no release ever used has no tag and no version-bump commit *by construction*, which is indistinguishable from a released version whose commit is gone. So it is DECLARED, not inferred: write the archive with `never_released = true` before running the backfill, and the pass leaves that fate alone forever. The note it prints on a version it is about to record from a version-bump commit says exactly this — there is deliberately no flag and no input file for the declaration, because the archive *is* the declaration.
+**The one fate the pass will not derive is `never_released`.** A version no release ever used has no tag and no version-bump commit *by construction*, which is indistinguishable from a released version whose commit is gone. So it is DECLARED, not inferred: write the archive with `never_released = true` before running the backfill, and the pass leaves that fate alone forever. The note it prints on a version it is about to record from a version-bump commit says exactly this — the backfill deliberately has no flag and no input file for the declaration, because the archive *is* the declaration. For an abandoned release attempt, `rlsbl release abandon` writes that archive (see [Abandoning an attempt](#abandoning-an-attempt)).
 
 **An unexplained tag refuses the whole apply, all-or-nothing.** A tag is explained when it is one of the refs an archived version owns (its primary tag, an ecosystem companion, or a recorded alias — `shipped_as` included), or when a transition record carries a `non-version-tag` event naming it. Both the project's own record and the repository-scoped one are consulted for that declaration, which is where `rlsbl transition record` writes it. Anything else stops the pass with the three cheap resolutions spelled out: adopt it as released (recording the archive with `shipped_as` naming the historical spelling), record it as a non-version tag with `rlsbl transition record --non-version-tag <tag> --reason "<why>"`, or delete it on your own explicit decision. A stash present in the repository is a hard error on the apply too — it is uncommitted work with no branch of its own, and the pass commits what it writes.
 
@@ -287,7 +287,7 @@ Every archived release file records exactly one of three fates, and every read o
 | unrecoverable | `unrecoverable = true` | The version shipped, and the commit it shipped from cannot be recovered from any source. It still has consumers and real refs; only rlsbl's knowledge of where it came from is gone. |
 | never released | `never_released = true` | The version NUMBER exists in the record — a phantom tag's version, a version claimed and abandoned — but no release was ever published under it. |
 
-The third is not a degraded second. Every read that asks what this project RELEASED skips a never-released version: it is not the latest release, it does not bound the unreleased range, `rlsbl release undo` does not select it, the `unpublished-refs` check demands neither refs nor a GitHub Release for it, and `rlsbl release reconcile` never plans a deletion of a tag carrying its name. Its CHANGELOG.md section is still rendered — such a version can carry finalized changelog files, and hiding them would lose the record — annotated as never released.
+The third is not a degraded second. Every read that asks what this project RELEASED skips a never-released version: it is not a release for the first-release decision (see [Abandoning an attempt](#abandoning-an-attempt)), it is not the latest release, it does not bound the unreleased range, `rlsbl release undo` does not select it, the `unpublished-refs` check demands neither refs nor a GitHub Release for it, and `rlsbl release reconcile` never plans a deletion of a tag carrying its name. Its CHANGELOG.md section is still rendered — such a version can carry finalized changelog files, and hiding them would lose the record — annotated as never released.
 
 An archive recording none of the three is a hard error at every read-for-use site: it was written before release commits were recorded and never backfilled, and rlsbl cannot tell which commit the version shipped from, or whether it shipped at all.
 
@@ -336,6 +336,20 @@ From the version bump onward, every step records a success or failure marker in 
 Non-fatal failures (deploy, post-release hook, snapshot) are recorded and loudly named in the completion summary, and the release completes. The state file is cleared only when every step carries a marker and no fatal step failed; `rlsbl release run` auto-clears a provably-complete leftover state file instead of blocking.
 
 While a state file is present, `rlsbl release run` refuses and names `rlsbl release resume`. Resume is therefore the only door back into a stopped release, and it is built to be one that always opens.
+
+### Abandoning an attempt
+
+A release that is not going to be finished is abandoned with `rlsbl release abandon` (consequential). It writes the version's archive with `never_released = true`, deletes the in-progress state file, and commits the archive with the `Autogenerated: true` trailer, as one operation. The version comes from the state file, or from the version files when the state file is gone. Nothing the attempt committed is reverted: the version-bump commit stays, and the version files naming a never-released number is the state the next release starts from. It refuses, before writing anything, when there is nothing to abandon (no state file, and the version files name a version the record already holds), when the version is already archived, and when the attempt's tag exists locally or on origin or its GitHub Release exists -- that is a recorded release, and `rlsbl release undo` applies. A probe that cannot answer (gh unavailable, origin unreachable) is a hard error.
+
+The release record's fates decide what the next release ships, never an archive's mere existence:
+
+- **A first release** is one whose record holds no released version at all: the current version ships as-is and the declared bump is ignored. A releasable asks its own record, so a new releasable is a first release beside released siblings.
+- **Version files naming a released version** are bumped from, as always.
+- **Version files naming a version recorded never released** are bumped from too: a `minor` bump from a never-released 0.29.4 gives 0.30.0. Only a number the version files name is used this way; the highest archive is never picked as the base on its own.
+- **Version files naming a number with neither an archive nor a tag, once any release exists,** are refused before anything changes. That is the state an abandoned attempt leaves behind, and the refusal names the version files' number, the latest release, and `rlsbl release abandon`.
+- **A next version the record holds as never released** is refused before anything changes: a never-released number is never reused. The refusal names the version-files value that bumps past it (with 0.29.4 never released and the files at 0.29.3, a `patch` bump is refused, and setting the files to 0.29.4 makes it 0.29.5). The archive step never writes over a never-released archive either.
+
+The in-progress refusals follow the same fates: while the state file names a version with no archive, `rlsbl release run`, `rlsbl release undo`, and the executor's unverified-candidate error name `rlsbl release resume` and `rlsbl release abandon`, and undo refuses rather than reverting the release before the attempt. While it names a version recorded never released, the attempt was already abandoned, and they name the leftover state file to delete.
 
 ### Resuming adopts the branch
 
@@ -481,7 +495,7 @@ Watching is always in-process: there is no detached background watcher. To watch
 
 ## Related commands
 
-The `release` command group covers the full release lifecycle — from scaffolding the release file through post-release corrections and rollbacks. Each subcommand is designed for a specific phase: `init` prepares, `run` executes, `resume` continues a release that stopped (most often at a red CI gate), `retry` re-dispatches publish workflows, `edit` corrects release notes, `undo` reverts a completed release, and `deprecate` / `yank` retire published ones.
+The `release` command group covers the full release lifecycle — from scaffolding the release file through post-release corrections and rollbacks. Each subcommand is designed for a specific phase: `init` prepares, `run` executes, `resume` continues a release that stopped (most often at a red CI gate), `retry` re-dispatches publish workflows, `edit` corrects release notes, `undo` reverts a completed release, `abandon` records an attempt that will not be finished as never released, and `deprecate` / `yank` retire published ones.
 
 | Command | Purpose |
 | --- | --- |
@@ -490,6 +504,7 @@ The `release` command group covers the full release lifecycle — from scaffoldi
 | `rlsbl release retry` | Re-dispatch publish workflows for a completed release (reads from `retry.toml`) |
 | `rlsbl release edit [version]` | Sync GitHub Release notes from CHANGELOG.md (defaults to current version) |
 | `rlsbl release undo` | Revert a completed release: delete GitHub Release, delete tag, revert commit, and push the reverted branch itself |
+| `rlsbl release abandon` | Record a stopped attempt's version as never released, delete its in-progress state file, and commit the archive (see [Abandoning an attempt](#abandoning-an-attempt)) |
 | `rlsbl release deprecate <version>` | Flag a published release as deprecated on GitHub, with an optional reason and replacement |
 | `rlsbl release yank <version>` | Registry-aware removal of a published version (npm deprecate, cargo yank, Go retract, PyPI checklist) |
 | `rlsbl release scrub` | Scrub sensitive content from history and re-align tags, changelog hashes and GitHub Releases |
