@@ -32,10 +32,11 @@ What undo will not touch
 Because the target comes from the record, a release that stopped before its
 archive step is invisible here -- and the version the record does name is the
 PREVIOUS, published one. Undo therefore refuses outright while an in-progress
-release record names a version the archives do not contain, rather than
-reverting the release before it (see
-:func:`_refuse_unrecorded_in_progress`). A record naming a version that IS
-archived is a leftover from a release that got far enough, and changes nothing.
+release record names a version the archives do not record as released -- no
+archive at all, or one recording it never released -- rather than reverting
+the release before it (see :func:`_refuse_unrecorded_in_progress`). A record
+naming a version archived as a release is a leftover from a release that got
+far enough, and changes nothing.
 
 What is reverted, and what is repaired
 --------------------------------------
@@ -374,14 +375,23 @@ def _refuse_unrecorded_in_progress(uc):
     release before it -- silently, because nothing in the plan says which
     version the operator had in mind.
 
-    The two cases are separated here, and only the first is refused:
+    Three cases are separated here, and only the last one proceeds:
 
     - the in-progress record names a version with NO archive: the release never
       reached the step that records it, so there is no recorded release to
-      revert and undo has nothing to say about this version;
-    - the in-progress record names a version that HAS an archive: that release
-      WAS recorded (a leftover state file from a release that got far enough),
-      undo's selection is the version the operator means, and it proceeds.
+      revert and undo has nothing to say about this version. The refusal names
+      ``rlsbl release abandon``, which records the version as never released;
+    - the in-progress record names a version whose archive records it NEVER
+      RELEASED: the attempt was abandoned and the state file is left over.
+      Undo would skip the archive and revert the release before it, so this is
+      refused too, naming the file to delete;
+    - the in-progress record names a version whose archive records a RELEASE:
+      that release WAS recorded (a leftover state file from a release that got
+      far enough), undo's selection is the version the operator means, and it
+      proceeds.
+
+    The fate comes from :func:`~rlsbl.release_record.read_version_fate`, never
+    from the archive's mere existence.
     """
     from ..release_file import archived_release_path
     from .release.release_state import load_release_state
@@ -412,17 +422,42 @@ def _refuse_unrecorded_in_progress(uc):
             "it would select is the one you mean.",
         )
 
+    from ..release_record import VersionFate, read_version_fate
+    from .release_abandon import abandon_remedy, leftover_state_remedy
+
     releases_dir = _release_record_dir(uc)
-    if os.path.isfile(archived_release_path(releases_dir, version)):
+    fate = read_version_fate(releases_dir, version, cwd=uc.project_path)
+    if fate.released:
         # Recorded: a leftover state file from a release that reached its
         # archive step. Undo's own selection is the version in flight.
         return
+
+    would_select = _latest_recorded_version(uc)
+    if fate is VersionFate.NEVER_RELEASED:
+        # An archive exists, but it records that no release happened: undo's
+        # selection skips it and lands on the release BEFORE the attempt.
+        lines = [
+            f"Error: a release of {version} is in progress, and this project's "
+            f"record holds {version} as never released.",
+        ]
+        if would_select:
+            lines.extend([
+                f"  Undoing now would have reverted {would_select} instead -- "
+                f"the release before this one --",
+                "  deleting its tag and its GitHub Release.",
+            ])
+        lines.extend([
+            "  Nothing was changed.",
+            "  " + leftover_state_remedy(
+                version, archived_release_path(releases_dir, version), state_path,
+            ),
+        ])
+        _die(*lines)
 
     from .release.release_state import RELEASE_STEPS
 
     completed = set(state.get("completed_steps") or [])
     done = len([s for s in RELEASE_STEPS if s in completed])
-    would_select = _latest_recorded_version(uc)
     # Every variable-length value (a path) ends its own line, so the fixed
     # wrapping of the prose around it stays readable whatever the repository
     # is called.
@@ -448,9 +483,7 @@ def _refuse_unrecorded_in_progress(uc):
         f"from the {done} of",
         f"  {len(RELEASE_STEPS)} steps it completed. Once {version} is "
         f"recorded, undo reverts it.",
-        f"  To abandon {version} instead: delete the state file, then reverse "
-        f"by hand whatever the",
-        "  attempt already pushed. No command does that for you.",
+        "  " + abandon_remedy(version),
         f"    {state_path}",
     ])
     _die(*lines)

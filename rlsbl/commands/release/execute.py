@@ -9,7 +9,7 @@ import sys
 import time
 
 from ...ci_checks import RUN_ALL_REMEDY
-from ...errors import RlsblError
+from ...errors import ReleaseFileError, RlsblError
 from ...git_util import Ancestry, ancestry, tree_rev_spec
 from ...router_filters import any_path_matches
 
@@ -1506,6 +1506,28 @@ def require_adopted_commits_covered(adopted, *, changes_dir, version,
     raise ForeignCommitError("\n".join(lines))
 
 
+def refuse_never_released_archive(releases_dir, version, *, cwd=None):
+    """The archive step never writes over an archive recording *version* never released.
+
+    The release flow refuses a never-released version before anything changes
+    (see :func:`~rlsbl.commands.release.validate.decide_release_version`), so
+    reaching the archive step with one means the record changed under the
+    release. Renaming the release file over that archive, or synthesizing one
+    in its place, would erase the record that the number was abandoned; the
+    step stops instead, and the release stays resumable.
+    """
+    from ...release_file import archived_release_path
+    from ...release_record import VersionFate, read_version_fate
+
+    if read_version_fate(releases_dir, version, cwd=cwd) is VersionFate.NEVER_RELEASED:
+        raise ReleaseFileError(
+            f"refusing to archive the release of {version}: the release record "
+            f"already holds {version} as never released, and the archive step "
+            f"never writes over that record: "
+            f"{archived_release_path(releases_dir, version)}"
+        )
+
+
 def require_recorded_candidate(state_path, cwd=None, *, version):
     """The CI-verified commit this release is sealed to, or a hard error.
 
@@ -1528,32 +1550,40 @@ def require_recorded_candidate(state_path, cwd=None, *, version):
     tagged, released, and refused by the publish gate.
     """
     from ...release_file import archived_release_path
+    from ...release_record import VersionFate, read_version_fate
+    from ..release_abandon import abandon_remedy, leftover_state_remedy
 
     state = load_release_state(state_path) or {}
     recorded = (state.get("candidate_sha") or "").strip()
     # `rlsbl release undo` reverts a RECORDED release -- one the release
-    # archives contain. This error fires mid-release, and a release that
-    # stopped before its archive step has nothing recorded: undo refuses such a
-    # version rather than reverting the release before it. So the rollback half
-    # of the remedy is offered only where it can actually be followed.
-    if os.path.isfile(
-        archived_release_path(os.path.dirname(state_path), version)
-    ):
+    # archives record as released. This error fires mid-release, and a release
+    # that stopped before its archive step has nothing recorded: undo refuses
+    # such a version rather than reverting the release before it. So each
+    # remedy is offered only where it can actually be followed, decided by the
+    # version's fate rather than by its archive's mere existence.
+    releases_dir = os.path.dirname(state_path)
+    fate = read_version_fate(releases_dir, version, cwd=cwd)
+    if fate.released:
         remedy = (
             f"\n\nThe release cannot honestly claim CI verification for "
             f"{version}. Either roll back with `rlsbl release undo` and "
             f"release again, or put the intended commit on this branch and "
             f"run `rlsbl release resume`."
         )
+    elif fate is VersionFate.NEVER_RELEASED:
+        remedy = (
+            f"\n\nThe release cannot honestly claim CI verification for "
+            f"{version}. " + leftover_state_remedy(
+                version, archived_release_path(releases_dir, version), state_path,
+            )
+        )
     else:
         remedy = (
             f"\n\nThe release cannot honestly claim CI verification for "
             f"{version}. Put the commit CI verified back on this branch and "
-            f"run `rlsbl release resume`. To abandon the attempt instead, "
-            f"delete {state_path} and reverse by hand whatever it already "
-            f"pushed: `rlsbl release undo` does not apply, because {version} "
-            f"stopped before the step that records it, so there is no "
-            f"recorded release to revert."
+            f"run `rlsbl release resume`. `rlsbl release undo` does not apply, "
+            f"because {version} stopped before the step that records it, so "
+            f"there is no recorded release to revert. " + abandon_remedy(version)
         )
     if not recorded:
         raise UnverifiedCandidateError(
@@ -3203,6 +3233,7 @@ def _run_release_mutating(state: ReleaseState):
             log("Skipping release file finalization (already done)")
         else:
             releases_dir_rf = os.path.dirname(release_file_path)
+            refuse_never_released_archive(releases_dir_rf, new_version, cwd=_git_root)
             versioned_release_check = os.path.join(releases_dir_rf, f"v{new_version}.toml")
             if os.path.exists(versioned_release_check) and not os.path.exists(release_file_path):
                 _release_file_already_finalized = True

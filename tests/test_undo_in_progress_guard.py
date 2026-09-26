@@ -260,32 +260,45 @@ class TestTheRefusalsRemedies:
         for invocation in invocations:
             assert_invocation_is_real(invocation)
 
-    def test_it_names_no_discard_command(self, tmp_path, monkeypatch, capsys):
-        """There is no command that discards a half-finished release.
+    def test_it_names_the_abandon_command(self, tmp_path, monkeypatch, capsys):
+        """The command that abandons a half-finished release is `release abandon`.
 
-        The refusal therefore describes the manual route and says so, rather
-        than inventing a `release abort`/`release discard` for an operator to
-        type and be told does not exist.
+        No other spelling is invented for an operator to type and be told does
+        not exist, and the old "no command does that" is gone.
         """
         repo = _released_repo(tmp_path, monkeypatch)
         _stall(repo, "1.0.2")
 
         text = self._text(repo, capsys)
 
+        assert "`rlsbl release abandon --approve-consequential`" in text, text
+        assert "No command does that" not in text, text
         for invented in ("release abort", "release discard", "release cancel"):
             assert invented not in text, text
 
     def test_following_the_abandon_remedy_clears_the_refusal(
         self, tmp_path, monkeypatch, capsys,
     ):
-        """The refusal names a file to delete; deleting it lets undo through."""
+        """`rlsbl release abandon` is run for real, and the refusal is gone.
+
+        1.0.2 is then recorded as never released, so undo skips past it to the
+        real latest release, 1.0.1, rather than refusing.
+        """
+        import rlsbl
+
         repo = _released_repo(tmp_path, monkeypatch)
         state_path = _stall(repo, "1.0.2")
+        self._text(repo, capsys)
 
-        text = self._text(repo, capsys)
-        assert state_path in text, text
-
-        os.remove(state_path)
+        with patch(
+            "rlsbl.commands.release_abandon._github_release_exists",
+            return_value=False,
+        ):
+            result = rlsbl.app.test(
+                ["release", "abandon", "--approve-consequential"]
+            )
+        assert result.exit_code == 0, result.stderr + result.stdout
+        assert not os.path.exists(state_path)
 
         _run_undo(repo, {"dry-run": True})
         assert "v1.0.1" in capsys.readouterr().out
@@ -359,6 +372,64 @@ class TestTheRefusalsRemedies:
 
 
 # --------------------------------------------------------------------------- #
+# A state file whose version is recorded never released
+# --------------------------------------------------------------------------- #
+
+def _record_never_released(repo, version):
+    from conftest import archive_release, release_record_dir
+
+    archive_release(release_record_dir(repo), version, None, never_released=True)
+    git(repo, "add", ".rlsbl/releases")
+    git(repo, "commit", "-q", "-m", f"record {version} as never released")
+
+
+class TestANeverReleasedInProgressVersionIsRefused:
+    """The archive's existence is not a release: its fate is never released.
+
+    Undo used to read "an archive exists" as "that release was recorded", go
+    on to select the latest RELEASE, and print "Undoing 1.0.1" -- reverting the
+    release before the abandoned attempt.
+    """
+
+    def test_undo_does_not_target_the_previous_release(
+        self, tmp_path, monkeypatch, capsys,
+    ):
+        repo = _released_repo(tmp_path, monkeypatch)
+        _record_never_released(repo, "1.0.2")
+        _stall(repo, "1.0.2")
+        head = git(repo, "rev-parse", "HEAD")
+        gh = _FakeGh()
+
+        with pytest.raises(SystemExit) as exc:
+            _run_undo(repo, {}, gh=gh)
+
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "Undoing 1.0.1" not in err, err
+        assert "never released" in err, err
+        assert "v1.0.1" in git(repo, "tag", "-l").split()
+        assert git(repo, "rev-parse", "HEAD") == head
+        assert not gh.deleted
+
+    def test_deleting_the_leftover_state_file_clears_it(
+        self, tmp_path, monkeypatch, capsys,
+    ):
+        repo = _released_repo(tmp_path, monkeypatch)
+        _record_never_released(repo, "1.0.2")
+        state_path = _stall(repo, "1.0.2")
+
+        with pytest.raises(SystemExit):
+            _run_undo(repo, {"dry-run": True})
+        err = capsys.readouterr().err
+        assert state_path in err, err
+
+        os.remove(state_path)
+
+        _run_undo(repo, {"dry-run": True})
+        assert "v1.0.1" in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------- #
 # The two messages that routed operators into the wrong undo
 # --------------------------------------------------------------------------- #
 
@@ -386,6 +457,29 @@ class TestTheMessagesThatRoutedHere:
             )
         return capsys.readouterr().err
 
+    def _guard_message_or_none(self, repo, capsys):
+        """Run `release run --dry-run` past the guard; whatever it ends with."""
+        from rlsbl.commands.release import run_cmd as release_run_cmd
+        from rlsbl.context import ProjectContext
+        from rlsbl.release_file import ReleaseConfig
+
+        ctx = ProjectContext(
+            project_root=Path(str(repo)), workspace_root=None,
+            config={"publish_mode": "ci", "pipelines": {}},
+        )
+        try:
+            release_run_cmd(
+                ReleaseConfig(
+                    bump="patch", include=["npm"], exclude=[],
+                    description="another release",
+                ),
+                {"allow-dirty": False, "watch": False, "dry-run": True},
+                ctx=ctx,
+            )
+        except (SystemExit, Exception):
+            pass
+        return capsys.readouterr().err
+
     def test_release_run_does_not_offer_undo_for_an_unrecorded_version(
         self, tmp_path, monkeypatch, capsys,
     ):
@@ -397,6 +491,49 @@ class TestTheMessagesThatRoutedHere:
         assert "a previous release is in progress" in err, err
         assert "rlsbl release resume" in err, err
         assert "does not apply" in err, err
+        assert "`rlsbl release abandon --approve-consequential`" in err, err
+        for invocation in invocations_in(err):
+            assert_invocation_is_real(invocation)
+
+    def test_release_run_names_a_leftover_state_file_for_a_never_released_version(
+        self, tmp_path, monkeypatch, capsys,
+    ):
+        repo = _released_repo(tmp_path, monkeypatch)
+        _record_never_released(repo, "1.0.2")
+        state_path = _stall(repo, "1.0.2")
+
+        err = self._guard_message(repo, capsys)
+
+        assert "never released" in err, err
+        assert state_path in err, err
+        assert "rlsbl release undo" not in err, err
+
+        os.remove(state_path)
+        assert "a previous release is in progress" not in (
+            self._guard_message_or_none(repo, capsys)
+        )
+
+    def test_following_release_runs_abandon_remedy_clears_it(
+        self, tmp_path, monkeypatch, capsys,
+    ):
+        import rlsbl
+
+        repo = _released_repo(tmp_path, monkeypatch)
+        _stall(repo, "1.0.2")
+        self._guard_message(repo, capsys)
+
+        with patch(
+            "rlsbl.commands.release_abandon._github_release_exists",
+            return_value=False,
+        ):
+            result = rlsbl.app.test(
+                ["release", "abandon", "--approve-consequential"]
+            )
+        assert result.exit_code == 0, result.stderr + result.stdout
+
+        assert "a previous release is in progress" not in (
+            self._guard_message_or_none(repo, capsys)
+        )
 
     def test_release_run_still_offers_undo_for_a_recorded_version(
         self, tmp_path, monkeypatch, capsys,
@@ -430,8 +567,29 @@ class TestTheMessagesThatRoutedHere:
         message = str(exc.value)
         assert "rlsbl release undo` and" not in message, message
         assert "does not apply" in message, message
+        assert "`rlsbl release abandon --approve-consequential`" in message, message
         for invocation in invocations_in(message):
             assert_invocation_is_real(invocation)
+
+    def test_the_unverified_candidate_remedy_names_a_leftover_state_file(
+        self, tmp_path, monkeypatch,
+    ):
+        from rlsbl.commands.release.execute import (
+            UnverifiedCandidateError,
+            require_recorded_candidate,
+        )
+
+        repo = _released_repo(tmp_path, monkeypatch)
+        _record_never_released(repo, "1.0.2")
+        state_path = _stall(repo, "1.0.2")
+
+        with pytest.raises(UnverifiedCandidateError) as exc:
+            require_recorded_candidate(state_path, cwd=str(repo), version="1.0.2")
+
+        message = str(exc.value)
+        assert "never released" in message, message
+        assert state_path in message, message
+        assert "rlsbl release undo" not in message, message
 
     def test_the_unverified_candidate_remedy_keeps_undo_when_recorded(
         self, tmp_path, monkeypatch,
