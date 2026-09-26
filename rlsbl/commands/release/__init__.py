@@ -618,29 +618,39 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             if _ip_fatal:
                 _parts.append(f"; fatal step failure(s): {', '.join(_ip_fatal)}")
             # `rlsbl release undo` reverts a RECORDED release -- one the
-            # release archives contain. A release that stopped before its
-            # archive step is not one of those, and undo refuses it (it would
-            # otherwise have selected the release BEFORE it). So the rollback
-            # half of this remedy is offered only when it can actually be
-            # followed.
+            # release archives record as released. A release that stopped
+            # before its archive step is not one of those, and undo refuses it
+            # (it would otherwise have selected the release BEFORE it); nor is
+            # a version recorded never released. So each remedy is offered
+            # only where it can actually be followed, decided by the version's
+            # fate rather than by its archive's mere existence.
             from ...release_file import archived_release_path
+            from ...release_record import VersionFate, read_version_fate
+            from ..release_abandon import abandon_remedy, leftover_state_remedy
 
-            _ip_recorded = os.path.isfile(
-                archived_release_path(
-                    os.path.dirname(_ip_state_path), _ip_version,
-                )
+            _ip_releases_dir = os.path.dirname(_ip_state_path)
+            _ip_fate = read_version_fate(
+                _ip_releases_dir, _ip_version, cwd=str(project_root),
             )
-            if _ip_recorded:
+            if _ip_fate.released:
                 _parts.append(
                     "). Run `rlsbl release resume` to continue or "
                     "`rlsbl release undo` to roll back."
                 )
+            elif _ip_fate is VersionFate.NEVER_RELEASED:
+                _parts.append(
+                    "). " + leftover_state_remedy(
+                        _ip_version,
+                        archived_release_path(_ip_releases_dir, _ip_version),
+                        _ip_state_path,
+                    )
+                )
             else:
                 _parts.append(
                     "). Run `rlsbl release resume` to continue. "
-                    f"`rlsbl release undo` does not apply yet: v{_ip_version} "
+                    f"`rlsbl release undo` does not apply: v{_ip_version} "
                     f"stopped before the step that records it, so there is no "
-                    f"recorded release to revert."
+                    f"recorded release to revert. " + abandon_remedy(_ip_version)
                 )
             raise ReleaseValidationError("".join(_parts))
 
