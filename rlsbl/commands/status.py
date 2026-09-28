@@ -134,9 +134,13 @@ def _collect_status(registry, target_path=".", *, tag_glob=None, ctx, project=No
     release_commit = nearest_release_commit(release_record_dir, tag_glob=tag_glob, cwd=root_str)
     scoped_tag = release_commit.tag(tag_glob) if release_commit else None
     try:
+        from ..upstream import history_exclusions
+
         range_spec = f"{release_commit.candidate_sha}..HEAD" if release_commit else "HEAD"
+        # In a fork, upstream's history is not ours to cover.
         result = effects.run(
-            ["git", "log", "--format=%H", range_spec],
+            ["git", "log", "--format=%H", range_spec,
+             *history_exclusions(root_str)],
             capture_output=True, text=True, timeout=30,
         )
         if result.returncode == 0:

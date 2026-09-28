@@ -103,6 +103,10 @@ EXPECTED_EFFECTS = {
     # Mutating, previewable, and consequential -- what a repository's history
     # IS is a human's call, not an agent's.
     "transition.record": "mutating",
+    # Moves a fork's inherited tags to refs/tags-of/, pushing the kept refs
+    # and deleting the tags on origin. Mutating, previewable, and
+    # consequential -- whether a tag is upstream's is a human's call.
+    "upstream.adopt-tags": "mutating",
     "options.registry": "read_only",
     "options.set": "mutating",
 }

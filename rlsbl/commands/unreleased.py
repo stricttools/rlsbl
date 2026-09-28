@@ -33,9 +33,14 @@ def _get_commits_since(release_commit_sha):
     else:
         range_spec = "HEAD"
 
+    from ..upstream import history_exclusions
+
+    # In a fork, upstream's history is not ours: the changelog coverage
+    # checks leave it out, and so does this listing.
+    exclusions = history_exclusions()
     try:
         result = effects.run(
-            ["git", "log", range_spec, f"--format={fmt}"],
+            ["git", "log", range_spec, *exclusions, f"--format={fmt}"],
             capture_output=True, text=True, check=True, timeout=30,
         )
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired):

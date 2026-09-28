@@ -167,8 +167,13 @@ def _get_pushed_commits(refs):
 
     Returns a set of full 40-char SHAs, or None on error.
     """
+    from .upstream import history_exclusions
+
     zero_sha = "0" * 40
     commits = set()
+    # In a fork, upstream's history is not ours to cover: leave it out of
+    # every pushed range, as the coverage check does.
+    exclusions = history_exclusions()
 
     for local_sha, remote_sha in refs:
         if local_sha == zero_sha:
@@ -178,7 +183,8 @@ def _get_pushed_commits(refs):
             if remote_sha == zero_sha:
                 # New branch: commits not on any remote
                 result = effects.run(
-                    ["git", "log", "--format=%H", local_sha, "--not", "--remotes"],
+                    ["git", "log", "--format=%H", local_sha, *exclusions,
+                     "--not", "--remotes"],
                     capture_output=True, text=True, timeout=30,
                 )
             else:
@@ -201,7 +207,8 @@ def _get_pushed_commits(refs):
                     )
                     continue
                 result = effects.run(
-                    ["git", "log", "--format=%H", f"{remote_sha}..{local_sha}"],
+                    ["git", "log", "--format=%H", f"{remote_sha}..{local_sha}",
+                     *exclusions],
                     capture_output=True, text=True, timeout=30,
                 )
             if result.returncode == 0:

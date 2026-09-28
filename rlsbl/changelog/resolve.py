@@ -49,14 +49,18 @@ def resolve_hashes(hashes: list[str], *, cwd: str | None = None) -> dict[str, st
     return results
 
 
-def _git_log_hashes(range_spec: str) -> list[str]:
+def _git_log_hashes(range_spec: str | list[str]) -> list[str]:
     """Get commit hashes from git log for a given range spec.
+
+    *range_spec* is one revision argument, or the list of them
+    :func:`rlsbl.release_record.unreleased_revs` returns.
 
     Returns a list of full 40-char SHAs, or empty list on error.
     """
+    revs = [range_spec] if isinstance(range_spec, str) else list(range_spec)
     try:
         result = effects.run(
-            ["git", "log", "--format=%H", range_spec],
+            ["git", "log", "--format=%H", *revs],
             capture_output=True,
             text=True,
             timeout=30,

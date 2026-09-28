@@ -14,7 +14,7 @@ from .exemptions import (
 )
 from .files import list_versioned_files, read_unreleased
 from .resolve import resolve_hash, resolve_hashes, _git_log_hashes
-from ..release_record import releases_dir_for_changes_dir, unreleased_range
+from ..release_record import releases_dir_for_changes_dir, unreleased_revs
 from .schema import ChangelogEntry, parse_jsonl, validate_schema
 from ..config import get_changelog_validation_config
 from ..git_util import (
@@ -359,7 +359,7 @@ def check_in_range(entries: list[ChangelogEntry], releases_dir: str,
     """
     details: list[str] = []
     range_commits = set(_git_log_hashes(
-        unreleased_range(releases_dir, tag_glob=tag_glob)))
+        unreleased_revs(releases_dir, tag_glob=tag_glob)))
 
     in_scope = filter_commits_for_scope(
         range_commits, scope, operation="changelog range check",
@@ -399,7 +399,7 @@ def check_coverage(entries: list[ChangelogEntry], releases_dir: str,
     """
     details: list[str] = []
     unreleased_commits = set(_git_log_hashes(
-        unreleased_range(releases_dir, tag_glob=tag_glob)))
+        unreleased_revs(releases_dir, tag_glob=tag_glob)))
 
     # Collect all resolved hashes from entries
     all_hashes: list[str] = []
@@ -465,7 +465,7 @@ def check_no_orphans(
     """
     details: list[str] = []
     range_commits = set(_git_log_hashes(
-        unreleased_range(releases_dir, tag_glob=tag_glob)))
+        unreleased_revs(releases_dir, tag_glob=tag_glob)))
 
     unreleased_commits = filter_commits_for_scope(
         range_commits, scope, operation="changelog orphan check",
