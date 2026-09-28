@@ -67,7 +67,6 @@ from ...ci_checks import (  # noqa: F401  (same late-bound re-export path)
     ProjectCINotRunError,
     release_check_filters,
 )
-from .rollback import _cleanup_release_artifacts
 from .publish import _run_selfdoc_blog_post_generate, _print_stale_dep_advisory, upload_release_assets, _upload_assets_for_config
 from .validate import (
     _run_selfdoc_gen, _run_selfdoc_check, _abort_on_scaffold_conflicts,
@@ -78,7 +77,6 @@ from .validate import (
     validate_release_targets, validate_ota_mode, validate_config_integrity,
     validate_no_authored_release_commit,
     validate_pipeline_config, validate_gh_cli, validate_gh_push_access,
-    validate_clean_tree,
     validate_no_stash,
     validate_branch_and_remote, resolve_monorepo_context,
     compute_release_version, validate_changelog_state,

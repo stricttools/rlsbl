@@ -433,42 +433,6 @@ def validate_no_stash(cwd=None):
     )
 
 
-def validate_clean_tree(flags):
-    """Validate working tree is clean (or record pre-existing dirty files).
-
-    Returns set of pre-existing dirty file paths.
-    Raises ReleaseValidationError if tree is dirty and --allow-dirty not set.
-    """
-    from . import is_clean_tree
-
-    pre_existing_dirty = set()
-    if flags.get("allow-dirty"):
-        return set(working_tree_paths())
-
-    if is_clean_tree():
-        return pre_existing_dirty
-
-    # Something is dirty. Classify it: rlsbl's own release-state files
-    # (in-progress.json, scrub-result.json) are the tool's scratch state and
-    # never block -- refusing over them is rlsbl blocking its own `release
-    # resume`, which is exactly when those files exist.
-    try:
-        blocking = blocking_dirty_paths()
-    except Exception:
-        # An unreadable status is never "clean enough": refuse.
-        raise ReleaseValidationError(
-            "working tree is not clean. Commit your changes first."
-        )
-
-    if blocking:
-        listed = "\n".join(f"  {path}" for path in blocking)
-        raise ReleaseValidationError(
-            "working tree is not clean. Commit your changes first.\n"
-            f"Uncommitted:\n{listed}"
-        )
-    return pre_existing_dirty
-
-
 def validate_branch_and_remote(flags, *, config=None, cwd):
     """Validate branch state and return the release branch name.
 
