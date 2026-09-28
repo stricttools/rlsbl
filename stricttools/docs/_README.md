@@ -69,7 +69,7 @@ mode, is in [stricttools/docs/release-workflow.md](stricttools/docs/release-work
 Use `--dry-run` to preview without changes: mutating operations are recorded and printed as a
 would-do log rather than performed. A small set of commands declares itself `consequential`
 (`release run`/`resume`/`retry`/`undo`/`abandon`/`deprecate`/`yank`/`scrub`/`reconcile`/`backfill`,
-`claim-name`, `deploy`, `transition record`, `rewrite project-name`,
+`claim-name`, `deploy`, `transition record`, `rewrite project-name`, `upstream adopt-tags`,
 `monorepo release run`/`mirror`/`absorb`/`extract`/`rename-releasable`) and asks
 for confirmation before running; pass `--approve-consequential` in non-interactive contexts
 (CI, AI agents), where the prompt is a hard error instead. Every other command runs without
@@ -165,6 +165,8 @@ withdrawing what already shipped:
 | A subtree mirror's `main` | The mirror reconciler's converge (`rlsbl monorepo mirror`, and the release's mirror step, which calls the same code). Force-with-lease is its routine write; a commit it cannot account for is a contract violation it refuses. |
 | A subtree mirror's tags and their GitHub Releases | The mirror publication module, driven by the release's mirror step or by `rlsbl monorepo mirror` materializing a version the mirror is missing. A mirror's scaffold renders no publish workflow and every convergence sweeps one that arrived another way, so the mirror never releases itself. |
 | Rewritten history on any of the above | `rlsbl release scrub`, the one sanctioned rewrite: it force-pushes, remaps the changelog hashes, re-points the tags and rewrites each tag's Release document in a single pass -- in place, never delete-then-create. |
+| A fork's inherited tags, `refs/tags-of/<host>/<owner>/<repo>/<tag>`, here and on origin | `rlsbl upstream adopt-tags`, moving each tag the fork inherited from its declared upstream out of `refs/tags` with its object unchanged; a kept ref is never rewritten. |
+| A fork's upstream branch, `refs/upstream/<host>/<owner>/<repo>/<branch>`, local only | The operator's `git fetch --no-tags` that the changelog checks print when it is missing; rlsbl only reads it. |
 
 The repair and retraction surfaces, in full: `rlsbl release undo` (deletes the
 Release and the tag, reverts the version-bump commit and pushes the branch),
@@ -175,8 +177,10 @@ Release's notes), `rlsbl release deprecate` and `rlsbl release yank` (rewrite a
 Release body and set its pre-release flag; `yank` also performs the registry's
 removal), `rlsbl changelog amend`, `rlsbl changelog edit` and
 `rlsbl changelog remove` (re-sync a released
-version's Release notes), and `rlsbl monorepo rename-releasable` (pushes one
-boundary alias tag). A write from anywhere else is not rlsbl's.
+version's Release notes), `rlsbl monorepo rename-releasable` (pushes one
+boundary alias tag), and `rlsbl upstream adopt-tags` (deletes a fork's
+inherited tags from `refs/tags` here and on origin, after keeping each under
+`refs/tags-of/`). A write from anywhere else is not rlsbl's.
 
 ## Pre-push hook
 

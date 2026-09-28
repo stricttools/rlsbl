@@ -66,6 +66,8 @@ a command:
 | A subtree mirror's `main` | The mirror reconciler's converge -- `rlsbl monorepo mirror <project>`, and the release's mirror step, which calls the same code. Force-with-lease is its routine write, because the mirror is a derived artifact. | Anything that authors on the mirror. A commit the reconciler cannot account for is a contract violation and it refuses. |
 | A subtree mirror's tags, and their GitHub Releases | The mirror publication module, driven by the release's mirror step or by `rlsbl monorepo mirror` materializing a version the mirror is missing. | The mirror's own CI. A mirror's scaffold renders no publish workflow, and any publish workflow that reaches the mirror another way is swept on the next convergence. |
 | Rewritten history on any of the above | `rlsbl release scrub` (which wraps `safegit scrub`), the one sanctioned rewrite. It force-pushes, remaps the changelog hashes, re-points the tags and rewrites each tag's GitHub Release document in one pass -- in place, never delete-then-create. | A bare `git push --force`. A rewrite performed outside it leaves the release record, the tags and the Releases stale; `rlsbl release reconcile` is what heals that. |
+| A fork's inherited tags, `refs/tags-of/<host>/<owner>/<repo>/<tag>`, here and on origin | `rlsbl upstream adopt-tags`, moving each tag the fork inherited from the upstream it declares in `.strictmetadata/upstream/upstream.toml` out of `refs/tags` with its object unchanged. | Anything else. A kept ref is never rewritten. |
+| A fork's upstream branch, `refs/upstream/<host>/<owner>/<repo>/<branch>`, local only | The operator's `git fetch --no-tags`, printed by the changelog checks when the ref is missing. rlsbl reads it (coverage in a fork leaves out everything reachable from it and from the kept tags) and never writes it. | rlsbl. |
 
 **The sanctioned repair and retraction surfaces.** These write the same
 namespaces on purpose. The list is complete; a write from anywhere else is not
@@ -80,6 +82,7 @@ rlsbl's:
 | `rlsbl release deprecate` / `rlsbl release yank` | Rewrites a Release's body and sets its pre-release flag; `yank` also performs the registry's own removal. |
 | `rlsbl changelog amend` / `rlsbl changelog edit` / `rlsbl changelog remove` | Rewrites a released version's JSONL and re-syncs that version's GitHub Release notes. |
 | `rlsbl monorepo rename-releasable` | Pushes one boundary alias tag at the renamed releasable's current version. |
+| `rlsbl upstream adopt-tags` | Deletes a fork's inherited tags from `refs/tags` on origin and here, after writing each one's kept ref here and pushing it to origin. |
 
 ## Release pipeline order
 
