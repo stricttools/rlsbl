@@ -402,7 +402,7 @@
         },
         {
           "name": "hook",
-          "help": "Run the checks a hook declared in checks.toml selects (no hooks are declared)",
+          "help": "Run the checks a hook declared in checks.toml selects: pre-push (tag 'prepush'), pre-release (tag 'preflight')",
           "value_schema": {
             "type": "string"
           },
@@ -465,7 +465,7 @@
         },
         {
           "name": "hook",
-          "help": "Run the checks a hook declared in checks.toml selects (no hooks are declared)",
+          "help": "Run the checks a hook declared in checks.toml selects: pre-push (tag 'prepush'), pre-release (tag 'preflight')",
           "value_schema": {
             "type": "string"
           },
@@ -1019,7 +1019,7 @@
     },
     "pre-push-check": {
       "name": "pre-push-check",
-      "help": "Removed. This command no longer performs any check: it always exits 1 with instructions. The pre-push hook now runs `rlsbl check --tag prepush` instead, so a repo whose hook still calls pre-push-check needs `rlsbl scaffold` to regenerate it.",
+      "help": "Removed. This command no longer performs any check: it always exits 1 with instructions. The pre-push hook now runs `rlsbl failing-checks --hook pre-push` instead, so a repo whose hook still calls pre-push-check needs `rlsbl scaffold` to regenerate it.",
       "effect": "read_only"
     },
     "prs": {
@@ -4251,7 +4251,7 @@
     "handshakes": [
       {
         "env_var": "RLSBL_PUSH_STDIN",
-        "help": "Pre-push ref lines (`<local ref> <local sha> <remote ref> <remote sha>`) for `rlsbl check --tag prepush`, when the caller has already consumed git's hook stdin."
+        "help": "Pre-push ref lines (`<local ref> <local sha> <remote ref> <remote sha>`) for the checks the pre-push hook selects (`rlsbl failing-checks --hook pre-push`), when the caller has already consumed git's hook stdin."
       }
     ]
   }
