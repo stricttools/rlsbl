@@ -1,5 +1,5 @@
 +++
-description = "The rlsbl release flow: the untagged candidate and the CI check whose red verdict comes only from a run that really concluded in failure, how a resume re-pins at the branch tip and adopts what was committed while the release was stopped, the release commit and the flow-owned fields no editable release file may carry, the deprecate and yank notices an archive records and every Release body keeps on top, the three fates an archived version can record plus the historical tag it shipped under and keeps as its primary ref, how `rlsbl release backfill` reconstructs them for an existing repository, how `rlsbl release abandon` records an attempt that will not be finished as never released and which version the version files must name for the next release, which releasable a reconcile or an undo is scoped to, the bump types, and the check steps that block on error-level failures alone while the bump type decides whether a user-facing entry is required."
+description = "The rlsbl release flow: the release checkout every release runs in, which uncommitted changes block it and which are left alone, the compare-and-swap that advances the branch, the untagged candidate and the CI check whose red verdict comes only from a run that really concluded in failure, how a resume re-pins at the branch tip and adopts what was committed while the release was stopped, the release commit and the flow-owned fields no editable release file may carry, the deprecate and yank notices an archive records and every Release body keeps on top, the three fates an archived version can record plus the historical tag it shipped under and keeps as its primary ref, how `rlsbl release backfill` reconstructs them for an existing repository, how `rlsbl release abandon` records an attempt that will not be finished as never released and which version the version files must name for the next release, which releasable a reconcile or an undo is scoped to, the bump types, and the check steps that block on error-level failures alone while the bump type decides whether a user-facing entry is required."
 +++
 
 # Release workflow
@@ -10,7 +10,7 @@ description = "The rlsbl release flow: the untagged candidate and the CI check w
 
 This is **main-as-candidate ordering**, and it is the property the whole flow rests on: the tag, the GitHub Release, the finalized changelog and every registry push happen strictly *after* a green CI verdict on the exact commit being released. A red (or unresolved) verdict leaves nothing behind but the candidate commit on the branch — no tag, no GitHub Release, no finalized changelog, nothing on any registry. The version number is therefore never burnt by a failure: the fix is committed forward on the release branch at the *same* version and `rlsbl release resume` completes it.
 
-Validation failures abort with no partial state left behind. Once the mutating phase starts, every step records a success or failure marker in an in-progress state file: a fatal failure preserves the state so `rlsbl release resume` can continue from where the release stopped, and non-fatal failures are recorded and loudly named in the completion summary while the release completes (see "Release state and resume" below). `rlsbl release undo` exists for a release that *completed* and turned out to be bad — not for a CI failure, which under this ordering never produces anything to undo.
+The whole release runs in [the release checkout](#the-release-checkout), a detached checkout of the release branch's committed tip: nothing it builds, tests or generates reads the working tree, and the branch and the working tree receive only what the release's own commits change. Validation failures abort with no partial state left behind. Once the mutating phase starts, every step records a success or failure marker in an in-progress state file: a fatal failure preserves the state so `rlsbl release resume` can continue from where the release stopped, and non-fatal failures are recorded and loudly named in the completion summary while the release completes (see "Release state and resume" below). `rlsbl release undo` exists for a release that *completed* and turned out to be bad — not for a CI failure, which under this ordering never produces anything to undo.
 
 ## Prerequisites
 
@@ -18,12 +18,33 @@ Before running `rlsbl release run`, the project must satisfy several preconditio
 
 | Requirement | How to verify | What happens if missing |
 | --- | --- | --- |
-| Clean working tree | `git status --porcelain` is empty | Hard error (use `--allow-dirty` to override) |
-| No stash | `git stash list` is empty | Hard error, and `--allow-dirty` does not waive it: that flag accounts for the dirty paths git can name, and a stash is exactly the work git names nowhere. `rlsbl release resume` and `rlsbl release reconcile --apply` refuse one too. Drop it (`git stash drop`, or `git stash clear`) after landing the work where it belongs |
+| No uncommitted change to a path the release writes | `rlsbl release run --dry-run` lists them | Hard error naming each path; commit them and re-run. Every other uncommitted change is listed and left alone (see [the release checkout](#the-release-checkout)) |
+| On the release branch | `git symbolic-ref HEAD` names it | Hard error on a detached HEAD or another branch |
+| No stash | `git stash list` is empty | Hard error: a stash is work git names in no working tree, which the release would neither see nor carry. `rlsbl release resume` and `rlsbl release reconcile --apply` refuse one too. Drop it (`git stash drop`, or `git stash clear`) after landing the work where it belongs |
 | `gh` CLI authenticated | `gh auth status` | Hard error |
 | Changelog coverage | `rlsbl check --tag changelog` passes | Hard error during validation step |
 | Release file exists | `.rlsbl/releases/unreleased.toml` present | Hard error (run `rlsbl release init`) |
 | Description set | `description` field in unreleased.toml is non-empty | Hard error |
+
+## The release checkout
+
+A release never runs in the working tree. `rlsbl release run`, `rlsbl release resume` and `rlsbl monorepo release run` each check out the commit the release branch points at into the **release checkout**, a detached `git worktree` at `<git common dir>/rlsbl/release-checkout` (for a plain repository, `.git/rlsbl/release-checkout`), and run the release there: the producers (the strictcli schema dump, selfdoc generation, the pre-checks and pre-release hooks), the tests and checks -- the sandboxed test runner included, which copies the tree it runs from -- the local builds, the version bump, and every commit the release makes. The checkout is reused from release to release: each release resets it to the commit it starts from and removes its untracked files, but keeps ignored files, so dependency environments and build caches stay warm. Submodules are initialized when the commit declares any.
+
+Its commits reach the release branch through one door, a **compare-and-swap advance** (`git update-ref <branch> <new> <old>`):
+
+- the branch advances only from the commit this release last left it at. A branch another session moved in the meantime is refused, naming the commits that appeared, and nothing is written -- neither the branch nor any file;
+- only the files the release's own commits change are written into the working tree and the index; every other file is neither read nor written;
+- each of those files must be free of uncommitted changes in the working tree. One that is not refuses the advance, naming it.
+
+The advances happen where the release's commits become part of the branch: right before the candidate push, after each changelog and release-file finalization commit, and after the post-hoc snapshot commit. A batch advances after each member's commits, before the one push that publishes them all.
+
+**Uncommitted changes.** Before anything runs, the release reads the working tree once. An uncommitted change inside the paths the release writes -- its release state directory (`.rlsbl/`, or the releasable's directory under `.rlsbl-monorepo/releasables/`), the version files of the targets it releases and the lockfiles beside them, `CHANGELOG.md`, `selfdoc.json`, and in a workspace the snapshot and the combined changelog -- refuses the release, naming every such path. Every other uncommitted change, tracked or untracked, is listed and left alone: it is not part of the release and it is never touched. A file a producer generates cannot be named before the producer runs; the advance refuses it the same way. rlsbl's own bookkeeping (the release state file and the lock) is never counted.
+
+**`--dry-run`** reads the working tree the same way and reports both lists instead of refusing, and previews the release against the working tree as it stands; it creates no checkout and exits zero.
+
+**A failed release** leaves nothing to undo. Up to its candidate push it exists only in the checkout, which the next release resets: the branch and the working tree are as they were, and a fresh release's state file is deleted (a resume's is put back as the attempt found it). The one write before a push is the advance right before the candidate push; when that push is then refused, the advance is taken back by the same compare-and-swap, restoring only the files it wrote. If something was committed on top of the release commit meanwhile, or one of those files was edited, nothing is taken back: the release commit stays, the state file is kept, and the error names `rlsbl release resume` and `rlsbl release abandon`. There is no `git reset --hard` anywhere in a release.
+
+**What stays in the working tree.** State that belongs to the operator rather than to the commit is read and written there even while the release runs in its checkout: the in-progress state file, the advisory lock, a relative `env_file`, and the `dev-sources.toml.local-only` overlays the version-skew guard reads. Because the checkout holds only committed files, the release runs its tests against the dependencies the lockfile names, never against local overlays.
 
 ## The release file
 
@@ -168,13 +189,13 @@ The release file's `preid` key is the only way to declare it, and `rlsbl release
 
 ## Release pipeline order
 
-The release pipeline executes its steps in a fixed order, from initial validation through post-release hooks. Validation steps abort with no partial state left behind; once the mutating phase starts, progress is tracked in an in-progress state file so a failed release can be resumed with `rlsbl release resume`. Steps 9 and 10 are conditionally skipped when the pre-release hook is customized.
+The release pipeline executes its steps in a fixed order, from initial validation through post-release hooks, every one of them in [the release checkout](#the-release-checkout). Validation steps abort with no partial state left behind; once the mutating phase starts, progress is tracked in an in-progress state file so a failed release can be resumed with `rlsbl release resume`. Steps 9 and 10 are conditionally skipped when the pre-release hook is customized.
 
 Steps 15 and 16 are the **candidate push and the CI gate**: everything above them is reversible, everything below them is not. The gate is the dividing line of the whole flow.
 
 | Step | Action | Abort on failure |
 | --- | --- | --- |
-| 1 | Verify `gh` auth and clean working tree | Yes |
+| 1 | Verify `gh` auth, refuse uncommitted changes to the paths the release writes, and enter the release checkout at the branch tip | Yes |
 | 2 | Read `unreleased.toml` for bump type, description, context, and target selection | Yes |
 | 3 | Validate JSONL changelog (every structural check) | Yes |
 | 4 | Generate CHANGELOG.md from all JSONL files | Yes |
@@ -188,7 +209,7 @@ Steps 15 and 16 are the **candidate push and the CI gate**: everything above the
 | 12 | Write new version to all detected target files + `.rlsbl/version`, and re-sync the lockfiles that write stales (including a non-releasable workspace project whose `uv.lock` records a bumped sibling as an editable path source) | Yes |
 | 13 | Commit (message = tag string, e.g. `v1.2.3`) — **not** tagged | Yes |
 | 14 | Regenerate the monorepo snapshot, so the snapshot commit is part of what CI verifies | Yes |
-| 15 | **Push the version-bump commit to the release branch UNTAGGED** — this is the release candidate | Yes |
+| 15 | Advance the branch to the version-bump commit (compare-and-swap), then **push it to the release branch UNTAGGED** — this is the release candidate | Yes |
 | 16 | **CI gate**: wait in-process for the repository's own push-triggered CI to conclude on that exact commit | Yes (nothing is tagged, finalized or published while it is not green) |
 | 17 | Finalize JSONL: rename `unreleased.jsonl` to `x.y.z.jsonl` (chmod 444), create fresh `unreleased.jsonl`, regenerate CHANGELOG.md, generate `x.y.z.md`, commit | Yes (state preserved, resumable) |
 | 18 | Archive the release file to `v{version}.toml`, **recorded at the CI-verified commit and the released trees**, and regenerate `x.y.z.md` from the archived metadata | Yes (state preserved, resumable) |
@@ -335,7 +356,7 @@ Steps 9 and 10 are conditionally skipped — see the hooks override mechanism be
 
 ### Release state and resume
 
-From the version bump onward, every step records a success or failure marker in an in-progress state file (`.rlsbl/releases/in-progress.json`; for releasable releases, `.rlsbl-monorepo/releasables/<name>/releases/in-progress.json`). If a fatal step fails (anything through pipeline publish), the state file is preserved and `rlsbl release resume` continues from where the release stopped, skipping already-completed steps including post-release steps such as asset upload.
+From the version bump onward, every step records a success or failure marker in an in-progress state file (`.rlsbl/releases/in-progress.json`; for releasable releases, `.rlsbl-monorepo/releasables/<name>/releases/in-progress.json`). The state file lives in the working tree, not in the release checkout: it is the operator's, never committed. If a fatal step fails once the candidate has been pushed (anything from the candidate push through pipeline publish), the state file is preserved and `rlsbl release resume` continues from where the release stopped, skipping already-completed steps including post-release steps such as asset upload. A failure before the candidate push discards the attempt instead (see [the release checkout](#the-release-checkout)): a fresh release's state file is deleted, and a resume's is put back as the attempt found it.
 
 Non-fatal failures (deploy, post-release hook, snapshot) are recorded and loudly named in the completion summary, and the release completes. The state file is cleared only when every step carries a marker and no fatal step failed; `rlsbl release run` auto-clears a provably-complete leftover state file instead of blocking.
 
@@ -474,7 +495,7 @@ Publish workflows carry a per-ref concurrency group with `cancel-in-progress: fa
 
 ## Hooks
 
-Three shell scripts in `.rlsbl/hooks/` provide extension points at different stages of the release pipeline. Each hook runs in the project root directory with the new version available as `$RLSBL_VERSION`. A non-zero exit code from `pre-checks.sh` or `pre-release.sh` aborts the release immediately, while `post-release.sh` failures are logged but do not roll back the already-published release.
+Three shell scripts in `.rlsbl/hooks/` provide extension points at different stages of the release pipeline. Each hook runs in the project's directory in the release checkout, with the new version available as `$RLSBL_VERSION`. A non-zero exit code from `pre-checks.sh` or `pre-release.sh` aborts the release immediately, while `post-release.sh` failures are logged but do not roll back the already-published release.
 
 | Hook | Runs at step | Ownership | Three-way merged on scaffold | Failure behavior |
 | --- | --- | --- | --- | --- |
@@ -497,7 +518,7 @@ This means an unmodified scaffold hook or a missing hook file is considered "eff
 
 ## Flags
 
-`rlsbl release run` accepts both global flags (shared with all rlsbl commands) and release-specific flags that control working tree validation and post-release CI monitoring. `--watch` is a required negatable boolean — either `--watch` or `--no-watch` must be specified explicitly.
+`rlsbl release run` accepts both global flags (shared with all rlsbl commands) and release-specific flags that control post-release CI monitoring and timeouts. `--watch` is a required negatable boolean — either `--watch` or `--no-watch` must be specified explicitly.
 
 | Flag | Effect |
 | --- | --- |
@@ -505,9 +526,8 @@ This means an unmodified scaffold hook or a missing hook file is considered "eff
 | `--approve-consequential` | Skip the confirmation prompt a `consequential` command asks before it runs |
 | `--watch` | After release, automatically watch CI runs to completion (blocking, in-process) |
 | `--no-watch` | After release, print the watch command hint without watching |
-| `--allow-dirty` | Skip the clean working tree check (step 1) |
 
-`--dry-run`, `--approve-consequential`, `--quiet` and `--verbose` are framework-owned flags available on all rlsbl commands. `--allow-dirty` and `--watch` are release-specific. The same `--watch` / `--no-watch` pair applies to `rlsbl release resume`, `rlsbl release retry`, and `rlsbl monorepo release run`.
+`--dry-run`, `--approve-consequential`, `--quiet` and `--verbose` are framework-owned flags available on all rlsbl commands. `--watch` is release-specific. No flag lets a release carry or overwrite uncommitted changes: [the release checkout](#the-release-checkout) decides which of them block it. The same `--watch` / `--no-watch` pair applies to `rlsbl release resume`, `rlsbl release retry`, and `rlsbl monorepo release run`.
 
 Watching is always in-process: there is no detached background watcher. To watch later, run `rlsbl watch <sha>` — the hint `--no-watch` prints is exactly that command.
 
@@ -679,7 +699,7 @@ rlsbl release init
 #    description = "Add retry logic and fix timeout handling"
 
 # 6. Run the release
-rlsbl release run --no-allow-dirty --watch --approve-consequential
+rlsbl release run --watch --approve-consequential
 #   Reading .rlsbl/releases/unreleased.toml ...
 #   Bump: minor (0.5.2 -> 0.6.0)
 #   Validating JSONL changelog ... OK
@@ -708,7 +728,7 @@ The preview splits at the same seam the release does:
 - **Phase B — declared.** The CI gate, changelog finalization, the tag, the GitHub Release, asset upload, publishing, deploys and post-release hooks. These are *declared*, not recorded: their operands (which commit gets tagged, which artifacts get uploaded) do not exist until CI has judged the candidate, so the preview names each step and what it would do rather than pretending to know.
 
 ```bash
-rlsbl release run --no-allow-dirty --no-watch --approve-consequential --dry-run
+rlsbl release run --no-watch --approve-consequential --dry-run
 #   --- Recorded: Phase A (version bump -> candidate push) ---
 #      1. VERSION_BUMPED       bump npm version in . -> 0.6.1
 #      2. VERSION_BUMPED       build npm in .
