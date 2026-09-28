@@ -1581,10 +1581,12 @@ class TestScrubGhReleaseCreateFails:
         ep = {f"{MOD_SCRUB}.extract_changelog_entry": MagicMock(return_value="notes")}
         # The tag carries NO Release, so the missing one is created -- and the
         # creation fails.
-        # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); gh_view(fail), gh_create(fail) (run_gh)
+        # Calls: version, ls-remote, scrub, commit(archive), rev-parse, branch_push, tag_push (run); gh_view(fail), the Latest query (none yet), gh_create(fail) (run_gh)
         _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", "", ""], flags,
                     gh_auth=True, gh_installed=True, extra_patches=ep,
-                    run_gh_side_effect=[Exception("no release"), Exception("create failed")])
+                    run_gh_side_effect=[Exception("no release"),
+                                        Exception("release not found"),
+                                        Exception("create failed")])
         err = capsys.readouterr().err
         assert "create failed" in err
         assert "carries no GitHub Release, exactly as before" in err
