@@ -3831,6 +3831,18 @@
       "description": "The post-release hook carries no leftover private asset-upload code.",
       "subject": "release"
     },
+    "private-repo-publishing": {
+      "tags": [
+        "release"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": false,
+      "needs_network": true,
+      "depends_on": [],
+      "description": "A private repository's release uses nothing that needs a public repository: npm build provenance, PyPI attestations, or the Go module proxy (requires network).",
+      "subject": "release"
+    },
     "publish-mode-workflow": {
       "tags": [
         "project"

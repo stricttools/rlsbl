@@ -167,6 +167,21 @@ pure = false
 needs_network = true
 depends_on = []
 
+# private-repo-publishing: npm build provenance, PyPI attestations, and the Go
+# module proxy need a public source repository; on a private one they fail after
+# the tag is public or record the private repository in a public log. The
+# release refuses the same findings before it pushes anything. Visibility is
+# asked only when one of them is in use.
+[checks.private-repo-publishing]
+description = "A private repository's release uses nothing that needs a public repository: npm build provenance, PyPI attestations, or the Go module proxy (requires network)."
+subject = "release"
+tags = ["release"]
+severity = "error"
+fast = true
+pure = false
+needs_network = true
+depends_on = []
+
 # old-repo-archived: an absorb leaves its source repository standing, where it
 # keeps collecting issues, pull requests and clones for code that moved here.
 # Skips when the transition record holds no absorb. rlsbl never archives it: the

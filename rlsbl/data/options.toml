@@ -528,6 +528,15 @@ requires = []
 description = "The post-release hook carries no leftover private asset-upload code."
 
 [[option]]
+name = "private-repo-publishing"
+subject = "release"
+values = "error > warn > off"
+default = "error"
+scope = "none"
+requires = []
+description = "A private repository's release uses nothing that needs a public repository: npm build provenance, PyPI attestations, or the Go module proxy (requires network)."
+
+[[option]]
 name = "publish-mode-workflow"
 subject = "release"
 values = "error > warn > off"

@@ -1,7 +1,7 @@
 """Release checks (tag: release): the refs and the Releases hanging off them, the branch, the CI credentials, and the follow-ups a recorded conversion still owes the outside world.
 
-Checks: unpublished-refs, branch-sync, ci-publish-secrets, old-repo-archived,
-go-deprecation-published.
+Checks: unpublished-refs, branch-sync, ci-publish-secrets,
+private-repo-publishing, old-repo-archived, go-deprecation-published.
 
 Every check in this module reads something OUTSIDE the working tree -- the
 remote's refs, the GitHub API, the Go module proxy -- which is why they carry
@@ -419,6 +419,44 @@ def register_networked_release_checks(app):
         for problem in verdict.problems:
             reporter.error(problem)
         return reporter.found(f"{len(verdict.problems)} missing CI secret(s)")
+
+    @app.error_check("private-repo-publishing")
+    def check_private_repo_publishing(ctx, reporter):
+        """A private repository's release uses nothing that needs a public one.
+
+        npm build provenance, PyPI attestations, and the Go module proxy (see
+        :mod:`rlsbl.private_repo_publishing`). The repository's visibility is
+        asked only when one of them is in use, and an unanswered question is
+        an error. The release refuses the same findings before it pushes.
+        """
+        from ..private_repo_publishing import (
+            VisibilityUnknownError,
+            public_only_uses,
+            repo_is_private,
+            unknown_visibility,
+            workflows_dir_for,
+        )
+        from ..utils import run_gh
+
+        uses = public_only_uses(
+            [ctx.config], workflows_dir_for(ctx.project_root),
+        )
+        if not uses:
+            return reporter.skipped(
+                "nothing configured needs a public repository"
+            )
+        try:
+            private = repo_is_private(run_gh, ctx.config)
+        except VisibilityUnknownError as exc:
+            reporter.error(unknown_visibility(uses, exc))
+            return reporter.found("the repository's visibility is unknown")
+        if not private:
+            return reporter.passed("the repository is public")
+        for use in uses:
+            reporter.error(f"the repository is private: {use.sentence()}")
+        return reporter.found(
+            f"{len(uses)} use(s) of publishing that needs a public repository"
+        )
 
     @app.error_check("old-repo-archived")
     def check_old_repo_archived(ctx, reporter):
