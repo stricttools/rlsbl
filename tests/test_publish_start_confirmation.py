@@ -143,6 +143,158 @@ class TestTheRelease:
         _release(mock_git_repo, gh)
 
 
+class TestTheFixTheRefusalNames:
+    """The refusal names `rlsbl release retry`, then `rlsbl watch <sha>`.
+
+    Run exactly that, with no hand-written retry.toml: retry scaffolds the
+    file, dispatches the publish workflow at the tag, and the watch the
+    refusal names then confirms the start.
+    """
+
+    @staticmethod
+    def _retry(repo, gh):
+        from rlsbl.commands import release_retry
+
+        def retry_gh(args, *_config, **kwargs):
+            args = list(args)
+            if args[:2] == ["workflow", "run"]:
+                ref = args[args.index("--ref") + 1]
+                gh.dispatched.append(args)
+                gh.runs.append({"event": "workflow_dispatch",
+                                "head_branch": ref, "id": 9})
+                return f"https://github.com/o/r/actions/runs/9\n"
+            return gh(args, **kwargs)
+
+        with (
+            patch("rlsbl.commands.release_retry.check_gh_installed",
+                  return_value=True),
+            patch("rlsbl.commands.release_retry.check_gh_auth",
+                  return_value=True),
+            patch("rlsbl.commands.release_retry.run_gh", side_effect=retry_gh),
+            patch("sys.stderr", new_callable=StringIO) as err,
+        ):
+            try:
+                release_retry.run_cmd(
+                    None, {"quiet": True, "watch": False, "dry-run": False},
+                    project_root=repo,
+                )
+            except SystemExit as exc:
+                raise AssertionError(
+                    f"retry exited {exc.code}: {err.getvalue()}"
+                ) from exc
+
+    def test_retry_then_watch_clears_the_refusal(self, mock_git_repo, capsys):
+        from test_post_push_failure_state import _setup_npm_project
+
+        _setup_npm_project(mock_git_repo)
+        _commit_workflow(mock_git_repo)
+        gh = FakeGitHub()
+        gh.dispatched = []
+        with pytest.raises(SystemExit):
+            _release(mock_git_repo, gh)
+        err = capsys.readouterr().err
+        assert "rlsbl release retry" in err
+        sha = _git(mock_git_repo, "rev-list", "-1", "v1.0.1")
+        assert f"rlsbl watch {sha}" in err
+
+        self._retry(mock_git_repo, gh)
+        assert gh.dispatched == [
+            ["workflow", "run", "publish.yml", "--ref", "v1.0.1",
+             "-f", "tag=v1.0.1"],
+        ]
+        retry_file = mock_git_repo / ".rlsbl" / "releases" / "retry.toml"
+        assert not retry_file.exists(), "a completed retry leaves no file"
+
+        code, err = TestWatch()._watch(sha, gh)
+        assert code == 0, err
+        assert "no run of" not in err
+
+
+    def _released_and_refused(self, repo, capsys):
+        from test_post_push_failure_state import _setup_npm_project
+
+        _setup_npm_project(repo)
+        _commit_workflow(repo)
+        gh = FakeGitHub()
+        gh.dispatched = []
+        with pytest.raises(SystemExit):
+            _release(repo, gh)
+        capsys.readouterr()
+        return gh, _git(repo, "rev-list", "-1", "v1.0.1")
+
+    def _retry_exit(self, repo, gh):
+        try:
+            self._retry(repo, gh)
+        except AssertionError as exc:
+            return str(exc)
+        return None
+
+    def test_a_branch_ref_is_refused_until_it_names_the_tag(
+        self, mock_git_repo, capsys,
+    ):
+        """A run dispatched at a branch carries the branch and the branch head,
+        so `rlsbl watch <sha>` could never see it and would call for a second
+        dispatch. Retry refuses it, and setting the ref to the tag clears it."""
+        gh, sha = self._released_and_refused(mock_git_repo, capsys)
+        retry_file = mock_git_repo / ".rlsbl" / "releases" / "retry.toml"
+        retry_file.write_text(
+            'version = "1.0.1"\ndispatch = ["publish.yml"]\n'
+            'ref = "main"\ntag = "v1.0.1"\n'
+        )
+        err = self._retry_exit(mock_git_repo, gh)
+        assert err is not None and 'ref = "main"' in err
+        assert 'Set ref = "v1.0.1"' in err
+        assert gh.dispatched == [], "nothing dispatched at the branch"
+
+        # The fix the refusal names:
+        retry_file.write_text(retry_file.read_text().replace(
+            'ref = "main"', 'ref = "v1.0.1"'))
+        assert self._retry_exit(mock_git_repo, gh) is None
+        assert gh.dispatched[0][3:5] == ["--ref", "v1.0.1"]
+        code, err = TestWatch()._watch(sha, gh)
+        assert code == 0, err
+
+    def test_a_branch_ref_refusal_clears_by_deleting_the_file(
+        self, mock_git_repo, capsys,
+    ):
+        """The refusal's other fix: delete retry.toml and re-run retry."""
+        gh, sha = self._released_and_refused(mock_git_repo, capsys)
+        retry_file = mock_git_repo / ".rlsbl" / "releases" / "retry.toml"
+        retry_file.write_text(
+            'version = "1.0.1"\ndispatch = ["publish.yml"]\nref = "main"\n'
+        )
+        assert self._retry_exit(mock_git_repo, gh) is not None
+        retry_file.unlink()
+        assert self._retry_exit(mock_git_repo, gh) is None
+        assert gh.dispatched[0][3:5] == ["--ref", "v1.0.1"]
+        code, err = TestWatch()._watch(sha, gh)
+        assert code == 0, err
+
+    def test_a_file_with_neither_ref_nor_tag_clears_on_the_named_rerun(
+        self, mock_git_repo, capsys,
+    ):
+        from rlsbl import cmd_release_retry
+
+        from conftest import cli_ctx
+
+        gh, sha = self._released_and_refused(mock_git_repo, capsys)
+        retry_file = mock_git_repo / ".rlsbl" / "releases" / "retry.toml"
+        retry_file.write_text(
+            'version = "1.0.1"\ndispatch = ["publish.yml"]\nref = ""\n'
+        )
+        with (
+            patch("rlsbl._require_sub_project_root", return_value=mock_git_repo),
+            patch("sys.stderr", new_callable=StringIO) as err,
+            pytest.raises(SystemExit),
+        ):
+            cmd_release_retry(cli_ctx(quiet=True), watch=False)
+        assert "Re-run `rlsbl release retry`" in err.getvalue()
+        assert not retry_file.exists(), "the invalid file is discarded"
+        # The re-run the error names:
+        assert self._retry_exit(mock_git_repo, gh) is None
+        assert gh.dispatched[0][3:5] == ["--ref", "v1.0.1"]
+
+
 class TestWatch:
     """`rlsbl watch <sha>` on a released commit."""
 
