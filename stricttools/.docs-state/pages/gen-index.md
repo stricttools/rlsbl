@@ -1,6 +1,6 @@
 +++
 title = "API Reference"
-description = "API reference index for rlsbl covering 200 modules"
+description = "API reference index for rlsbl covering 203 modules"
 generated = true
 seeded = true
 nav_group = "API Reference"
@@ -66,10 +66,10 @@ nav_order = 90
 - [rlsbl.commands.release](../rlsbl-commands-release/)
 - [rlsbl.commands.release.execute](../rlsbl-commands-release-execute/)
 - [rlsbl.commands.release.hooks](../rlsbl-commands-release-hooks/)
+- [rlsbl.commands.release.in_checkout](../rlsbl-commands-release-in_checkout/)
 - [rlsbl.commands.release.phase_a](../rlsbl-commands-release-phase_a/)
 - [rlsbl.commands.release.publish](../rlsbl-commands-release-publish/)
 - [rlsbl.commands.release.release_state](../rlsbl-commands-release-release_state/)
-- [rlsbl.commands.release.rollback](../rlsbl-commands-release-rollback/)
 - [rlsbl.commands.release.shared](../rlsbl-commands-release-shared/)
 - [rlsbl.commands.release.steps](../rlsbl-commands-release-steps/)
 - [rlsbl.commands.release.validate](../rlsbl-commands-release-validate/)
@@ -154,11 +154,14 @@ nav_order = 90
 - [rlsbl.pipelines.pypi](../rlsbl-pipelines-pypi/)
 - [rlsbl.prepush_utils](../rlsbl-prepush_utils/)
 - [rlsbl.preview_apply](../rlsbl-preview_apply/)
+- [rlsbl.private_repo_publishing](../rlsbl-private_repo_publishing/)
 - [rlsbl.publication_probe](../rlsbl-publication_probe/)
 - [rlsbl.publish_gate](../rlsbl-publish_gate/)
+- [rlsbl.publish_workflows](../rlsbl-publish_workflows/)
 - [rlsbl.registry](../rlsbl-registry/)
 - [rlsbl.releasable_cleanup](../rlsbl-releasable_cleanup/)
 - [rlsbl.release_backfill](../rlsbl-release_backfill/)
+- [rlsbl.release_checkout](../rlsbl-release_checkout/)
 - [rlsbl.release_commit_remap](../rlsbl-release_commit_remap/)
 - [rlsbl.release_file](../rlsbl-release_file/)
 - [rlsbl.release_publication](../rlsbl-release_publication/)

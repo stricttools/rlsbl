@@ -14,7 +14,7 @@ Release orchestration commands covering the full release lifecycle. Provides 12 
 
 ## release run
 
-Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or infra) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, --approve-consequential to skip the confirmation prompt in non-interactive contexts, and --allow-dirty to skip the clean working tree check.
+Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or infra) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. The release runs in the release checkout, a detached checkout of the release branch's committed tip under the repository's git directory: producers, tests, hooks, the version bump and the release commit all happen there, the branch advances only from the commit the release started at, and only the files the release's own commits change are written into the working tree. An uncommitted change to one of those files refuses the release, naming it; every other uncommitted change is listed and left alone. Supports dry-run preview, which reports those changes instead of refusing, and --approve-consequential to skip the confirmation prompt in non-interactive contexts.
 
 **Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
@@ -27,7 +27,6 @@ Bump version, validate the JSONL changelog, run tests and lint, commit, tag, pus
 | `--check-timeout` |  | int | optional |  | Timeout in seconds for each preflight check subprocess (tests, lint, external checks). Overrides the check_timeout config key; when omitted, check_timeout applies, else the shipped default. |
 | `--hook-timeout` |  | int | optional |  | Timeout in seconds for each release hook. Overrides the hook_timeout config key; when omitted, hook_timeout applies, else no timeout. |
 | `--watch`, `--no-watch` |  | bool | required |  | After release, automatically watch CI runs to completion (--no-watch to skip) |
-| `--allow-dirty`, `--no-allow-dirty` |  | bool | required |  | Skip the clean working tree check and allow releasing with uncommitted changes |
 | `--releasable` |  | str | optional |  | Which releasable to release. Required when running at a monorepo workspace root, where the directory names the whole workspace rather than one releasable; rejected anywhere else, since the directory already names it. |
 
 ## release resume

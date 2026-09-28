@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.commands.release.shared"
-description = "Shared utilities for release commands: project root detection, git auth verification, working tree guards, and release file loading."
+description = "Shared helpers for the release commands: loading the env file, building the release flags, and applying the per-invocation timeout overrides."
 generated = true
 nav_group = "API Reference"
 nav_order = 61

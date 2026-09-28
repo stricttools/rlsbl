@@ -3448,6 +3448,11 @@
         },
         {
           "level": 2,
+          "text": "The release checkout",
+          "anchor": "the-release-checkout"
+        },
+        {
+          "level": 2,
           "text": "The release file",
           "anchor": "the-release-file"
         },
@@ -3690,6 +3695,21 @@
           "level": 3,
           "text": "`run_cmd`",
           "anchor": "run_cmd"
+        },
+        {
+          "level": 3,
+          "text": "`_exit_on_entry_error`",
+          "anchor": "_exit_on_entry_error"
+        },
+        {
+          "level": 3,
+          "text": "`run_release`",
+          "anchor": "run_release"
+        },
+        {
+          "level": 3,
+          "text": "`resume_release`",
+          "anchor": "resume_release"
         },
         {
           "level": 3,
@@ -5825,6 +5845,21 @@
         },
         {
           "level": 3,
+          "text": "`_git_line`",
+          "anchor": "_git_line"
+        },
+        {
+          "level": 3,
+          "text": "`_hooks_dir`",
+          "anchor": "_hooks_dir"
+        },
+        {
+          "level": 3,
+          "text": "`refuse_unreachable_hooks_dir`",
+          "anchor": "refuse_unreachable_hooks_dir"
+        },
+        {
+          "level": 3,
           "text": "`_is_workspace_root`",
           "anchor": "_is_workspace_root"
         },
@@ -6017,6 +6052,16 @@
           "level": 3,
           "text": "`_resolve_publish_mode`",
           "anchor": "_resolve_publish_mode"
+        },
+        {
+          "level": 3,
+          "text": "`_publish_gate_var`",
+          "anchor": "_publish_gate_var"
+        },
+        {
+          "level": 3,
+          "text": "`_private_repo_vars`",
+          "anchor": "_private_repo_vars"
         },
         {
           "level": 3,
@@ -6591,6 +6636,11 @@
         },
         {
           "level": 3,
+          "text": "`_advance_branch`",
+          "anchor": "_advance_branch"
+        },
+        {
+          "level": 3,
           "text": "`_batch_release_flags`",
           "anchor": "_batch_release_flags"
         },
@@ -6638,6 +6688,11 @@
           "level": 3,
           "text": "`_releasable_release_order`",
           "anchor": "_releasable_release_order"
+        },
+        {
+          "level": 3,
+          "text": "`release_batch`",
+          "anchor": "release_batch"
         },
         {
           "level": 3,
@@ -7952,11 +8007,6 @@
         },
         {
           "level": 3,
-          "text": "`RollbackClobberError`",
-          "anchor": "rollbackclobbererror"
-        },
-        {
-          "level": 3,
           "text": "`ReleaseCIError`",
           "anchor": "releasecierror"
         },
@@ -8122,11 +8172,6 @@
         },
         {
           "level": 3,
-          "text": "`_guard_rollback`",
-          "anchor": "_guard_rollback"
-        },
-        {
-          "level": 3,
           "text": "`_is_push_timeout_exc`",
           "anchor": "_is_push_timeout_exc"
         },
@@ -8134,6 +8179,16 @@
           "level": 3,
           "text": "`_is_resumable_failure`",
           "anchor": "_is_resumable_failure"
+        },
+        {
+          "level": 3,
+          "text": "`_advance_live_branch`",
+          "anchor": "_advance_live_branch"
+        },
+        {
+          "level": 3,
+          "text": "`_discard_unpushed_attempt`",
+          "anchor": "_discard_unpushed_attempt"
         },
         {
           "level": 3,
@@ -8376,6 +8431,38 @@
           "level": 3,
           "text": "`is_releasable_hook_customized`",
           "anchor": "is_releasable_hook_customized"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-commands-release-in_checkout.md",
+      "title": "rlsbl.commands.release.in_checkout",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.commands.release.in_checkout",
+          "anchor": "rlsblcommandsreleasein_checkout"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.commands.release.in_checkout`",
+          "anchor": "rlsblcommandsreleasein_checkout"
+        },
+        {
+          "level": 3,
+          "text": "`project_scope`",
+          "anchor": "project_scope"
+        },
+        {
+          "level": 3,
+          "text": "`workspace_scope`",
+          "anchor": "workspace_scope"
+        },
+        {
+          "level": 3,
+          "text": "`run_in_release_checkout`",
+          "anchor": "run_in_release_checkout"
         }
       ]
     },
@@ -8681,38 +8768,6 @@
       ]
     },
     {
-      "path": "rlsbl-commands-release-rollback.md",
-      "title": "rlsbl.commands.release.rollback",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.commands.release.rollback",
-          "anchor": "rlsblcommandsreleaserollback"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.commands.release.rollback`",
-          "anchor": "rlsblcommandsreleaserollback"
-        },
-        {
-          "level": 3,
-          "text": "`_rollback_context`",
-          "anchor": "_rollback_context"
-        },
-        {
-          "level": 3,
-          "text": "`_is_tracked`",
-          "anchor": "_is_tracked"
-        },
-        {
-          "level": 3,
-          "text": "`_cleanup_release_artifacts`",
-          "anchor": "_cleanup_release_artifacts"
-        }
-      ]
-    },
-    {
       "path": "rlsbl-commands-release-shared.md",
       "title": "rlsbl.commands.release.shared",
       "type": "doc",
@@ -8806,11 +8861,6 @@
         },
         {
           "level": 3,
-          "text": "`no_artifacts`",
-          "anchor": "no_artifacts"
-        },
-        {
-          "level": 3,
           "text": "`ReleaseStep`",
           "anchor": "releasestep"
         },
@@ -8841,8 +8891,8 @@
         },
         {
           "level": 3,
-          "text": "`reset_branch_to_pin`",
-          "anchor": "reset_branch_to_pin"
+          "text": "`unwind_branch_to_pin`",
+          "anchor": "unwind_branch_to_pin"
         },
         {
           "level": 3,
@@ -8896,16 +8946,6 @@
         },
         {
           "level": 3,
-          "text": "`changelog_finalization_artifacts`",
-          "anchor": "changelog_finalization_artifacts"
-        },
-        {
-          "level": 3,
-          "text": "`release_file_finalization_artifacts`",
-          "anchor": "release_file_finalization_artifacts"
-        },
-        {
-          "level": 3,
           "text": "`_validate_table`",
           "anchor": "_validate_table"
         },
@@ -8918,11 +8958,6 @@
           "level": 3,
           "text": "`all_plan_kinds`",
           "anchor": "all_plan_kinds"
-        },
-        {
-          "level": 3,
-          "text": "`rollback_artifacts`",
-          "anchor": "rollback_artifacts"
         }
       ]
     },
@@ -9000,11 +9035,6 @@
           "level": 3,
           "text": "`validate_no_stash`",
           "anchor": "validate_no_stash"
-        },
-        {
-          "level": 3,
-          "text": "`validate_clean_tree`",
-          "anchor": "validate_clean_tree"
         },
         {
           "level": 3,
@@ -9143,13 +9173,8 @@
         },
         {
           "level": 3,
-          "text": "`_npm_provenance_requested`",
-          "anchor": "_npm_provenance_requested"
-        },
-        {
-          "level": 3,
-          "text": "`_abort_on_npm_provenance`",
-          "anchor": "_abort_on_npm_provenance"
+          "text": "`_abort_on_private_repo_publishing`",
+          "anchor": "_abort_on_private_repo_publishing"
         },
         {
           "level": 3,
@@ -9207,6 +9232,21 @@
           "level": 3,
           "text": "`run_cmd`",
           "anchor": "run_cmd"
+        },
+        {
+          "level": 3,
+          "text": "`_exit_on_entry_error`",
+          "anchor": "_exit_on_entry_error"
+        },
+        {
+          "level": 3,
+          "text": "`run_release`",
+          "anchor": "run_release"
+        },
+        {
+          "level": 3,
+          "text": "`resume_release`",
+          "anchor": "resume_release"
         },
         {
           "level": 3,
@@ -10316,6 +10356,11 @@
           "level": 3,
           "text": "`_release_at`",
           "anchor": "_release_at"
+        },
+        {
+          "level": 3,
+          "text": "`_release_tag_at`",
+          "anchor": "_release_tag_at"
         },
         {
           "level": 3,
@@ -13916,6 +13961,11 @@
         },
         {
           "level": 4,
+          "text": "`public_repo_requirement`",
+          "anchor": "public_repo_requirement"
+        },
+        {
+          "level": 4,
           "text": "`publish`",
           "anchor": "publish"
         },
@@ -14171,6 +14221,11 @@
         },
         {
           "level": 4,
+          "text": "`public_repo_requirement`",
+          "anchor": "public_repo_requirement"
+        },
+        {
+          "level": 4,
           "text": "`template_dir`",
           "anchor": "template_dir"
         },
@@ -14356,6 +14411,11 @@
           "level": 3,
           "text": "`NpmPipeline`",
           "anchor": "npmpipeline"
+        },
+        {
+          "level": 4,
+          "text": "`public_repo_requirement`",
+          "anchor": "public_repo_requirement"
         },
         {
           "level": 4,
@@ -14665,6 +14725,83 @@
       ]
     },
     {
+      "path": "rlsbl-private_repo_publishing.md",
+      "title": "rlsbl.private_repo_publishing",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.private_repo_publishing",
+          "anchor": "rlsblprivate_repo_publishing"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.private_repo_publishing`",
+          "anchor": "rlsblprivate_repo_publishing"
+        },
+        {
+          "level": 3,
+          "text": "`PublicOnlyUse`",
+          "anchor": "publiconlyuse"
+        },
+        {
+          "level": 4,
+          "text": "`sentence`",
+          "anchor": "sentence"
+        },
+        {
+          "level": 3,
+          "text": "`_publishes`",
+          "anchor": "_publishes"
+        },
+        {
+          "level": 3,
+          "text": "`config_uses`",
+          "anchor": "config_uses"
+        },
+        {
+          "level": 3,
+          "text": "`_attests`",
+          "anchor": "_attests"
+        },
+        {
+          "level": 3,
+          "text": "`workflow_uses`",
+          "anchor": "workflow_uses"
+        },
+        {
+          "level": 3,
+          "text": "`public_only_uses`",
+          "anchor": "public_only_uses"
+        },
+        {
+          "level": 3,
+          "text": "`VisibilityUnknownError`",
+          "anchor": "visibilityunknownerror"
+        },
+        {
+          "level": 3,
+          "text": "`repo_is_private`",
+          "anchor": "repo_is_private"
+        },
+        {
+          "level": 3,
+          "text": "`refusal`",
+          "anchor": "refusal"
+        },
+        {
+          "level": 3,
+          "text": "`unknown_visibility`",
+          "anchor": "unknown_visibility"
+        },
+        {
+          "level": 3,
+          "text": "`workflows_dir_for`",
+          "anchor": "workflows_dir_for"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-publication_probe.md",
       "title": "rlsbl.publication_probe",
       "type": "doc",
@@ -14740,6 +14877,88 @@
           "level": 3,
           "text": "`gate_job_template_snippet`",
           "anchor": "gate_job_template_snippet"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-publish_workflows.md",
+      "title": "rlsbl.publish_workflows",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.publish_workflows",
+          "anchor": "rlsblpublish_workflows"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.publish_workflows`",
+          "anchor": "rlsblpublish_workflows"
+        },
+        {
+          "level": 3,
+          "text": "`PublishWorkflowError`",
+          "anchor": "publishworkflowerror"
+        },
+        {
+          "level": 3,
+          "text": "`ReleaseWorkflow`",
+          "anchor": "releaseworkflow"
+        },
+        {
+          "level": 4,
+          "text": "`filename`",
+          "anchor": "filename"
+        },
+        {
+          "level": 4,
+          "text": "`starts_for`",
+          "anchor": "starts_for"
+        },
+        {
+          "level": 3,
+          "text": "`_release_types`",
+          "anchor": "_release_types"
+        },
+        {
+          "level": 3,
+          "text": "`release_workflows`",
+          "anchor": "release_workflows"
+        },
+        {
+          "level": 3,
+          "text": "`actions_enabled`",
+          "anchor": "actions_enabled"
+        },
+        {
+          "level": 3,
+          "text": "`workflow_state`",
+          "anchor": "workflow_state"
+        },
+        {
+          "level": 3,
+          "text": "`preflight`",
+          "anchor": "preflight"
+        },
+        {
+          "level": 3,
+          "text": "`runs_for_tag`",
+          "anchor": "runs_for_tag"
+        },
+        {
+          "level": 3,
+          "text": "`_diagnosis`",
+          "anchor": "_diagnosis"
+        },
+        {
+          "level": 3,
+          "text": "`confirm_runs_started`",
+          "anchor": "confirm_runs_started"
+        },
+        {
+          "level": 3,
+          "text": "`confirm_or_exit`",
+          "anchor": "confirm_or_exit"
         }
       ]
     },
@@ -15140,6 +15359,168 @@
       ]
     },
     {
+      "path": "rlsbl-release_checkout.md",
+      "title": "rlsbl.release_checkout",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.release_checkout",
+          "anchor": "rlsblrelease_checkout"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.release_checkout`",
+          "anchor": "rlsblrelease_checkout"
+        },
+        {
+          "level": 3,
+          "text": "`ReleaseCheckoutError`",
+          "anchor": "releasecheckouterror"
+        },
+        {
+          "level": 3,
+          "text": "`LiveTreeConflictError`",
+          "anchor": "livetreeconflicterror"
+        },
+        {
+          "level": 3,
+          "text": "`BranchMovedError`",
+          "anchor": "branchmovederror"
+        },
+        {
+          "level": 3,
+          "text": "`ReleaseCheckout`",
+          "anchor": "releasecheckout"
+        },
+        {
+          "level": 4,
+          "text": "`owns`",
+          "anchor": "owns"
+        },
+        {
+          "level": 4,
+          "text": "`to_live`",
+          "anchor": "to_live"
+        },
+        {
+          "level": 4,
+          "text": "`to_checkout`",
+          "anchor": "to_checkout"
+        },
+        {
+          "level": 3,
+          "text": "`active`",
+          "anchor": "active"
+        },
+        {
+          "level": 3,
+          "text": "`live_path`",
+          "anchor": "live_path"
+        },
+        {
+          "level": 3,
+          "text": "`branch_ref`",
+          "anchor": "branch_ref"
+        },
+        {
+          "level": 3,
+          "text": "`current_branch_for`",
+          "anchor": "current_branch_for"
+        },
+        {
+          "level": 3,
+          "text": "`checkout_dir`",
+          "anchor": "checkout_dir"
+        },
+        {
+          "level": 3,
+          "text": "`_changed_paths`",
+          "anchor": "_changed_paths"
+        },
+        {
+          "level": 3,
+          "text": "`_dirty_records`",
+          "anchor": "_dirty_records"
+        },
+        {
+          "level": 3,
+          "text": "`_is_operator_state`",
+          "anchor": "_is_operator_state"
+        },
+        {
+          "level": 3,
+          "text": "`live_changes`",
+          "anchor": "live_changes"
+        },
+        {
+          "level": 3,
+          "text": "`_under`",
+          "anchor": "_under"
+        },
+        {
+          "level": 3,
+          "text": "`partition_changes`",
+          "anchor": "partition_changes"
+        },
+        {
+          "level": 3,
+          "text": "`conflict_message`",
+          "anchor": "conflict_message"
+        },
+        {
+          "level": 3,
+          "text": "`report_ignored`",
+          "anchor": "report_ignored"
+        },
+        {
+          "level": 3,
+          "text": "`prepare_checkout`",
+          "anchor": "prepare_checkout"
+        },
+        {
+          "level": 3,
+          "text": "`_write_back`",
+          "anchor": "_write_back"
+        },
+        {
+          "level": 3,
+          "text": "`advance_live_branch`",
+          "anchor": "advance_live_branch"
+        },
+        {
+          "level": 3,
+          "text": "`take_back`",
+          "anchor": "take_back"
+        },
+        {
+          "level": 3,
+          "text": "`unwind_last_advance`",
+          "anchor": "unwind_last_advance"
+        },
+        {
+          "level": 3,
+          "text": "`write_scope`",
+          "anchor": "write_scope"
+        },
+        {
+          "level": 3,
+          "text": "`entered`",
+          "anchor": "entered"
+        },
+        {
+          "level": 3,
+          "text": "`live_branch`",
+          "anchor": "live_branch"
+        },
+        {
+          "level": 3,
+          "text": "`say`",
+          "anchor": "say"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-release_commit_remap.md",
       "title": "rlsbl.release_commit_remap",
       "type": "doc",
@@ -15515,6 +15896,11 @@
         },
         {
           "level": 3,
+          "text": "`create_argv`",
+          "anchor": "create_argv"
+        },
+        {
+          "level": 3,
           "text": "`create_args`",
           "anchor": "create_args"
         },
@@ -15694,6 +16080,11 @@
           "level": 3,
           "text": "`latest_release_fact`",
           "anchor": "latest_release_fact"
+        },
+        {
+          "level": 3,
+          "text": "`latest_released_version`",
+          "anchor": "latest_released_version"
         },
         {
           "level": 3,
@@ -19778,6 +20169,11 @@
         },
         {
           "level": 3,
+          "text": "`_commit_tool_for`",
+          "anchor": "_commit_tool_for"
+        },
+        {
+          "level": 3,
           "text": "`has_staged_or_modified`",
           "anchor": "has_staged_or_modified"
         },
@@ -22347,7 +22743,7 @@
       ]
     }
   ],
-  "last_gen": "2026-09-28T18:23:07.236717+00:00",
+  "last_gen": "2026-09-28T21:26:06.987194+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
