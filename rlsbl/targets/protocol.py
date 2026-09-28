@@ -110,7 +110,7 @@ class ReleaseTarget(Protocol):
         ...
 
     @property
-    def accepts_test_options(self) -> bool:
+    def accepts_test_settings(self) -> bool:
         """Whether ``.rlsbl/config.json`` may carry a ``test.<name>`` block here."""
         ...
 
@@ -488,12 +488,12 @@ class ReleaseTarget(Protocol):
         """
         ...
 
-    def validate_test_options(self, block: dict) -> None:
-        """Validate this target's ``test.<name>`` options block.
+    def validate_test_settings(self, block: dict) -> None:
+        """Validate this target's ``test.<name>`` settings block.
 
-        The default accepts no options, so the target is not a recognized test
+        The default accepts no settings, so the target is not a recognized test
         target and ``config.validate_test_config`` never reaches it. An
-        overriding target names its own option set and each option's value
+        overriding target names its own settings and each setting's value
         rule, raising ``ConfigError`` on anything else.
         """
         ...

@@ -560,7 +560,7 @@ class TestGoTestCommand:
     """``test.go.command`` replaces the hard-coded ``go test`` invocation.
 
     The block mirrors the ``test.pypi`` block: absent section, absent target
-    key, or absent option all keep today's command byte-identical.
+    key, or absent setting all keep today's command byte-identical.
     """
 
     COMMAND_CONFIG = {"test": {"go": {"command": "scripts/full-suite.sh"}}}
@@ -591,7 +591,7 @@ class TestGoTestCommand:
             assert mock_run.call_args[0][0] == self.DEFAULT_CMD
 
     def test_empty_go_block_runs_the_default_command(self, tmp_project):
-        """A declared but optionless ``test.go`` block still runs everything."""
+        """A declared ``test.go`` block with no settings still runs everything."""
         with patch("rlsbl.effects.run") as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(args=[], returncode=0)
 

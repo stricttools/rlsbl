@@ -607,8 +607,8 @@ class PypiTarget(BaseTarget):
             message=f"{self.name} tests {'passed' if passed else 'failed'}",
         )
 
-    def validate_test_options(self, block):
-        """Validate the ``test.pypi`` block: one option, ``markers``.
+    def validate_test_settings(self, block):
+        """Validate the ``test.pypi`` block: one setting, ``markers``.
 
         ``markers`` is the pytest marker expression the suite runs with; the
         runner passes it as ``-m <markers>``. An empty string is refused rather
@@ -616,7 +616,7 @@ class PypiTarget(BaseTarget):
         """
         from ..errors import ConfigError
 
-        self._reject_unknown_test_options(self.name, block, {"markers"})
+        self._reject_unknown_test_settings(self.name, block, {"markers"})
 
         if "markers" in block:
             markers = block["markers"]

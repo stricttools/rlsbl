@@ -630,8 +630,8 @@ class GoTarget(BaseTarget):
             message=f"{self.name} tests {'passed' if passed else 'failed'}",
         )
 
-    def validate_test_options(self, block):
-        """Validate the ``test.go`` block: one option, ``command``.
+    def validate_test_settings(self, block):
+        """Validate the ``test.go`` block: one setting, ``command``.
 
         ``command`` is the whole suite command as one string, run from the
         project root in place of the built-in ``go test`` invocation. An empty
@@ -640,7 +640,7 @@ class GoTarget(BaseTarget):
         """
         from ..errors import ConfigError
 
-        self._reject_unknown_test_options(self.name, block, {"command"})
+        self._reject_unknown_test_settings(self.name, block, {"command"})
 
         if "command" in block:
             command = block["command"]
