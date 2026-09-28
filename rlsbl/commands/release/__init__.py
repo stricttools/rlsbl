@@ -684,7 +684,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # Consolidated config schema validation (banned keys, structural invariants).
     from ...config import validate_config_schema, validate_test_config
     validate_config_schema(config, project_dir=str(project_root))
-    # Gate malformed ``test`` blocks (unknown targets/options, bad marker types)
+    # Gate malformed ``test`` blocks (unknown targets/settings, bad marker types)
     # before any mutation. Both raise ConfigError, caught by the run_cmd wrapper.
     # Scope matches validate_config_schema: root config only. (validate_pipeline_config
     # runs per releasable member below; test-config validation intentionally does not,

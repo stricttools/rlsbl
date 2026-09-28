@@ -79,7 +79,7 @@ class TestValidateTestConfig:
         validate_test_config({"test": {"pypi": {"markers": "not integration"}}})
 
     def test_empty_pypi_block_passes(self):
-        # A target block with no options is valid -- run everything.
+        # A target block with no settings is valid -- run everything.
         validate_test_config({"test": {"pypi": {}}})
 
     def test_test_not_dict_raises(self):
@@ -96,7 +96,13 @@ class TestValidateTestConfig:
 
     def test_unknown_inner_key_raises(self):
         # A typo like "marker" (singular) must be rejected, not silently ignored.
-        with pytest.raises(ConfigError, match="not a recognized option"):
+        # The block is "test settings": the refusal says "setting", never "option".
+        with pytest.raises(ConfigError) as exc:
+            validate_test_config({"test": {"pypi": {"marker": "not integration"}}})
+        assert str(exc.value) == (
+            "test.pypi.'marker' is not a recognized setting. Valid settings: markers"
+        )
+        with pytest.raises(ConfigError, match="not a recognized setting"):
             validate_test_config({"test": {"pypi": {"marker": "not integration"}}})
 
     def test_non_string_markers_raises(self):
@@ -111,7 +117,7 @@ class TestValidateTestConfig:
         validate_test_config({"test": {"go": {"command": "scripts/full-suite.sh"}}})
 
     def test_empty_go_block_passes(self):
-        # A target block with no options is valid -- run the default command.
+        # A target block with no settings is valid -- run the default command.
         validate_test_config({"test": {"go": {}}})
 
     def test_go_block_not_dict_raises(self):
@@ -120,12 +126,12 @@ class TestValidateTestConfig:
 
     def test_unknown_go_inner_key_raises(self):
         # A typo like "commnad" must be rejected, not silently ignored.
-        with pytest.raises(ConfigError, match="not a recognized option"):
+        with pytest.raises(ConfigError, match="not a recognized setting"):
             validate_test_config({"test": {"go": {"commnad": "scripts/x.sh"}}})
 
     def test_go_markers_key_raises(self):
-        # The pypi option is not a go option -- key sets are per target.
-        with pytest.raises(ConfigError, match="not a recognized option"):
+        # The pypi setting is not a go setting -- key sets are per target.
+        with pytest.raises(ConfigError, match="not a recognized setting"):
             validate_test_config({"test": {"go": {"markers": "not integration"}}})
 
     def test_non_string_go_command_raises(self):
@@ -148,7 +154,7 @@ class TestConfigSchemaCheckSurfacesTestConfig:
         )
         result = app._check_defs["config-schema"].impl(ctx)
         assert result.status == "fail"
-        assert any("not a recognized option" in d for d in (p.text for p in result.problems))
+        assert any("not a recognized setting" in d for d in (p.text for p in result.problems))
 
     def test_valid_test_block_passes_check(self, tmp_project):
         ctx = ProjectContext(
@@ -183,7 +189,7 @@ class TestConfigSchemaCheckSurfacesTestConfig:
         result = app._check_defs["config-schema"].impl(ctx)
         assert result.status == "fail"
         assert any(
-            "not a recognized option" in d for d in (p.text for p in result.problems)
+            "not a recognized setting" in d for d in (p.text for p in result.problems)
         )
 
 

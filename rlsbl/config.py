@@ -658,7 +658,7 @@ def validate_test_config(config):
     """Validate the optional ``test`` section of a project config.
 
     The ``test`` section maps a release target name to a block of per-target
-    test options::
+    test settings::
 
         {"test": {"pypi": {"markers": "not integration"},
                   "go": {"command": "scripts/full-suite.sh"}}}
@@ -667,18 +667,18 @@ def validate_test_config(config):
     way". Everything must be declared -- unknown targets and unknown inner keys
     are hard errors (no silent tolerance of typos like ``marker``).
 
-    Which targets accept a block, and which options each one takes, are the
+    Which targets accept a block, and which settings each one takes, are the
     registry's answers: the recognized targets are
-    ``targets_with_test_options()`` and each block is handed to that target's
-    own ``validate_test_options``. Adding an option to a target is therefore a
+    ``targets_with_test_settings()`` and each block is handed to that target's
+    own ``validate_test_settings``. Adding a setting to a target is therefore a
     change in one place, and this function never names a target.
 
     Raises ``ConfigError`` if:
     - ``test`` is present but not a dict
     - a target key is not a recognized test target
     - a target block is not a dict
-    - an inner key is not a recognized option for that target
-    - an option's value breaks that target's own rule for it
+    - an inner key is not a recognized setting for that target
+    - a setting's value breaks that target's own rule for it
     """
     test_section = config.get("test")
     if test_section is None:
@@ -689,9 +689,9 @@ def validate_test_config(config):
             f"test must be a dict, got {type(test_section).__name__}"
         )
 
-    from .targets import TARGETS, targets_with_test_options
+    from .targets import TARGETS, targets_with_test_settings
 
-    known_targets = targets_with_test_options()
+    known_targets = targets_with_test_settings()
     for target_name, block in test_section.items():
         if target_name not in known_targets:
             raise ConfigError(
@@ -702,7 +702,7 @@ def validate_test_config(config):
             raise ConfigError(
                 f"test.'{target_name}' must be a dict, got {type(block).__name__}"
             )
-        TARGETS[target_name].validate_test_options(block)
+        TARGETS[target_name].validate_test_settings(block)
 
 
 # ---------------------------------------------------------------------------

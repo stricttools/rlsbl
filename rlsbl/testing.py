@@ -217,7 +217,7 @@ def _pytest_marker_args(config: dict) -> list[str]:
     configured, else ``[]``.
 
     Reads the per-target test block via ``config.get("test", {}).get("pypi", {})``
-    so future per-target options (npm script selection) slot into the same
+    so future per-target test settings (npm script selection) slot into the same
     shape -- ``_go_test_command`` reads ``test.go`` the same way. An absent
     section/key -- or an empty/falsy markers value -- yields no arguments,
     keeping the pytest invocation byte-identical to the no-config case.
