@@ -39,8 +39,8 @@
         },
         {
           "level": 3,
-          "text": "Transition (`changelog_format_version_enforced`)",
-          "anchor": "transition-changelog_format_version_enforced"
+          "text": "The format-version gate",
+          "anchor": "the-format-version-gate"
         },
         {
           "level": 3,
@@ -221,11 +221,6 @@
           "level": 3,
           "text": "`load_filter_repo_commit_map`",
           "anchor": "load_filter_repo_commit_map"
-        },
-        {
-          "level": 3,
-          "text": "`read_changelog_format_version_enforced`",
-          "anchor": "read_changelog_format_version_enforced"
         },
         {
           "level": 3,
@@ -413,6 +408,11 @@
           "level": 2,
           "text": "Check results",
           "anchor": "check-results"
+        },
+        {
+          "level": 2,
+          "text": "Options",
+          "anchor": "options"
         },
         {
           "level": 2,
@@ -755,6 +755,23 @@
       ]
     },
     {
+      "path": "cli-failing-checks.md",
+      "title": "rlsbl failing-checks",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl failing-checks",
+          "anchor": "rlsbl-failing-checks"
+        },
+        {
+          "level": 2,
+          "text": "Flags",
+          "anchor": "flags"
+        }
+      ]
+    },
+    {
       "path": "cli-index.md",
       "title": "rlsbl CLI Reference",
       "type": "doc",
@@ -960,6 +977,38 @@
           "level": 3,
           "text": "Arguments",
           "anchor": "arguments-5"
+        }
+      ]
+    },
+    {
+      "path": "cli-options.md",
+      "title": "rlsbl options",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl options",
+          "anchor": "rlsbl-options"
+        },
+        {
+          "level": 2,
+          "text": "options registry",
+          "anchor": "options-registry"
+        },
+        {
+          "level": 2,
+          "text": "options set",
+          "anchor": "options-set"
+        },
+        {
+          "level": 3,
+          "text": "Flags",
+          "anchor": "flags"
+        },
+        {
+          "level": 3,
+          "text": "Arguments",
+          "anchor": "arguments"
         }
       ]
     },
@@ -1280,6 +1329,11 @@
         },
         {
           "level": 3,
+          "text": "Settings that belong to an option",
+          "anchor": "settings-that-belong-to-an-option"
+        },
+        {
+          "level": 3,
           "text": "strictspec_gate",
           "anchor": "strictspec_gate"
         },
@@ -1417,6 +1471,16 @@
           "level": 3,
           "text": "`non_list_targets_ban_message`",
           "anchor": "non_list_targets_ban_message"
+        },
+        {
+          "level": 3,
+          "text": "`retired_format_version_key_message`",
+          "anchor": "retired_format_version_key_message"
+        },
+        {
+          "level": 3,
+          "text": "`validate_option_settings`",
+          "anchor": "validate_option_settings"
         },
         {
           "level": 3,
@@ -4036,11 +4100,6 @@
           "level": 3,
           "text": "`load_filter_repo_commit_map`",
           "anchor": "load_filter_repo_commit_map"
-        },
-        {
-          "level": 3,
-          "text": "`read_changelog_format_version_enforced`",
-          "anchor": "read_changelog_format_version_enforced"
         }
       ]
     },
@@ -7155,6 +7214,11 @@
         },
         {
           "level": 3,
+          "text": "`_switch_on_dep_floors`",
+          "anchor": "_switch_on_dep_floors"
+        },
+        {
+          "level": 3,
           "text": "`_apply_next_steps`",
           "anchor": "_apply_next_steps"
         },
@@ -9881,6 +9945,11 @@
         },
         {
           "level": 3,
+          "text": "`_dep_floors_option_item`",
+          "anchor": "_dep_floors_option_item"
+        },
+        {
+          "level": 3,
           "text": "`observe`",
           "anchor": "observe"
         },
@@ -10493,6 +10562,16 @@
           "level": 3,
           "text": "`non_list_targets_ban_message`",
           "anchor": "non_list_targets_ban_message"
+        },
+        {
+          "level": 3,
+          "text": "`retired_format_version_key_message`",
+          "anchor": "retired_format_version_key_message"
+        },
+        {
+          "level": 3,
+          "text": "`validate_option_settings`",
+          "anchor": "validate_option_settings"
         },
         {
           "level": 3,
@@ -13337,6 +13416,180 @@
           "level": 3,
           "text": "`prefixes`",
           "anchor": "prefixes"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-options.md",
+      "title": "rlsbl.options",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.options",
+          "anchor": "rlsbloptions"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.options`",
+          "anchor": "rlsbloptions"
+        },
+        {
+          "level": 3,
+          "text": "`OptionsError`",
+          "anchor": "optionserror"
+        },
+        {
+          "level": 3,
+          "text": "`registry_text`",
+          "anchor": "registry_text"
+        },
+        {
+          "level": 3,
+          "text": "`checked_registry`",
+          "anchor": "checked_registry"
+        },
+        {
+          "level": 3,
+          "text": "`declaration`",
+          "anchor": "declaration"
+        },
+        {
+          "level": 3,
+          "text": "`strongest_value`",
+          "anchor": "strongest_value"
+        },
+        {
+          "level": 3,
+          "text": "`repository_root`",
+          "anchor": "repository_root"
+        },
+        {
+          "level": 3,
+          "text": "`scope_of`",
+          "anchor": "scope_of"
+        },
+        {
+          "level": 3,
+          "text": "`_workspace_scopes`",
+          "anchor": "_workspace_scopes"
+        },
+        {
+          "level": 3,
+          "text": "`_diagnostic_lines`",
+          "anchor": "_diagnostic_lines"
+        },
+        {
+          "level": 3,
+          "text": "`RepositoryOptions`",
+          "anchor": "repositoryoptions"
+        },
+        {
+          "level": 4,
+          "text": "`value`",
+          "anchor": "value"
+        },
+        {
+          "level": 3,
+          "text": "`OptionValue`",
+          "anchor": "optionvalue"
+        },
+        {
+          "level": 3,
+          "text": "`_snapshot`",
+          "anchor": "_snapshot"
+        },
+        {
+          "level": 3,
+          "text": "`load`",
+          "anchor": "load"
+        },
+        {
+          "level": 3,
+          "text": "`option_value`",
+          "anchor": "option_value"
+        },
+        {
+          "level": 3,
+          "text": "`is_off`",
+          "anchor": "is_off"
+        },
+        {
+          "level": 3,
+          "text": "`check_value`",
+          "anchor": "check_value"
+        },
+        {
+          "level": 3,
+          "text": "`set_command`",
+          "anchor": "set_command"
+        },
+        {
+          "level": 3,
+          "text": "`member_scope`",
+          "anchor": "member_scope"
+        },
+        {
+          "level": 3,
+          "text": "`setting_problem`",
+          "anchor": "setting_problem"
+        },
+        {
+          "level": 3,
+          "text": "`settings_problems`",
+          "anchor": "settings_problems"
+        },
+        {
+          "level": 3,
+          "text": "`SetResult`",
+          "anchor": "setresult"
+        },
+        {
+          "level": 3,
+          "text": "`_manifest_missing`",
+          "anchor": "_manifest_missing"
+        },
+        {
+          "level": 3,
+          "text": "`_render`",
+          "anchor": "_render"
+        },
+        {
+          "level": 3,
+          "text": "`_blank_line_before_tables`",
+          "anchor": "_blank_line_before_tables"
+        },
+        {
+          "level": 3,
+          "text": "`set_entry`",
+          "anchor": "set_entry"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-options_registry.md",
+      "title": "rlsbl.options_registry",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.options_registry",
+          "anchor": "rlsbloptions_registry"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.options_registry`",
+          "anchor": "rlsbloptions_registry"
+        },
+        {
+          "level": 3,
+          "text": "`declarations`",
+          "anchor": "declarations"
+        },
+        {
+          "level": 3,
+          "text": "`render`",
+          "anchor": "render"
         }
       ]
     },
@@ -18999,6 +19252,11 @@
         },
         {
           "level": 3,
+          "text": "`_undeclared`",
+          "anchor": "_undeclared"
+        },
+        {
+          "level": 3,
           "text": "`run_tool_check`",
           "anchor": "run_tool_check"
         },
@@ -20265,6 +20523,21 @@
         },
         {
           "level": 3,
+          "text": "`_check_project_dir`",
+          "anchor": "_check_project_dir"
+        },
+        {
+          "level": 3,
+          "text": "`_check_value_resolver`",
+          "anchor": "_check_value_resolver"
+        },
+        {
+          "level": 3,
+          "text": "`run_checks_for`",
+          "anchor": "run_checks_for"
+        },
+        {
+          "level": 3,
           "text": "`cmd_release_run`",
           "anchor": "cmd_release_run"
         },
@@ -20622,6 +20895,16 @@
           "level": 3,
           "text": "`cmd_transition_record`",
           "anchor": "cmd_transition_record"
+        },
+        {
+          "level": 3,
+          "text": "`cmd_options_registry`",
+          "anchor": "cmd_options_registry"
+        },
+        {
+          "level": 3,
+          "text": "`cmd_options_set`",
+          "anchor": "cmd_options_set"
         },
         {
           "level": 3,
@@ -22024,7 +22307,7 @@
       ]
     }
   ],
-  "last_gen": "2026-09-28T16:03:47.955837+00:00",
+  "last_gen": "2026-09-28T17:45:23.082481+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [

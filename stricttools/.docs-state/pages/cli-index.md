@@ -10,13 +10,14 @@ nav_order = 91
 
 # rlsbl CLI Reference
 
-Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding. Ships 58 commands organized into 13 top-level commands and 6 command groups (release, changelog, monorepo, dev, rewrite, transition). Covers 17 release targets: npm, pypi, go, swift, swift-apple, spec, hex, deno, dart, docker, flutter, maven, native-android, native-ios, zig, pgdesign, plain.
+Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding. Ships 61 commands organized into 14 top-level commands and 7 command groups (release, changelog, monorepo, dev, rewrite, transition, options). Covers 17 release targets: npm, pypi, go, swift, swift-apple, spec, hex, deno, dart, docker, flutter, maven, native-android, native-ios, zig, pgdesign, plain.
 
 Version: :-: var key="project.version"
 
 ## Commands
 
 - [check](../cli-check/) -- Run project checks registered via the check framework and report results
+- [failing-checks](../cli-failing-checks/) -- Run project checks and report only error-level failures, exiting nonzero when any exist
 - [status](../cli-status/) -- Display the current project version, branch, latest release, unreleased commit count, and changelog coverage. The latest release comes from the project's release archives and is annotated when this checkout does not contain it. Outputs plain text by default or structured JSON with the --json flag.
 - [scaffold](../cli-scaffold/) -- Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- three-way merges template changes with your customizations. Existing files with no stored merge base are healed from their last scaffold commit before merging.
 - [check-name](../cli-check-name/) -- Check whether one or more package names are usable. npm and PyPI are queried over the network for availability and for names that collide after normalization; go is an offline check of the Go package name a candidate implies. Each name gets a status of available, taken, invalid (go only), discouraged (go only), or error. Accepts multiple names as positional arguments and waits a configurable delay between networked checks. Exits 0 when every name is available, 2 when any check ended in an error, and 1 otherwise: taken, invalid, and discouraged all exit 1, so a discouraged Go name exits 1 even though Go accepts it.
@@ -38,6 +39,7 @@ Version: :-: var key="project.version"
 - [dev](../cli-dev/) -- Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install -e, npm -> npm link, go -> go install).
 - [rewrite](../cli-rewrite/) -- Sweeping rewrites of the current working tree, each previewed before it is performed. Every command in this group observes the tree, reports a per-file plan with occurrence counts, and refuses to apply when a count moved between the preview and the write.
 - [transition](../cli-transition/) -- Record the transition-record facts an operator states. Most events in a repository's transition record are written by the operation that performed them; the ones here are statements about a repository somebody read -- two that nothing can derive at all, and one whose command exists but which a rename performed by hand leaves unrecorded.
+- [options](../cli-options/) -- Print rlsbl's options registry, and write this repository's entries for rlsbl's options in .strictmetadata/options/ at its git root. Every rlsbl check is an option, rlsbl:<check name>, and so is rlsbl:test-sandbox: an error check ranks error > warn > off, a warning check warn > off, and `rlsbl check` and every release apply each entry's current value (off: the check does not run; warn: it runs and reports, never blocking; error: as registered). The options that stand for an adoption (rlsbl:dep-floors, rlsbl:format, rlsbl:lint, rlsbl:strictspec-certificate-gate, rlsbl:test-sandbox, rlsbl:type-check) default to off and accept a path scope naming one workspace member. Invalid entries stop every check run and every release.
 
 ## Framework flags
 
