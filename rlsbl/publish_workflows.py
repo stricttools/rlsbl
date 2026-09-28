@@ -183,9 +183,10 @@ def preflight(*, git_root, commit, gh, publishes, prerelease, slug):
     except Exception as exc:
         raise PublishWorkflowError(
             f"could not read whether GitHub Actions is enabled for this "
-            f"repository ({exc}). A release's publish workflows start only when "
-            f"it is, so the answer is required. Check `gh auth status` (reading "
-            f"it needs admin access to the repository) and re-run."
+            f"repository ({_describe(exc)}). A release's publish workflows "
+            f"start only when it is, so the answer is required. Check `gh auth "
+            f"status` (the token needs read access to the repository, and a "
+            f"fine-grained token its Actions policies permission) and re-run."
         ) from exc
     if not enabled:
         raise PublishWorkflowError(
@@ -200,7 +201,8 @@ def preflight(*, git_root, commit, gh, publishes, prerelease, slug):
             state = workflow_state(gh, workflow.filename)
         except Exception as exc:
             raise PublishWorkflowError(
-                f"could not read the state of {workflow.path} on GitHub ({exc}). "
+                f"could not read the state of {workflow.path} on GitHub "
+                f"({_describe(exc)}). "
                 f"A disabled workflow starts nothing, so the answer is "
                 f"required. Check `gh auth status` and re-run."
             ) from exc

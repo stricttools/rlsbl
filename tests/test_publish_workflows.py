@@ -192,6 +192,26 @@ class TestPreflight:
         with pytest.raises(PublishWorkflowError, match="could not read"):
             self._preflight(tmp_path, sha, gh)
 
+    def test_an_unreadable_answer_names_githubs_reason_not_admin_access(
+        self, tmp_path,
+    ):
+        """GitHub's own answer names what the token lacks, and it is not admin
+        access: a collaborator with read access reads the Actions permissions.
+        (Measured: `gh api repos/cli/cli/actions/permissions` from a
+        non-collaborator answers 403 "You must have repository read permissions
+        or have the repository Actions policies fine-grained permission.")"""
+        sha = _repo(tmp_path, {"publish.yml": PUBLISH})
+        reason = ("You must have repository read permissions or have the "
+                  "repository Actions policies fine-grained permission. (HTTP 403)")
+
+        def gh(args):
+            raise subprocess.CalledProcessError(1, "gh", stderr=f"gh: {reason}")
+
+        with pytest.raises(PublishWorkflowError) as exc:
+            self._preflight(tmp_path, sha, gh)
+        assert reason in str(exc.value)
+        assert "admin" not in str(exc.value)
+
 
 def _run(event="release", branch=TAG):
     return {"event": event, "head_branch": branch, "id": 1}
