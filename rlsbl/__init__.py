@@ -3390,6 +3390,49 @@ def _extract_variadic_args():
     return []
 
 
+# The changelog commands whose `--commits` is one comma-separated value.
+_COMMITS_FLAG_COMMANDS = ("add", "amend", "edit")
+
+
+def _refuse_repeated_commits_flag():
+    """Refuse ``rlsbl changelog <add|amend|edit>`` with ``--commits`` repeated.
+
+    ``--commits`` is one comma-separated value, not a repeatable flag, and
+    strictcli keeps only the last occurrence of a flag that is not declared
+    repeatable: ``--commits a --commits b`` recorded an entry covering ``b``
+    alone and reported success. Making the flag repeatable would give the one
+    list two spellings, so a repetition is refused instead, naming the
+    comma-separated spelling with every value it was given. Checked on argv
+    before the app parses it, as the selector lifts above are; the command is
+    located past any leading reserved flags, which carry no value.
+    """
+    argv = sys.argv[1:]
+    words = [(i, tok) for i, tok in enumerate(argv) if not tok.startswith("-")]
+    if len(words) < 2 or words[0][1] != "changelog":
+        return
+    if words[1][1] not in _COMMITS_FLAG_COMMANDS:
+        return
+    values = []
+    i = words[1][0] + 1
+    while i < len(argv) and argv[i] != "--":
+        tok = argv[i]
+        if tok == "--commits":
+            values.append(argv[i + 1] if i + 1 < len(argv) else "")
+            i += 2
+            continue
+        if tok.startswith("--commits="):
+            values.append(tok[len("--commits="):])
+        i += 1
+    if len(values) > 1:
+        print(
+            f"Error: --commits was given {len(values)} times, and only the "
+            f"last would be kept. Give every hash in one comma-separated "
+            f"flag: --commits {','.join(values)}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 def _extract_check_releasable():
     """Lift ``rlsbl check --releasable <name>`` out of ``sys.argv``.
 
@@ -3486,6 +3529,7 @@ def main():
     # strictcli recognizes --dry-run/--approve-consequential/--quiet/--verbose
     # anywhere in argv, so `rlsbl release run --approve-consequential` reaches
     # the framework as written and needs no argv rewriting here.
+    _refuse_repeated_commits_flag()
     _check_releasable = _extract_check_releasable()
     _variadic_args = _extract_variadic_args()
     try:
