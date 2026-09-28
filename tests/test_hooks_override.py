@@ -432,6 +432,7 @@ _FULL_FLOW_PATCHES = (
     patch("rlsbl.commands.release.validate_branch_and_remote", return_value="main"),
     patch("rlsbl.commands.release.resolve_monorepo_context", return_value=(None, None, False, False, None)),
     patch("rlsbl.commands.release.validate_changelog_state", return_value=None),
+    patch("rlsbl.commands.release.validate_user_facing_entries"),
     patch("rlsbl.commands.release.validate_blog_body", return_value=(None, None)),
     patch("rlsbl.commands.release._abort_on_scaffold_conflicts"),
     patch("rlsbl.commands.release.resolve_target_paths", return_value={}),

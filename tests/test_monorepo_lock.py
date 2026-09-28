@@ -191,6 +191,7 @@ class TestMonorepoReleaseLockPlacement:
              patch("rlsbl.workspace.load_workspace", return_value=[]), \
              patch("rlsbl.workspace.members_of", return_value=[]), \
              patch("rlsbl.commands.release.validate_changelog_state", return_value=None), \
+             patch("rlsbl.commands.release.validate_user_facing_entries"), \
              patch("rlsbl.commands.release.resolve_tag_push_plan", return_value=False), \
              patch("rlsbl.commands.release.acquire_lock", spy_acquire):
             with patch("sys.stdout", new_callable=StringIO):

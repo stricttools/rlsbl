@@ -13,15 +13,15 @@ class TestSelfdocBeforeTestsAndLint:
 
         We verify the ordering by reading the source and checking that
         _run_selfdoc_check appears before the test/lint preflight
-        (tag_expr="preflight") in the release function.  The changelog
+        (tag_expr=hook_selection("pre-release"), the preflight tag) in the release function.  The changelog
         preflight (tag_expr="preflight-changelog") runs earlier in the
         validation phase.
         """
         source = inspect.getsource(_run_cmd_inner)
         selfdoc_pos = source.index("_run_selfdoc_check(")
-        # Find the test/lint preflight call (tag_expr="preflight"), not
+        # Find the test/lint preflight call (tag_expr=hook_selection("pre-release"), the preflight tag), not
         # the changelog preflight (tag_expr="preflight-changelog")
-        preflight_pos = source.index('tag_expr="preflight"')
+        preflight_pos = source.index('tag_expr=hook_selection("pre-release")')
 
         assert selfdoc_pos < preflight_pos, (
             "_run_selfdoc_check must appear before test/lint preflight"
@@ -42,7 +42,7 @@ class TestSelfdocBeforeTestsAndLint:
         source = inspect.getsource(_run_cmd_inner)
 
         selfdoc_pos = source.index("_run_selfdoc_check(")
-        preflight_pos = source.index('tag_expr="preflight"')
+        preflight_pos = source.index('tag_expr=hook_selection("pre-release")')
 
         assert selfdoc_pos < preflight_pos, (
             f"Expected ordering selfdoc ({selfdoc_pos}) < test/lint preflight ({preflight_pos})"
@@ -82,7 +82,7 @@ class TestSelfdocBeforeTestsAndLint:
         """Selfdoc gen must run before test/lint preflight checks."""
         source = inspect.getsource(_run_cmd_inner)
         gen_pos = source.index("_run_selfdoc_gen(")
-        preflight_pos = source.index('tag_expr="preflight"')
+        preflight_pos = source.index('tag_expr=hook_selection("pre-release")')
 
         assert gen_pos < preflight_pos, (
             "_run_selfdoc_gen must appear before test/lint preflight"

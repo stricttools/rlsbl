@@ -50,6 +50,7 @@ _BASE_PATCHES = {
     "resolve_target_paths": {},
     "compute_release_version": ("0.1.0", "0.1.1", "patch", "v0.1.1"),
     "validate_changelog_state": None,
+    "validate_user_facing_entries": None,
     "validate_blog_body": (None, None),
     "extract_changelog_entry_from_text": "- test",
     "build_hook_env": {},

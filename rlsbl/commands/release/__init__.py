@@ -25,6 +25,7 @@ from ...lock import acquire_lock, release_lock
 from ...targets import TARGETS, detect_targets, _parse_target_entry
 from ...tagging import ensure_github_topic, ensure_npm_keyword, ensure_pypi_keyword
 from ...strictcli_detect import detect_strictcli
+from ...checks import hook_selection
 from ...workspace import load_workspace, resolve_project
 from ...utils import (
     bump_version,
@@ -82,6 +83,7 @@ from .validate import (
     validate_no_stash,
     validate_branch_and_remote, resolve_monorepo_context,
     compute_release_version, validate_changelog_state,
+    validate_user_facing_entries,
     print_dry_run_summary,
     print_resume_dry_run_summary,
     _format_releasable_tag, _releasable_tag_glob,
@@ -165,6 +167,21 @@ def _format_preflight_summary(results, *, label="Preflight"):
     if not passed:
         return None
     return f"{label}: {len(passed)} checks passed ({', '.join(passed)})"
+
+
+def _error_level_failures(results, *, prefix=""):
+    """The release check step's verdict: the error-level failures in *results*.
+
+    Returns one ``"<name>: <message>"`` line per failed check, each prefixed
+    with *prefix*. A check at warn -- registered that way, or softened to warn
+    by an options entry -- is printed as a WARN line and never blocks. The
+    run's exit code is deliberately not consulted: it is nonzero on a warning
+    too, so deciding by it aborted a warn-only run with no failure to name.
+    """
+    for r in results:
+        if r.status == "warn":
+            print(f"  WARN  {prefix}{r.name}: {r.message}", file=sys.stderr)
+    return [f"{prefix}{r.name}: {r.message}" for r in results if r.status == "fail"]
 
 
 def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
@@ -894,26 +911,18 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                 config=config,
             )
 
-        # For infra releases, ignore warnings (the user-facing check
-        # produces a warning when no user-facing entries exist, which
-        # is expected for infra).
-        _cl_ignore_warn = (bump_type == "infra")
+        # Only error-level failures block, for every bump type; warnings are
+        # reported. Whether the release needs a user-facing entry is the bump
+        # type's rule, validated below.
         _cl_results, _cl_impure, _cl_exit = _rlsbl_run_checks_for(
             _changelog_ctx, tag_expr="preflight-changelog",
-            ignore_warnings=_cl_ignore_warn,
             pure_only=_is_dry,
         )
         if _is_dry:
             for _impure_name in _cl_impure:
                 log(f"would run: {_impure_name} (impure)")
-        if _cl_exit != 0:
-            # When warnings are treated as errors, include them in the report
-            _cl_error_statuses = {"fail"} if _cl_ignore_warn else {"fail", "warn"}
-            _cl_failed = [
-                f"{r.name}: {r.message}"
-                for r in _cl_results
-                if r.status in _cl_error_statuses
-            ]
+        _cl_failed = _error_level_failures(_cl_results)
+        if _cl_failed:
             for msg in _cl_failed:
                 print(f"  FAIL  {msg}", file=sys.stderr)
             raise HookError(
@@ -925,17 +934,10 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         if _cl_summary:
             log(_cl_summary)
 
-        # Infra releases must not have user-facing changelog entries.
-        # The preflight-changelog checks above validate structural integrity;
-        # this is a semantic constraint specific to the infra bump type.
-        if bump_type == "infra":
-            from ...changelog.files import read_unreleased as _read_unreleased
-            _infra_entries = _read_unreleased(changes_dir)
-            if any(e.user_facing for e in _infra_entries):
-                raise ReleaseValidationError(
-                    "infra releases must not have user-facing changelog entries "
-                    "— use patch, minor, or major instead"
-                )
+        # The bump type decides whether user-facing entries are required or
+        # forbidden. The preflight-changelog checks above validate structural
+        # integrity; this is a semantic constraint of the bump type.
+        validate_user_facing_entries(bump_type, changes_dir)
 
     # Validate blog body file if blog is enabled (releasable-aware: the
     # body lives alongside unreleased.toml in the releasable releases dir)
@@ -1138,22 +1140,21 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                     # owns built-in tests/lint.  Under --dry-run the SAME call
                     # partitions exactly as the other branch does: pure checks
                     # execute, impure ones are listed.
-                    results, _impure_listed, exit_code = (
+                    results, _impure_listed, _exit_code = (
                         run_external_preflight_checks(
                             _rlsbl_app, member_ctx, ctx.config,
+                            tag_expr=hook_selection("pre-release"),
                             pure_only=_pf_dry,
                         )
                     )
                     if _pf_dry:
                         for _impure_name in _impure_listed:
                             log(f"would run: {_impure_name} (impure)")
-                    if exit_code != 0:
-                        for r in results:
-                            if r.status == "fail":
-                                all_failed.append(
-                                    f"{pkg_name}: {r.name}: {r.message}"
-                                )
-                    else:
+                    _member_failed = _error_level_failures(
+                        results, prefix=f"{pkg_name}: ",
+                    )
+                    all_failed.extend(_member_failed)
+                    if not _member_failed:
                         _member_summary = _format_preflight_summary(
                             results, label=f"Preflight ({pkg_name})"
                         )
@@ -1161,20 +1162,18 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                             log(_member_summary)
                 else:
                     # One run covering built-in + external preflight checks.
-                    results, _impure_listed, exit_code = _rlsbl_run_checks_for(
-                        member_ctx, tag_expr="preflight",
+                    results, _impure_listed, _exit_code = _rlsbl_run_checks_for(
+                        member_ctx, tag_expr=hook_selection("pre-release"),
                         pure_only=_pf_dry,
                     )
                     if _pf_dry:
                         for _impure_name in _impure_listed:
                             log(f"would run: {_impure_name} (impure)")
-                    if exit_code != 0:
-                        for r in results:
-                            if r.status == "fail":
-                                all_failed.append(
-                                    f"{pkg_name}: {r.name}: {r.message}"
-                                )
-                    else:
+                    _member_failed = _error_level_failures(
+                        results, prefix=f"{pkg_name}: ",
+                    )
+                    all_failed.extend(_member_failed)
+                    if not _member_failed:
                         _member_summary = _format_preflight_summary(
                             results, label=f"Preflight ({pkg_name})"
                         )
@@ -1229,18 +1228,15 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                 # partitions exactly as the other branch does: pure checks
                 # execute, impure ones are listed.
                 log("Skipping built-in checks (pre-release hook handles testing/linting; running config-declared external checks)")
-                results, _impure_listed, exit_code = run_external_preflight_checks(
-                    _rlsbl_app, standalone_ctx, config, pure_only=_pf_dry,
+                results, _impure_listed, _exit_code = run_external_preflight_checks(
+                    _rlsbl_app, standalone_ctx, config,
+                    tag_expr=hook_selection("pre-release"), pure_only=_pf_dry,
                 )
                 if _pf_dry:
                     for _impure_name in _impure_listed:
                         log(f"would run: {_impure_name} (impure)")
-                if exit_code != 0:
-                    failed = [
-                        f"{r.name}: {r.message}"
-                        for r in results
-                        if r.status == "fail"
-                    ]
+                failed = _error_level_failures(results)
+                if failed:
                     for msg in failed:
                         print(f"  FAIL  {msg}", file=sys.stderr)
                     raise HookError(
@@ -1251,19 +1247,15 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                     log(_pf_summary)
             else:
                 # One run covering built-in + external preflight checks.
-                results, _impure_listed, exit_code = _rlsbl_run_checks_for(
-                    standalone_ctx, tag_expr="preflight",
+                results, _impure_listed, _exit_code = _rlsbl_run_checks_for(
+                    standalone_ctx, tag_expr=hook_selection("pre-release"),
                     pure_only=_pf_dry,
                 )
                 if _pf_dry:
                     for _impure_name in _impure_listed:
                         log(f"would run: {_impure_name} (impure)")
-                if exit_code != 0:
-                    failed = [
-                        f"{r.name}: {r.message}"
-                        for r in results
-                        if r.status == "fail"
-                    ]
+                failed = _error_level_failures(results)
+                if failed:
                     for msg in failed:
                         print(f"  FAIL  {msg}", file=sys.stderr)
                     raise HookError(

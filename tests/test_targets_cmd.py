@@ -111,8 +111,14 @@ class TestMultiTargetRelease:
             f.write("# Changelog\n\n## 1.0.1\n\nPatch release with improvements.\n")
         # Create .rlsbl/changes/ for JSONL changelog
         os.makedirs(os.path.join(".rlsbl", "changes"), exist_ok=True)
+        # A user-facing entry: every release except infra needs one. The
+        # checks that would resolve its hash are stubbed.
         with open(os.path.join(".rlsbl", "changes", "unreleased.jsonl"), "w") as f:
-            f.write("")
+            f.write(json.dumps({
+                "format_version": 1, "commits": ["abc1234"],
+                "user_facing": True, "description": "Improvements",
+                "type": "fix",
+            }) + "\n")
         with open(os.path.join(".rlsbl", "config.json"), "w") as f:
             json.dump({"publish_mode": "ci", "targets": ["npm", "spec"]}, f)
 
