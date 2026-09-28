@@ -29,9 +29,9 @@
     "schema_hash": "a715b74523370fd1e7e4f6b86feca3b07f5d883178641fef6c5cdb0f38b24483"
   },
   "en/cli-check.md": {
-    "content": "26acd33ef3821ddcf31a274ce57bd2694deb7ead82c3d3aca39ec38dd8fd9a41",
+    "content": "447809d470bb2f981cb6c2f854a9624978b1740672fdfa851c8392b6e9e9310a",
     "description": "294231ab7e262bd4a893776622b7c519380878c7df13f19f96c7f3c2cd5a4364",
-    "schema_hash": "80263b508c54cbdb3049bb2bf6143b26eeb28a78477d0067b6d9bea76fdd6346",
+    "schema_hash": "a7e8d376e6389f57f9fc8ea5a49720ee23027806d0acc085c746bbc2c93624a6",
     "seed_hash": "294231ab7e262bd4a893776622b7c519380878c7df13f19f96c7f3c2cd5a4364"
   },
   "en/cli-claim-name.md": {
@@ -65,13 +65,13 @@
     "seed_hash": "fcf763657174f6f67caf821bc63e5bebaad176eb032db4b39f29e06e9618a8ee"
   },
   "en/cli-failing-checks.md": {
-    "content": "66b3837687798486229861c377a5f79cca351c5d704096996240bc2ce2001a78",
+    "content": "be67950d047bbee50c9d54c402fa3698ee43006b4672d58caf7117126483281d",
     "description": "714ac7a57eb755ee99fb4bb89966aeba7cd9faaae19b83c604ca9e151162efe8",
-    "schema_hash": "1cb291691f1444280e3730e50081a74fe7f62168b8e1bbaa259c4ce4e9bcb824",
+    "schema_hash": "c2621eb87e84778efd5d2b2b65ad2adeec8c8e670cca093f6a8a3298eae78290",
     "seed_hash": "714ac7a57eb755ee99fb4bb89966aeba7cd9faaae19b83c604ca9e151162efe8"
   },
   "en/cli-index.md": {
-    "content": "9f4d565f2614050de7aebcd0e78ea15e06c05fe953b28f40374c02f4e67d82ab",
+    "content": "2c425b9288d5878874c12fefa9cb362230f346918c696a58cf9c5e8c85791832",
     "description": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2",
     "seed_hash": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2"
   },
@@ -93,9 +93,9 @@
     "seed_hash": "eb39fffddc605ae3de8a3d253f237b403e542e639175b0bca84b4dd98828804b"
   },
   "en/cli-pre-push-check.md": {
-    "content": "ba72de1e7600e82f09b4965780b6850faf4a7fac252a7aafa03d8479a66eea7e",
+    "content": "6d4cdd613acfc016f8206f42ce1233dabd33f7817e7e3cbe7999618718a290f9",
     "description": "b4df0c43b59cfbb146d94d5610850a72afbd6844486643b3e025e7eee9891af2",
-    "schema_hash": "ceecd14476cf53bdbef05a8427ca64d9ab172d77429c69ccf443bd64d7cfe6c5",
+    "schema_hash": "31eb6ecd2032661b0ac759527af1457feb9c96430c8d2c5a267bfaa62d9c681c",
     "seed_hash": "b4df0c43b59cfbb146d94d5610850a72afbd6844486643b3e025e7eee9891af2"
   },
   "en/cli-prs.md": {
