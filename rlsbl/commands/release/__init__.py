@@ -937,16 +937,11 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     from ...publish_workflows import (
         PublishWorkflowError as _PublishWorkflowError,
         preflight as _publish_preflight,
+        publishes_from_ci as _publishes_from_ci_of,
     )
     from ...release_publication import is_prerelease as _is_prerelease
     from ...utils import get_github_repo as _get_github_repo
-    _publishes_from_ci = any(
-        (c or {}).get("publish_mode") != "none" and any(
-            isinstance(entry, dict) and entry.get("local") is False
-            for entry in ((c or {}).get("pipelines") or {}).values()
-        )
-        for c in _provenance_scan_configs
-    )
+    _publishes_from_ci = _publishes_from_ci_of(_provenance_scan_configs)
     try:
         _publish_preflight(
             git_root=_resolve_git_root(project_dir), commit="HEAD",

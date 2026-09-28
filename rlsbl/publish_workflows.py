@@ -153,6 +153,27 @@ def workflow_state(gh, filename) -> str | None:
         raise
 
 
+def publishes_from_ci(configs) -> bool:
+    """Does a release from *configs* publish through a release-triggered workflow?
+
+    True when a config that publishes (``publish_mode`` is not ``"none"``) has
+    a pipeline with ``"local": false`` whose CI publish is a workflow rlsbl
+    scaffolds (the pipeline has CI templates). A ``"local": false`` pipeline
+    without them -- a cloudflare-pages site deployed by the repository's own
+    wiring -- gets no workflow from ``rlsbl scaffold``, so requiring one would
+    be a refusal its own fix never clears.
+    """
+    from .pipelines import load_pipelines
+
+    for config in configs:
+        if (config or {}).get("publish_mode") == "none":
+            continue
+        for pipeline in load_pipelines(config or {}).values():
+            if not pipeline.local and pipeline.template_dir() is not None:
+                return True
+    return False
+
+
 def preflight(*, git_root, commit, gh, publishes, prerelease, slug):
     """Refuse a release whose Release would start no publish workflow.
 
