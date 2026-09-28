@@ -1130,7 +1130,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         # (the hook then owns testing/linting).
         # Under --dry-run, pure checks execute; impure checks are listed.
         if True:
-            from rlsbl import app as _rlsbl_app, run_checks_for as _rlsbl_run_checks_for
+            from rlsbl import run_checks_for as _rlsbl_run_checks_for
             from ...check_context import WorkspaceCheckContext
             from ...external_checks import run_external_preflight_checks
             from pathlib import Path as _Path
@@ -1169,7 +1169,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                     # execute, impure ones are listed.
                     results, _impure_listed, _exit_code = (
                         run_external_preflight_checks(
-                            _rlsbl_app, member_ctx, ctx.config,
+                            member_ctx, ctx.config,
                             tag_expr=hook_selection("pre-release"),
                             pure_only=_pf_dry,
                         )
@@ -1237,7 +1237,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         # (the hook then owns testing/linting).
         # Under --dry-run, pure checks execute; impure checks are listed.
         if True:
-            from rlsbl import app as _rlsbl_app, run_checks_for as _rlsbl_run_checks_for
+            from rlsbl import run_checks_for as _rlsbl_run_checks_for
             from ...context import ProjectContext as _ProjectContext
             from ...external_checks import run_external_preflight_checks
             from pathlib import Path as _Path
@@ -1256,7 +1256,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                 # execute, impure ones are listed.
                 log("Skipping built-in checks (pre-release hook handles testing/linting; running config-declared external checks)")
                 results, _impure_listed, _exit_code = run_external_preflight_checks(
-                    _rlsbl_app, standalone_ctx, config,
+                    standalone_ctx, config,
                     tag_expr=hook_selection("pre-release"), pure_only=_pf_dry,
                 )
                 if _pf_dry:

@@ -326,7 +326,7 @@ def make_external_check_provider(config_reader):
     return _provider
 
 
-def run_external_preflight_checks(app, ctx, config, *, tag_expr="preflight",
+def run_external_preflight_checks(ctx, config, *, tag_expr="preflight",
                                   pure_only=False):
     """Run ONLY the config-declared external checks matching *tag_expr*.
 
@@ -346,13 +346,17 @@ def run_external_preflight_checks(app, ctx, config, *, tag_expr="preflight",
     through is what stops the customized-hook branch from being the one place
     a preview silently skips a check it could have run.
 
-    The check provider must have already been registered on *app*
-    (via ``app.register_check_provider``).
+    Every check runs through :func:`rlsbl.run_checks_for`, so each value --
+    the external check's own, and those of the checks it depends on -- comes
+    from the options of the project *ctx* was built for, never from the
+    directory the process stands in.
 
     Returns ``(results, impure_listed, exit_code)``: the executed checks, the
     names withheld by the purity partition (empty unless *pure_only*), and a
     non-zero exit code if any executed check failed.
     """
+    from . import run_checks_for
+
     select_names = [
         entry["name"] for entry in validate_external_checks(config)
     ]
@@ -364,7 +368,7 @@ def run_external_preflight_checks(app, ctx, config, *, tag_expr="preflight",
     for name in select_names:
         if name in seen:
             continue
-        results, impure_listed, exit_code = app.run_checks(
+        results, impure_listed, exit_code = run_checks_for(
             ctx, tag_expr=tag_expr, name_glob=name, pure_only=pure_only,
         )
         for r in results:
