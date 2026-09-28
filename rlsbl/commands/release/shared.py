@@ -1,4 +1,4 @@
-"""Shared utilities for release commands: project root detection, git auth verification, working tree guards, and release file loading."""
+"""Shared helpers for the release commands: loading the env file, building the release flags, and applying the per-invocation timeout overrides."""
 
 import os
 
