@@ -16,6 +16,7 @@ from unittest.mock import patch
 import pytest
 
 from githarness import record_release
+from rlsbl import publish_workflows
 
 PUBLISH = """\
 name: Publish
@@ -75,9 +76,17 @@ class FakeGitHub:
         return ""
 
 
+_REAL_PREFLIGHT = publish_workflows.preflight
+_REAL_CONFIRM_OR_EXIT = publish_workflows.confirm_or_exit
+
+
 @pytest.fixture(autouse=True)
-def _no_discovery_wait(monkeypatch):
-    monkeypatch.setattr("rlsbl.publish_workflows.DISCOVERY_SECONDS", 0)
+def _real_checks_without_the_discovery_wait(monkeypatch):
+    """The real preflight and confirmation (conftest neutralizes both by
+    default), with no discovery wait."""
+    monkeypatch.setattr(publish_workflows, "preflight", _REAL_PREFLIGHT)
+    monkeypatch.setattr(publish_workflows, "confirm_or_exit", _REAL_CONFIRM_OR_EXIT)
+    monkeypatch.setattr(publish_workflows, "DISCOVERY_SECONDS", 0)
 
 
 def _release(repo, gh):

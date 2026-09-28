@@ -764,16 +764,22 @@ class TestNotifyUrl:
 class TestReleaseUrl:
     """Tests for _release_url helper."""
 
-    @patch("rlsbl.commands.watch.run_gh")
-    def test_returns_url_for_latest_tag(self, mock_run_gh):
-        """Returns a release URL when gh release list succeeds."""
-        mock_run_gh.return_value = "v1.2.3"
+    def test_returns_url_for_latest_tag(self, tmp_path, monkeypatch):
+        """Returns the URL of the project's own latest release, from its record."""
+        monkeypatch.chdir(tmp_path)
+        releases = tmp_path / ".rlsbl" / "releases"
+        releases.mkdir(parents=True)
+        (tmp_path / ".rlsbl" / "config.json").write_text('{"publish_mode": "ci"}\n')
+        (releases / "v1.2.3.toml").write_text(
+            'format_version = 1\nbump = "patch"\ndescription = "d"\n'
+            'include = []\nexclude = []\n',
+        )
         url = _release_url("user/repo")
         assert url == "https://github.com/user/repo/releases/tag/v1.2.3"
 
     @patch("rlsbl.commands.watch.run_gh", side_effect=Exception("no releases"))
     def test_returns_none_on_failure(self, mock_run_gh):
-        """Returns None when gh release list fails."""
+        """Returns None when the project records no release."""
         url = _release_url("user/repo")
         assert url is None
 
