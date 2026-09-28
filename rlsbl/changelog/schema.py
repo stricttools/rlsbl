@@ -12,10 +12,10 @@ Transition contract (see docs/changelog.md): every line rlsbl WRITES carries
 ``format_version = 1``. Reading is EXPLICIT two-mode -- a line carrying
 ``format_version`` is validated via strictspec; a line lacking it is legacy and
 accepted ONLY when the caller opts into legacy mode
-(``enforce_format_version=False``, the transition default). With
-``enforce_format_version=True`` a missing gate is a hard error. The absence is
-never silent: a warn-level check surfaces "enforcement not yet enabled" until a
-repo records its ``changelog_format_version_enforced`` decision in its config.
+(``enforce_format_version=False``). With ``enforce_format_version=True`` a
+missing gate is an error. The ``changelog-format-version-gate`` check reads
+every changelog file with enforcement on, and the check's own option,
+``rlsbl:changelog-format-version-gate``, decides whether its findings block.
 """
 
 from __future__ import annotations
@@ -167,9 +167,9 @@ def parse_entry(line: str, *, enforce_format_version: bool = False) -> Changelog
       unsupported version is a hard error);
     - a line lacking ``format_version`` is LEGACY. It is accepted only when
       ``enforce_format_version`` is False (the transition default). With
-      ``enforce_format_version=True`` a missing gate is a hard error telling the
-      operator to stamp the line, re-add the entry, or record a deliberate
-      legacy-mode decision in ``.rlsbl/config.json``.
+      ``enforce_format_version=True`` a missing gate is an error telling the
+      operator to stamp the line or re-add the entry, or to report such lines
+      without blocking through the gate check's option.
 
     Raises ChangelogError on malformed JSON or missing required fields.
     Historical entries without ``id`` load fine (``id`` is optional on read).
@@ -192,8 +192,10 @@ def parse_entry(line: str, *, enforce_format_version: bool = False) -> Changelog
             "missing format_version: this changelog line predates the "
             'format_version gate. Add \'"format_version":1\' to the line (or '
             "re-add the entry with `rlsbl changelog add`, which always stamps "
-            "it), or set \"changelog_format_version_enforced\": false in "
-            ".rlsbl/config.json to read this repo in legacy mode."
+            "it). To report such lines without blocking, write the options "
+            "entry: rlsbl options set rlsbl:changelog-format-version-gate "
+            "--current warn --ideal error --reason \"<why this repository "
+            "keeps unstamped changelog lines>\""
         )
 
     if "user_facing" not in data:
@@ -266,9 +268,7 @@ def parse_jsonl(path: str, *, enforce_format_version: bool = False) -> list[Chan
 
     Raises ChangelogError with line number on malformed JSON. When
     ``enforce_format_version`` is True, a line lacking ``format_version`` is a
-    hard error (the caller threads this from the project's
-    ``changelog_format_version_enforced`` config -- see
-    :func:`rlsbl.changelog.files.read_changelog_format_version_enforced`).
+    hard error (the ``changelog-format-version-gate`` check reads with it on).
     """
     entries: list[ChangelogEntry] = []
     with open(path, "r", encoding="utf-8") as f:

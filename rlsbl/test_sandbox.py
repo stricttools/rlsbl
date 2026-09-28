@@ -6,8 +6,9 @@ repo; what ships from here is the bubblewrap runner script that the floor's
 bare-run refusal points at, plus the adoption check that keeps an adopted repo
 honest.
 
-A project opts in by declaring a ``test_sandbox`` section in
-``.rlsbl/config.json``::
+A project opts in by switching the ``rlsbl:test-sandbox`` option on
+(``rlsbl options set rlsbl:test-sandbox --current on --ideal on --reason ...``)
+and declaring a ``test_sandbox`` section in ``.rlsbl/config.json``::
 
     "test_sandbox": {
       "runner_path": "scripts/test.sh",
@@ -25,9 +26,10 @@ the runner exists and that every declared CI workflow actually invokes it.
 
 Design notes:
 
-* **The declaration is the choice.** No key has a runtime fallback: the section
-  is either absent (unadopted -- the check skips visibly) or present and
-  complete (the check enforces).
+* **The option is the choice.** The section is required while
+  ``rlsbl:test-sandbox`` is on and refused while it is off, and no key has a
+  runtime fallback: the section is either absent (unadopted -- the check skips
+  visibly) or present and complete (the check enforces).
 * **``caches`` is a closed enum.** Only ecosystems the template genuinely
   implements are accepted; an unimplemented name is a hard error, never a
   silently ignored bind.
@@ -228,19 +230,30 @@ def validate_test_sandbox_config(config):
 # ---------------------------------------------------------------------------
 
 
-def get_section(config):
-    """Return the validated ``test_sandbox`` section, or None when absent."""
+def get_section(config, project_dir):
+    """Return the validated ``test_sandbox`` section while the
+    ``rlsbl:test-sandbox`` option is on for *project_dir*, or None while it is
+    off.
+
+    Raises :class:`ConfigError` when the two disagree: a section present
+    while the option is off (nothing reads it), or absent while it is on.
+    """
+    from .options import setting_problem
+
+    problem = setting_problem("test-sandbox", config, project_dir)
+    if problem is not None:
+        raise ConfigError(problem)
     validate_test_sandbox_config(config)
     return (config or {}).get(CONFIG_KEY)
 
 
-def runner_mapping(config):
+def runner_mapping(config, project_dir):
     """Return the scaffold mapping that emits the runner, or None.
 
     The mapping carries ``executable: True`` so ``apply_plans`` chmods the
     rendered script 0755 -- a runner that is not executable is not a runner.
     """
-    section = get_section(config)
+    section = get_section(config, project_dir)
     if section is None:
         return None
     return {
@@ -258,13 +271,13 @@ def _root_relative(runner_path):
     return "/".join([".."] * len([p for p in parent.split("/") if p]))
 
 
-def template_vars(config):
+def template_vars(config, project_dir):
     """Return the ``sandbox*`` template variables for the runner template.
 
     Returns an empty dict when the project has not adopted the family, so
     callers can unconditionally merge the result into their vars dict.
     """
-    section = get_section(config)
+    section = get_section(config, project_dir)
     if section is None:
         return {}
 
@@ -385,27 +398,29 @@ class FloorVerdict:
 def evaluate_floor(config, project_root):
     """Evaluate the testisolation floor's adoption state for a project.
 
-    Returns a :class:`FloorVerdict`. Unadopted repos (no ``test_sandbox``
-    section and no testisolation plugin dependency) come back with
+    Returns a :class:`FloorVerdict`. Unadopted repos (``rlsbl:test-sandbox``
+    off and no testisolation plugin dependency) come back with
     ``adopted=False`` and a skip reason. Adopted repos come back with the
     concrete broken states, if any.
     """
-    root = str(project_root)
-    try:
-        section = get_section(config)
-    except ConfigError as e:
-        return FloorVerdict(adopted=True, problems=[str(e)])
+    from .options import OFF, option_value
 
+    root = str(project_root)
+    sandbox = option_value("test-sandbox", root)
     has_plugin = plugin_declared(root)
 
-    if section is None and not has_plugin:
+    if sandbox.value == OFF and not has_plugin:
         return FloorVerdict(
             adopted=False,
             skip_reason=(
-                "testisolation floor not adopted (no test_sandbox config section, "
-                "no testisolation dependency)"
+                f"testisolation floor not adopted (rlsbl:test-sandbox is off "
+                f"({sandbox.source}), no testisolation dependency)"
             ),
         )
+    try:
+        section = get_section(config, root)
+    except ConfigError as e:
+        return FloorVerdict(adopted=True, problems=[str(e)])
 
     problems = []
     notes = []
@@ -414,11 +429,19 @@ def evaluate_floor(config, project_root):
         # Plugin adopted without a runner. Only broken when the suite itself
         # declares that it requires one.
         if sandbox_required_declared(root):
+            from .options import member_scope, set_command
+
             problems.append(
                 "pyproject.toml sets testisolation_sandbox_required = true, but "
-                f"'{CONFIG_KEY}' is absent from .rlsbl/config.json, so no "
-                "sandbox runner is distributed to this repo. Declare the "
-                f"'{CONFIG_KEY}' section and run `rlsbl scaffold`."
+                f"rlsbl:test-sandbox is off ({sandbox.source}), so no sandbox "
+                "runner is distributed to this repo. Switch it on ("
+                + set_command(
+                    "test-sandbox", "on", "on",
+                    "<why this project runs its suite in the sandbox>",
+                    scope=member_scope(root),
+                )
+                + f"), declare the '{CONFIG_KEY}' section in "
+                ".rlsbl/config.json, and run `rlsbl scaffold`."
             )
         else:
             notes.append(

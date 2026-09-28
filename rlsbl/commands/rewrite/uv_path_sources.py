@@ -14,7 +14,11 @@ registry constraint floored at the version the lock already resolves:
   covering the platforms the checkout does not is left standing;
 * ``.rlsbl/config.json``'s ``internal_dep_floors`` gains every converted name,
   so rlsbl's ``dep-floors`` preflight check starts policing the floor it just
-  created (the key is created when absent).
+  created (the key is created when absent);
+* the ``rlsbl:dep-floors`` option is switched on with an options entry (current
+  and ideal ``error``, scoped to the project when it is a workspace member),
+  unless the option is already on: the check is off by default, and the key
+  above is refused while it is.
 
 Where the lock is read from
 ---------------------------
@@ -53,7 +57,8 @@ and a preview that could not probe would have nothing to preview.
 Preview and apply
 -----------------
 
-One verdict item per dependency, plus one for the config-key update.  Each
+One verdict item per dependency, plus one for the config-key update and one
+for the ``rlsbl:dep-floors`` options entry.  Each
 dependency's item carries the number of manifest entries it occupies, and the
 apply re-counts them from disk before writing: a count that moved between
 preview and apply is a hard abort with nothing further written.
@@ -266,6 +271,46 @@ def probe_published(name, version):
 #: Preview key of the item that records the config-key update.
 CONFIG_ITEM_KEY = ".rlsbl/config.json"
 
+#: The reason the options entry this command writes carries.
+DEP_FLOORS_REASON = (
+    "rlsbl rewrite uv-path-sources floored this project's internal "
+    "dependencies at their locked versions, and dep-floors polices those floors"
+)
+
+
+def _dep_floors_option_item(root):
+    """The item switching ``rlsbl:dep-floors`` on, or recording that it is on."""
+    from ...options import (
+        OFF, OPTIONS_DIR, OptionsError, declaration, member_scope, option_value,
+    )
+
+    key = f"{OPTIONS_DIR}/{declaration('dep-floors').subject}.toml"
+    try:
+        value = option_value("dep-floors", root)
+    except OptionsError as e:
+        raise UvPathSourceError(str(e)) from e
+    fact = f"rlsbl:dep-floors: {value.value} ({value.source})"
+    if value.value != OFF:
+        return VerdictItem(
+            key=key,
+            state="dep_floors_already_on",
+            summary=f"rlsbl:dep-floors is already {value.value}",
+            facts=(fact,),
+        )
+    scope = member_scope(root)
+    scoped = f", scope {scope!r}" if scope is not None else ""
+    return VerdictItem(
+        key=key,
+        state="switch_on_dep_floors",
+        summary="rlsbl:dep-floors would be switched on",
+        facts=(fact,),
+        actions=(
+            f"apply would write the entry rlsbl:dep-floors (current error, "
+            f"ideal error{scoped}).",
+        ),
+        data=("option", scope),
+    )
+
 
 def observe(project_root, *, probe=probe_published):
     """Build the plan: one item per dependency, plus the config update."""
@@ -345,6 +390,7 @@ def observe(project_root, *, probe=probe_published):
         ),
         data=("config", additions),
     ))
+    items.append(_dep_floors_option_item(root))
     return Preview(tuple(items))
 
 
@@ -367,6 +413,20 @@ def apply_item(item, project_root, applied=None):
         wrote = _apply_config(root, item.data[1])
         if wrote and applied is not None:
             applied.append(item.key)
+        return
+    if isinstance(item.data, tuple) and item.data[0] == "option":
+        from ...options import OptionsError, set_entry
+
+        try:
+            result = set_entry(
+                root, "rlsbl:dep-floors", "error", "error", DEP_FLOORS_REASON,
+                scope=item.data[1],
+            )
+        except OptionsError as e:
+            raise UvPathSourceError(f"{e} {already_written(applied)}".rstrip()) from e
+        if applied is not None:
+            applied.append(item.key)
+        print(f"  rlsbl:dep-floors: {result.action} in {result.file}")
         return
 
     conv = item.data

@@ -739,10 +739,11 @@ def register_project_checks(app):
     def check_testisolation_floor(ctx, reporter):
         """An adopted testisolation floor must have a working sandbox runner.
 
-        Skips visibly on repos that have adopted neither the ``test_sandbox``
-        config family nor the testisolation plugin. Once adopted, a missing or
-        non-executable runner, an incomplete config family, or a CI workflow
-        that does not invoke the declared runner is a hard error.
+        Skips visibly on repos that have adopted neither the sandboxed runner
+        (the ``rlsbl:test-sandbox`` option) nor the testisolation plugin. Once
+        adopted, a missing or non-executable runner, an incomplete config
+        family, or a CI workflow that does not invoke the declared runner is a
+        hard error.
         """
         skip_reason = _virtual_root_skip_reason(ctx)
         if skip_reason is not None:
@@ -775,8 +776,8 @@ def register_project_checks(app):
         ``>=`` floor allows. A lock ahead of the floor across a minor or
         major boundary is the shape that ships broken releases.
 
-        Skips visibly on repos that have not adopted the
-        ``internal_dep_floors`` config key.
+        Runs only while the ``rlsbl:dep-floors`` option is on (it defaults to
+        off); the ``internal_dep_floors`` key names what it polices.
         """
         skip_reason = _virtual_root_skip_reason(ctx)
         if skip_reason is not None:
@@ -789,9 +790,6 @@ def register_project_checks(app):
             str(ctx.project_root),
             workspace_names=workspace_package_names(ctx.workspace_root),
         )
-        if not verdict.adopted:
-            return reporter.skipped(verdict.skip_reason)
-
         if verdict.ok:
             if verdict.notes:
                 return reporter.passed("; ".join(verdict.notes[:3]))

@@ -28,6 +28,8 @@ import pytest
 
 import rlsbl
 
+from conftest import run_git
+
 
 pytestmark = pytest.mark.usefixtures("source_work_tree")
 
@@ -142,6 +144,8 @@ class TestGoModulePathThroughTheCli:
 @pytest.fixture
 def uv_project(tmp_path):
     root = _make_project(tmp_path / "pyproj")
+    # The apply writes an options entry, and options live at a git root.
+    run_git(root, "init", "-q")
     _write(root, "pyproject.toml", textwrap.dedent("""\
         [project]
         name = "app"
@@ -213,6 +217,9 @@ class TestUvPathSourcesThroughTheCli:
 
         config = json.loads((uv_project / ".rlsbl" / "config.json").read_text())
         assert config["internal_dep_floors"] == ["sibling"]
+        entries = (uv_project / ".strictmetadata" / "options" / "dependencies.toml").read_text()
+        assert 'id = "rlsbl:dep-floors"' in entries
+        assert 'current = "error"' in entries
 
     def test_an_unpublished_floor_exits_one_and_writes_nothing(
         self, uv_project, monkeypatch

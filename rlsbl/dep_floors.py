@@ -29,9 +29,11 @@ version selection, so the build can never sit ahead of the declared floor.
 The check degenerates to "a declared minimum exists", which the toolchain
 guarantees -- so Go is reported as satisfied with a note, not evaluated.
 
-The enforced set of "ecosystem-internal" dependencies comes from the
-``internal_dep_floors`` config key (a list of package names) plus, in a
-monorepo, every workspace sibling's package name. No project names are
+The check is the option ``rlsbl:dep-floors``, off by default: a project adopts
+it by switching the option on. The enforced set of "ecosystem-internal"
+dependencies then comes from the ``internal_dep_floors`` config key (a list of
+package names), which the option requires, plus, in a monorepo, every workspace
+sibling's package name. No project names are
 hardcoded here, and nothing on this path touches the network: it reads only
 committed manifests and lockfiles.
 
@@ -51,7 +53,8 @@ import tomllib
 
 from .uv_workspace import locate_uv_lock
 
-# Config key that gates adoption AND names the cross-repo internal deps.
+# Config key naming the cross-repo internal deps; required while the
+# rlsbl:dep-floors option is on, refused while it is off.
 CONFIG_KEY = "internal_dep_floors"
 
 _VERSION_RE = re.compile(r"(\d+)\.(\d+)(?:\.(\d+))?")
@@ -70,9 +73,7 @@ _NPM_NON_REGISTRY = (
 class DepFloorVerdict:
     """Result of evaluating internal dependency floors for one project."""
 
-    def __init__(self, *, adopted, skip_reason=None, problems=None, notes=None):
-        self.adopted = adopted
-        self.skip_reason = skip_reason
+    def __init__(self, *, problems=None, notes=None):
         self.problems = list(problems or [])
         self.notes = list(notes or [])
 
@@ -511,17 +512,19 @@ def _evaluate_go(root, names):
 def evaluate_dep_floors(config, project_root, workspace_names=None):
     """Evaluate internal dependency floors for one project.
 
-    Returns a :class:`DepFloorVerdict`. Projects that have not adopted the
-    ``internal_dep_floors`` config key come back with ``adopted=False`` and
-    a skip reason.
+    Returns a :class:`DepFloorVerdict`. It is asked only while the
+    ``rlsbl:dep-floors`` option is on, so a config without the
+    ``internal_dep_floors`` key it requires is a problem, never a skip.
     """
     config = config or {}
     if CONFIG_KEY not in config:
         return DepFloorVerdict(
-            adopted=False,
-            skip_reason=(
-                f"internal dep floors not adopted (no {CONFIG_KEY} config key)"
-            ),
+            problems=[
+                f"rlsbl:dep-floors is on, but .rlsbl/config.json declares no "
+                f"{CONFIG_KEY}. Declare {CONFIG_KEY} (a list of the "
+                f"ecosystem-internal package names whose floors are policed), "
+                f"or switch the option off by deleting its entry."
+            ],
         )
 
     listed = config.get(CONFIG_KEY)
@@ -529,7 +532,6 @@ def evaluate_dep_floors(config, project_root, workspace_names=None):
         not isinstance(n, str) or not n.strip() for n in listed
     ):
         return DepFloorVerdict(
-            adopted=True,
             problems=[
                 f"{CONFIG_KEY} must be a list of package names, got "
                 f"{type(listed).__name__}"
@@ -539,7 +541,7 @@ def evaluate_dep_floors(config, project_root, workspace_names=None):
     names = {n.strip() for n in listed} | set(workspace_names or ())
     if not names:
         return DepFloorVerdict(
-            adopted=True, notes=["no ecosystem-internal dependencies to enforce"]
+            notes=["no ecosystem-internal dependencies to enforce"]
         )
 
     root = str(project_root)
@@ -549,4 +551,4 @@ def evaluate_dep_floors(config, project_root, workspace_names=None):
         found, ecosystem_notes = evaluate(root, names)
         problems.extend(found)
         notes.extend(ecosystem_notes)
-    return DepFloorVerdict(adopted=True, problems=problems, notes=notes)
+    return DepFloorVerdict(problems=problems, notes=notes)

@@ -1,8 +1,9 @@
 """strictspec certificate deploy-gate check (tag: preflight).
 
 Consumes a configured strictspec diff certificate as a format_version deploy
-gate. Feature-flagged by config presence: skips cleanly when the project has no
-``strictspec_gate`` section (no behavior change for the fleet).
+gate. The check is the option ``rlsbl:strictspec-certificate-gate``, off by
+default: a project adopts it by switching the option on, and the
+``strictspec_gate`` section it then requires names the certificate.
 """
 
 from ..errors import ConfigError
@@ -20,7 +21,17 @@ def register_strictspec_gate_checks(app):
 
         config = ctx.config
         if config.get(CONFIG_KEY) is None:
-            return reporter.skipped("strictspec_gate not configured")
+            # The check runs only while its option is on, so the section the
+            # option requires is missing: the disagreement config-schema
+            # also reports.
+            msg = (
+                f"rlsbl:strictspec-certificate-gate is on, but "
+                f".rlsbl/config.json declares no {CONFIG_KEY}. Declare "
+                f'"{CONFIG_KEY}": {{"certificate": "<path>"}}, or switch the '
+                f"option off by deleting its entry."
+            )
+            reporter.error(msg)
+            return reporter.found(msg)
 
         try:
             verdict = evaluate_certificate_gate(config, str(ctx.project_root))

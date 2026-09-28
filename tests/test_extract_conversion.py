@@ -941,6 +941,17 @@ class TestApplyMultiMember:
         )
         assert config[CONFIG_KEY] == ["pkgA", "pkgB"]
         assert not (ns.root / ".rlsbl").exists()
+        # The key is read only while rlsbl:dep-floors is on, so every member
+        # of a releasable that stays gets its own entry, scoped to it and
+        # naming the command, committed with the extract.
+        from rlsbl.options import option_value
+
+        value = option_value("dep-floors", ns.root / "pkgC")
+        assert value.value == "error"
+        assert value.entry.ideal == "error"
+        assert value.entry.scope == "pkgC"
+        assert "rlsbl monorepo extract" in value.entry.reason
+        assert gitout(ns.root, "status", "--porcelain") == ""
 
     def test_source_workspace_checks_gain_no_failure(self, tmp_path, monkeypatch):
         """The conversion introduces no new workspace-check failure.

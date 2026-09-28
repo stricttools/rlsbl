@@ -110,7 +110,6 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "changelog-user-facing": None,
     "changelog-batch-commits": None,
     "changelog-batch-entries": None,
-    "changelog-format-version": None,
     "changelog-format-version-gate": None,
     # --- workspace tag (workspace-only, target-agnostic) ---
     "router-filters-fresh": "workspace",

@@ -1398,6 +1398,8 @@ def observe(dep) -> Preview:
             f"entry",
             f"internal_dep_floors gains {', '.join(floors)} in "
             f"{', '.join(_relative(dep.workspace_root, p) for p in _floor_config_paths(dep)) or '(no releasable stays behind)'}",
+            "rlsbl:dep-floors is switched on, in an options entry scoped to "
+            "the member, for every member of those releasables that has it off",
             "the tags themselves STAY in the source; the departed-globs record "
             "is what explains them",
         ),
@@ -2420,7 +2422,9 @@ def _declare_dep_floors(dep):
     depending on one must declare a floor at the version it was developed
     against, and the ``dep-floors`` check only polices packages named in
     ``internal_dep_floors``. Declaring them now is what makes the check speak up
-    the first time somebody adds the dependency back through a registry.
+    the first time somebody adds the dependency back through a registry. The
+    check reads the key only while its option is on, so the members the key
+    now covers get the ``rlsbl:dep-floors`` entry too.
     """
     from ...dep_floors import CONFIG_KEY
 
@@ -2445,6 +2449,38 @@ def _declare_dep_floors(dep):
         f"  {CONFIG_KEY}: {', '.join(names)} declared in "
         f"{', '.join(_relative(dep.workspace_root, p) for p in paths)}"
     )
+    _switch_on_dep_floors(dep)
+
+
+#: The reason the options entries this command writes carry.
+DEP_FLOORS_REASON = (
+    "rlsbl monorepo extract declared the departed packages in this member's "
+    "internal_dep_floors, and dep-floors polices those floors"
+)
+
+
+def _switch_on_dep_floors(dep):
+    """Switch ``rlsbl:dep-floors`` on for every member the floors now cover.
+
+    The key is read only while the option is on, and refused while it is off,
+    so each member of a releasable that stays gets an options entry scoped to
+    its own directory -- unless its option is already on.
+    """
+    from ...options import OFF, OptionsError, member_scope, option_value, set_entry
+
+    staying = [rel for rel in dep.releasables if rel.name != dep.releasable.name]
+    for project in [p for rel in staying for p in members_of(rel.name, dep.projects)]:
+        member_dir = os.path.join(dep.workspace_root, project.path)
+        try:
+            if option_value("dep-floors", member_dir).value != OFF:
+                continue
+            result = set_entry(
+                member_dir, "rlsbl:dep-floors", "error", "error",
+                DEP_FLOORS_REASON, scope=member_scope(member_dir),
+            )
+        except OptionsError as e:
+            raise ExtractError(str(e)) from e
+        print(f"  rlsbl:dep-floors: switched on for {project.name} in {result.file}")
 
 
 def _apply_next_steps(dep, item, run):

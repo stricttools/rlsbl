@@ -14,7 +14,13 @@ from pathlib import Path
 
 import pytest
 
-from conftest import capture_all_checks, make_ctx
+from conftest import (
+    capture_all_checks,
+    make_ctx,
+    run_git,
+    run_named_options_command,
+    set_option,
+)
 
 from rlsbl.commands.init_cmd import apply_plans, plan_mappings, process_template
 from rlsbl.context import ProjectContext
@@ -49,6 +55,13 @@ def _section(**overrides):
         if value is None:
             del section[key]
     return {"publish_mode": "ci", CONFIG_KEY: section}
+
+
+@pytest.fixture
+def sandbox_on(tmp_path):
+    """A project directory whose rlsbl:test-sandbox option is on."""
+    set_option(tmp_path, "test-sandbox", "on")
+    return tmp_path
 
 
 # ---------------------------------------------------------------------------
@@ -155,11 +168,11 @@ class TestValidation:
 
 
 class TestTemplateVars:
-    def test_absent_family_yields_no_vars(self):
-        assert template_vars({"publish_mode": "ci"}) == {}
+    def test_absent_family_yields_no_vars(self, tmp_path):
+        assert template_vars({"publish_mode": "ci"}, tmp_path) == {}
 
-    def test_vars_derived_from_config(self):
-        v = template_vars(_section())
+    def test_vars_derived_from_config(self, sandbox_on):
+        v = template_vars(_section(), sandbox_on)
         assert v["sandboxRunnerPath"] == "scripts/test.sh"
         assert v["sandboxRootRelative"] == ".."
         assert v["sandboxCommand"] == "uv sync --offline && uv run --offline pytest"
@@ -168,17 +181,18 @@ class TestTemplateVars:
         assert v["sandboxPrewarm"] == "scripts/test-prewarm.sh"
         assert v["sandboxExtraEnv"] == "  --setenv LEGACY_SANDBOX 1"
 
-    def test_root_relative_depth(self):
-        assert template_vars(_section(runner_path="test.sh"))[
+    def test_root_relative_depth(self, sandbox_on):
+        assert template_vars(_section(runner_path="test.sh"), sandbox_on)[
             "sandboxRootRelative"
         ] == "."
-        assert template_vars(_section(runner_path="a/b/test.sh"))[
+        assert template_vars(_section(runner_path="a/b/test.sh"), sandbox_on)[
             "sandboxRootRelative"
         ] == "../.."
 
-    def test_optional_keys_render_empty(self):
+    def test_optional_keys_render_empty(self, sandbox_on):
         v = template_vars(
-            {CONFIG_KEY: {"runner_path": "test.sh", "command": "go test ./..."}}
+            {CONFIG_KEY: {"runner_path": "test.sh", "command": "go test ./..."}},
+            sandbox_on,
         )
         assert v["sandboxCaches"] == ""
         assert v["sandboxPrewarm"] == ""
@@ -187,16 +201,16 @@ class TestTemplateVars:
 
 
 class TestRunnerMapping:
-    def test_absent_family_emits_nothing(self):
+    def test_absent_family_emits_nothing(self, tmp_path):
         ctx = ProjectContext(
-            project_root=Path("."), workspace_root=None, config={"publish_mode": "ci"}
+            project_root=tmp_path, workspace_root=None, config={"publish_mode": "ci"}
         )
         targets = {m["target"] for m in BaseTarget().shared_template_mappings(ctx)}
         assert "scripts/test.sh" not in targets
 
-    def test_declared_family_emits_executable_runner(self):
+    def test_declared_family_emits_executable_runner(self, sandbox_on):
         ctx = ProjectContext(
-            project_root=Path("."), workspace_root=None, config=_section()
+            project_root=sandbox_on, workspace_root=None, config=_section()
         )
         mappings = BaseTarget().shared_template_mappings(ctx)
         runner = [m for m in mappings if m["target"] == "scripts/test.sh"]
@@ -208,20 +222,33 @@ class TestRunnerMapping:
             }
         ]
 
-    def test_mapping_is_none_without_family(self):
-        assert runner_mapping({"publish_mode": "ci"}) is None
+    def test_mapping_is_none_without_family(self, tmp_path):
+        assert runner_mapping({"publish_mode": "ci"}, tmp_path) is None
+
+    def test_a_section_while_the_option_is_off_is_refused(self, tmp_path):
+        """Scaffolding never renders a runner for dead config."""
+        with pytest.raises(ConfigError, match="rlsbl:test-sandbox is off"):
+            runner_mapping(_section(), tmp_path)
+
+    def test_the_option_on_without_a_section_is_refused(self, sandbox_on):
+        with pytest.raises(ConfigError, match="declares no test_sandbox"):
+            runner_mapping({"publish_mode": "ci"}, sandbox_on)
 
 
 class TestScaffoldEmission:
     """Scaffolding a repo whose config declares the family emits the runner."""
 
     def _scaffold(self, tmp_path, config, monkeypatch):
+        from rlsbl.options import OFF, option_value
+
+        if option_value("test-sandbox", tmp_path).value == OFF:
+            set_option(tmp_path, "test-sandbox", "on")
         monkeypatch.chdir(tmp_path)
         mappings = [m for m in BaseTarget().shared_template_mappings(
             ProjectContext(project_root=tmp_path, workspace_root=None, config=config)
         ) if m["template"] == TEMPLATE_NAME]
         plans = plan_mappings(
-            str(TEMPLATE_PATH.parent), mappings, template_vars(config)
+            str(TEMPLATE_PATH.parent), mappings, template_vars(config, tmp_path)
         )
         return apply_plans(plans)
 
@@ -295,9 +322,13 @@ class TestDevOverlayBlock:
     the locked registry wheel -- two runs verifying different code.
     """
 
+    @pytest.fixture(autouse=True)
+    def _sandbox_on(self, sandbox_on):
+        self.project_dir = sandbox_on
+
     def _render(self, config):
         rendered, unreplaced = process_template(
-            TEMPLATE_PATH.read_text(), template_vars(config)
+            TEMPLATE_PATH.read_text(), template_vars(config, self.project_dir)
         )
         assert unreplaced == []
         return rendered
@@ -405,7 +436,7 @@ def test_rlsbl_own_runner_is_a_template_instance():
     """
     config = json.loads((REPO_ROOT / ".rlsbl" / "config.json").read_text())
     rendered, unreplaced = process_template(
-        TEMPLATE_PATH.read_text(), template_vars(config)
+        TEMPLATE_PATH.read_text(), template_vars(config, REPO_ROOT)
     )
     assert unreplaced == []
     assert (REPO_ROOT / "scripts" / "test.sh").read_text() == rendered
@@ -527,11 +558,17 @@ class TestOrphanedScratchSweep:
 
 def _repo(tmp_path, *, config=None, runner=True, executable=True,
           workflow=None, pyproject=None):
-    """Build a fixture repo directory for the floor check."""
+    """Build a fixture repo directory for the floor check.
+
+    A config declaring the family belongs to a project whose
+    rlsbl:test-sandbox option is on, as the option requires.
+    """
     (tmp_path / ".rlsbl").mkdir(exist_ok=True)
     config = config if config is not None else {"publish_mode": "ci"}
     (tmp_path / ".rlsbl" / "config.json").write_text(json.dumps(config))
     section = config.get(CONFIG_KEY)
+    if section is not None:
+        set_option(tmp_path, "test-sandbox", "on")
     if section and runner:
         runner_file = tmp_path / section["runner_path"]
         runner_file.parent.mkdir(parents=True, exist_ok=True)
@@ -597,6 +634,7 @@ class TestFloorCheck:
         config = {"publish_mode": "ci", CONFIG_KEY: {"command": "pytest"}}
         (tmp_path / ".rlsbl").mkdir()
         (tmp_path / ".rlsbl" / "config.json").write_text(json.dumps(config))
+        set_option(tmp_path, "test-sandbox", "on")
         result = _run_floor_check(tmp_path, config)
         assert result.status == "fail"
         assert any("missing required key" in m for m in _texts(result))
@@ -630,6 +668,30 @@ class TestFloorCheck:
         result = _run_floor_check(tmp_path, config)
         assert result.status == "fail"
         assert any("no sandbox runner is distributed" in m for m in _texts(result))
+
+    def test_the_named_fix_clears_the_refusal(self, tmp_path, monkeypatch):
+        """Switch the option on with the command the finding names, declare
+        the section, and scaffold the runner: the finding is gone."""
+        pyproject = (
+            "[project]\nname = 'x'\nversion = '0'\n"
+            "[dependency-groups]\ndev = ['testisolation>=0.1']\n"
+            "[tool.pytest.ini_options]\n"
+            'testisolation_sandbox_required = "true"\n'
+        )
+        config = _repo(tmp_path, pyproject=pyproject)
+        run_git(tmp_path, "init", "-q")
+        message = next(
+            m for m in _texts(_run_floor_check(tmp_path, config))
+            if "no sandbox runner is distributed" in m
+        )
+        assert "rlsbl:test-sandbox is off" in message
+        assert run_named_options_command(message, tmp_path, monkeypatch).exit_code == 0
+
+        config = _repo(tmp_path, config=_section(ci_workflows=None), runner=False,
+                       pyproject=pyproject)
+        TestScaffoldEmission()._scaffold(tmp_path, config, monkeypatch)
+        result = _run_floor_check(tmp_path, config)
+        assert result.status == "pass", _texts(result)
 
     def test_plugin_adopted_without_runner_and_not_required(self, tmp_path):
         config = _repo(
