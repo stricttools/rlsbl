@@ -1299,7 +1299,7 @@ class TestHookGeneratedFiles:
         ):
             run_cmd(
                 _rc(),
-                {"quiet": True, "allow-dirty": True},
+                {"quiet": True},
             
                 ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}),
 )

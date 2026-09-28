@@ -2,8 +2,8 @@
 
 The check guards against concurrent modifications during the version bump.
 Files that were already dirty when the mutating phase began (from
-generate_changelog, hooks, lint, --allow-dirty) must NOT trigger the abort.
-Only genuinely new modifications (appearing after the baseline snapshot)
+generate_changelog, hooks, lint) must NOT trigger the abort. Only new
+modifications (appearing after the baseline snapshot)
 should cause the release to fail.
 
 Uses real git repos (not mocked git) to exercise the actual dirty-tree
@@ -249,8 +249,10 @@ class TestReleaseUnexpectedFiles:
         ``.rlsbl/releases/`` while a release is mid-bump, and the release
         aborted over rlsbl's own scratch state.
 
-        ``validate_clean_tree`` already exempts both files structurally; this
-        guard is the second gate on the same tree and must agree with it.
+        The release's reading of the working tree
+        (``rlsbl.release_checkout.live_changes``) exempts both files
+        structurally; this guard reads the tree the release runs in and must
+        agree with it.
         """
         _setup_releasable_npm_project(tmp_project)
         # A tracked .rlsbl/releases/ makes git status list its untracked files
