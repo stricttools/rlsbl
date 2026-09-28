@@ -1183,7 +1183,7 @@
       "commands": {
         "run": {
           "name": "run",
-          "help": "Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or infra) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, --approve-consequential to skip the confirmation prompt in non-interactive contexts, and --allow-dirty to skip the clean working tree check.",
+          "help": "Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or infra) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. The release runs in the release checkout, a detached checkout of the release branch's committed tip under the repository's git directory: producers, tests, hooks, the version bump and the release commit all happen there, the branch advances only from the commit the release started at, and only the files the release's own commits change are written into the working tree. An uncommitted change to one of those files refuses the release, naming it; every other uncommitted change is listed and left alone. Supports dry-run preview, which reports those changes instead of refusing, and --approve-consequential to skip the confirmation prompt in non-interactive contexts.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
@@ -1222,15 +1222,6 @@
             {
               "name": "watch",
               "help": "After release, automatically watch CI runs to completion (--no-watch to skip)",
-              "value_schema": {
-                "type": "boolean"
-              },
-              "presence": "required",
-              "negatable": true
-            },
-            {
-              "name": "allow-dirty",
-              "help": "Skip the clean working tree check and allow releasing with uncommitted changes",
               "value_schema": {
                 "type": "boolean"
               },
@@ -2658,7 +2649,7 @@
           "commands": {
             "run": {
               "name": "run",
-              "help": "Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --approve-consequential and --allow-dirty flags.",
+              "help": "Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. The whole batch runs in the release checkout, a detached checkout of the release branch's committed tip, as rlsbl release run does: an uncommitted change to a path the batch writes (the workspace's release state, a member's version files, the workspace changelog) refuses it, naming the path, and every other uncommitted change is listed and left alone. Supports --dry-run, which reports those changes instead of refusing, and --approve-consequential.",
               "effect": "mutating",
               "consequential": true,
               "flags": [
@@ -2697,15 +2688,6 @@
                 {
                   "name": "watch",
                   "help": "After batch release, automatically watch CI runs to completion (--no-watch to skip)",
-                  "value_schema": {
-                    "type": "boolean"
-                  },
-                  "presence": "required",
-                  "negatable": true
-                },
-                {
-                  "name": "allow-dirty",
-                  "help": "Skip the clean working tree check and allow releasing with uncommitted changes",
                   "value_schema": {
                     "type": "boolean"
                   },

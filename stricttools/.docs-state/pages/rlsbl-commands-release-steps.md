@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.commands.release.steps"
-description = "Every release step in one record: what performs it, the inverse that undoes it, the repository-only probe for its artifact, and the paths it creates."
+description = "Every release step in one record: what performs it, the inverse that undoes it, and the repository-only probe that answers whether its artifact exists."
 generated = true
 nav_group = "API Reference"
 nav_order = 62
