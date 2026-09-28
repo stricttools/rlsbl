@@ -1140,6 +1140,32 @@ def validate_changelog_state(project_dir, target, monorepo_name,
     )
 
 
+def validate_user_facing_entries(bump_type, changes_dir):
+    """The bump type's rule on user-facing changelog entries.
+
+    An ``infra`` release must have none; every other release needs at least
+    one. This is release validation, not a check result: the
+    ``changelog-user-facing`` check only warns, and the release's check step
+    blocks on error-level failures alone.
+    """
+    from ...changelog.files import read_unreleased
+
+    has_user_facing = any(e.user_facing for e in read_unreleased(changes_dir))
+    if bump_type == "infra":
+        if has_user_facing:
+            raise ReleaseValidationError(
+                "infra releases must not have user-facing changelog entries "
+                "— use patch, minor, or major instead"
+            )
+    elif not has_user_facing:
+        kind = f"a {bump_type} release" if bump_type else "a release"
+        raise ReleaseValidationError(
+            f"{kind} needs at least one user-facing changelog entry; a "
+            f"release with only infrastructure changes sets bump = \"infra\" "
+            f"in its release file, unreleased.toml"
+        )
+
+
 def print_dry_run_summary(log, registry, monorepo_name, monorepo_project_path,
                           bump_type, current_version, new_version, tag,
                           commit_msg, branch, target_paths, project_dir,

@@ -1105,6 +1105,7 @@ class TestReleaseEnvFile:
              patch(f"{MOD_RELEASE}.resolve_target_paths", return_value={"npm": "."}), \
              patch(f"{MOD_RELEASE}.compute_release_version", return_value=("0.1.0", "0.2.0", "minor", "v0.2.0")), \
              patch(f"{MOD_RELEASE}.validate_changelog_state", return_value=None), \
+             patch(f"{MOD_RELEASE}.validate_user_facing_entries"), \
              patch(f"{MOD_RELEASE}.validate_blog_body", return_value=(None, None)), \
              patch(f"{MOD_RELEASE}.generate_changelog", return_value="## 0.2.0\n"), \
              patch(f"{MOD_RELEASE}.extract_changelog_entry_from_text", return_value="entry"), \

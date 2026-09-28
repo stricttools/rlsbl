@@ -288,9 +288,9 @@ class TestStrictcliSchemaOrdering:
         """Schema dump must run before test/lint preflight checks."""
         source = inspect.getsource(_run_cmd_inner)
         schema_pos = source.index("_run_strictcli_schema_dump(")
-        # Find the test/lint preflight (tag_expr="preflight"), not the
+        # Find the test/lint preflight (tag_expr=hook_selection("pre-release"), the preflight tag), not the
         # changelog preflight (tag_expr="preflight-changelog")
-        preflight_pos = source.index('tag_expr="preflight"')
+        preflight_pos = source.index('tag_expr=hook_selection("pre-release")')
 
         assert schema_pos < preflight_pos, (
             "_run_strictcli_schema_dump must appear before test/lint preflight"

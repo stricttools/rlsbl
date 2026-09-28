@@ -56,6 +56,8 @@ For pre-stable projects (0.x.x), breaking changes are a minor bump. Never bump t
 
 `infra` exempts the release from the at-least-one-user-facing-entry gate and **forbids** user-facing entries. It is not a hotfix mechanism — a user-facing hotfix is a `patch`.
 
+Both rules are release validation, not check results: every release except `infra` refuses to run without a user-facing entry, naming `bump = "infra"` for a release with only infrastructure changes, and an `infra` release refuses to run with one. The release's check steps block on error-level failures only, for every bump type: a check at `warn`, registered that way or softened to `warn` by an options entry, is printed as a `WARN` line and never blocks, and every failure that does block is named. The main check step runs the selection `checks.toml` declares for the `pre-release` hook (the `preflight` tag).
+
 ### Description and context
 
 - **description** (mandatory): A short summary of the release. Appears as a paragraph under the version heading in CHANGELOG.md and as the GitHub Release title suffix.

@@ -464,6 +464,15 @@ class TestTwoHookModel:
     ):
         """A failing pre-checks.sh aborts the release before running preflight checks."""
         _setup_npm_project(tmp_project, test_script="jest")
+        # A user-facing entry, so the release reaches the hook: without one it
+        # stops earlier, on the bump type's user-facing rule. The checks that
+        # would resolve its hash are stubbed.
+        (tmp_project / ".rlsbl" / "changes" / "unreleased.jsonl").write_text(
+            json.dumps({
+                "format_version": 1, "commits": ["abc1234"],
+                "user_facing": True, "description": "d", "type": "fix",
+            }) + "\n"
+        )
         hooks_dir = tmp_project / ".rlsbl" / "hooks"
         hooks_dir.mkdir(parents=True)
         (hooks_dir / "pre-checks.sh").write_text("#!/bin/bash\nexit 1\n")
@@ -510,6 +519,7 @@ class TestFullFlowOrder:
     @patch("rlsbl.commands.release.validate_branch_and_remote", return_value="main")
     @patch("rlsbl.commands.release.resolve_monorepo_context", return_value=(None, None, False, False, None))
     @patch("rlsbl.commands.release.validate_changelog_state", return_value=None)
+    @patch("rlsbl.commands.release.validate_user_facing_entries", new=lambda *a: None)
     @patch("rlsbl.commands.release.validate_blog_body", return_value=(None, None))
     @patch("rlsbl.commands.release._abort_on_scaffold_conflicts")
     @patch("rlsbl.commands.release.resolve_target_paths", return_value={})
@@ -624,6 +634,7 @@ class TestFullFlowOrder:
     @patch("rlsbl.commands.release.validate_branch_and_remote", return_value="main")
     @patch("rlsbl.commands.release.resolve_monorepo_context", return_value=(None, None, False, False, None))
     @patch("rlsbl.commands.release.validate_changelog_state", return_value=None)
+    @patch("rlsbl.commands.release.validate_user_facing_entries", new=lambda *a: None)
     @patch("rlsbl.commands.release.validate_blog_body", return_value=(None, None))
     @patch("rlsbl.commands.release._abort_on_scaffold_conflicts")
     @patch("rlsbl.commands.release.resolve_target_paths", return_value={})
