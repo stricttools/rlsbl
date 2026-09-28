@@ -381,6 +381,97 @@ def create_release(pub: ReleasePublication, *, gh, moves_latest, config=None,
     return args
 
 
+def latest_release_tag(gh, *, config=None, repo=None):
+    """The tag of the repository's "Latest" Release, or None when it has none.
+
+    Raises when GitHub could not be asked: "no Latest" is only ever gh's own
+    "release not found" answer.
+    """
+    try:
+        out = gh(["release", "view", "--json", "tagName", "--jq", ".tagName",
+                  *_repo_args(repo)], config=config)
+    except Exception as exc:
+        if "release not found" in f"{exc} {getattr(exc, 'stderr', '') or ''}":
+            return None
+        raise
+    if not isinstance(out, str) or not out.strip():
+        raise ValueError(f"gh answered no tag for the Latest release ({out!r})")
+    return out.strip()
+
+
+def repair_takes_latest(tag, *, prerelease, is_newer, gh, config=None,
+                        repo=None, log=print):
+    """Does a repair creating *tag*'s Release give it the "Latest" badge?
+
+    The decided rule is GitHub's default, "so the most recent release shows as
+    Latest": a real release keeps the default, and a repair passes
+    ``--latest=false`` so it never moves the badge onto an OLD release. But a
+    repair is also how the newest release gets its Release when the release's
+    own Release step failed (the release flow names ``rlsbl release
+    reconcile`` and ``rlsbl monorepo mirror`` as the healers). Keeping the
+    badge off it there leaves the most recent release without the badge, the
+    opposite of the rule's purpose. So a repair takes the badge exactly when
+    the repository has no Latest release, or *is_newer(latest_tag)* says
+    *tag* is more recent than it.
+
+    Every unanswered question keeps the badge where it is (False): a
+    pre-release (which GitHub never marks Latest), a Latest that could not be
+    read, and a comparison that could not be made.
+    """
+    if prerelease:
+        return False
+    try:
+        latest = latest_release_tag(gh, config=config, repo=repo)
+    except Exception as exc:
+        log(f"Could not read the Latest release ({exc}); {tag} is created "
+            f"without taking the Latest badge.")
+        return False
+    if latest is None:
+        return True
+    try:
+        newer = bool(is_newer(latest))
+    except Exception:
+        newer = False
+    if not newer:
+        return False
+    log(f"{tag} is newer than the Latest release {latest}, so it takes the "
+        f"Latest badge.")
+    return True
+
+
+def tag_newer_in_history(tag, than, *, git):
+    """Is *tag*'s commit a strict descendant of *than*'s? False when unknown.
+
+    *git* is a ``run``-style callable (``git("git", [...])``) that raises on a
+    nonzero exit. Recency in one repository's history: in a monorepo the
+    Latest can belong to another package, whose version number says nothing
+    about which release came last.
+    """
+    try:
+        mine = git("git", ["rev-parse", f"refs/tags/{tag}^{{commit}}"]).strip()
+        theirs = git("git", ["rev-parse", f"refs/tags/{than}^{{commit}}"]).strip()
+        if not mine or not theirs or mine == theirs:
+            return False
+        git("git", ["merge-base", "--is-ancestor", theirs, mine])
+    except Exception:
+        return False
+    return True
+
+
+def version_newer_than_tag(version, than):
+    """Is *version* higher than the version *than* names? False when it names none.
+
+    For one package's own tags (a mirror carries exactly one package).
+    """
+    from .release_file import archive_sort_key
+    from .tag_glob import TagMode, parse_version_tag
+
+    parsed = parse_version_tag(than, mode=TagMode.PRERELEASE_INCLUSIVE)
+    if not parsed:
+        return False
+    return archive_sort_key(version) > archive_sort_key(parsed.version)
+
+
 def update_release(pub: ReleasePublication, *, gh, config=None, repo=None,
                    directory="."):
     """Rewrite an EXISTING Release to exactly the document *pub* describes.

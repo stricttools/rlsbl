@@ -1263,6 +1263,25 @@ def _apply_tag(plan, remote, root, project_path, *, notes_dir):
             file=sys.stderr,
         )
         return
+    from ...release_publication import (
+        is_prerelease,
+        repair_takes_latest,
+        version_newer_than_tag,
+    )
+
+    # Unscoped: --repo names the MIRROR, so this must not inherit the
+    # monorepo's own GH_REPO.
+    def gh(args, config=None):
+        return run_gh_unscoped(args)
+
+    # A repair never moves the mirror's badge onto an older version, and gives
+    # it to the newest one (a release whose own mirror Release failed). The
+    # mirror carries one package, so its versions order its releases.
+    moves_latest = repair_takes_latest(
+        plan.tag, prerelease=is_prerelease(plan.version),
+        is_newer=lambda latest: version_newer_than_tag(plan.version, latest),
+        gh=gh, repo=remote,
+    )
     publish_version(
         remote=remote,
         root=root,
@@ -1271,11 +1290,8 @@ def _apply_tag(plan, remote, root, project_path, *, notes_dir):
         tag=plan.tag,
         release_commit_sha=plan.release_commit_sha,
         notes=plan.notes,
-        # Unscoped: --repo names the MIRROR, so this must not inherit the
-        # monorepo's own GH_REPO.
-        gh=lambda args, config=None: run_gh_unscoped(args),
-        # A repair: materializing a version never moves the mirror's badge.
-        moves_latest=False,
+        gh=gh,
+        moves_latest=moves_latest,
         directory=notes_dir,
         log=print,
     )
