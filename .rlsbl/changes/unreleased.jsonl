@@ -52,3 +52,4 @@
 {"format_version":1,"id":"18d99c53e45962c257cacc5e1956485b9abd8999f855525b","commits":["f24e194efe3dfc3c559d08ad6f64de077d31ee52"],"user_facing":false}
 {"format_version":1,"id":"18d99c5cc9f27af2721192dcbccc4b05a77dee1294c33ede","commits":["965ba459b6f4bbdf9d94a7e94ccb790ae166cdb3"],"user_facing":true,"description":"**An unpushed batch finalize commit names the release that publishes it.** When the push of a batch's finalize commit fails, the message says the next `rlsbl monorepo release run` publishes it with its candidate push, instead of telling the reader to push the branch by hand.","type":"fix"}
 {"format_version":1,"id":"18d99c6474ecd4045c61a72cc6ce4672b9ea7e9afcececb9","commits":["3078ef539544aaab15fd2fdc955b3c20f3bf795e"],"user_facing":false}
+{"format_version":1,"id":"18d99c8ad7c6cd2b0cbe854523c1442da016a0ab293a9dde","commits":["92296f6f130e18f491f1cbdf59fb5de15a041edd"],"user_facing":false}
