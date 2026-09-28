@@ -3,7 +3,13 @@
 import sys
 
 from ..config import read_deploy_config
-from ..deploy import deploy_target
+from ..deploy import (
+    DeployBranchError,
+    branch_carrying_head,
+    deploy_target,
+    head_is_detached,
+)
+from ..release_checkout import current_branch_for
 from ..utils import get_current_branch
 
 
@@ -51,21 +57,31 @@ def run_cmd(registry, args, flags, *, ctx):
         print(f"Error: multiple deploy targets configured. Specify one: {available}", file=sys.stderr)
         sys.exit(1)
 
-    # 3. Get current branch
-    branch = get_current_branch(cwd=str(ctx.project_root))
-
-    # 4. Branch restriction (always enforced, and enforced BEFORE the preview)
-    #    A preview answers the same question the live run answers. With the
-    #    dry-run gate above this check, `rlsbl deploy --dry-run` on a branch the
-    #    target forbids printed a full plan and exited 0 -- a confident
-    #    description of a deploy that could never run.
+    # 3-4. Branch restriction (always enforced, and enforced BEFORE the
+    #    preview). A preview answers the same question the live run answers.
+    #    With the dry-run gate above this check, `rlsbl deploy --dry-run` on a
+    #    branch the target forbids printed a full plan and exited 0 -- a
+    #    confident description of a deploy that could never run.
+    #
+    #    A detached HEAD -- the scaffolded deploy workflow checks out the
+    #    published Release's tag -- has no current branch; its commit must be
+    #    reachable from an allowed branch as origin has it instead.
     only_on = target_config["only_on"]
-    if branch not in only_on:
-        print(
-            f'Error: current branch "{branch}" is not in allowed branches {only_on}.',
-            file=sys.stderr,
-        )
-        sys.exit(1)
+    project_dir = str(ctx.project_root)
+    if current_branch_for(project_dir) is None and head_is_detached(project_dir):
+        try:
+            branch = branch_carrying_head(project_dir, only_on)
+        except DeployBranchError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        branch = get_current_branch(cwd=project_dir)
+        if branch not in only_on:
+            print(
+                f'Error: current branch "{branch}" is not in allowed branches {only_on}.',
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     # 5. Dry run
     if flags.get("dry-run"):

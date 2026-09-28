@@ -88,17 +88,29 @@ If no `rollback_steps` are configured and health fails, the deploy simply report
 
 ## Branch restrictions
 
-The `only_on` field restricts which git branches can deploy to each target, preventing accidental deployments from feature branches or other non-release branches. The field is required and must contain at least one branch name. When the current branch is not in the list:
+The `only_on` field restricts which git branches can deploy to each target, preventing accidental deployments from feature branches or other non-release branches. The field is required and must contain at least one branch name. The restriction is always enforced, before a `--dry-run` preview too, and nothing overrides it.
 
-- Without `--force`: the command exits with an error showing allowed branches
-- With `--force`: the restriction is bypassed and deployment proceeds
+On a branch, the current branch must be in the list; otherwise the command exits with an error showing the allowed branches.
+
+On a detached HEAD (a tag or commit checkout, such as the scaffolded deploy workflow's checkout of a published Release's tag), there is no current branch. The commit must instead be reachable from one of the `only_on` branches as origin has them, `refs/remotes/origin/<branch>`, and the deploy runs as that branch. A local branch is not asked, because it may carry commits origin never received. The command refuses:
+
+- when no allowed branch reaches the commit, naming the fix: deploy a release tagged on one of them, or add the branch that carries the commit to `only_on`;
+- when the checkout cannot answer, because it lacks `origin/<branch>` or its history is shallow, naming the fix: `fetch-depth: 0` on the workflow's checkout step, or `git fetch origin <branch>` (with `--unshallow` for a shallow clone) locally.
+
+### Why reachability, and why from `only_on`
+
+This rule was decided by the run that built it, not by the project owner, and is freely reversible:
+
+- The workflow checks out the Release's tag, so HEAD is always detached there, and a check that requires a checked-out branch refuses every run of it.
+- A Release's tag is created by `rlsbl release run`, which releases only from a release branch, so the tagged commit is on that branch's history on origin. Reachability asks that question directly, with no branch checked out.
+- `only_on` is the target's own statement of which branches may deploy, and the check on a branch already reads it. Holding a detached HEAD to the same list keeps one rule per target. Accepting the default branch or `release_branches` instead would widen a target restricted to another branch.
+- The scaffolded workflow's checkout sets `fetch-depth: 0`, which fetches every branch into `refs/remotes/origin/` with its full history; the default depth of 1 fetches only the tag, and the check then refuses rather than guessing.
 
 ## Flags
 
 | Flag | Description |
 | --- | --- |
 | `--dry-run` | Print what would be deployed (target info, steps, health config) without executing |
-| `--force` | Override branch restrictions |
 | (positional) | Target name. Auto-selects if only one target is configured. Required when multiple targets exist. |
 
 ## SSH execution details

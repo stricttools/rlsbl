@@ -29,9 +29,14 @@ jobs:
     needs: gate
     runs-on: ubuntu-latest
     steps:
+      # The tag's checkout is a detached HEAD, so `rlsbl deploy` holds the
+      # target's only_on against origin's branches: the tagged commit must be
+      # reachable from one of them. fetch-depth: 0 brings those branches and
+      # the history that answers it.
       - uses: {{action "actions/checkout"}}
         with:
           ref: ${{ inputs.tag || github.event.release.tag_name }}
+          fetch-depth: 0
       - uses: {{action "actions/setup-python"}}
         with:
           python-version: '3.11'
