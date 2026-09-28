@@ -289,24 +289,24 @@ class TestCmdClaimName:
 
     def test_exits_when_no_target(self):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_claim_name(cli_ctx(), target="", force_publish=False)
+            rlsbl.cmd_claim_name(cli_ctx(), target="")
         assert exc.value.code == 1
 
     def test_exits_on_invalid_target(self):
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_claim_name(cli_ctx(), target="bogus", force_publish=False)
+            rlsbl.cmd_claim_name(cli_ctx(), target="bogus")
         assert exc.value.code == 1
 
     def test_exits_when_multiple_names(self):
         rlsbl._variadic_args = ["name1", "name2"]
         with pytest.raises(SystemExit) as exc:
-            rlsbl.cmd_claim_name(cli_ctx(), target="npm", force_publish=False)
+            rlsbl.cmd_claim_name(cli_ctx(), target="npm")
         assert exc.value.code == 1
 
     @patch("rlsbl.commands.claim_name.run_cmd")
     def test_delegates(self, mock_run):
         rlsbl._variadic_args = ["my-package"]
-        rlsbl.cmd_claim_name(cli_ctx(), target="npm", force_publish=False)
+        rlsbl.cmd_claim_name(cli_ctx(), target="npm")
         mock_run.assert_called_once()
         assert mock_run.call_args[0][0] == "npm"
 

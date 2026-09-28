@@ -353,7 +353,20 @@ class TestStandaloneWiring:
         assert result.exit_code == 0, result.stderr
         assert m.call_args[0][0] == "npm"
         assert m.call_args[0][1] == ["mypkg"]
-        assert m.call_args[0][2] == {"dry-run": False, "force-publish": False}
+        assert m.call_args[0][2] == {"dry-run": False}
+
+    def test_claim_name_has_no_force_publish_flag(self):
+        """claim-name always respects its availability check: the flag that
+        published a name the check reported as taken is gone, and strictcli
+        refuses it as unknown before the handler runs."""
+        result, m = _dispatch(
+            ["claim-name", "--target", "npm", "--force-publish"],
+            "rlsbl.commands.claim_name.run_cmd",
+            variadic=["mypkg"],
+        )
+        assert result.exit_code != 0
+        assert "unknown flag '--force-publish'" in result.stderr
+        m.assert_not_called()
 
     def test_commit(self):
         result, m = _dispatch(

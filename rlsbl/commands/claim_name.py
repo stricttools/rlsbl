@@ -16,11 +16,10 @@ def run_cmd(target, args, flags):
     when set, otherwise npm's own ~/.npmrc login; PyPI with UV_PUBLISH_TOKEN
     or PYPI_TOKEN when set, otherwise the token in ~/.pypirc. With neither,
     the claim is refused naming both places.
-    When --force-publish is passed, proceeds even if the name appears taken or
-    the availability check returns an ambiguous status. That is a decision
-    about the availability CHECK, deliberately not the framework's
-    --approve-consequential, which only skips the confirmation prompt: skipping
-    a prompt must never also override a "this name is taken" refusal.
+    The availability check is always respected: only an "available" name is
+    published. A name reported taken exits 1; an "error" status, or any status
+    the check does not define, exits 2. There is no override, and the
+    framework's --approve-consequential only skips the confirmation prompt.
     """
 
     if len(args) != 1:
@@ -44,25 +43,22 @@ def run_cmd(target, args, flags):
     result = _check_single_name(name, target)
     status = result["status"]
 
-    if status == "available":
-        pass
-    elif status == "taken":
+    if status == "taken":
         detail = result.get("note") or result.get("reason", "unknown reason")
         print(f"Name '{name}' appears taken on {target}: {detail}.", file=sys.stderr)
-        if flags["force-publish"]:
-            print("--force-publish passed, attempting publish anyway...")
-        else:
-            sys.exit(1)
-    elif status == "error":
+        sys.exit(1)
+    if status == "error":
         error = result.get("error", "unknown error")
         print(f"Error checking '{name}' on {target}: {error}", file=sys.stderr)
         sys.exit(2)
-    else:
-        print(f"Ambiguous status '{status}' for '{name}' on {target}.", file=sys.stderr)
-        if flags["force-publish"]:
-            print("--force-publish passed, attempting publish anyway...")
-        else:
-            sys.exit(1)
+    if status != "available":
+        print(
+            f"Error: the availability check for '{name}' on {target} returned "
+            f"the unrecognized status '{status}'. claim-name publishes only a "
+            f"name the check reports as available.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
 
     # Where a claim's credentials come from is the target's own knowledge
     # (an environment token, or the registry's own login file), declared
