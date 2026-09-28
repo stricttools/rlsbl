@@ -897,13 +897,12 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # module proxy need a public repository. Probes visibility only when one
     # of them is in use (pre-mutation). gh_config drives GH_REPO resolution.
     from .validate import _abort_on_private_repo_publishing
+    # The workflows judged are the committed ones the release tags: an
+    # uncommitted `attestations: false` never reaches the release checkout.
     _guard_git_root = _resolve_git_root(project_dir)
     _abort_on_private_repo_publishing(
         _provenance_scan_configs, gh_config=config,
-        workflows_dir=(
-            os.path.join(_guard_git_root, ".github", "workflows")
-            if _guard_git_root else None
-        ),
+        git_root=_guard_git_root, commit="HEAD",
     )
 
     # Resolve target paths (with releasable-level inheritance in explicit

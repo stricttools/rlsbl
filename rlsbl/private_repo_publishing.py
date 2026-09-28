@@ -85,14 +85,43 @@ def workflow_uses(workflows_dir) -> list[PublicOnlyUse]:
     """The PyPI publish steps under *workflows_dir* that would attest."""
     if not workflows_dir or not os.path.isdir(workflows_dir):
         return []
-    uses = []
-    yaml = YAML(typ="safe")
+    files = []
     for filename in sorted(os.listdir(workflows_dir)):
         if not filename.endswith((".yml", ".yaml")):
             continue
-        path = os.path.join(workflows_dir, filename)
-        with open(path, encoding="utf-8") as f:
-            workflow = yaml.load(f) or {}
+        with open(os.path.join(workflows_dir, filename), encoding="utf-8") as f:
+            files.append((filename, f.read()))
+    return _uses_in(files)
+
+
+def committed_workflow_uses(git_root, commit) -> list[PublicOnlyUse]:
+    """The PyPI publish steps in *commit*'s ``.github/workflows`` that would attest.
+
+    What a release publishes is the committed tree it tags, never the working
+    tree: a workflow regenerated with ``attestations: false`` but not
+    committed still attests in the release.
+    """
+    from .utils import run
+
+    listing = run(
+        "git", ["ls-tree", "--name-only", commit, ".github/workflows/"],
+        cwd=str(git_root),
+    )
+    files = []
+    for path in sorted(p for p in listing.splitlines() if p.strip()):
+        if not path.endswith((".yml", ".yaml")):
+            continue
+        text = run("git", ["show", f"{commit}:{path}"], cwd=str(git_root))
+        files.append((os.path.basename(path), text))
+    return _uses_in(files)
+
+
+def _uses_in(files) -> list[PublicOnlyUse]:
+    """The attesting PyPI publish steps in *files*, ``(filename, text)`` pairs."""
+    uses = []
+    yaml = YAML(typ="safe")
+    for filename, text in files:
+        workflow = yaml.load(text) or {}
         jobs = workflow.get("jobs") if isinstance(workflow, dict) else None
         for job_name, job in (jobs or {}).items():
             steps = (job or {}).get("steps") or []
