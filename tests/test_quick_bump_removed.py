@@ -30,7 +30,6 @@ pytestmark = pytest.mark.repo_cwd
 
 # Common kwargs for a direct handler call -- the whole surface that remains.
 _BASE_KWARGS = dict(
-    allow_dirty=False,
     watch=False,
     push_timeout=0,
     ci_timeout=0,
@@ -49,9 +48,9 @@ class TestQuickBumpFlagsRejected:
     """Every removed flag must be an unknown-flag parse error."""
 
     @pytest.mark.parametrize("argv", [
-        ["release", "run", "--no-allow-dirty", "--no-watch", "--bump", "patch"],
-        ["release", "run", "--no-allow-dirty", "--no-watch", "--description", "d"],
-        ["release", "run", "--no-allow-dirty", "--no-watch", "--preid", "alpha"],
+        ["release", "run", "--no-watch", "--bump", "patch"],
+        ["release", "run", "--no-watch", "--description", "d"],
+        ["release", "run", "--no-watch", "--preid", "alpha"],
     ])
     def test_removed_flag_is_unknown(self, argv):
         result = app.test(argv)
@@ -99,8 +98,8 @@ class TestReleaseFileIsTheOnlyIntentSource:
     @patch("rlsbl.release_file.get_release_file_path", return_value="/fake/unreleased.toml")
     @patch("os.path.exists", return_value=True)
     @patch("rlsbl.release_file.read_release_file")
-    @patch("rlsbl.commands.release.run_cmd")
-    def test_the_file_is_what_reaches_run_cmd(self, mock_run, mock_read, *_):
+    @patch("rlsbl.commands.release.run_release")
+    def test_the_file_is_what_reaches_the_release(self, mock_run, mock_read, *_):
         parsed = MagicMock()
         mock_read.return_value = parsed
         rlsbl.cmd_release_run(cli_ctx(), **_BASE_KWARGS)

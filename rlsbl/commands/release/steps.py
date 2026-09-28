@@ -18,13 +18,11 @@ tuple of :class:`ReleaseStep` records, and every other path derives from it:
 - ``phase_a`` builds its plan-kind dispatch from the kinds the table declares,
   and every ``PlanStep`` validates its ``release_step`` and ``marks`` against
   the table's names at construction time.
-- ``rollback`` derives the orphaned-artifact candidates from the files the
-  table says each step creates.
 
 What every step must decide
 ---------------------------
 
-Each record answers four questions, and none of them has a default -- a step
+Each record answers the questions below, and none of them has a default -- a step
 that fails to answer one is a hard error when this module is imported, not a
 silently absent capability:
 
@@ -48,11 +46,6 @@ silently absent capability:
     :class:`NoLocalProbe` (the artifact can only be observed over the network,
     with the reason).  A probe NEVER reaches the network: a check that can
     block a release reads only inputs the repository owns.
-
-``artifacts``
-    The repository paths this step CREATES -- the files a pre-push
-    ``git reset --hard`` would leave behind as untracked orphans.  Steps that
-    create no such file declare :func:`no_artifacts`.
 
 The recorded step names are the state file's format and never change: a state
 file written before this table existed is still understood.
@@ -233,11 +226,6 @@ _PROBE_KINDS = (LocalProbe, NoLocalProbe)
 _PERFORM_KINDS = (PlanIssued, DirectlyIssued)
 
 
-def no_artifacts(ctx):
-    """This step creates no file a rollback would have to sweep."""
-    return ()
-
-
 # ---------------------------------------------------------------------------
 # The record
 # ---------------------------------------------------------------------------
@@ -257,8 +245,6 @@ class ReleaseStep:
     perform: object
     inverse: object
     probe: object
-    #: ``artifacts(ctx)`` -> repository paths this step creates.
-    artifacts: Callable
 
     def __post_init__(self):
         if self.phase not in _PHASES:
@@ -283,12 +269,6 @@ class ReleaseStep:
                 f"NoLocalProbe -- a step whose artifact is only observable "
                 f"over the network says so with NoLocalProbe(reason=...), it "
                 f"is never left absent"
-            )
-        if not callable(self.artifacts):
-            raise TypeError(
-                f"release step {self.name!r}: artifacts must be a callable "
-                f"taking a StepContext; declare no_artifacts when the step "
-                f"creates no file"
             )
 
     @property
@@ -355,30 +335,52 @@ def undo_version_bump(ctx):
         )
 
 
-def reset_branch_to_pin(ctx):
-    """Return the branch to the commit the release started from.
+def unwind_branch_to_pin(ctx):
+    """Take the branch back to the commit the release started from.
 
     The inverse of every commit the mutating phase creates below the candidate
     push: the release commit itself and the snapshot commit that may sit on top
-    of it.  Refuses rather than guessing when the pin is not an ancestor of
-    HEAD -- something other than this release moved the branch, and resetting
-    would destroy it.
+    of it. Those commits are made in the release checkout and reach the branch
+    only by the advance before the candidate push, so this is that advance's
+    inverse (:func:`rlsbl.release_checkout.take_back`): a compare-and-swap of
+    the branch ref, and a restore of only the files those commits changed,
+    each only while it still holds what the release wrote. It refuses rather
+    than guessing when the pin is not an ancestor of the branch, and rather
+    than touching anybody else's work when the branch moved on or one of those
+    files was edited since.
     """
+    from ...release_checkout import take_back
+
     if not ctx.pin_sha:
         raise StepInverseError(
-            "cannot reset the branch: the release did not record the commit "
-            "it started from"
+            "cannot take the branch back: the release did not record the "
+            "commit it started from"
         )
+    if not ctx.branch:
+        raise StepInverseError(
+            "cannot take the branch back: the release did not record its branch"
+        )
+    tip = _git(
+        ["rev-parse", "--verify", "--quiet", f"refs/heads/{ctx.branch}"],
+        cwd=ctx.git_root, check=False,
+    ).stdout.strip()
     merge_base = _git(
-        ["merge-base", "--is-ancestor", ctx.pin_sha, "HEAD"],
+        ["merge-base", "--is-ancestor", ctx.pin_sha, tip or "HEAD"],
         cwd=ctx.git_root, check=False,
     )
-    if merge_base.returncode != 0:
+    if not tip or merge_base.returncode != 0:
         raise StepInverseError(
-            f"cannot reset the branch to {ctx.pin_sha[:10]}: it is not an "
-            f"ancestor of HEAD, so the branch moved outside this release"
+            f"cannot take {ctx.branch} back to {ctx.pin_sha[:10]}: it is not "
+            f"an ancestor of the branch, so the branch moved outside this "
+            f"release"
         )
-    _git(["reset", "--hard", ctx.pin_sha], cwd=ctx.git_root)
+    ok, reason = take_back(
+        ctx.git_root, ctx.branch, from_sha=tip, to_sha=ctx.pin_sha,
+    )
+    if not ok:
+        raise StepInverseError(
+            f"cannot take {ctx.branch} back to {ctx.pin_sha[:10]}: {reason}"
+        )
 
 
 def undo_changelog_finalization(ctx):
@@ -540,31 +542,6 @@ def probe_tagged(ctx):
 
 
 # ---------------------------------------------------------------------------
-# Artifact declarations
-# ---------------------------------------------------------------------------
-
-
-def changelog_finalization_artifacts(ctx):
-    """The files the changelog finalization creates in the changes dir."""
-    if not ctx.changes_dir:
-        return ()
-    return (
-        os.path.join(ctx.changes_dir, f"{ctx.version}.jsonl"),
-        os.path.join(ctx.changes_dir, f"{ctx.version}.md"),
-    )
-
-
-def release_file_finalization_artifacts(ctx):
-    """The files the release-file finalization creates in the releases dir."""
-    if not ctx.releases_dir:
-        return ()
-    return (
-        os.path.join(ctx.releases_dir, f"v{ctx.version}.toml"),
-        os.path.join(ctx.releases_dir, f"v{ctx.version}.md"),
-    )
-
-
-# ---------------------------------------------------------------------------
 # The table
 # ---------------------------------------------------------------------------
 
@@ -586,9 +563,10 @@ _MUTATING = "rlsbl.commands.release.execute:_run_release_mutating"
 # step. Fatal steps split into two tiers around the CANDIDATE PUSH:
 #
 #   - Pre-push fatal steps (VERSION_BUMPED, COMMITTED, SNAPSHOT_REGENERATED):
-#     a failure ROLLS BACK -- `git reset --hard` to the pre-release HEAD plus
-#     orphan-artifact cleanup -- leaving the tree as if the release never
-#     started. Nothing left the machine.
+#     a failure DISCARDS the attempt. These steps run in the release checkout,
+#     so nothing of them is on the branch or in the working tree; the one
+#     exception, the branch advance right before a candidate push that is then
+#     refused, is taken back by compare-and-swap. Nothing left the machine.
 #   - Post-push fatal steps (BRANCH_PUSHED onward, plus ASSETS_UPLOADED and
 #     PIPELINES_PUBLISHED): NO rollback. The candidate commit is on the remote,
 #     so a local reset would diverge from it. The failure is recorded and
@@ -623,7 +601,6 @@ RELEASE_STEP_TABLE = (
         inverse=LocalInverse(undo_version_bump),
         probe=LocalProbe(probe_version_bumped),
         # The manifests are MODIFIED, not created: a reset restores them.
-        artifacts=no_artifacts,
     ),
     ReleaseStep(
         name="COMMITTED",
@@ -631,9 +608,8 @@ RELEASE_STEP_TABLE = (
         fatal=True,
         mutates_repository=True,
         perform=PlanIssued(performer=_PHASE_A, kinds=(COMMIT,)),
-        inverse=LocalInverse(reset_branch_to_pin),
+        inverse=LocalInverse(unwind_branch_to_pin),
         probe=LocalProbe(probe_committed),
-        artifacts=no_artifacts,
     ),
     ReleaseStep(
         name="SNAPSHOT_REGENERATED",
@@ -644,10 +620,9 @@ RELEASE_STEP_TABLE = (
         # The snapshot commit sits on top of the release commit, so the same
         # return-to-the-pin removes it. Declared rather than inherited: a step
         # whose undo happens to be another's still has to say what its own is.
-        inverse=LocalInverse(reset_branch_to_pin),
+        inverse=LocalInverse(unwind_branch_to_pin),
         probe=LocalProbe(probe_snapshot_regenerated),
         # snapshot.json is a committed, tracked file; a reset restores it.
-        artifacts=no_artifacts,
     ),
     ReleaseStep(
         name="BRANCH_PUSHED",
@@ -673,7 +648,6 @@ RELEASE_STEP_TABLE = (
             "origin's branch head is not a repository input: the "
             "remote-tracking ref records the last fetch, not the remote"
         ),
-        artifacts=no_artifacts,
     ),
     ReleaseStep(
         name="CI_VERIFIED",
@@ -688,7 +662,6 @@ RELEASE_STEP_TABLE = (
         probe=NoLocalProbe(
             "the verdict is a GitHub Actions workflow run's conclusion"
         ),
-        artifacts=no_artifacts,
     ),
     ReleaseStep(
         name="CHANGELOG_FINALIZED",
@@ -698,7 +671,6 @@ RELEASE_STEP_TABLE = (
         perform=DirectlyIssued(performer=_MUTATING),
         inverse=LocalInverse(undo_changelog_finalization),
         probe=LocalProbe(probe_changelog_finalized),
-        artifacts=changelog_finalization_artifacts,
     ),
     ReleaseStep(
         name="RELEASE_FILE_FINALIZED",
@@ -708,7 +680,6 @@ RELEASE_STEP_TABLE = (
         perform=DirectlyIssued(performer=_MUTATING),
         inverse=LocalInverse(undo_release_file_finalization),
         probe=LocalProbe(probe_release_file_finalized),
-        artifacts=release_file_finalization_artifacts,
     ),
     ReleaseStep(
         name="TAGGED",
@@ -718,7 +689,6 @@ RELEASE_STEP_TABLE = (
         perform=DirectlyIssued(performer=_MUTATING),
         inverse=LocalInverse(delete_local_tags),
         probe=LocalProbe(probe_tagged),
-        artifacts=no_artifacts,
     ),
     ReleaseStep(
         name="PUSHED",
@@ -737,7 +707,6 @@ RELEASE_STEP_TABLE = (
         probe=NoLocalProbe(
             "whether origin carries the tag is a live ls-remote query"
         ),
-        artifacts=no_artifacts,
     ),
     ReleaseStep(
         name="GITHUB_RELEASE",
@@ -755,7 +724,6 @@ RELEASE_STEP_TABLE = (
         probe=NoLocalProbe(
             "a GitHub Release is only observable through the GitHub API"
         ),
-        artifacts=no_artifacts,
     ),
     ReleaseStep(
         name="SUBTREE_PUBLISHED",
@@ -775,7 +743,6 @@ RELEASE_STEP_TABLE = (
             "the mirror's branch head lives in another repository on the "
             "network"
         ),
-        artifacts=no_artifacts,
     ),
     ReleaseStep(
         name="MIRROR_RELEASED",
@@ -791,7 +758,6 @@ RELEASE_STEP_TABLE = (
             "the mirror's tags and Releases live in another repository on the "
             "network"
         ),
-        artifacts=no_artifacts,
     ),
     ReleaseStep(
         name="ASSETS_UPLOADED",
@@ -809,7 +775,6 @@ RELEASE_STEP_TABLE = (
         probe=NoLocalProbe(
             "a Release's asset list is only observable through the GitHub API"
         ),
-        artifacts=no_artifacts,
     ),
     ReleaseStep(
         name="PIPELINES_PUBLISHED",
@@ -828,7 +793,6 @@ RELEASE_STEP_TABLE = (
         probe=NoLocalProbe(
             "whether a version is published is a registry query"
         ),
-        artifacts=no_artifacts,
     ),
     ReleaseStep(
         name="DEPLOYED",
@@ -843,7 +807,6 @@ RELEASE_STEP_TABLE = (
         probe=NoLocalProbe(
             "what a deploy target currently runs is a property of that target"
         ),
-        artifacts=no_artifacts,
     ),
     ReleaseStep(
         name="POST_HOOKS_RUN",
@@ -858,7 +821,6 @@ RELEASE_STEP_TABLE = (
         probe=NoLocalProbe(
             "a hook's effect is whatever the project's own script did"
         ),
-        artifacts=no_artifacts,
     ),
 )
 

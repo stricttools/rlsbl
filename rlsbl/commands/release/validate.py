@@ -416,11 +416,10 @@ def blocking_dirty_paths(cwd=None):
 def validate_no_stash(cwd=None):
     """Refuse a release while the repository has a stash.
 
-    Unlike the clean-tree check, this one is not waived by ``--allow-dirty``:
-    that flag says the operator accounted for the dirty paths git can name,
-    and a stash is exactly the work git names nowhere. The release commits,
-    tags and pushes this tree; a stash would either be silently left behind or
-    quietly outlive the release with nothing recording what it belonged to.
+    A stash is work git names in no working tree: the release, which runs in
+    the release checkout and leaves every uncommitted change it does not write
+    alone, would neither see nor carry it, and it would quietly outlive the
+    release with nothing recording what it belonged to.
     """
     from ...git_util import refuse_present_stash
 
@@ -1595,10 +1594,16 @@ def _abort_on_version_skew(project_dir, *, workspace_root=None):
     skip. No overlays file means nothing is declared, so nothing to check.
 
     Runs PRE-MUTATION and unconditionally (like the other release guards,
-    not the hook-skippable preflight tag).
+    not the hook-skippable preflight tag). The overlays file is never
+    committed, so while the release runs in the release checkout it is read
+    in the working tree the checkout was made from.
     """
     from ..dev_sync import OVERRIDES_FILENAME, _load_overlays
+    from ...release_checkout import live_path
 
+    project_dir = live_path(str(project_dir))
+    if workspace_root is not None:
+        workspace_root = live_path(str(workspace_root))
     overlay_root = None
     if os.path.isfile(os.path.join(str(project_dir), OVERRIDES_FILENAME)):
         overlay_root = str(project_dir)

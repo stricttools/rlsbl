@@ -16,6 +16,7 @@ from rlsbl.lock import acquire_lock, is_stale, release_lock, rlsbl_lock
 def _reset_lock_fd(monkeypatch):
     """Reset _lock_fd between tests so a failed test doesn't leave stale state."""
     monkeypatch.setattr(rlsbl.lock, "_lock_fd", None)
+    monkeypatch.setattr(rlsbl.lock, "_lock_depth", 0)
 
 
 def test_lock_file_created(tmp_path, monkeypatch):
@@ -64,6 +65,30 @@ def test_release_allows_reacquire(tmp_path, monkeypatch):
     # empty directory (defensive rmdir for spurious lock dirs).
     acquire_lock(project_root=tmp_path)
     release_lock()
+
+
+def _held_by_someone(lock_path):
+    fd = open(lock_path, "w")
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except (OSError, BlockingIOError):
+        return True
+    finally:
+        fd.close()
+    return False
+
+
+def test_a_nested_acquire_leaves_the_lock_with_its_outer_holder(tmp_path, monkeypatch):
+    """A release holds the lock around the release checkout, and the code it
+    runs there takes it again; the inner release must not drop it."""
+    monkeypatch.chdir(tmp_path)
+    lock_path = os.path.join(str(tmp_path), ".rlsbl", "lock")
+    acquire_lock(project_root=tmp_path)
+    with rlsbl_lock(project_root=tmp_path):
+        assert _held_by_someone(lock_path)
+    assert _held_by_someone(lock_path), "the inner release dropped the outer lock"
+    release_lock()
+    assert not os.path.exists(lock_path)
 
 
 def test_context_manager(tmp_path, monkeypatch):

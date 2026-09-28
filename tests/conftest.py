@@ -917,7 +917,6 @@ def bypass_upfront_validation():
     """Patch batch release upfront validation functions so tests that test
     other behavior are not blocked by gh/clean-tree/branch checks."""
     with patch("rlsbl.commands.monorepo.batch_release.validate_gh_cli"), \
-         patch("rlsbl.commands.monorepo.batch_release.validate_clean_tree", return_value=set()), \
          patch("rlsbl.commands.monorepo.batch_release.validate_branch_and_remote", return_value="main"):
         yield
 

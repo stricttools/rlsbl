@@ -127,7 +127,7 @@ class TestEveryHandlerBindsTheChokepoint:
         import inspect
 
         sig = inspect.signature(rlsbl.cmd_release_run)
-        assert "allow_dirty" in sig.parameters
+        assert "releasable" in sig.parameters
         assert not any(
             p.kind is inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
         )

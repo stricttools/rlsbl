@@ -338,7 +338,6 @@ class TestTwoHookModel:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -349,7 +348,6 @@ class TestTwoHookModel:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,
@@ -389,7 +387,6 @@ class TestTwoHookModel:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -400,7 +397,6 @@ class TestTwoHookModel:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,
@@ -442,7 +438,6 @@ class TestTwoHookModel:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -453,7 +448,6 @@ class TestTwoHookModel:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,
@@ -515,7 +509,6 @@ class TestFullFlowOrder:
     @patch("rlsbl.commands.release.validate_ota_mode")
     @patch("rlsbl.commands.release.validate_gh_cli")
     @patch("rlsbl.commands.release.validate_gh_push_access")
-    @patch("rlsbl.commands.release.validate_clean_tree", return_value=set())
     @patch("rlsbl.commands.release.validate_branch_and_remote", return_value="main")
     @patch("rlsbl.commands.release.resolve_monorepo_context", return_value=(None, None, False, False, None))
     @patch("rlsbl.commands.release.validate_changelog_state", return_value=None)
@@ -542,7 +535,7 @@ class TestFullFlowOrder:
         _hook_timeout, _hook_env, _porcelain,
         _extract, _compute, _resolve_targets, _scaffold,
         _validate_blog, _validate_changelog, _resolve_mono,
-        _validate_branch, _validate_clean, _validate_push_access, _validate_gh,
+        _validate_branch, _validate_validate_push_access, _validate_gh,
         _validate_ota, _validate_config, _validate_pipeline,
         _validate_targets,
         _validate,
@@ -630,7 +623,6 @@ class TestFullFlowOrder:
     @patch("rlsbl.commands.release.validate_ota_mode")
     @patch("rlsbl.commands.release.validate_gh_cli")
     @patch("rlsbl.commands.release.validate_gh_push_access")
-    @patch("rlsbl.commands.release.validate_clean_tree", return_value=set())
     @patch("rlsbl.commands.release.validate_branch_and_remote", return_value="main")
     @patch("rlsbl.commands.release.resolve_monorepo_context", return_value=(None, None, False, False, None))
     @patch("rlsbl.commands.release.validate_changelog_state", return_value=None)
@@ -657,7 +649,7 @@ class TestFullFlowOrder:
         _hook_timeout, _hook_env, _porcelain,
         _extract, _compute, _resolve_targets, _scaffold,
         _validate_blog, _validate_changelog, _resolve_mono,
-        _validate_branch, _validate_clean, _validate_push_access, _validate_gh,
+        _validate_branch, _validate_validate_push_access, _validate_gh,
         _validate_ota, _validate_config, _validate_pipeline,
         _validate_targets,
         _validate,

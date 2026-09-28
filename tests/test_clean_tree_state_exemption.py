@@ -5,8 +5,10 @@
 gate then saw them as uncommitted work and refused to start or resume --
 the tool blocking itself.  Observed live twice.
 
-The exemption is structural: `validate_clean_tree` path-matches the two
-tool-owned state filenames under their two canonical homes, so a stale
+The exemption is structural: the release's reading of the working tree
+(`rlsbl.release_checkout.live_changes`, which decides what blocks a release
+and what it lists and leaves alone) path-matches the two tool-owned state
+filenames under their two canonical homes, so a stale
 consumer `.gitignore` cannot defeat it.  It must NOT swallow genuine dirt,
 and must NOT cover `unreleased.plan.json`, which is deliberately committed.
 """
@@ -17,11 +19,7 @@ import subprocess
 
 import pytest
 
-from rlsbl.commands.release.validate import (
-    ReleaseValidationError,
-    is_tool_owned_state_path,
-    validate_clean_tree,
-)
+from rlsbl.commands.release.validate import is_tool_owned_state_path
 
 
 STATE_REL = os.path.join(".rlsbl", "releases", "in-progress.json")
@@ -95,21 +93,31 @@ class TestToolOwnedStatePathPredicate:
         assert is_tool_owned_state_path(".rlsbl/releases/") is False
 
 
-class TestValidateCleanTreeStateExemption:
-    """Integration: a real repo, real `git status --porcelain`."""
+def _paths(repo):
+    from rlsbl.release_checkout import live_changes
 
-    def test_clean_repo_passes(self, mock_git_repo):
-        assert validate_clean_tree({}) == set()
+    return [path for _status, path in live_changes(str(repo))]
+
+
+class TestReleaseDirtyTreeStateExemption:
+    """Integration: the release's reading of the working tree, real git.
+
+    A release refuses on uncommitted changes to the paths it writes and lists
+    the rest; neither side may ever count rlsbl's own state files.
+    """
+
+    def test_clean_repo_reports_nothing(self, mock_git_repo):
+        assert _paths(mock_git_repo) == []
 
     @pytest.mark.parametrize("rel", [
         STATE_REL, SCRUB_REL, RELEASABLE_STATE_REL, RELEASABLE_SCRUB_REL,
     ])
-    def test_untracked_tool_state_does_not_block(self, mock_git_repo, rel):
+    def test_untracked_tool_state_is_not_counted(self, mock_git_repo, rel):
         """The defect: rlsbl's own state file made rlsbl refuse to run."""
         _write(mock_git_repo, rel)
-        assert validate_clean_tree({}) == set()
+        assert _paths(mock_git_repo) == []
 
-    def test_tracked_but_modified_tool_state_does_not_block(self, mock_git_repo):
+    def test_tracked_but_modified_tool_state_is_not_counted(self, mock_git_repo):
         """A repo that committed its state file once is exempt too."""
         _write(mock_git_repo, STATE_REL)
         subprocess.run(["git", "add", STATE_REL], cwd=str(mock_git_repo), check=True)
@@ -117,123 +125,30 @@ class TestValidateCleanTreeStateExemption:
             ["git", "commit", "-q", "-m", "state"], cwd=str(mock_git_repo), check=True,
         )
         _write(mock_git_repo, STATE_REL, '{"completed_steps": ["COMMITTED"]}\n')
-        assert validate_clean_tree({}) == set()
+        assert _paths(mock_git_repo) == []
 
-    def test_genuine_dirt_still_blocks_and_names_only_the_real_file(self, mock_git_repo):
-        """The exemption must not swallow a genuinely dirty tree."""
+    def test_genuine_dirt_is_still_reported_and_only_the_real_file(self, mock_git_repo):
         _write(mock_git_repo, STATE_REL)
         _write(mock_git_repo, SCRUB_REL)
         _write(mock_git_repo, "notes.txt", "wip\n")
-
-        with pytest.raises(ReleaseValidationError) as exc:
-            validate_clean_tree({})
-
-        message = str(exc.value)
-        assert "notes.txt" in message
-        assert "in-progress.json" not in message
-        assert "scrub-result.json" not in message
-
-    def test_modified_tracked_file_still_blocks(self, mock_git_repo):
-        _write(mock_git_repo, STATE_REL)
         (mock_git_repo / "README.md").write_text("# test\nedited\n")
+        assert sorted(_paths(mock_git_repo)) == ["README.md", "notes.txt"]
 
-        with pytest.raises(ReleaseValidationError) as exc:
-            validate_clean_tree({})
-        assert "README.md" in str(exc.value)
-
-    def test_unreleased_plan_json_still_blocks(self, mock_git_repo):
+    def test_unreleased_plan_json_is_never_exempt(self, mock_git_repo):
         """unreleased.plan.json is deliberately committed -- never exempt."""
         _write(mock_git_repo, os.path.join(".rlsbl", "releases", "unreleased.plan.json"))
+        assert _paths(mock_git_repo) == [".rlsbl/releases/unreleased.plan.json"]
 
-        with pytest.raises(ReleaseValidationError) as exc:
-            validate_clean_tree({})
-        assert "unreleased.plan.json" in str(exc.value)
-
-    def test_allow_dirty_still_reports_state_files_as_baseline(self, mock_git_repo):
-        """--allow-dirty keeps returning every dirty path, exempt ones included.
-
-        The returned set is the baseline the unexpected-files guard subtracts
-        later; dropping the state file from it would make the guard flag it.
-        """
-        # Track the releases dir first so git reports the state file
-        # individually instead of collapsing it into `?? .rlsbl/releases/`.
-        _write(mock_git_repo, os.path.join(".rlsbl", "releases", "unreleased.toml"), "")
-        subprocess.run(
-            ["git", "add", os.path.join(".rlsbl", "releases", "unreleased.toml")],
-            cwd=str(mock_git_repo), check=True,
-        )
-        subprocess.run(
-            ["git", "commit", "-q", "-m", "release file"],
-            cwd=str(mock_git_repo), check=True,
-        )
-        _write(mock_git_repo, STATE_REL)
-        _write(mock_git_repo, "notes.txt", "wip\n")
-
-        dirty = validate_clean_tree({"allow-dirty": True})
-        assert "notes.txt" in dirty
-        assert STATE_REL.replace(os.sep, "/") in dirty
-
-    def test_wholly_untracked_releases_dir_still_blocks_on_real_dirt(self, mock_git_repo):
-        """`?? .rlsbl/releases/` must be classified per-file, not exempted wholesale.
-
-        git collapses a wholly untracked directory into one entry. The check
-        must still see the deliberately-committed unreleased.toml inside it.
-        """
+    def test_wholly_untracked_releases_dir_is_classified_per_file(self, mock_git_repo):
+        """`?? .rlsbl/releases/` must be classified per-file, not exempted wholesale."""
         _write(mock_git_repo, STATE_REL)
         _write(mock_git_repo, os.path.join(".rlsbl", "releases", "unreleased.toml"), "")
-
-        with pytest.raises(ReleaseValidationError) as exc:
-            validate_clean_tree({})
-        message = str(exc.value)
-        assert "unreleased.toml" in message
-        assert "in-progress.json" not in message
+        assert _paths(mock_git_repo) == [".rlsbl/releases/unreleased.toml"]
 
     def test_a_dirty_unicode_path_is_named_as_it_is_on_disk(self, mock_git_repo):
-        """The refusal must name the file, not git's C-escaped spelling of it.
-
-        ``git status --porcelain`` quotes any path outside plain ASCII, so a
-        parser that reads the default output reports
-        ``"docs/na\\303\\257ve note.md"`` -- a name no filesystem has, which the
-        operator cannot copy, paste or find.
-        """
+        """The report must name the file, not git's C-escaped spelling of it."""
         _write(mock_git_repo, os.path.join("docs", "naïve note.md"), "wip\n")
-
-        with pytest.raises(ReleaseValidationError) as exc:
-            validate_clean_tree({})
-
-        message = str(exc.value)
-        assert "docs/naïve note.md" in message
-        assert "\\303" not in message
-        assert '"' not in message
-
-    def test_allow_dirty_baseline_carries_the_real_unicode_path(self, mock_git_repo):
-        """The baseline set feeds the unexpected-files guard and the commit.
-
-        An escaped spelling in it makes the guard compare two different names
-        for the same file and flag the release's own work as foreign.
-        """
-        (mock_git_repo / "naïve note.md").write_text("wip\n")
-
-        dirty = validate_clean_tree({"allow-dirty": True})
-
-        assert dirty == {"naïve note.md"}
-
-    def test_unreadable_status_fails_closed(self, mock_git_repo, monkeypatch):
-        """If the porcelain read fails, refuse -- never assume the tree is clean.
-
-        The read is the shared ``working_tree_paths`` helper, so that is what
-        this pins: whatever it raises must come out as a refusal.
-        """
-        import rlsbl.commands.release.validate as validate_mod
-
-        _write(mock_git_repo, STATE_REL)
-
-        def _boom(*args, **kwargs):
-            raise subprocess.CalledProcessError(128, ["git"])
-
-        monkeypatch.setattr(validate_mod, "working_tree_paths", _boom)
-        with pytest.raises(ReleaseValidationError):
-            validate_clean_tree({})
+        assert _paths(mock_git_repo) == ["docs/naïve note.md"]
 
 
 class TestGitignoreTemplateStateEntries:

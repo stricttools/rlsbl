@@ -503,8 +503,8 @@ class TestCliReadsReleasableReleaseFile:
         _write_releasable_release_file(tmp_project)
         monkeypatch.chdir(core)
 
-        with patch("rlsbl.commands.release.run_cmd") as mock_run:
-            rlsbl_mod.cmd_release_run(cli_ctx(quiet=True), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, releasable=None)
+        with patch("rlsbl.commands.release.run_release") as mock_run:
+            rlsbl_mod.cmd_release_run(cli_ctx(quiet=True), watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, releasable=None)
         mock_run.assert_called_once()
         cfg = mock_run.call_args[0][0]
         assert cfg.bump == "patch"

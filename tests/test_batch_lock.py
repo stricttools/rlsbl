@@ -50,7 +50,6 @@ class TestSkipLockInRunCmdInner:
     @patch("rlsbl.commands.release.validate_blog_body", return_value=(None, None))
     @patch("rlsbl.commands.release.resolve_monorepo_context", return_value=(None, None, False, False, None))
     @patch("rlsbl.commands.release.validate_branch_and_remote", return_value="main")
-    @patch("rlsbl.commands.release.validate_clean_tree", return_value=set())
     @patch("rlsbl.commands.release.validate_pipeline_config")
     @patch("rlsbl.commands.release.validate_gh_cli")
     @patch("rlsbl.commands.release.validate_config_integrity")
@@ -74,7 +73,7 @@ class TestSkipLockInRunCmdInner:
         _hook_empty, _hook_timeout, _hook_env,
         _porcelain, _run, _extract, _compute, _resolve_targets,
         _scaffold, _validate_targets_top, _validate_ota, _validate_config,
-        _validate_gh, _validate_pipeline, _validate_clean, _validate_branch,
+        _validate_gh, _validate_pipeline, _validate_validate_branch,
         _resolve_mono, _validate_blog, _validate_changelog, _gen_changelog,
         _dry_run_summary, _resolve_release_targets, _mutating,
         mock_acquire, mock_release,
@@ -103,7 +102,6 @@ class TestSkipLockInRunCmdInner:
     @patch("rlsbl.commands.release.validate_blog_body", return_value=(None, None))
     @patch("rlsbl.commands.release.resolve_monorepo_context", return_value=(None, None, False, False, None))
     @patch("rlsbl.commands.release.validate_branch_and_remote", return_value="main")
-    @patch("rlsbl.commands.release.validate_clean_tree", return_value=set())
     @patch("rlsbl.commands.release.validate_pipeline_config")
     @patch("rlsbl.commands.release.validate_gh_cli")
     @patch("rlsbl.commands.release.validate_config_integrity")
@@ -128,7 +126,7 @@ class TestSkipLockInRunCmdInner:
         _run_checks, _hook_empty, _hook_timeout, _hook_env,
         _porcelain, _run, _extract, _compute, _resolve_targets,
         _scaffold, _validate_targets_top, _validate_ota, _validate_config,
-        _validate_gh, _validate_pipeline, _validate_clean, _validate_branch,
+        _validate_gh, _validate_pipeline, _validate_validate_branch,
         _resolve_mono, _validate_blog, _validate_changelog, _gen_changelog,
         _dry_run_summary, _resolve_release_targets, _mutating,
         mock_acquire, mock_release,

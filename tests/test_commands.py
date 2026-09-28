@@ -688,12 +688,11 @@ class TestRelease:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
-    def test_release_dry_run(self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch,
+    def test_release_dry_run(self, _validate, _gen_cl, _gh_inst, _gh_auth, _branch,
                              _commit_files, mock_run, _tag_local, _push, _remote_exists):
         """Dry run should not modify any files."""
         # 1. git fetch origin --quiet (remote-ahead check)
@@ -719,24 +718,12 @@ class TestRelease:
         with open("CHANGELOG.md") as f:
             assert f.read() == orig_cl
 
-    @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
-    @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=False)
-    def test_release_dirty_tree(self, _clean, _gh_auth, _gh_inst):
-        """Dirty working tree should cause SystemExit."""
-        from rlsbl.commands.release import run_cmd
-
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd(_rc(), {"quiet": True}, ctx=ProjectContext(project_root=Path("."), workspace_root=None, config={"publish_mode": "ci", "pipelines": {}}))
-        assert exc_info.value.code == 1
-
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
-    def test_release_behind_remote_aborts(self, _gh_inst, _gh_auth, _clean,
+    def test_release_behind_remote_aborts(self, _gh_inst, _gh_auth,
                                           _branch, mock_run, _remote_exists):
         """Release should abort when local branch is behind origin."""
         from rlsbl.commands.release import run_cmd
@@ -755,14 +742,13 @@ class TestRelease:
     @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_release_fetch_failure_warns_but_continues(self, _validate, _gen_cl,
                                                         _gh_inst, _gh_auth,
-                                                        _clean, _branch, mock_run,
+                                                        _branch, mock_run,
                                                         _tag_local):
         """If git fetch fails, warn but don't block the release."""
         from rlsbl.commands.release import run_cmd
@@ -784,7 +770,6 @@ class TestRelease:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -792,7 +777,7 @@ class TestRelease:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=False)
     def test_release_empty_remote_continues(self, _remote_exists, _validate,
                                             _gen_cl, _gh_inst, _gh_auth,
-                                            _clean, _branch, _commit_files,
+                                            _branch, _commit_files,
                                             mock_run, _tag_local, _push):
         """Empty remote (first push) should skip rev-list and continue."""
         from rlsbl.commands.release import run_cmd
@@ -812,11 +797,10 @@ class TestRelease:
     @patch("rlsbl.commands.release.remote_branch_exists", return_value=True)
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     def test_release_remote_branch_exists_but_revlist_fails_aborts(
-            self, _gh_inst, _gh_auth, _clean, _branch, mock_run,
+            self, _gh_inst, _gh_auth, _branch, mock_run,
             _remote_exists):
         """When remote branch exists but rev-list fails, abort for safety."""
         from rlsbl.commands.release import run_cmd
@@ -886,7 +870,6 @@ class TestReleaseCommitTrailers:
     @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.should_tag", return_value=False)
@@ -902,7 +885,7 @@ class TestReleaseCommitTrailers:
                                                     _changes_dir, _extract, _finalize,
                                                     _gen_ver_file, _validate, _gen_cl,
                                                     _deploy, _tag,
-                                                    _gh_inst, _gh_auth, _clean, _branch,
+                                                    _gh_inst, _gh_auth, _branch,
                                                     mock_commit_files, _run_gh, mock_run,
                                                     _tag_local, _tag_remote,
                                                     _push, _lock, _unlock, _remote_exists):
@@ -933,7 +916,6 @@ class TestReleaseCommitTrailers:
     @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.should_tag", return_value=False)
@@ -949,7 +931,7 @@ class TestReleaseCommitTrailers:
                                                _changes_dir, _extract, _finalize,
                                                _gen_ver_file, _validate, _gen_cl,
                                                _deploy, _tag,
-                                               _gh_inst, _gh_auth, _clean, _branch,
+                                               _gh_inst, _gh_auth, _branch,
                                                mock_commit_files, _run_gh, mock_run,
                                                _tag_local, _tag_remote,
                                                _push, _lock, _unlock, _remote_exists):

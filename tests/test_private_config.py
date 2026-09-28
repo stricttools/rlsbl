@@ -106,13 +106,12 @@ class TestPrivateConfigRequired:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_release_proceeds_when_private_true_no_local_pipeline(
-        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch,
+        self, _validate, _gen_cl, _gh_inst, _gh_auth, _branch,
         _commit_files, mock_run, _tag_local, _push, _remote_exists, capsys,
     ):
         """Release does not abort when private=true and no local pipeline config."""
@@ -133,13 +132,12 @@ class TestPrivateConfigRequired:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
     @patch("rlsbl.commands.release.validate_unreleased", return_value={"passed": True, "checks": {}})
     def test_release_proceeds_when_private_false(
-        self, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch,
+        self, _validate, _gen_cl, _gh_inst, _gh_auth, _branch,
         _commit_files, mock_run, _tag_local, _push, _remote_exists, capsys,
     ):
         """Release does not abort when private=false (normal public repo)."""
@@ -184,7 +182,6 @@ class TestPrivatePublishGuardrail:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.should_tag", return_value=False)
@@ -201,7 +198,7 @@ class TestPrivatePublishGuardrail:
         self, _run_checks, _vrt,
         _changes_dir, _extract, _finalize, _gen_ver_file,
         _validate, _gen_cl, _deploy, _tag, _gh_inst, _gh_auth,
-        _clean, _branch, _commit_files, mock_run, _tag_local, _tag_remote,
+        _branch, _commit_files, mock_run, _tag_local, _tag_remote,
         _run_gh, _push, _lock, _unlock,
         _remote_exists, capsys,
     ):
@@ -228,7 +225,6 @@ class TestPrivatePublishGuardrail:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.should_tag", return_value=False)
@@ -246,7 +242,7 @@ class TestPrivatePublishGuardrail:
         self, _run_checks, _vrt, mock_upload_assets,
         _changes_dir, _extract, _finalize, _gen_ver_file,
         _validate, _gen_cl, _deploy, _tag, _gh_inst, _gh_auth,
-        _clean, _branch, _commit_files, mock_run, mock_tag_local, _tag_remote,
+        _branch, _commit_files, mock_run, mock_tag_local, _tag_remote,
         _run_gh, _push, _lock, _unlock,
         _remote_exists, capsys,
     ):

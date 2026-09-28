@@ -98,13 +98,45 @@ class TestStatusCommitsAheadStandalone:
         warning = warning_lines[0]
         assert "3 commits ahead of v1.0.0" in warning
         # The whole invocation, not the bare group: `rlsbl release` alone
-        # prints the group's help, and `release run` refuses without its two
-        # required booleans.
+        # prints the group's help, and `release run` refuses without its
+        # required --watch/--no-watch.
         assert "rlsbl release run" in warning
-        assert "--no-allow-dirty" in warning and "--watch" in warning
+        assert "--watch" in warning
+        assert "allow-dirty" not in warning, "the removed flag is still named"
         # The separator is an em-dash (U+2014), not a double hyphen.
         assert "— run `rlsbl release run" in warning
         assert "-- run `rlsbl release run" not in warning
+
+    def test_the_named_invocation_reaches_the_release(self, mock_git_repo, capsys, monkeypatch):
+        """The command the warning prints is accepted as written: parsed, it
+        reaches the release itself rather than a usage refusal."""
+        import re
+        from unittest.mock import patch
+
+        from rlsbl import app
+
+        _make_npm_project(mock_git_repo, name="pkg-a", version="1.0.0")
+        subprocess.run(["git", "add", "package.json"], cwd=str(mock_git_repo), check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "add package"], cwd=str(mock_git_repo), check=True)
+        _tag(mock_git_repo, "v1.0.0")
+        _commit_file(mock_git_repo, "a.txt", message="add a")
+        releases = mock_git_repo / ".rlsbl" / "releases"
+        releases.mkdir(parents=True, exist_ok=True)
+        (releases / "unreleased.toml").write_text(
+            'format_version = 1\nbump = "patch"\ninclude = ["npm"]\n'
+            'exclude = []\ndescription = "d"\n'
+        )
+
+        capsys.readouterr()
+        from rlsbl.commands.status import run_cmd
+        run_cmd("npm", [], {}, ctx=make_ctx("."))
+        out = capsys.readouterr().out
+        named = re.search(r"run `rlsbl ([^`]+)`", out).group(1).split()
+
+        with patch("rlsbl.commands.release.run_release") as released:
+            result = app.test(named)
+        assert result.exit_code == 0, result.stderr
+        released.assert_called_once()
 
     def test_singular_form_for_one_commit(self, mock_git_repo, capsys):
         """A single unreleased commit uses 'commit' (singular), not 'commits'."""

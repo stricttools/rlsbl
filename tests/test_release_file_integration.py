@@ -82,7 +82,6 @@ class TestRunCmdWithReleaseConfig:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -96,7 +95,6 @@ class TestRunCmdWithReleaseConfig:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,
@@ -131,7 +129,6 @@ class TestRunCmdWithReleaseConfig:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -145,7 +142,6 @@ class TestRunCmdWithReleaseConfig:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,
@@ -177,7 +173,6 @@ class TestRunCmdWithReleaseConfig:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -191,7 +186,6 @@ class TestRunCmdWithReleaseConfig:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,
@@ -226,12 +220,10 @@ class TestTargetExhaustivenessValidation:
 
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
     def test_missing_target_in_release_file(
         self,
         _branch,
-        _clean,
         _gh_inst,
         _gh_auth,
         tmp_project,
@@ -261,7 +253,6 @@ class TestTargetExhaustivenessValidation:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -275,7 +266,6 @@ class TestTargetExhaustivenessValidation:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,
@@ -302,9 +292,8 @@ class TestTargetExhaustivenessValidation:
 
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    def test_unknown_target_in_release_file(self, _branch, _clean, _gh_inst, _gh_auth, tmp_project, capsys):
+    def test_unknown_target_in_release_file(self, _branch, _gh_inst, _gh_auth, tmp_project, capsys):
         """Error when release file references a target unknown to TARGETS."""
         _setup_npm_project(tmp_project)
 
@@ -328,7 +317,6 @@ class TestTargetExhaustivenessValidation:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -342,7 +330,6 @@ class TestTargetExhaustivenessValidation:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,
@@ -372,9 +359,8 @@ class TestTargetExhaustivenessValidation:
 
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    def test_empty_include_errors(self, _branch, _clean, _gh_inst, _gh_auth, tmp_project, capsys):
+    def test_empty_include_errors(self, _branch, _gh_inst, _gh_auth, tmp_project, capsys):
         """Error when include list is empty."""
         _setup_npm_project(tmp_project)
 
@@ -406,7 +392,7 @@ class TestCmdReleaseMissingFile:
         from rlsbl import cmd_release_run
 
         with pytest.raises(SystemExit) as exc_info:
-            cmd_release_run(cli_ctx(quiet=True), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, releasable=None)
+            cmd_release_run(cli_ctx(quiet=True), watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, releasable=None)
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
@@ -429,7 +415,7 @@ class TestCmdReleaseInvalidFile:
         from rlsbl import cmd_release_run
 
         with pytest.raises(SystemExit) as exc_info:
-            cmd_release_run(cli_ctx(quiet=True), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, releasable=None)
+            cmd_release_run(cli_ctx(quiet=True), watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, releasable=None)
 
         assert exc_info.value.code == 1
         captured = capsys.readouterr()
@@ -449,7 +435,7 @@ class TestCmdReleaseInvalidFile:
         from rlsbl import cmd_release_run
 
         with pytest.raises(SystemExit) as exc_info:
-            cmd_release_run(cli_ctx(quiet=True), allow_dirty=False, watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, releasable=None)
+            cmd_release_run(cli_ctx(quiet=True), watch=False, push_timeout=0, ci_timeout=0, check_timeout=0, hook_timeout=0, releasable=None)
 
         assert exc_info.value.code == 1
         err = capsys.readouterr().err
@@ -473,7 +459,6 @@ class TestReleaseConfigSignature:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -487,7 +472,6 @@ class TestReleaseConfigSignature:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,
@@ -635,7 +619,6 @@ class TestMonorepoDirectoryScoping:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -646,7 +629,6 @@ class TestMonorepoDirectoryScoping:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,

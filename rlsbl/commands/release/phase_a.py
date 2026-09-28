@@ -58,14 +58,15 @@ Result captures are the executor's SOLE permitted reads.  ``tests/
 test_release_phase_a_seam.py`` scans this module and fails if any other read
 appears in it.
 
-Rollback is NOT a plan step
----------------------------
+Undo is NOT a plan step
+-----------------------
 
-A step that fails does not schedule its own undo.  Phase-A execution runs
-inside the caller's existing revert handler (``git reset --hard`` to the
-pre-release pin plus orphan-artifact cleanup), which is an executor-level
-concern and stays exactly where it was.  A preview executes nothing and so
-needs no rollback at all.
+A step that fails does not schedule its own undo.  Phase A runs in the
+release checkout, so a failure before the candidate reaches the remote leaves
+nothing to undo in the working tree: the caller discards the attempt, taking
+back only the branch advance the candidate push makes when that push is
+refused (``execute._discard_unpushed_attempt``).  A preview executes nothing
+and so needs no undo at all.
 """
 
 import dataclasses
@@ -826,8 +827,6 @@ def _expected_dirty_files(inp, files_to_commit):
         os.path.relpath(validated_raw, git_root)
         if os.path.isabs(validated_raw) else validated_raw
     )
-    if inp.state.pre_existing_dirty:
-        expected |= set(inp.state.pre_existing_dirty)
     return expected
 
 
@@ -965,10 +964,9 @@ def execute_phase_a_plan(plan, inp, *, preview):
     Returns the resolved ``candidate_sha`` (a real SHA in live mode, the
     framework's carrier in preview mode, or None when the plan defers the push).
 
-    Rollback is deliberately absent: a failing step raises, and the caller's
-    existing revert handler -- ``git reset --hard`` to the pre-release pin plus
-    orphan-artifact cleanup -- owns the undo. A preview executed nothing and
-    needs none.
+    Undo is deliberately absent: a failing step raises, and the caller
+    discards the attempt (``execute._discard_unpushed_attempt``). A preview
+    executed nothing and needs none.
     """
     return _Executor(plan, inp, preview=preview).run()
 
@@ -1421,6 +1419,16 @@ class _Executor:
                 argv, timeout=step.payload["timeout"], cwd=self._inp.git_root,
             )
         else:
+            # The candidate joins the live branch first, by compare-and-swap,
+            # so the branch never lags a candidate that may be on the remote;
+            # a push that is then refused takes the advance back (see
+            # execute._discard_unpushed_attempt).
+            from .execute import _advance_live_branch
+
+            _advance_live_branch(rerun=(
+                "run `rlsbl release resume`" if self._inp.state.resuming
+                else "re-run `rlsbl release run`"
+            ))
             push_if_needed(
                 self._inp.state.branch, config=self._inp.ctx.config,
                 cwd=self._inp.project_dir,

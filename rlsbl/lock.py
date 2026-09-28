@@ -25,6 +25,11 @@ from .errors import RlsblError
 
 # Module-level fd so the lock persists for the process lifetime
 _lock_fd = None
+# How many nested acquires the held lock is carrying. A release takes the lock
+# before it enters the release checkout and keeps it until it leaves, and the
+# code it runs in there takes it again (the batch orchestrator's own
+# ``rlsbl_lock``); the inner release must not drop the outer holder's lock.
+_lock_depth = 0
 
 
 class LockHeldError(RlsblError):
@@ -35,8 +40,9 @@ def acquire_lock(lock_dir=".rlsbl", *, project_root, wait=True):
     """Acquire an exclusive advisory lock on <lock_dir>/lock.
 
     If another process holds the lock and ``wait`` is True, prints a waiting
-    message and blocks until the lock is available. Returns early if already
-    locked (prevents fd leak on double-acquire).
+    message and blocks until the lock is available. Acquiring a lock this
+    process already holds nests: it opens no second descriptor, and the
+    matching :func:`release_lock` leaves the lock held for the outer holder.
 
     lock_dir: directory for the lock file (default ".rlsbl").
               In monorepo mode pass ".rlsbl-monorepo".
@@ -45,12 +51,18 @@ def acquire_lock(lock_dir=".rlsbl", *, project_root, wait=True):
           held lock raises :class:`LockHeldError` naming the lock file instead,
           for an operation whose caller would rather be told than queued.
     """
-    if project_root is not None:
-        lock_dir = os.path.join(str(project_root), lock_dir)
-    global _lock_fd
+    from .release_checkout import live_path
 
-    # Guard against double-acquire: if already holding the lock, return early
+    if project_root is not None:
+        # The lock guards the operator's working tree, so it lives there even
+        # when the caller stands in the release checkout.
+        lock_dir = os.path.join(str(live_path(str(project_root))), lock_dir)
+    global _lock_fd, _lock_depth
+
+    # Already holding it: count the nested acquire, so the matching release
+    # leaves the lock with its outer holder.
     if _lock_fd is not None:
+        _lock_depth += 1
         return
 
     # Real in every mode, preview included: flock needs a real descriptor, and
@@ -84,8 +96,11 @@ def acquire_lock(lock_dir=".rlsbl", *, project_root, wait=True):
 
 def release_lock():
     """Release the advisory lock, close the file descriptor, and remove the lock file."""
-    global _lock_fd
+    global _lock_fd, _lock_depth
 
+    if _lock_depth > 0:
+        _lock_depth -= 1
+        return
     if _lock_fd is not None:
         lock_path = _lock_fd.name
         fcntl.flock(_lock_fd, fcntl.LOCK_UN)
