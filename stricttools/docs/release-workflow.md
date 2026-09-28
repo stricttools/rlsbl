@@ -444,7 +444,7 @@ The gate resolves the release commit ref-based: it uses the workflow run's own `
 | No matching check runs after a grace window (default 5 minutes) | Hard error -- a scaffolded repository always has CI, so the release commit must produce check runs |
 | Checks still running past the timeout (default 20 minutes) | Hard error listing each pending check |
 
-Timeout, grace window, and poll interval are job env values (`GATE_TIMEOUT_MINUTES`, `GATE_GRACE_MINUTES`, `GATE_POLL_SECONDS`) -- edit them in the generated workflow if a repository's CI needs different limits. The gate job carries its own `permissions: checks: read`.
+Timeout, grace window, and poll interval are job env values (`GATE_TIMEOUT_MINUTES`, `GATE_GRACE_MINUTES`, `GATE_POLL_SECONDS`) -- edit them in the generated workflow if a repository's CI needs different limits. The gate job carries its own `timeout-minutes`, the timeout plus five, so a gate whose checks API keeps failing or whose step hangs ends there instead of at GitHub's six-hour job limit: raise it together with `GATE_TIMEOUT_MINUTES`, or GitHub cancels the job before the new timeout. The gate job carries its own `permissions: checks: read`.
 
 ### Retry contract
 

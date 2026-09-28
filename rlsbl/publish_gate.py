@@ -190,7 +190,9 @@ fi
 echo "Publish gate: waiting for CI on $GITHUB_REF_NAME (commit $sha)"
 echo "Check-run name filter: $CI_CHECK_REGEX"
 # Timeout, grace window, and poll interval come from the job env above;
-# edit them there if this repository's CI needs different limits.
+# edit them there if this repository's CI needs different limits. Raising
+# GATE_TIMEOUT_MINUTES needs the job's own timeout-minutes raised with it
+# (it is the deadline plus five), or GitHub cancels the job first.
 
 now() { date +%s; }
 start="$(now)"

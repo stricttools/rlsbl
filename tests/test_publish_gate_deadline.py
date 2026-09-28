@@ -70,3 +70,14 @@ def test_every_gate_job_has_its_own_timeout():
     assert _timeout(build_gate_job(check_regex="^(test)$")) == expected
     assert _timeout(build_router_gate_job([("pkg@v", "^(x)$")])) == expected
     assert f"timeout-minutes: {expected}" in gate_job_template_snippet("^(test)$")
+
+
+def test_the_edit_instruction_names_the_job_timeout_that_caps_the_deadline():
+    """The gate's tunables are configurable by editing the generated workflow,
+    and its script says so. Raising GATE_TIMEOUT_MINUTES alone now leaves the
+    job's own timeout-minutes (the old deadline plus five) in force, and GitHub
+    cancels the job before the new deadline: the instruction must say to raise
+    both."""
+    comments = [line for line in GATE_POLL_SCRIPT.splitlines()
+                if line.startswith("#")]
+    assert any("timeout-minutes" in line for line in comments), comments
