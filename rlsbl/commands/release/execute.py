@@ -4215,6 +4215,14 @@ def _run_release_mutating(state: ReleaseState):
     # are released, so skip both the watch call and the hint here.
     # Dry-run returns earlier (no push happens), but guard defensively.
     if not flags.get("dry-run", False) and not flags.get("batch-mode", False):
+        # A published Release that starts no publish run fails silently on
+        # GitHub's side, so the start is confirmed in both modes: it does not
+        # need CI to finish.
+        from ...publish_workflows import confirm_or_exit as _confirm_or_exit
+        _confirm_or_exit(
+            tag=tag, sha=pushed_sha, version=new_version, git_root=_git_root,
+            gh=lambda args: run_gh(args, config=ctx.config), log=log,
+        )
         if flags.get("watch"):
             log(f"Watching CI for {pushed_sha}...")
             from ..watch import run_cmd as watch_run_cmd
