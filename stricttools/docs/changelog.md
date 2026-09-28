@@ -1,5 +1,5 @@
 +++
-description = "JSONL changelog reference: the entry schema, the format_version gate, adding, amending and removing entries, the validation checks, and CHANGELOG output."
+description = "JSONL changelog reference: the entry schema, the format_version gate, adding, amending and removing entries, validation, fork coverage, and CHANGELOG output."
 +++
 
 # JSONL changelog
@@ -202,7 +202,7 @@ git fetch --no-tags origin 'refs/tags-of/github.com/ncruces/wasm2go/*:refs/tags-
 
 `--no-tags` is part of both: without it git follows every upstream tag pointing into the fetched history into `refs/tags`, bringing back the inherited tags `rlsbl upstream adopt-tags` moved out. (Re-running that command moves such tags out again.) The kept tags are read whenever present; a fork whose upstream has no tags, or whose tags have not been adopted yet, has none. The branch ref records upstream as of its last fetch: re-run the first fetch after upstream moves, or commits merged from its newer history are asked for entries.
 
-A fork's inherited tags are upstream's releases, not its own, and they must leave `refs/tags` before rlsbl can read the fork's release record: an empty record beside tags under the project's version scheme is refused as an unbackfilled release history, and in a fork that refusal names `rlsbl upstream adopt-tags` before `rlsbl release backfill`, which would record upstream's releases as the fork's.
+A fork's inherited tags are upstream's releases, not its own, and they must leave `refs/tags` before rlsbl can read the fork's release record: an empty record beside tags under the project's version scheme is refused as a release history that was never backfilled, and in a fork that refusal names `rlsbl upstream adopt-tags` before `rlsbl release backfill`, which would record upstream's releases as the fork's.
 
 ### Moving inherited tags: `rlsbl upstream adopt-tags`
 

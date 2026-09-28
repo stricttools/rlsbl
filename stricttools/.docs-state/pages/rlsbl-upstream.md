@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.upstream"
-description = "A fork's upstream: its declaration, the refs holding upstream's history, and the move of the tags a fork inherited from it."
+description = "A fork's upstream declaration, the refs/upstream and refs/tags-of refs holding upstream's history, and the move of inherited tags out of refs/tags."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 200
 +++
