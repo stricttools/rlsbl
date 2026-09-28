@@ -54,6 +54,66 @@ def _find_git_dir():
         return None
 
 
+def _git_line(args):
+    """One git answer from the current directory, or None when git gives none."""
+    try:
+        result = effects.run(
+            ["git", *args], capture_output=True, text=True, check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    return result.stdout.strip() or None
+
+
+def _hooks_dir():
+    """The directory git runs this repository's hooks from, or None outside git.
+
+    ``git rev-parse --git-path hooks`` answers it the way git itself does: it
+    honors ``core.hooksPath``, and in a linked worktree it names the common
+    directory's hooks rather than the worktree's own git directory.
+    """
+    path = _git_line(["rev-parse", "--path-format=absolute", "--git-path", "hooks"])
+    return os.path.abspath(path) if path else None
+
+
+def refuse_unreachable_hooks_dir():
+    """Refuse to scaffold when ``core.hooksPath`` points away from the repository.
+
+    Scaffold installs its hooks where git runs them. A ``core.hooksPath`` that
+    names another directory makes that somewhere else -- often a directory
+    other repositories share, or one committed to the working tree -- and
+    scaffold does not write hooks there. It refuses instead, before writing
+    anything, naming the setting and the command that removes it.
+
+    Raises:
+        ConfigError: naming the setting's value, where it is set, and the fix.
+    """
+    from ..errors import ConfigError
+
+    hooks = _hooks_dir()
+    common = _git_line(["rev-parse", "--path-format=absolute", "--git-common-dir"])
+    if hooks is None or common is None:
+        return
+    default = os.path.join(os.path.abspath(common), "hooks")
+    if os.path.realpath(hooks) == os.path.realpath(default):
+        return
+    origin = _git_line(["config", "--show-origin", "--get", "core.hooksPath"]) or ""
+    source, _, value = origin.partition("\t")
+    if source.startswith("file:"):
+        where = source[len("file:"):]
+        fix = f"`git config --file {where} --unset core.hooksPath`"
+    else:
+        where = source or "the git configuration"
+        fix = f"removing it from {where}"
+    raise ConfigError(
+        f"core.hooksPath is set to {value or '(unknown)'!r} (in {where}), so "
+        f"git runs this repository's hooks from {hooks}, not from {default}. "
+        f"rlsbl scaffold installs its pre-push and post-rewrite hooks where git "
+        f"runs them, and does not write into a directory core.hooksPath names. "
+        f"Remove the setting with {fix}, then re-run rlsbl scaffold."
+    )
+
+
 def _is_workspace_root(project_root):
     """Check if project_root is a monorepo workspace root.
 
@@ -1233,7 +1293,8 @@ def _install_or_update_hook(hook_name, current_content, current_hash, known_hash
         known_hashes: frozenset of all historical content hashes for this hook.
 
     Behavior:
-      - .git missing                -> no-op
+      - not in a git repository     -> no-op
+      - core.hooksPath elsewhere    -> ConfigError (see refuse_unreachable_hooks_dir)
       - hook missing                -> write current template, chmod 755
       - hook matches current hash   -> no-op (already up to date)
       - hook matches old known hash -> overwrite, print upgrade notice
@@ -1242,11 +1303,10 @@ def _install_or_update_hook(hook_name, current_content, current_hash, known_hash
     import difflib
     from ..hook_hashes import compute_hook_hash
 
-    git_dir = _find_git_dir()
-    if git_dir is None:
+    hooks_dir = _hooks_dir()
+    if hooks_dir is None:
         return
-
-    hooks_dir = os.path.join(git_dir, "hooks")
+    refuse_unreachable_hooks_dir()
     hook_target = os.path.join(hooks_dir, hook_name)
 
     if not os.path.exists(hook_target):
@@ -1254,7 +1314,7 @@ def _install_or_update_hook(hook_name, current_content, current_hash, known_hash
         with effects.open_write(hook_target, "w", encoding="utf-8") as f:
             f.write(current_content)
         effects.chmod(hook_target, 0o755)
-        print(f"Installed {hook_name} hook (.git/hooks/{hook_name})")
+        print(f"Installed {hook_name} hook ({hook_target})")
         return
 
     with open(hook_target, "r", encoding="utf-8") as f:
@@ -1853,6 +1913,7 @@ def run_cmd(registry, args, flags, ctx):
     _require_healable_bases_dir()
     from ..scratch_dirs import refuse_tracked_scratch_files
     refuse_tracked_scratch_files()
+    refuse_unreachable_hooks_dir()
 
     acquire_lock(project_root=project_root)
 
@@ -2981,6 +3042,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
     _require_healable_bases_dir()
     from ..scratch_dirs import refuse_tracked_scratch_files
     refuse_tracked_scratch_files()
+    refuse_unreachable_hooks_dir()
 
     # Acquire advisory lock to prevent concurrent rlsbl operations
     acquire_lock(project_root=project_root)
