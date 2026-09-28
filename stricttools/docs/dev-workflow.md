@@ -1,5 +1,5 @@
 +++
-description = "Local development: editable installs per target, sibling overlays via dev sync, overlay drift detection, CI watching with retry, and pre-push enforcement."
+description = "Local development: editable installs per target, sibling overlays via dev sync, overlay drift detection, CI watching with retry and a publish-start check for released commits, and pre-push enforcement."
 +++
 
 # Development workflow
@@ -126,14 +126,15 @@ A bare `uv sync` still reverts overlays -- harmlessly: re-run `rlsbl dev sync` t
 
 ### Behavior
 
-1. **Discovery** -- polls `gh run list --commit <sha>` until at least one run appears (30 attempts, 4 seconds apart: about two minutes)
-2. **Parallel watching** -- all discovered runs are watched concurrently via `gh run watch`
-3. **Classified auto-retry** -- when a workflow fails, the failing step's log tail is fetched and classified. A DETERMINISTIC failure (a test failure, a compile or config error, a workflow syntax error, a missing-secret or auth denial) will fail identically on a rerun and is never retried. Anything else is treated as a transient flake and retried exactly once, in place, via `gh run rerun <failed_run_id>` -- a full rerun of the same run id, not a `gh workflow run` dispatch (a dispatch would create a run the publish gate cannot match). The rerun is then watched to completion.
-4. **Late-starting workflow detection** -- after initial runs complete, polls once more for workflows that started late (e.g., publish/deploy workflows triggered by a GitHub Release created during CI). Late runs are watched with the same parallel/retry logic.
-5. **Workflow audit** -- prints a summary table of all workflows that ran. Warns if a publish workflow exists on disk but did not trigger for this commit.
-6. **Desktop notifications** -- sends a notification on completion:
+1. **Publish-start confirmation** -- for a commit a release shipped from (per the project's release record), every workflow in that commit's `.github/workflows/` that a published GitHub Release starts must show a run for the release's tag: the Release's own, or a dispatch at the tag from `rlsbl release retry`. GitHub reports no error when a Release starts nothing (a workflow missing at the tagged commit, a disabled workflow or GitHub Actions, a Release created with a workflow's `GITHUB_TOKEN`), so a run that has not appeared within five minutes is a hard error naming what rlsbl found, before anything is watched
+2. **Discovery** -- polls `gh run list --commit <sha>` until at least one run appears (30 attempts, 4 seconds apart: about two minutes)
+3. **Parallel watching** -- all discovered runs are watched concurrently via `gh run watch`
+4. **Classified auto-retry** -- when a workflow fails, the failing step's log tail is fetched and classified. A DETERMINISTIC failure (a test failure, a compile or config error, a workflow syntax error, a missing-secret or auth denial) will fail identically on a rerun and is never retried. Anything else is treated as a transient flake and retried exactly once, in place, via `gh run rerun <failed_run_id>` -- a full rerun of the same run id, not a `gh workflow run` dispatch (a dispatch would create a run the publish gate cannot match). The rerun is then watched to completion.
+5. **Late-starting workflow detection** -- after initial runs complete, polls once more for workflows that started late (e.g., publish/deploy workflows triggered by a GitHub Release created during CI). Late runs are watched with the same parallel/retry logic.
+6. **Workflow audit** -- prints a summary table of all workflows that ran. Warns if a publish workflow exists on disk but did not trigger for this commit.
+7. **Desktop notifications** -- sends a notification on completion:
    - On failure: opens the Actions page for the failed run
-   - On success: opens the GitHub Release page (if a tag exists for this commit)
+   - On success: opens the GitHub Release page of the release this commit shipped, or else of the project's own latest release, read from its release record
 
 ### Flags
 
