@@ -48,6 +48,24 @@ def _release_at(commit_sha):
     )
 
 
+def _release_tag_at(commit_sha):
+    """The tag of the release *commit_sha* is, under the project's own scheme, or None.
+
+    The release's own tag (``shipped_as`` when recorded), spelled under the
+    project's tag scheme -- a monorepo member's ``name@v1.2.3`` or
+    ``path/v1.2.3``, never the standalone ``v1.2.3``.
+    """
+    from ..context import resolve_release_scope
+    from ..utils import find_sub_project_root
+
+    released = _release_at(commit_sha)
+    if released is None:
+        return None
+    root, _project, _ws_root = find_sub_project_root()
+    _proj, tag_glob, _changes_dir, _scope = resolve_release_scope(root)
+    return released.tag(tag_glob)
+
+
 def _open_url(url):
     """Open a URL in the default browser. Non-fatal if unavailable."""
     try:
@@ -1287,6 +1305,20 @@ def run_cmd(registry, args, flags):
         # version is labelled by its short hash, as before.
         released = _release_at(commit_sha)
         label_for_commit = released.version if released else commit_sha[:12]
+        released_tag = _release_tag_at(commit_sha) if released else None
+
+        # A released commit's Release must have started its publish runs:
+        # GitHub reports no error when it does not (a workflow missing at the
+        # tagged commit, a disabled workflow or Actions, a Release created with
+        # a workflow's GITHUB_TOKEN), so an absent run is a hard error here,
+        # never an empty watch that exits 0.
+        if released is not None:
+            from ..publish_workflows import confirm_or_exit
+            confirm_or_exit(
+                tag=released_tag, sha=commit_sha, version=released.version,
+                git_root=_repo_root(), gh=run_gh,
+                log=lambda line: print(f"rlsbl: {line}", file=sys.stderr),
+            )
 
         label = f"{repo_name} {label_for_commit}" if repo_name else label_for_commit
 
@@ -1302,9 +1334,8 @@ def run_cmd(registry, args, flags):
             )
             # Best-effort hint: if this commit has a GitHub Release but no
             # workflows ran, suggest `rlsbl release retry`.
-            released_here = _release_at(commit_sha)
-            if released_here is not None:
-                release_tag = released_here.tag(None)
+            if released is not None:
+                release_tag = released_tag
                 try:
                     run_gh(["release", "view", release_tag])
                     print(
@@ -1368,7 +1399,7 @@ def run_cmd(registry, args, flags):
             if repo_slug and released is not None:
                 success_url = (
                     f"https://github.com/{repo_slug}/releases/tag/"
-                    f"{released.tag(None)}"
+                    f"{released_tag}"
                 )
             else:
                 success_url = _release_url(repo_slug)

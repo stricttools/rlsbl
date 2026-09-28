@@ -857,6 +857,33 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         preid=release_config.preid,
     )
 
+    # Publish-workflow preflight (pre-mutation): a published Release starts
+    # nothing, and GitHub reports no error, when the tagged commit lacks the
+    # workflow, the workflow or Actions is disabled. The Release's commit
+    # carries the workflow files committed now.
+    from ...publish_workflows import (
+        PublishWorkflowError as _PublishWorkflowError,
+        preflight as _publish_preflight,
+    )
+    from ...release_publication import is_prerelease as _is_prerelease
+    from ...utils import get_github_repo as _get_github_repo
+    _publishes_from_ci = any(
+        (c or {}).get("publish_mode") != "none" and any(
+            isinstance(entry, dict) and entry.get("local") is False
+            for entry in ((c or {}).get("pipelines") or {}).values()
+        )
+        for c in _provenance_scan_configs
+    )
+    try:
+        _publish_preflight(
+            git_root=_resolve_git_root(project_dir), commit="HEAD",
+            gh=lambda args: run_gh(args, config), publishes=_publishes_from_ci,
+            prerelease=_is_prerelease(new_version),
+            slug=_get_github_repo(config),
+        )
+    except _PublishWorkflowError as exc:
+        raise ReleaseValidationError(str(exc)) from exc
+
     # --- Validate changelog ---
     # In monorepo mode, resolve the project dict for scoped coverage checks.
     # For releasable mode, pass the full member project list; the

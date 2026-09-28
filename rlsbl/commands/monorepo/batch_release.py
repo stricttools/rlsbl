@@ -170,7 +170,21 @@ def _watch_and_verify_batch(flags, last_sha, probe_specs, log):
     is still in flight, so a probe would report every member as missing and
     fail every ``--no-watch`` batch. The run says so out loud instead (see
     :func:`_announce_unverified_publication`).
+
+    In both modes every member's Release must first have STARTED its publish
+    runs: GitHub reports no error when a published Release starts nothing, and
+    confirming a start does not need CI to finish.
     """
+    from ...publish_workflows import confirm_or_exit
+    from ...utils import run_gh
+
+    for _label, _targets, version, tag, ctx in probe_specs:
+        confirm_or_exit(
+            tag=tag, sha=last_sha.strip(), version=version,
+            git_root=str(ctx.workspace_root or ctx.project_root),
+            gh=lambda args, _config=ctx.config: run_gh(args, config=_config),
+            log=log,
+        )
     if not flags.get("watch"):
         _announce_unverified_publication(last_sha, log)
         return
