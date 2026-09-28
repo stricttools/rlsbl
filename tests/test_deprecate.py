@@ -22,11 +22,13 @@ def _archive_in_cwd(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     releases = tmp_path / ".rlsbl" / "releases"
     releases.mkdir(parents=True)
-    (releases / "v0.9.1.toml").write_text(
-        'format_version = 1\nbump = "patch"\ndescription = "d"\n'
-        'include = []\nexclude = []\n',
-        encoding="utf-8",
-    )
+    for version in ("0.9.1", "0.9.2"):
+        # v0.9.2 is the package's latest release: 0.9.1 can be deprecated.
+        (releases / f"v{version}.toml").write_text(
+            'format_version = 1\nbump = "patch"\ndescription = "d"\n'
+            'include = []\nexclude = []\n',
+            encoding="utf-8",
+        )
     with patch("rlsbl.release_publication.commit_files"):
         yield
 
@@ -100,7 +102,6 @@ class TestDeprecateNoHardFlag(unittest.TestCase):
         """The 'hard' key in flags is not processed (no _hard_yank path)."""
         mock_run_gh.side_effect = [
             "",         # gh release view v0.9.1
-            "v0.9.2",  # gh release list (latest)
         ]
         # Even if 'hard' is passed in flags, deprecate should just do the soft path
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
@@ -122,7 +123,6 @@ class TestDeprecateDryRun(unittest.TestCase):
         """Dry run prints what would happen without editing."""
         mock_run_gh.side_effect = [
             "",         # gh release view v0.9.1
-            "v0.9.2",  # gh release list (latest)
         ]
 
         with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
@@ -163,9 +163,13 @@ class TestDeprecateErrorCases(unittest.TestCase):
     @patch("rlsbl.commands.deprecate.resolve_member_context", return_value=MagicMock(targets=[]))
     def test_latest_release_blocked(self, _detect, _ws_root, mock_run_gh, _gh_inst, _gh_auth):
         """Deprecating the latest release is blocked with a suggestion to use undo."""
+        (Path(".rlsbl") / "releases" / "v1.0.0.toml").write_text(
+            'format_version = 1\nbump = "patch"\ndescription = "d"\n'
+            'include = []\nexclude = []\n',
+            encoding="utf-8",
+        )
         mock_run_gh.side_effect = [
             "",         # gh release view v1.0.0 (exists)
-            "v1.0.0",  # gh release list (latest IS our target)
         ]
 
         with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
@@ -229,7 +233,6 @@ class TestDeprecateNoLongerPromptsItself:
     ):
         mock_run_gh.side_effect = [
             "",         # gh release view v0.9.1 (exists check)
-            "v0.9.2",   # gh release list (latest, not our target)
             "",         # gh release view --json body
             "",         # gh release edit
         ]

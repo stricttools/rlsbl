@@ -254,7 +254,6 @@ class TestYankCommand:
 
         mock_gh.side_effect = [
             "",         # release view
-            "v2.0.0",  # release list (latest)
             "body",    # release view body
         ]
 
@@ -285,7 +284,6 @@ class TestYankCommand:
 
         mock_gh.side_effect = [
             "",         # release view
-            "v2.0.0",  # release list (latest)
         ]
 
         with patch(f"rlsbl.commands.yank.TARGETS", {"plain": target}), \
@@ -316,7 +314,6 @@ class TestYankCommand:
 
         mock_gh.side_effect = [
             "",         # release view
-            "v2.0.0",  # release list (latest)
             "body",    # release view body
             "",         # release edit
         ]
@@ -361,7 +358,6 @@ class TestYankCommand:
 
         mock_gh.side_effect = [
             "",         # release view
-            "v2.0.0",  # release list (latest)
             "body",    # release view body
         ]
 
@@ -383,12 +379,19 @@ class TestYankCommand:
     @patch(f"{MOD}.check_gh_auth", return_value=True)
     @patch(f"{MOD}.run_gh")
     def test_latest_release_blocked(self, mock_gh, *_):
+        """The package's own release record names 1.0.0 as its latest release."""
+        releases = Path(".rlsbl") / "releases"
+        releases.mkdir(parents=True)
+        (releases / "v1.0.0.toml").write_text(
+            'format_version = 1\nbump = "patch"\ndescription = "d"\n'
+            'include = []\nexclude = []\n',
+            encoding="utf-8",
+        )
         mock_gh.side_effect = [
             "",         # release view
-            "v1.0.0",  # latest IS our target
         ]
         with pytest.raises(SystemExit) as exc:
-            run_cmd(["1.0.0"], {}, project_root=Path("/fake"))
+            run_cmd(["1.0.0"], {}, project_root=Path("."))
         assert exc.value.code == 1
 
 

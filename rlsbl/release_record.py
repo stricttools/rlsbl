@@ -636,6 +636,24 @@ def latest_release_fact(releases_dir: str, *, tag_glob: str | None = None,
                              never_released_above=tuple(phantoms))
 
 
+def latest_released_version(releases_dir: str) -> str | None:
+    """The highest version *releases_dir*'s archives record as released, or None.
+
+    A package's own latest release, which in a monorepo is not the repository's
+    newest GitHub Release: that one belongs to whichever package released last.
+    Reads only the archives -- an archive recorded ``never_released`` is a
+    version number no release used, and is passed over -- so it needs neither
+    the network nor this checkout's history. None when nothing was released.
+    """
+    from .release_file import archived_release_path, read_release_file
+
+    for version in list_archived_versions(releases_dir):
+        archive = read_release_file(archived_release_path(releases_dir, version))
+        if not archive.never_released:
+            return version
+    return None
+
+
 def require_checkout_contains_latest(releases_dir: str, *,
                                      tag_glob: str | None = None,
                                      cwd: str | None = None,

@@ -60,16 +60,40 @@ def _open_url(url):
 
 
 def _release_url(repo_slug):
-    """Try to find the latest release tag and return its GitHub URL. Returns None on failure."""
+    """The GitHub URL of this package's own latest release, or None.
+
+    Read from the package's release record, like :func:`_release_at`: in a
+    monorepo the repository's newest GitHub Release is whichever package
+    released last, so asking GitHub would link another package's release.
+    None outside an rlsbl project, for a package with no release yet, and when
+    the record cannot be read -- this only picks the link a desktop
+    notification opens.
+    """
     if not repo_slug:
         return None
+    from ..context import resolve_release_scope
+    from ..release_file import archived_release_path, read_release_file
+    from ..release_record import (
+        latest_released_version,
+        releases_dir_for_changes_dir,
+        tag_for_version,
+    )
+    from ..utils import find_sub_project_root
+
     try:
-        raw = run_gh(["release", "list", "--limit", "1", "--json", "tagName", "-q", ".[0].tagName"])
-        if raw:
-            return f"https://github.com/{repo_slug}/releases/tag/{raw}"
+        root, _project, _ws_root = find_sub_project_root()
+        if root is None:
+            return None
+        _proj, tag_glob, changes_dir, _scope = resolve_release_scope(root)
+        releases_dir = releases_dir_for_changes_dir(changes_dir)
+        version = latest_released_version(releases_dir)
+        if version is None:
+            return None
+        archive = read_release_file(archived_release_path(releases_dir, version))
     except Exception:
-        pass
-    return None
+        return None
+    tag = archive.shipped_as or tag_for_version(tag_glob, version)
+    return f"https://github.com/{repo_slug}/releases/tag/{tag}"
 
 
 def _notify(title, body, url=None):
