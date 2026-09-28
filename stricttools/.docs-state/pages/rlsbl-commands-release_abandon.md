@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.commands.release_abandon"
-description = "``rlsbl release abandon``: record an abandoned release attempt's version as never released."
+description = "Records an abandoned release attempt's version as never released: writes its archive, deletes the in-progress state, and refuses when a tag or Release exists."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 64
 +++
