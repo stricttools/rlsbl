@@ -29,6 +29,18 @@ from test_private_repo_publishing import (
 
 RUN_GH = "rlsbl.commands.release.validate.run_gh"
 
+from rlsbl import private_repo_publishing as _prp  # noqa: E402
+
+_REAL_COMMITTED_WORKFLOW_USES = _prp.committed_workflow_uses
+
+
+@pytest.fixture(autouse=True)
+def _real_committed_workflow_read(monkeypatch):
+    """The real read of the committed workflows (conftest neutralizes it)."""
+    monkeypatch.setattr(
+        _prp, "committed_workflow_uses", _REAL_COMMITTED_WORKFLOW_USES,
+    )
+
 
 class TestTheReleaseRefusesAndTheFixClearsIt:
 
