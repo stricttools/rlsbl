@@ -1031,7 +1031,7 @@ def _setup_releasable_project_with_hook(repo, hook_name, hook_body):
     )
     changes_dir = repo / ".rlsbl" / "changes"
     changes_dir.mkdir(parents=True)
-    (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
+    (changes_dir / "unreleased.jsonl").write_text(json.dumps({"format_version": 1, "commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
     (repo / ".rlsbl" / "config.json").write_text(
         json.dumps({"publish_mode": "ci", "targets": ["npm"], "pipelines": {}}) + "\n"
     )
@@ -1054,7 +1054,7 @@ def _setup_releasable_project_with_hook(repo, hook_name, hook_body):
     feature_sha = _git_head(repo)
 
     # Cover it with a JSONL entry
-    entry = {
+    entry = {"format_version": 1, 
         "commits": [feature_sha],
         "user_facing": True,
         "description": "**Add feature.** New feature.",
@@ -1079,7 +1079,7 @@ def _setup_releasable_project_with_hook(repo, hook_name, hook_body):
     # Cover the hook commit
     hook_sha = _git_head(repo)
     with open(changes_dir / "unreleased.jsonl", "a") as f:
-        f.write(json.dumps({"commits": [hook_sha], "user_facing": False}) + "\n")
+        f.write(json.dumps({"format_version": 1, "commits": [hook_sha], "user_facing": False}) + "\n")
     _git(repo, "add", ".rlsbl/changes/unreleased.jsonl")
     _git(
         repo, "commit", "-q", "-m", "changelog: cover hook commit",
@@ -1116,7 +1116,7 @@ class TestHookGeneratedFiles:
         schema_sha = _git_head(tmp_project)
         changes_dir = tmp_project / ".rlsbl" / "changes"
         with open(changes_dir / "unreleased.jsonl", "a") as f:
-            f.write(json.dumps({"commits": [schema_sha], "user_facing": False}) + "\n")
+            f.write(json.dumps({"format_version": 1, "commits": [schema_sha], "user_facing": False}) + "\n")
         _git(tmp_project, "add", ".rlsbl/changes/unreleased.jsonl")
         _git(
             tmp_project, "commit", "-q", "-m", "changelog: cover schema commit",
@@ -1219,7 +1219,7 @@ class TestHookGeneratedFiles:
         )
         changes_dir = tmp_project / ".rlsbl" / "changes"
         changes_dir.mkdir(parents=True)
-        (changes_dir / "unreleased.jsonl").write_text(json.dumps({"commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
+        (changes_dir / "unreleased.jsonl").write_text(json.dumps({"format_version": 1, "commits": ["abc1234"], "user_facing": True, "description": "test", "type": "feature"}) + "\n")
         (tmp_project / ".rlsbl" / "config.json").write_text(
             json.dumps({"publish_mode": "ci", "targets": ["npm"], "pipelines": {}}) + "\n"
         )
@@ -1237,7 +1237,7 @@ class TestHookGeneratedFiles:
         _git(tmp_project, "add", "feature.txt")
         _git(tmp_project, "commit", "-q", "-m", "add feature")
         feature_sha = _git_head(tmp_project)
-        entry = {
+        entry = {"format_version": 1, 
             "commits": [feature_sha],
             "user_facing": True,
             "description": "**Feature.** Something new.",
@@ -1302,7 +1302,7 @@ class TestHookGeneratedFiles:
         notes_sha = _git_head(tmp_project)
         changes_dir = tmp_project / ".rlsbl" / "changes"
         with open(changes_dir / "unreleased.jsonl", "a") as f:
-            f.write(json.dumps({"commits": [notes_sha], "user_facing": False}) + "\n")
+            f.write(json.dumps({"format_version": 1, "commits": [notes_sha], "user_facing": False}) + "\n")
         _git(tmp_project, "add", ".rlsbl/changes/unreleased.jsonl")
         _git(
             tmp_project, "commit", "-q", "-m", "changelog: cover notes commit",

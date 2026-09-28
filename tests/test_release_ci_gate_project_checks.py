@@ -116,7 +116,7 @@ def _add_ci_workflows(root, core):
         get_releasable_changes_dir(str(root), "alpha"), "unreleased.jsonl"
     )
     with open(unreleased, "a", encoding="utf-8") as f:
-        f.write(json.dumps({"commits": [sha], "user_facing": False}) + "\n")
+        f.write(json.dumps({"format_version": 1, "commits": [sha], "user_facing": False}) + "\n")
     git(root, "add", os.path.relpath(unreleased, str(root)))
     git(root, "commit", "-q", "-m", "changelog: ci workflows")
 

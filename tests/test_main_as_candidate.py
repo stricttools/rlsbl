@@ -130,7 +130,7 @@ def _add_fix_commit(root, core):
     sha = git(root, "rev-parse", "HEAD")
     unreleased = os.path.join(_changes(root), "unreleased.jsonl")
     with open(unreleased, "a", encoding="utf-8") as f:
-        f.write(json.dumps({
+        f.write(json.dumps({"format_version": 1, 
             "commits": [sha],
             "user_facing": True,
             "description": "**Fix the failure.** The bug is gone.",

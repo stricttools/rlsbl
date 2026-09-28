@@ -118,6 +118,7 @@ def _setup_batch_workspace(root):
         git(root, "commit", "-q", "-m", f"{name}: add feature")
         sha = git(root, "rev-parse", "HEAD")
         entry = json.dumps({
+            "format_version": 1,
             "commits": [sha],
             "user_facing": True,
             "description": f"**{name} feature.** It works.",
@@ -217,6 +218,7 @@ def _setup_releasable_batch_workspace(root):
         )
         with open(jsonl, "w") as f:
             f.write(json.dumps({
+                "format_version": 1,
                 "commits": [sha],
                 "user_facing": True,
                 "description": f"**{name} feature.** It works.",

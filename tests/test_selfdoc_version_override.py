@@ -124,7 +124,7 @@ class TestReleaseFlowThreadsTheNewVersion:
             "unreleased.jsonl",
         )
         with open(unreleased, "a", encoding="utf-8") as f:
-            f.write(json.dumps({
+            f.write(json.dumps({"format_version": 1, 
                 "commits": [git(tmp_project, "rev-parse", "HEAD")],
                 "user_facing": False,
             }) + "\n")

@@ -105,7 +105,7 @@ def _setup_pr_mode_project(repo):
     feature_sha = _git_head(repo)
 
     # Cover it with a JSONL entry
-    entry = {
+    entry = {"format_version": 1, 
         "commits": [feature_sha],
         "user_facing": True,
         "description": "**New feature.** A shiny new thing.",
@@ -263,7 +263,7 @@ class TestImperativeModeUnchanged:
         _git(mock_git_repo, "commit", "-q", "-m", "add feature")
         feature_sha = _git_head(mock_git_repo)
 
-        entry = {
+        entry = {"format_version": 1, 
             "commits": [feature_sha],
             "user_facing": True,
             "description": "**New feature.** A shiny new thing.",

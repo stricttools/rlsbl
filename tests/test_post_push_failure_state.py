@@ -79,7 +79,7 @@ def _setup_npm_project(repo):
     _git(repo, "add", "feature.txt")
     _git(repo, "commit", "-q", "-m", "add feature")
     feature_sha = _git_out(repo, "rev-parse", "HEAD")
-    entry = {
+    entry = {"format_version": 1, 
         "commits": [feature_sha],
         "user_facing": True,
         "description": "**New feature.** A shiny new thing.",

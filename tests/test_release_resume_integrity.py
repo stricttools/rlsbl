@@ -255,7 +255,7 @@ def _cover_commit(repo, sha):
     """
     changes = repo / ".rlsbl" / "changes"
     unreleased = changes / "unreleased.jsonl"
-    entry = {"commits": [sha], "user_facing": False}
+    entry = {"format_version": 1, "commits": [sha], "user_facing": False}
     unreleased.write_text(unreleased.read_text() + json.dumps(entry) + "\n")
     _git(repo, "add", ".rlsbl/changes/unreleased.jsonl")
     _git(repo, "commit", "-q", "-m", "changelog: cover the fix")
