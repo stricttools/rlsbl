@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.commands.upstream_cmd"
-description = "``rlsbl upstream adopt-tags``: move the tags a fork inherited from its upstream out of ``refs/tags``."
+description = "The rlsbl upstream adopt-tags command: observes under the no-writes guard, prints the plan, refuses a conflict before any write, then moves the inherited tags."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 80
 +++
