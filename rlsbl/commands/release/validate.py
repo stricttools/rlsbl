@@ -1700,13 +1700,16 @@ def _abort_on_npm_provenance(configs, *, gh_config):
         )
 
 
-def _abort_on_private_repo_publishing(configs, *, gh_config, workflows_dir):
+def _abort_on_private_repo_publishing(configs, *, gh_config, workflows_dir=None,
+                                      git_root=None, commit="HEAD"):
     """Abort the release when a private repository would publish what needs a public one.
 
     npm build provenance, PyPI attestations, and the Go module proxy all need
     a public source repository (see :mod:`rlsbl.private_repo_publishing`).
-    *configs* are the project or member configs this release publishes from,
-    and *workflows_dir* is the repository's ``.github/workflows``. The
+    *configs* are the project or member configs this release publishes from.
+    The workflows judged are those in *commit*'s tree under *git_root* -- the
+    committed tree the release tags, so an uncommitted fix clears nothing --
+    or, without *git_root*, the files in *workflows_dir*. The
     repository's visibility is asked through ``gh repo view --json isPrivate``
     (with *gh_config* for GH_REPO resolution) only when one of them is in use,
     and an unanswered question is a hard error rather than a pass.
@@ -1715,13 +1718,18 @@ def _abort_on_private_repo_publishing(configs, *, gh_config, workflows_dir):
     """
     from ...private_repo_publishing import (
         VisibilityUnknownError,
-        public_only_uses,
+        committed_workflow_uses,
+        config_uses,
         refusal,
         repo_is_private,
         unknown_visibility,
+        workflow_uses,
     )
 
-    uses = public_only_uses(configs, workflows_dir)
+    uses = config_uses(configs) + (
+        committed_workflow_uses(git_root, commit) if git_root is not None
+        else workflow_uses(workflows_dir)
+    )
     if not uses:
         return
     try:
