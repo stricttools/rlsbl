@@ -422,8 +422,7 @@ class TestResumeDryRun:
                     bump="patch", include=["npm"], exclude=[],
                     description="test release",
                 ),
-                {"dry-run": True, "quiet": False,
-                 "allow-dirty": True},
+                {"dry-run": True, "quiet": False},
                 ctx=_make_ctx(mock_git_repo),
             )
         finally:

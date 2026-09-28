@@ -194,7 +194,7 @@ class TestBatchReleaseRootSelfdocIntegration:
         # Create selfdoc.json at root (but NOT in the member)
         (tmp_path / "selfdoc.json").write_text('{"version": "0.1.0"}')
 
-        flags = {"dry-run": True, "allow-dirty": True, "quiet": False}
+        flags = {"dry-run": True, "quiet": False}
 
         with patch(
             "rlsbl.commands.monorepo.batch_release.validate_gh_cli"

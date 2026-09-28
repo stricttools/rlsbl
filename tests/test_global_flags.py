@@ -124,7 +124,7 @@ class TestReservedFlagsAfterTheCommand:
     """`rlsbl <command> --dry-run` must work, not just `rlsbl --dry-run <command>`.
 
     Every documented rlsbl invocation writes the framework-owned flags AFTER the
-    command name (`rlsbl release run --no-allow-dirty --watch
+    command name (`rlsbl release run --watch
     --approve-consequential`). strictcli recognizes them anywhere in argv, so this works with no argv
     rewriting on rlsbl's side; `main()` carried a hoisting shim until then.
     These tests pin the property, not the removed shim.

@@ -452,7 +452,7 @@ class TestTheMessagesThatRoutedHere:
                     bump="patch", include=["npm"], exclude=[],
                     description="another release",
                 ),
-                {"allow-dirty": False, "watch": False, "dry-run": True},
+                {"watch": False, "dry-run": True},
                 ctx=ctx,
             )
         return capsys.readouterr().err
@@ -473,7 +473,7 @@ class TestTheMessagesThatRoutedHere:
                     bump="patch", include=["npm"], exclude=[],
                     description="another release",
                 ),
-                {"allow-dirty": False, "watch": False, "dry-run": True},
+                {"watch": False, "dry-run": True},
                 ctx=ctx,
             )
         except (SystemExit, Exception):
