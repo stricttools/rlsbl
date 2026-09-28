@@ -1,0 +1,7 @@
+format_version = 1
+
+[[entry]]
+id = "rlsbl:dep-floors"
+current = "error"
+ideal = "error"
+reason = "rlsbl adopts new strictcli and strictspec behavior release by release, so its declared floors must follow the versions its lock resolves"

@@ -1,0 +1,7 @@
+format_version = 1
+
+[[entry]]
+id = "rlsbl:test-sandbox"
+current = "on"
+ideal = "on"
+reason = "rlsbl distributes the sandboxed test runner and runs its own suite through it (scripts/test.sh)"
