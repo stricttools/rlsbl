@@ -686,7 +686,7 @@ class TestRunExternalPreflightChecks:
                 workspace_root=None, config=config,
             )
             results, _listed, exit_code = run_external_preflight_checks(
-                rlsbl.app, ctx, config,
+                ctx, config,
             )
             assert exit_code == 0
             assert ext_marker.exists()
@@ -721,7 +721,7 @@ class TestRunExternalPreflightChecks:
                 workspace_root=None, config=config,
             )
             results, _listed, exit_code = run_external_preflight_checks(
-                rlsbl.app, ctx, config,
+                ctx, config,
             )
             assert exit_code != 0
             assert any(
@@ -773,7 +773,7 @@ class TestBothRehearsalBranchesPartitionTheSameWay:
                 workspace_root=None, config=config,
             )
             run_external_preflight_checks(
-                rlsbl.app, ctx, config, pure_only=True,
+                ctx, config, pure_only=True,
             )
         finally:
             rlsbl.app.reset_check_provider_cache()
@@ -810,7 +810,7 @@ class TestBothRehearsalBranchesPartitionTheSameWay:
                 workspace_root=None, config=config,
             )
             results, listed, exit_code = run_external_preflight_checks(
-                rlsbl.app, ctx, config, pure_only=True,
+                ctx, config, pure_only=True,
             )
         finally:
             rlsbl.app.reset_check_provider_cache()
@@ -1110,3 +1110,54 @@ class TestReleaseContextEnvWorkspace:
         assert "tag=[alpha@v1.0.0]" in result.message
         assert f"range={released}..HEAD" in result.message
         assert f"root={pkg}" in result.message
+
+
+class TestExternalPreflightResolvesForTheMember:
+    """The customized-hook branch runs the config-declared external checks for
+    one member. Each check's value -- the external check's own dependencies
+    included -- comes from THAT member's options, never from whichever
+    directory the process happens to stand in."""
+
+    def test_a_dependency_s_value_comes_from_the_member(self, tmp_path, monkeypatch):
+        import rlsbl
+        from pathlib import Path
+
+        from conftest import set_option
+        from rlsbl.context import ProjectContext
+        from rlsbl.external_checks import run_external_preflight_checks
+
+        member = tmp_path / "member"
+        member.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=str(member), check=True)
+        config = {
+            "publish_mode": "ci",
+            "external_checks": [_freeform(
+                name="ext-needs-license", command="true",
+                depends_on=["license-file"],
+            )],
+        }
+        (member / ".rlsbl").mkdir()
+        (member / ".rlsbl" / "config.json").write_text(json.dumps(config))
+        # The process stands in another project declaring the same external
+        # check (the check provider reads the current directory's config), and
+        # that project's options switch the dependency off.
+        elsewhere = tmp_path / "elsewhere"
+        (elsewhere / ".rlsbl").mkdir(parents=True)
+        (elsewhere / ".rlsbl" / "config.json").write_text(json.dumps(config))
+        set_option(elsewhere, "license-file", "off", ideal="error")
+        monkeypatch.chdir(elsewhere)
+        rlsbl.app.reset_check_provider_cache()
+        try:
+            ctx = ProjectContext(
+                project_root=Path(str(member)), workspace_root=None, config=config,
+            )
+            results, _listed, _exit = run_external_preflight_checks(ctx, config)
+        finally:
+            rlsbl.app.reset_check_provider_cache()
+
+        statuses = {r.name: r.outcome.status for r in results}
+        assert "license-file" in statuses
+        assert statuses["license-file"] != "off", (
+            "the dependency was switched off by the options of the directory "
+            "the process stands in, not the member being released"
+        )

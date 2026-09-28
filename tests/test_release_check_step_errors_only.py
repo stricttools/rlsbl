@@ -182,7 +182,7 @@ class TestWarnOnlyOutcomes:
         """The customized pre-release hook path decides the same way."""
         _setup_project(tmp_project, user_facing=True)
 
-        def external(app, ctx, config, **kwargs):
+        def external(ctx, config, **kwargs):
             return ([_Result("my-lint", "warn", "style nit")], [], 1)
 
         mutating = _release(
@@ -233,7 +233,7 @@ class TestErrorLevelFailuresBlockAndAreNamed:
     def test_an_external_failure_is_named(self, tmp_project, capsys):
         _setup_project(tmp_project, user_facing=True)
 
-        def external(app, ctx, config, **kwargs):
+        def external(ctx, config, **kwargs):
             return ([_Result("my-lint", "fail", "broken")], [], 1)
 
         with pytest.raises(SystemExit):
