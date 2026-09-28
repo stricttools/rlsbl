@@ -823,6 +823,16 @@ class BaseTarget:
     members each resolve independently.
     """
 
+    publish_workflow_attests: ClassVar[bool] = False
+    """Whether this target's CI publish step attaches attestations by default.
+
+    True where the publish action records the repository's name, workflow, and
+    commit in a public transparency log unless told not to (PyPI's
+    ``pypa/gh-action-pypi-publish``). Scaffold asks the repository's
+    visibility only for such targets, and switches attestations off for a
+    private repository.
+    """
+
     supports_dep_floors: ClassVar[bool] = False
     """Whether this target's manifest states dependency floors a lock resolves.
 

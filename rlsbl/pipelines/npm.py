@@ -18,6 +18,17 @@ class NpmPipeline(TokenPipeline):
     # repository carries it.
     ci_secret_vars = ("NPM_TOKEN",)
 
+    def public_repo_requirement(self) -> tuple[str, str] | None:
+        """npm build provenance needs a public source repository."""
+        if self.config.get("provenance") is not True:
+            return None
+        return (
+            f'npm pipeline "{self.name}" declares "provenance": true, and npm '
+            f"build provenance needs a public source repository.",
+            'Set "provenance": false on that pipeline in .rlsbl/config.json '
+            "(or drop the pipeline).",
+        )
+
     def template_dir(self) -> str | None:
         """Return the npm CI templates directory."""
         return os.path.join(

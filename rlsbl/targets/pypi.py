@@ -634,6 +634,7 @@ class PypiTarget(BaseTarget):
 
     shares_workspace_environment = True
     supports_dep_floors = True
+    publish_workflow_attests = True
 
     def find_dead_modules(self, root, *, exclude_dirs=None, suppress=frozenset()):
         """Union-of-imports detector over the project's Python modules."""
