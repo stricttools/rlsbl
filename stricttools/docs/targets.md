@@ -224,6 +224,7 @@ Each target declares an `ecosystem` string: the human-readable name of the regis
 - Detection: `pgdesign.toml` file presence
 - Version: reads/writes the `version` field in `pgdesign.toml`
 - No publish mechanism — version bumping only (the tagged GitHub Release is the artifact)
+- Build: the release validates the schema with `pgdesign check --tag validation --json` in the target directory and fails on a check whose status is `fail`, naming its errors; warnings are printed and never block. The output must be strictcli's machine envelope (interface_version 2, which pgdesign 0.27.1 prints); anything else, or a validation tag that selects no check, fails the build
 - Use case: PostgreSQL schema design projects managed by the pgdesign tool
 
 ### native-ios

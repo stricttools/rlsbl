@@ -1,5 +1,6 @@
 """Pgdesign release target for projects using pgdesign to manage database schemas, with version tracking in pgdesign.toml."""
 
+import json
 import os
 import sys
 
@@ -12,6 +13,73 @@ from .. import effects
 
 #: The file the scaffolded CI installs Go from, next to pgdesign.toml.
 GO_VERSION_FILE = ".go-version"
+
+
+_VALIDATION_ARGV = ["pgdesign", "check", "--tag", "validation", "--json"]
+_VALIDATION_COMMAND = " ".join(_VALIDATION_ARGV)
+
+
+def _validation_verdict(result):
+    """Read `pgdesign check --tag validation --json`: None when it passed,
+    else the text naming why it did not.
+
+    The machine output is strictcli's envelope (interface_version 2, as
+    pgdesign 0.27.1 prints it): the check results are its ``payload``, one
+    object per check with ``name``, ``status``, ``message``, and
+    ``problems``. Only a ``fail`` status fails; each ``warn`` result's
+    problems are printed as they are reported. Output that is not that
+    envelope, a selection that matched no check, and a nonzero exit with
+    neither a failure nor a warning to show for it are refused, never read as
+    a pass.
+    """
+    raw = (result.stdout or "").strip()
+    try:
+        doc = json.loads(raw) if raw else None
+    except json.JSONDecodeError:
+        doc = None
+    if not isinstance(doc, dict) or doc.get("interface_version") != 2:
+        return (
+            f"its output is not strictcli's machine envelope "
+            f"(interface_version 2, which pgdesign 0.27.1 prints); it exited "
+            f"{result.returncode} with:\n{result.stderr or result.stdout}"
+        )
+    diagnostics = "\n".join(
+        str(d.get("message", "")) for d in doc.get("diagnostics") or []
+        if isinstance(d, dict)
+    )
+    results = doc.get("payload")
+    if not results:
+        return (
+            f"the validation tag selected no checks, so nothing was "
+            f"validated; pgdesign said:\n{diagnostics}"
+        )
+    if not isinstance(results, list) or not all(
+        isinstance(r, dict) and "status" in r for r in results
+    ):
+        return f"its payload is not a list of check results:\n{raw}"
+
+    failed = []
+    for r in results:
+        problems = [
+            p for p in r.get("problems") or [] if isinstance(p, dict)
+        ]
+        if r["status"] == "warn":
+            for p in problems:
+                print(f"  WARN  {r.get('name')}: {p.get('text')}", file=sys.stderr)
+        elif r["status"] == "fail":
+            lines = [f"{r.get('name')}: {r.get('message')}"]
+            lines += [
+                f"  [{p.get('severity')}] {p.get('text')}" for p in problems
+            ]
+            failed.append("\n".join(lines))
+    if failed:
+        return "\n".join(failed)
+    if result.returncode != 0 and not any(r["status"] == "warn" for r in results):
+        return (
+            f"it exited {result.returncode} without reporting a failure or a "
+            f"warning:\n{result.stderr or diagnostics}"
+        )
+    return None
 
 
 def machine_go_version():
@@ -143,26 +211,24 @@ class PgdesignTarget(BaseTarget):
         therefore expressed as cwd -- and that directory is *dir_path*, which
         for a schema in a subdirectory is the declared target path.
 
-        `--ignore-warnings` is always passed: pgdesign's check framework exits
-        nonzero on warn-severity results, and warnings are advisory under its
-        own severity model. Only errors are release-blocking, so warnings must
-        never abort a release.
+        The verdict is read from the machine output, not the exit code:
+        pgdesign's check exits nonzero on a warn-severity result too, and its
+        warnings are advisory under its own severity model. A result whose
+        status is `fail` fails the release and is named; warnings are printed
+        and never block. See :func:`_validation_verdict`.
         """
         timeout = self._resolve_build_timeout(config)
         self._require_toml_path(dir_path)
         result = effects.run(
-            ["pgdesign", "check", "--tag", "validation", "--ignore-warnings"],
+            _VALIDATION_ARGV,
             cwd=dir_path,
             capture_output=True,
             text=True,
             timeout=timeout,
         )
-        if result.returncode != 0:
-            print(
-                "pgdesign check --tag validation failed:\n"
-                f"{result.stderr or result.stdout}",
-                file=sys.stderr,
-            )
+        problem = _validation_verdict(result)
+        if problem is not None:
+            print(f"{_VALIDATION_COMMAND} failed:\n{problem}", file=sys.stderr)
             raise RuntimeError("pgdesign schema validation failed")
 
     def template_vars(self, dir_path, ctx):
