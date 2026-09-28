@@ -62,17 +62,14 @@ def _archive(project, version="0.9.1", notices=None):
 class _FakeForge:
     """A gh stand-in for one past Release, recording every body written."""
 
-    def __init__(self, tag, body, latest="v0.9.2"):
+    def __init__(self, tag, body):
         self.tag = tag
         self.body = body
-        self.latest = latest
         self.written = []
         self.edits = []
 
     def __call__(self, args, **kwargs):
         args = list(args)
-        if args[:2] == ["release", "list"]:
-            return self.latest
         if args[:3] == ["release", "view", self.tag]:
             return self.body
         if args[:3] == ["release", "edit", self.tag]:
@@ -144,6 +141,7 @@ class TestComposition:
 class TestArchiveField:
     def test_archive_carrying_notices_reads(self, tmp_path):
         path = _archive(tmp_path, notices=[_NOTICE])
+        _archive(tmp_path, version="0.9.2")  # the package's latest release
         assert read_release_file(str(path)).release_notices == [_NOTICE]
 
     def test_unreleased_file_carrying_notices_is_refused(self, tmp_path):
@@ -253,6 +251,7 @@ class TestDeprecateRecordsNotice:
 
     def test_notice_lands_in_archive_and_on_forge(self, tmp_path):
         path = _archive(tmp_path)
+        _archive(tmp_path, version="0.9.2")  # the package's latest release
         forge = _FakeForge("v0.9.1", _notes_body())
         commit = _run_deprecate(tmp_path, forge, self.FLAGS)
 
@@ -267,6 +266,7 @@ class TestDeprecateRecordsNotice:
 
     def test_second_notice_goes_on_top(self, tmp_path):
         path = _archive(tmp_path, notices=[_NOTICE])
+        _archive(tmp_path, version="0.9.2")  # the package's latest release
         forge = _FakeForge("v0.9.1", _NOTICE + "\n\n" + _notes_body())
         _run_deprecate(tmp_path, forge, {"reason": "again"})
 
@@ -286,6 +286,7 @@ class TestDeprecateRecordsNotice:
 class TestYankRecordsNotice:
     def test_notice_lands_in_archive_and_on_forge(self, tmp_path):
         path = _archive(tmp_path)
+        _archive(tmp_path, version="0.9.2")  # the package's latest release
         forge = _FakeForge("v0.9.1", _notes_body())
         commit = _run_yank(tmp_path, forge, {"reason": "broken", "use": "0.9.2"})
 

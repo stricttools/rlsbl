@@ -5,6 +5,7 @@ import sys
 from ..member_context import resolve_member_context
 from ..release_file import get_releases_dir
 from ..release_publication import notice_archive_path, publish_release_notice
+from ..release_record import latest_released_version
 from ..targets import TARGETS, resolve_releasable_config_dir
 from ..utils import run_gh, check_gh_installed, check_gh_auth
 from ..workspace import find_workspace_root, resolve_project
@@ -101,17 +102,26 @@ def run_cmd(args, flags, project_root):
         sys.exit(1)
 
     # Refuse to deprecate the latest release -- suggest rlsbl release undo instead
+    # The package's own latest release comes from its release record: in a
+    # monorepo the repository's newest GitHub Release is whichever package
+    # released last.
+    releases_dir = get_releases_dir(project_dir, releasable_dir=releasable_config_dir)
     try:
-        latest_line = run_gh(["release", "list", "--limit", "1", "--json", "tagName", "--jq", ".[0].tagName"])
-        if latest_line == tag:
-            print(
-                f"Error: {tag} is the latest release. Use 'rlsbl release undo' to revert it instead.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+        latest = latest_released_version(releases_dir)
     except Exception as e:
-        print(f"Error: could not determine latest release: {e}", file=sys.stderr)
-        print("Cannot verify whether this is the latest release. Aborting for safety.", file=sys.stderr)
+        print(
+            f"Error: could not read this package's latest release from its "
+            f"release record at {releases_dir}: {e}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if latest == version:
+        print(
+            f"Error: {tag} is the latest release of this package (the highest "
+            f"version its release record holds). Use 'rlsbl release undo' to "
+            f"revert it instead.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     # No hand-rolled prompt: `release deprecate` declares itself
