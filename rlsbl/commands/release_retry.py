@@ -6,7 +6,9 @@ this command dispatches all workflows listed in ``retry.toml`` via
 
 The command is file-driven: it reads ``.rlsbl/releases/retry.toml`` for
 configuration (version, dispatch, ref). If the file does not exist, it
-auto-scaffolds one from project state and proceeds.
+auto-scaffolds one from project state, with the release tag as the ref, and
+proceeds. The ref must be the release tag: a run dispatched at a branch cannot
+be tied to the release by anything that confirms a publish started.
 """
 
 import json
@@ -92,8 +94,12 @@ def _scaffold_retry_file(
     doc = tomlkit.document()
     doc.add("version", version)
     doc.add("dispatch", dispatch)
-    doc.add(tomlkit.comment("Git ref to dispatch CI against. Examples: v1.2.3 (tag), main (branch)"))
-    doc.add("ref", "")
+    doc.add(tomlkit.comment(
+        "Git ref to dispatch CI against: the release tag. A branch is refused, "
+        "because a run dispatched at a branch carries neither the tag nor the "
+        "tagged commit, so nothing can confirm it started for this release."
+    ))
+    doc.add("ref", tag)
     doc.add(tomlkit.comment("Release tag passed as workflow_dispatch input (checkout ref)"))
     doc.add("tag", tag)
 
@@ -255,6 +261,23 @@ def run_cmd(retry_config, flags, project_root):
         releasable_config_dir=releasable_config_dir,
     )
 
+    # The ref must be the release tag. A run dispatched at a branch has the
+    # branch as its head_branch and the branch head as its head_sha, so neither
+    # the start confirmation nor `rlsbl watch <sha>` can tie it to the release:
+    # the watch would report that no run started, and point at another retry
+    # that publishes twice.
+    if retry_config.ref not in (tag, f"refs/tags/{tag}"):
+        print(
+            f"Error: {retry_path} sets ref = \"{retry_config.ref}\", but a "
+            f"retry dispatches at the release tag {tag}. A run dispatched at "
+            f"any other ref carries neither the tag nor the tagged commit, so "
+            f"nothing can confirm it started for this release. Set "
+            f"ref = \"{tag}\" in {retry_path}, or delete the file and re-run "
+            f"`rlsbl release retry`, which writes it with the tag.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     # Verify the GitHub Release exists
     try:
         run_gh(["release", "view", tag])
@@ -282,8 +305,8 @@ def run_cmd(retry_config, flags, project_root):
     for filename in dispatch:
         try:
             dispatch_args = ["workflow", "run", filename, "--ref", retry_config.ref]
-            # Pass the tag as a workflow_dispatch input so the workflow
-            # checks out the correct ref even when dispatched against a branch.
+            # Pass the tag as a workflow_dispatch input too: the scaffolded
+            # publish workflows check out ``inputs.tag`` when it is set.
             if retry_config.tag:
                 dispatch_args.extend(["-f", f"tag={retry_config.tag}"])
             output = run_gh(dispatch_args)

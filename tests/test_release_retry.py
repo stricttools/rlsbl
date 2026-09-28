@@ -315,7 +315,7 @@ class TestReleaseRetry(unittest.TestCase):
 
         mock_run.side_effect = run_effect
 
-        config = _make_retry_config("0.41.7")
+        config = _make_retry_config("0.41.7", ref="my-pkg@v0.41.7")
 
         with patch("rlsbl.commands.release_retry.time.sleep"):
             with patch("sys.stdout", new_callable=StringIO):
@@ -333,7 +333,7 @@ class TestReleaseRetry(unittest.TestCase):
         self.assertGreater(len(workflow_calls), 0)
         for call in workflow_calls:
             self.assertIn("--ref", call[0][0])
-            self.assertIn("v0.41.7", call[0][0])
+            self.assertIn("my-pkg@v0.41.7", call[0][0])
 
     @patch("rlsbl.commands.release_retry._cleanup_retry_file")
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
@@ -450,16 +450,16 @@ class TestReleaseRetry(unittest.TestCase):
                                                 mock_targets_dict, mock_detect,
                                                 _exists, mock_run, _run_gh,
                                                 mock_cleanup):
-        """When retry_config is None and retry.toml doesn't exist, auto-scaffolds then exits
-        because ref is empty and must be set by the user."""
+        """When retry_config is None and retry.toml doesn't exist, auto-scaffolds;
+        a scaffold that finds no dispatchable workflow exits with the error."""
         target = self._make_mock_target("0.41.7")
         entry = self._make_mock_entry()
         mock_detect.return_value = MagicMock(targets=[entry])
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
-        # _scaffold_retry_file raises ReleaseFileError because ref is empty
-        scaffold_error = ReleaseFileError("ref must be set in retry.toml (e.g. a tag like v1.2.3 or a branch like main)")
+        # _scaffold_retry_file raises ReleaseFileError: no dispatchable workflow
+        scaffold_error = ReleaseFileError("dispatch must be non-empty")
 
         with patch("rlsbl.commands.release_retry._scaffold_retry_file", side_effect=scaffold_error) as mock_scaffold, \
              patch("rlsbl.commands.release_retry.get_retry_file_path", return_value="/fake/retry.toml"):
@@ -474,7 +474,7 @@ class TestReleaseRetry(unittest.TestCase):
                     run_cmd(None, {}, project_root=".")
 
         self.assertEqual(ctx.exception.code, 1)
-        self.assertIn("ref must be set", mock_stderr.getvalue())
+        self.assertIn("dispatch must be non-empty", mock_stderr.getvalue())
 
         # _scaffold_retry_file was called
         mock_scaffold.assert_called_once()
@@ -490,7 +490,7 @@ class TestReleaseRetry(unittest.TestCase):
     def test_auto_scaffold_cleans_up_file_on_validation_error(self, _gh_inst, _gh_auth, _ws_root,
                                                                 mock_targets_dict, mock_detect,
                                                                 _exists, mock_run, _run_gh):
-        """When auto-scaffold fails validation (empty ref), retry.toml is deleted and
+        """When auto-scaffold fails validation (empty dispatch), retry.toml is deleted and
         error message suggests `rlsbl release run`."""
         import tempfile
 
@@ -500,14 +500,14 @@ class TestReleaseRetry(unittest.TestCase):
         mock_targets_dict.__getitem__ = lambda self, key: target
         mock_run.side_effect = self._run_side_effect
 
-        scaffold_error = ReleaseFileError("ref must be set in retry.toml (e.g. a tag like v1.2.3 or a branch like main)")
+        scaffold_error = ReleaseFileError("dispatch must be non-empty")
 
         with tempfile.TemporaryDirectory() as tmpdir:
             retry_path = os.path.join(tmpdir, "retry.toml")
             # Pre-create the file to simulate what _scaffold_retry_file does
             # before read_retry_file raises ReleaseFileError
             with open(retry_path, "w") as f:
-                f.write('version = "0.41.7"\ndispatch = ["ci.yml"]\nref = ""\n')
+                f.write('version = "0.41.7"\ndispatch = []\nref = "v0.41.7"\n')
 
             with patch("rlsbl.commands.release_retry._scaffold_retry_file", side_effect=scaffold_error), \
                  patch("rlsbl.commands.release_retry.get_retry_file_path", return_value=retry_path):
@@ -533,7 +533,7 @@ class TestReleaseRetry(unittest.TestCase):
 
             # Error message should mention `release run` as the alternative
             stderr_output = mock_stderr.getvalue()
-            self.assertIn("ref must be set", stderr_output)
+            self.assertIn("dispatch must be non-empty", stderr_output)
             self.assertIn("rlsbl release run", stderr_output)
 
     @patch("rlsbl.commands.release_retry.run_gh", return_value="")
@@ -577,7 +577,7 @@ class TestReleaseRetry(unittest.TestCase):
 
             # Error message should mention `release run` as the alternative
             stderr_output = mock_stderr.getvalue()
-            self.assertIn("ref must be set", stderr_output)
+            self.assertIn("sets neither ref nor tag", stderr_output)
             self.assertIn("rlsbl release run", stderr_output)
 
     @patch("rlsbl.commands.release_retry.read_retry_file")
@@ -724,8 +724,8 @@ class TestRetryConfig(unittest.TestCase):
         finally:
             os.unlink(path)
 
-    def test_read_retry_file_empty_ref(self):
-        """Empty ref field raises ReleaseFileError with helpful message."""
+    def test_read_retry_file_empty_ref_and_tag(self):
+        """Neither ref nor tag set raises ReleaseFileError naming the re-run."""
         import tempfile
         import tomlkit as tk
 
@@ -742,7 +742,23 @@ class TestRetryConfig(unittest.TestCase):
             from rlsbl.release_file import read_retry_file
             with self.assertRaises(ReleaseFileError) as ctx:
                 read_retry_file(path)
-            self.assertIn("ref must be set in retry.toml", str(ctx.exception))
+            self.assertIn("sets neither ref nor tag", str(ctx.exception))
+            self.assertIn("rlsbl release retry", str(ctx.exception))
+        finally:
+            os.unlink(path)
+
+    def test_read_retry_file_empty_ref_defaults_to_tag(self):
+        """An empty ref with a tag set dispatches at the tag."""
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
+            f.write('version = "1.2.3"\ndispatch = ["publish.yml"]\n'
+                    'ref = ""\ntag = "v1.2.3"\n')
+            path = f.name
+        try:
+            from rlsbl.release_file import read_retry_file
+            config = read_retry_file(path)
+            self.assertEqual((config.ref, config.tag), ("v1.2.3", "v1.2.3"))
         finally:
             os.unlink(path)
 
@@ -768,8 +784,9 @@ class TestRetryConfig(unittest.TestCase):
 class TestScaffoldRetryFile(unittest.TestCase):
     """Tests for the _scaffold_retry_file helper."""
 
-    def test_scaffold_creates_file_with_empty_ref(self):
-        """_scaffold_retry_file writes retry.toml with empty ref and a comment."""
+    def test_scaffold_writes_the_tag_as_the_ref(self):
+        """_scaffold_retry_file writes retry.toml with the tag as the ref, so
+        the file it writes is one retry can use."""
         import tempfile
         import tomlkit as tk
         from rlsbl.commands.release_retry import _scaffold_retry_file
@@ -786,17 +803,15 @@ class TestScaffoldRetryFile(unittest.TestCase):
 
             with patch("rlsbl.commands.release_retry.TARGETS", {"pypi": target}), \
                  patch("rlsbl.commands.release_retry._find_dispatch_workflows", return_value=["publish.yml", "ci.yml"]):
-                # read_retry_file will raise because ref is empty
-                with self.assertRaises(ReleaseFileError) as ctx:
-                    _scaffold_retry_file(retry_path, entry, lambda msg: None)
-                self.assertIn("ref must be set", str(ctx.exception))
+                config = _scaffold_retry_file(retry_path, entry, lambda msg: None)
+            self.assertEqual((config.ref, config.tag), ("v2.0.0", "v2.0.0"))
 
             # Verify file on disk has correct structure
             with open(retry_path) as f:
                 data = tk.load(f)
             self.assertEqual(data["version"], "2.0.0")
             self.assertEqual(list(data["dispatch"]), ["publish.yml", "ci.yml"])
-            self.assertEqual(data["ref"], "")
+            self.assertEqual(data["ref"], "v2.0.0")
 
             # Verify the comment is present in the raw file
             with open(retry_path) as f:
@@ -825,17 +840,17 @@ class TestScaffoldRetryFile(unittest.TestCase):
 
             with patch("rlsbl.commands.release_retry.TARGETS", {"pypi": target}), \
                  patch("rlsbl.commands.release_retry._find_dispatch_workflows", return_value=["publish.yml"]):
-                with self.assertRaises(ReleaseFileError):
-                    _scaffold_retry_file(
-                        retry_path, entry, lambda msg: None,
-                        monorepo_name="mypkg",
-                        monorepo_project_path="packages/mypkg",
-                    )
+                _scaffold_retry_file(
+                    retry_path, entry, lambda msg: None,
+                    monorepo_name="mypkg",
+                    monorepo_project_path="packages/mypkg",
+                )
 
             with open(retry_path) as f:
                 data = tk.load(f)
             # Must use monorepo tag format (mypkg@v1.5.0), not standalone (v1.5.0)
             self.assertEqual(data["tag"], "mypkg@v1.5.0")
+            self.assertEqual(data["ref"], "mypkg@v1.5.0")
             target.monorepo_tag_format.assert_called_once_with(
                 "mypkg", "1.5.0", path="packages/mypkg"
             )
@@ -859,16 +874,16 @@ class TestScaffoldRetryFile(unittest.TestCase):
             with patch("rlsbl.commands.release_retry.TARGETS", {"pypi": target}), \
                  patch("rlsbl.commands.release_retry._find_dispatch_workflows", return_value=["publish.yml"]), \
                  patch("rlsbl.commands.release.validate._format_releasable_tag", return_value="core@v2.0.0"):
-                with self.assertRaises(ReleaseFileError):
-                    _scaffold_retry_file(
-                        retry_path, entry, lambda msg: None,
-                        releasable_name="core",
-                        releasable_tag_fmt="{{name}}@v{{version}}",
-                    )
+                _scaffold_retry_file(
+                    retry_path, entry, lambda msg: None,
+                    releasable_name="core",
+                    releasable_tag_fmt="{{name}}@v{{version}}",
+                )
 
             with open(retry_path) as f:
                 data = tk.load(f)
             self.assertEqual(data["tag"], "core@v2.0.0")
+            self.assertEqual(data["ref"], "core@v2.0.0")
 
 
 class TestRunIdCapture(unittest.TestCase):
@@ -1153,7 +1168,7 @@ class TestCmdReleaseRetryCleanup(unittest.TestCase):
 
             # Error message should include both the error and the hint
             stderr_output = mock_stderr.getvalue()
-            self.assertIn("ref must be set", stderr_output)
+            self.assertIn("sets neither ref nor tag", stderr_output)
             self.assertIn("rlsbl release run", stderr_output)
 
 

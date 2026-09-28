@@ -1154,7 +1154,7 @@ class RetryConfig:
 
     version: str  # version to retry (mandatory)
     dispatch: list[str]  # workflow filenames to dispatch, e.g. ["publish.yml"]
-    ref: str  # git ref for CI dispatch, defaults to tag
+    ref: str  # git ref for CI dispatch: the release tag (defaults to tag)
     tag: str  # release tag (e.g. "v1.2.3"), passed as workflow_dispatch input
 
 
@@ -1208,23 +1208,24 @@ def read_retry_file(path: str) -> RetryConfig:
     if not dispatch:
         raise ReleaseFileError("dispatch must be non-empty")
 
-    # --- ref ---
-    if "ref" not in data:
-        raise ReleaseFileError("missing required field: ref")
-    ref = data["ref"]
-    if not isinstance(ref, str) or not ref.strip():
-        raise ReleaseFileError("ref must be set in retry.toml (e.g. a tag like v1.2.3 or a branch like main)")
-
-    # --- tag (optional, defaults to ref) ---
+    # --- ref and tag: each defaults to the other; one must be set ---
+    ref = data.get("ref", "")
     tag = data.get("tag", "")
-    if isinstance(tag, str) and tag.strip():
-        tag = tag.strip()
-    else:
-        tag = ref.strip()  # default: tag = ref
+    if not isinstance(ref, str) or not isinstance(tag, str):
+        raise ReleaseFileError("ref and tag in retry.toml must be strings")
+    ref, tag = ref.strip(), tag.strip()
+    if not ref and not tag:
+        raise ReleaseFileError(
+            "retry.toml sets neither ref nor tag. Re-run `rlsbl release retry`: "
+            "the invalid file is discarded, and the re-run writes a new one "
+            "with the release tag as the ref"
+        )
+    ref = ref or tag
+    tag = tag or ref
 
     return RetryConfig(
         version=version.strip(),
         dispatch=list(dispatch),
-        ref=ref.strip(),
+        ref=ref,
         tag=tag,
     )
