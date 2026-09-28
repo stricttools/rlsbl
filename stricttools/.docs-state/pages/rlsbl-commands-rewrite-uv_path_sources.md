@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.commands.rewrite.uv_path_sources"
-description = "Converts path- and workspace-sourced dependencies into registry floors at the version the lock resolves, deleting the source entry that overrode them."
+description = "Converts path- and workspace-sourced dependencies into registry floors at the locked version, deletes the overriding source entry, and switches rlsbl:dep-floors on."
 generated = true
 nav_group = "API Reference"
 nav_order = 74

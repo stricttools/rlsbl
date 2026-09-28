@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.checks.strictspec_gate"
-description = "Preflight check that evaluates a configured strictspec diff certificate and blocks a release when its format_version claims are unmet."
+description = "Preflight check, off until its option is switched on, that judges a strictspec diff certificate and blocks a release when its format_version claims are unmet."
 generated = true
 nav_group = "API Reference"
 nav_order = 21

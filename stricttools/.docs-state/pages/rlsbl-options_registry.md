@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.options_registry"
-description = "rlsbl's options registry: generated from the check registry, never edited by hand."
+description = "Generates rlsbl's options registry from checks.toml: one option per check ranked by its severity, adoption options off by default, requirements from depends_on."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 126
 +++
