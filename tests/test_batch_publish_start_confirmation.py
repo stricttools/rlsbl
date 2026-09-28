@@ -58,6 +58,9 @@ class FakeGitHub:
     def __call__(self, args, *_a, **_k):
         args = list(args)
         if args[:2] == ["release", "view"]:
+            if "publishedAt" in args:
+                from datetime import datetime, timezone
+                return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             return "smm-h"
         if args[:3] == ["api", "--method", "GET"]:
             path = args[3]

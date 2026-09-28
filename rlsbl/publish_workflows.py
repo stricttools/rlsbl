@@ -285,6 +285,29 @@ def _diagnosis(gh, tag, missing) -> list[str]:
     return found
 
 
+def _runs_expired(gh, tag, now):
+    """``(published, days)`` when *tag*'s Release is older than run retention, else None.
+
+    GitHub deletes a repository's workflow runs once they are older than its
+    Actions retention setting (the same setting as artifacts and logs), so a
+    Release older than that has no runs left to find. A Release younger than
+    a day is inside every retention GitHub allows, so nothing more is asked.
+    Raises when either answer cannot be read.
+    """
+    from datetime import datetime
+
+    raw = gh(["release", "view", tag, "--json", "publishedAt",
+              "--jq", ".publishedAt"]).strip()
+    published = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    age_days = (now - published).total_seconds() / 86400
+    if age_days < 1:
+        return None
+    days = json.loads(_api(
+        gh, "repos/{owner}/{repo}/actions/permissions/artifact-and-log-retention",
+    ))["days"]
+    return (published, days) if age_days > days else None
+
+
 def _describe(exc) -> str:
     """*exc* with the stderr a failed ``gh`` carries, which names the cause."""
     stderr = (getattr(exc, "stderr", None) or "").strip()
@@ -293,7 +316,7 @@ def _describe(exc) -> str:
 
 def confirm_runs_started(*, tag, sha, prerelease, git_root, gh, log,
                          discovery_seconds=None, interval=None, sleep=None,
-                         clock=None):
+                         clock=None, now=None):
     """Require a run for *tag* of every workflow the Release starts.
 
     The workflows are the release-triggered ones in *sha*'s tree (the tagged
@@ -301,6 +324,12 @@ def confirm_runs_started(*, tag, sha, prerelease, git_root, gh, log,
     or from a dispatch at the tag -- within *discovery_seconds*. None
     expected, nothing asked. Raises :class:`PublishWorkflowError` naming each
     missing workflow and what rlsbl found about why.
+
+    A Release older than the repository's Actions retention has had its runs
+    deleted, so finding none says nothing about whether they started: that is
+    reported, and nothing is raised. When the retention cannot be read for an
+    old Release, the two cannot be told apart, which is raised without naming
+    a retry, since the runs may well have started.
     """
     expected = [
         w for w in release_workflows(git_root, sha)
@@ -359,6 +388,32 @@ def confirm_runs_started(*, tag, sha, prerelease, git_root, gh, log,
             f"`rlsbl watch {sha}` confirms the start, and names the fix if "
             f"none did."
         )
+
+    from datetime import datetime, timezone
+
+    try:
+        expired = _runs_expired(
+            gh, tag, now or datetime.now(timezone.utc),
+        )
+    except Exception as exc:
+        raise PublishWorkflowError(
+            f"no run of {', '.join(w.path for w in missing)} was found for "
+            f"{tag}, and rlsbl cannot tell whether none started or GitHub "
+            f"deleted them under the repository's Actions retention: reading "
+            f"the Release's publish date or the retention failed "
+            f"({_describe(exc)}). A run may well have started, so dispatch "
+            f"nothing yet: re-run once GitHub answers."
+        ) from exc
+    if expired is not None:
+        published, days = expired
+        log(
+            f"{tag} was published {published:%Y-%m-%d}, longer ago than this "
+            f"repository's {days}-day Actions retention, and GitHub has deleted "
+            f"the runs of that age, so whether "
+            f"{', '.join(w.path for w in missing)} started for it can no longer "
+            f"be confirmed."
+        )
+        return
 
     lines = [
         f"{tag} is tagged and released, but no run of "
