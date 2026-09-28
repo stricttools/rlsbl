@@ -173,7 +173,78 @@ def _batch_release_trail(pending, inline_commits):
     return trail
 
 
-def _watch_and_verify_batch(flags, last_sha, probe_specs, log):
+def _release_to_confirm(name, project_dir, workspace_root):
+    """``(tag, sha, version, ctx)`` of the release member *name* just made.
+
+    Read from the release record, which every completed release writes: the
+    member's highest released archive is the release this batch made, and its
+    release commit is what the tag points at. A member that completed inside
+    its own pass-1 call has no state file left, and one whose targets cannot
+    be resolved has no registry probe spec, but both have this.
+    """
+    from pathlib import Path
+
+    from ...context import create_context, resolve_release_scope
+    from ...errors import ReleaseRecordError
+    from ...release_record import (
+        latest_released_version,
+        read_entry,
+        releases_dir_for_changes_dir,
+    )
+
+    _project, tag_glob, changes_dir, _scope = resolve_release_scope(project_dir)
+    releases_dir = releases_dir_for_changes_dir(changes_dir)
+    version = latest_released_version(releases_dir)
+    entry = (
+        read_entry(releases_dir, version, tag_glob=tag_glob,
+                   cwd=str(workspace_root))
+        if version else None
+    )
+    if entry is None or not entry.recorded:
+        raise ReleaseRecordError(
+            f"{name}'s release record ({releases_dir}) holds no release with a "
+            f"recorded release commit, so which Release to confirm cannot be "
+            f"read"
+        )
+    ctx = create_context(Path(project_dir), workspace_root=Path(workspace_root))
+    return entry.tag(tag_glob), entry.candidate_sha, version, ctx
+
+
+def _confirm_publish_starts(started, workspace_root, log):
+    """Require every released member's Release to have started its publish runs.
+
+    The workflows expected are those at the git root's ``.github/workflows/``
+    in the tagged commit's tree; a workspace can sit below the git root.
+    """
+    from ...errors import RlsblError
+    from ...publish_workflows import confirm_or_exit
+    from ...utils import run_gh
+
+    git_root = effects.run(
+        ["git", "rev-parse", "--show-toplevel"], capture_output=True,
+        text=True, check=True, cwd=str(workspace_root),
+    ).stdout.strip()
+    for name, project_dir in started:
+        try:
+            tag, sha, version, ctx = _release_to_confirm(
+                name, project_dir, workspace_root,
+            )
+        except (RlsblError, OSError) as exc:
+            print(
+                f"Error: {name} is released, but whether its Release started "
+                f"its publish workflows cannot be confirmed: {exc}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        confirm_or_exit(
+            tag=tag, sha=sha, version=version, git_root=git_root,
+            gh=lambda args, _config=ctx.config: run_gh(args, config=_config),
+            log=log,
+        )
+
+
+def _watch_and_verify_batch(flags, last_sha, probe_specs, started,
+                            workspace_root, log):
     """The batch's watch tail: CI verdict, then the registry outcome check.
 
     Both batch loops (releasable and package mode) end here so the two paths
@@ -188,20 +259,12 @@ def _watch_and_verify_batch(flags, last_sha, probe_specs, log):
     fail every ``--no-watch`` batch. The run says so out loud instead (see
     :func:`_announce_unverified_publication`).
 
-    In both modes every member's Release must first have STARTED its publish
-    runs: GitHub reports no error when a published Release starts nothing, and
-    confirming a start does not need CI to finish.
+    In both modes every released member in *started* -- ``(name,
+    project_dir)`` pairs -- must first have STARTED its publish runs: GitHub
+    reports no error when a published Release starts nothing, and confirming a
+    start does not need CI to finish (see :func:`_confirm_publish_starts`).
     """
-    from ...publish_workflows import confirm_or_exit
-    from ...utils import run_gh
-
-    for _label, _targets, version, tag, ctx in probe_specs:
-        confirm_or_exit(
-            tag=tag, sha=last_sha.strip(), version=version,
-            git_root=str(ctx.workspace_root or ctx.project_root),
-            gh=lambda args, _config=ctx.config: run_gh(args, config=_config),
-            log=log,
-        )
+    _confirm_publish_starts(started, workspace_root, log)
     if not flags.get("watch"):
         _announce_unverified_publication(last_sha, log)
         return
@@ -823,6 +886,9 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
     # Per-member probe specs for the watch tail's registry check, captured
     # before each member's state file is cleared by its pass-2 completion.
     probe_specs = []
+    # Every member this run released, pass 1 or pass 2, whose Release the
+    # watch tail confirms started its publish runs.
+    started = []
     with rlsbl_lock(".rlsbl-monorepo", project_root=workspace_root):
         # Workspace-level pin, taken before the first candidate is built. Every
         # commit that appears in pin..HEAD must be one a member's own release
@@ -909,6 +975,7 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
                         # nothing for the batch gate to finish. The archive
                         # gate below is the correctness backstop.
                         released.append(rel_name)
+                        started.append((rel_name, project_dir))
                         last_sha = run("git", ["rev-parse", "HEAD"])
                         # Its trail died with its state file; the commits that
                         # appeared across its call are the batch's own.
@@ -1000,6 +1067,7 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
                         )
                         raise
                 released.append(rel_name)
+                started.append((rel_name, project_dir))
                 if _spec is not None:
                     probe_specs.append(_spec)
                 log("")
@@ -1020,7 +1088,8 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
     _announce_batch_completion(released, log)
 
     if not dry_run and last_sha:
-        _watch_and_verify_batch(flags, last_sha, probe_specs, log)
+        _watch_and_verify_batch(flags, last_sha, probe_specs, started,
+                                workspace_root, log)
 
 
 def _abort_on_completed_plan(plan, plan_path, batch_path, workspace_root):
