@@ -262,6 +262,12 @@ def _diagnosis(gh, tag, missing) -> list[str]:
     return found
 
 
+def _describe(exc) -> str:
+    """*exc* with the stderr a failed ``gh`` carries, which names the cause."""
+    stderr = (getattr(exc, "stderr", None) or "").strip()
+    return f"{exc}: {stderr}" if stderr else str(exc)
+
+
 def confirm_runs_started(*, tag, sha, prerelease, git_root, gh, log,
                          discovery_seconds=None, interval=None, sleep=None,
                          clock=None):
@@ -290,6 +296,11 @@ def confirm_runs_started(*, tag, sha, prerelease, git_root, gh, log,
     log(f"Confirming the Release started {names}...")
     deadline = clock() + discovery_seconds
     missing = list(expected)
+    # Workflows whose runs query answered at least once. One that never did
+    # (a rate limit, no network) is unconfirmed, not absent: reporting it as
+    # "no run started" would be false, and the retry that statement names
+    # would dispatch a second publish when the first one did start.
+    answered = set()
     last_error = None
     while True:
         still = []
@@ -300,6 +311,7 @@ def confirm_runs_started(*, tag, sha, prerelease, git_root, gh, log,
                 last_error = exc
                 still.append(workflow)
                 continue
+            answered.add(workflow.path)
             if not runs:
                 still.append(workflow)
         missing = still
@@ -310,6 +322,21 @@ def confirm_runs_started(*, tag, sha, prerelease, git_root, gh, log,
             break
         sleep(interval)
 
+    unconfirmed = [w for w in missing if w.path not in answered]
+    missing = [w for w in missing if w.path in answered]
+    if not missing:
+        raise PublishWorkflowError(
+            f"{tag} is tagged and released, but whether "
+            f"{', '.join(w.path for w in unconfirmed)} started for it could not "
+            f"be confirmed: every runs query for "
+            f"{'it' if len(unconfirmed) == 1 else 'them'} failed for "
+            f"{discovery_seconds} seconds (last: {_describe(last_error)}). A "
+            f"run may well have started, so dispatch nothing yet: once GitHub "
+            f"answers, "
+            f"`rlsbl watch {sha}` confirms the start, and names the fix if "
+            f"none did."
+        )
+
     lines = [
         f"{tag} is tagged and released, but no run of "
         f"{', '.join(w.path for w in missing)} started for it within "
@@ -317,8 +344,14 @@ def confirm_runs_started(*, tag, sha, prerelease, git_root, gh, log,
         f"{'this workflow' if len(missing) == 1 else 'these workflows'}, and "
         f"GitHub reports no error when one does not start.",
     ]
-    if last_error is not None:
-        lines.append(f"  The last runs query failed: {last_error}")
+    if unconfirmed:
+        lines.append(
+            f"  Whether {', '.join(w.path for w in unconfirmed)} started could "
+            f"not be confirmed: its runs query failed every time "
+            f"({_describe(last_error)})."
+        )
+    elif last_error is not None:
+        lines.append(f"  The last runs query failed: {_describe(last_error)}")
     found = _diagnosis(gh, tag, missing)
     if found:
         lines.append("  Found:")

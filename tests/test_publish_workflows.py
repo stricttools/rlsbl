@@ -244,3 +244,49 @@ class TestTheStartConfirmation:
             self._confirm(tmp_path, sha, gh)
         gh.runs["publish.yml"] = [_run(event="workflow_dispatch")]
         self._confirm(tmp_path, sha, gh)
+
+
+class _RateLimited(FakeGitHub):
+    """Every runs query fails, as under a rate limit or with no network."""
+
+    def __call__(self, args):
+        if args[:3] == ["api", "--method", "GET"] and "/runs?" in args[3]:
+            self.calls.append(list(args))
+            raise subprocess.CalledProcessError(
+                1, "gh", stderr="gh: API rate limit exceeded (HTTP 403)",
+            )
+        return super().__call__(args)
+
+
+class TestAnUnansweredConfirmation:
+    """A runs query that never answered proves nothing either way.
+
+    Reporting it as "no run started" is a false statement, and the fix that
+    statement names (dispatching the publish again with `rlsbl release retry`)
+    would start a second publish when the first did start.
+    """
+
+    def _confirm(self, tmp_path, sha, gh):
+        confirm_runs_started(
+            tag=TAG, sha=sha, prerelease=False, git_root=str(tmp_path), gh=gh,
+            log=lambda *_: None, discovery_seconds=0, sleep=lambda _s: None,
+        )
+
+    def test_it_is_reported_as_unconfirmed_not_as_absent(self, tmp_path):
+        sha = _repo(tmp_path, {"publish.yml": PUBLISH})
+        gh = _RateLimited(states={"publish.yml": "active"})
+        with pytest.raises(PublishWorkflowError) as exc:
+            self._confirm(tmp_path, sha, gh)
+        message = str(exc.value)
+        assert "no run of" not in message
+        assert "could not be confirmed" in message
+        assert "rate limit" in message
+        assert f"rlsbl watch {sha}" in message
+
+    def test_the_watch_it_names_confirms_once_github_answers(self, tmp_path):
+        sha = _repo(tmp_path, {"publish.yml": PUBLISH})
+        gh = _RateLimited(states={"publish.yml": "active"},
+                          runs={"publish.yml": [_run()]})
+        with pytest.raises(PublishWorkflowError):
+            self._confirm(tmp_path, sha, gh)
+        self._confirm(tmp_path, sha, FakeGitHub(runs=gh.runs))
