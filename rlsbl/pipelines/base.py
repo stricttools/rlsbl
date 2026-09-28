@@ -106,6 +106,15 @@ class BasePipeline:
             return []
         return list(self.ci_secret_vars)
 
+    def public_repo_requirement(self) -> tuple[str, str] | None:
+        """What in this pipeline needs a PUBLIC source repository, and its fix.
+
+        ``(what, fix)`` as sentences, or None when nothing does. A release
+        from a private repository refuses every pipeline that answers
+        (see :mod:`rlsbl.private_repo_publishing`).
+        """
+        return None
+
     def publish(self, dir_path: str, version: str, ctx) -> None:
         """Publish the package. No-op by default; subclasses override."""
         pass

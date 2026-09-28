@@ -54,45 +54,21 @@ def _publishes(config) -> bool:
     return (config or {}).get("publish_mode") != "none"
 
 
-def _pipelines(config):
-    pipelines = (config or {}).get("pipelines") or {}
-    return pipelines.items() if isinstance(pipelines, dict) else ()
-
-
 def config_uses(configs) -> list[PublicOnlyUse]:
-    """The public-only features the pipeline configs in *configs* declare."""
+    """The public-only features the pipelines in *configs* declare.
+
+    Each pipeline answers for itself (``public_repo_requirement``).
+    """
+    from .pipelines import load_pipelines
+
     uses = []
     for config in configs:
         if not _publishes(config):
             continue
-        for name, entry in _pipelines(config):
-            if not isinstance(entry, dict):
-                continue
-            kind = entry.get("type")
-            if kind == "npm" and entry.get("provenance") is True:
-                uses.append(PublicOnlyUse(
-                    f'npm pipeline "{name}" declares "provenance": true, and '
-                    f"npm build provenance needs a public source repository.",
-                    f'Set "provenance": false on that pipeline in '
-                    f".rlsbl/config.json (or drop the pipeline).",
-                ))
-            elif kind == "go" and (
-                entry.get("local") is True or entry.get("artifact") == "library"
-            ):
-                how = (
-                    "notifies the Go module proxy from this machine"
-                    if entry.get("local") is True
-                    else "asks the Go module proxy for the new version from CI"
-                )
-                uses.append(PublicOnlyUse(
-                    f'Go pipeline "{name}" {how}, which cannot fetch a private '
-                    f"module and caches every version it is asked about "
-                    f"permanently.",
-                    'Set "publish_mode": "none" in .rlsbl/config.json: the '
-                    "release then tags and creates GitHub Releases without "
-                    "publishing, and consumers fetch the module with GOPRIVATE "
-                    "set.",
-                ))
+        for pipeline in load_pipelines(config or {}).values():
+            requirement = pipeline.public_repo_requirement()
+            if requirement is not None:
+                uses.append(PublicOnlyUse(*requirement))
     return uses
 
 

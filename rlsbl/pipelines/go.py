@@ -30,6 +30,27 @@ class GoPipeline(BasePipeline):
     All failures raise -- the outer release flow decides fatality.
     """
 
+    def public_repo_requirement(self) -> tuple[str, str] | None:
+        """The Go module proxy cannot fetch a private module.
+
+        A local pipeline notifies the proxy from this machine, and a library
+        published from CI asks the proxy for the new version; a binary
+        published from CI never asks it.
+        """
+        if self.local:
+            how = "notifies the Go module proxy from this machine"
+        elif self.config.get("artifact") == "library":
+            how = "asks the Go module proxy for the new version from CI"
+        else:
+            return None
+        return (
+            f'Go pipeline "{self.name}" {how}, which cannot fetch a private '
+            f"module and caches every version it is asked about permanently.",
+            'Set "publish_mode": "none" in .rlsbl/config.json: the release '
+            "then tags and creates GitHub Releases without publishing, and "
+            "consumers fetch the module with GOPRIVATE set.",
+        )
+
     def template_dir(self) -> str | None:
         """Return the Go CI templates directory."""
         return os.path.join(

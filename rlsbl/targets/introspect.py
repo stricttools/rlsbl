@@ -277,6 +277,11 @@ TARGET_AXES: tuple[TargetAxis, ...] = (
         _prop("supports_dep_floors"),
     ),
     TargetAxis(
+        "publish_workflow_attests",
+        "Its CI publish step attaches attestations to a public transparency log unless told not to.",
+        _prop("publish_workflow_attests"),
+    ),
+    TargetAxis(
         "lint_language",
         "Which library-lint language its sources are written in, or null.",
         lambda t: t.lint_language,
