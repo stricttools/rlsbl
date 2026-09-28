@@ -57,27 +57,24 @@ The document shape of one JSONL line — the per-line `format_version` gate plus
 
 Reading is **explicit two-mode**, never a silent fallback:
 
-- A line **carrying** `format_version` is validated via strictspec. A missing gate is fine only in legacy mode; a *wrong* or unsupported `format_version` is always a hard error.
-- A line **lacking** `format_version` is a **legacy** line. It is accepted only when the reader is in legacy mode. The mode is chosen explicitly per repo by the `changelog_format_version_enforced` config key.
+- A line **carrying** `format_version` is validated via strictspec. A *wrong* or unsupported `format_version` is always a hard error.
+- A line **lacking** `format_version` is a **legacy** line. Readers that load a changelog to act on it accept it; the `changelog-format-version-gate` check reads every changelog file with the gate enforced, and reports it.
 
-### Transition (`changelog_format_version_enforced`)
+### The format-version gate
 
-Historical finalized `x.y.z.jsonl` files and in-flight `unreleased.jsonl` lines predate the gate and carry no `format_version`. Because retroactively stamping every line across all repositories would be disruptive, the rollout is incremental: each repo transitions independently by setting the `changelog_format_version_enforced` config key, which controls both reading behavior and check severity as shown below:
+Every line `rlsbl changelog add` writes carries `format_version`. The `changelog-format-version-gate` check runs on every repository: it reads `unreleased.jsonl` and every finalized `x.y.z.jsonl`, and reports each line lacking a supported `format_version`, naming the file and the line.
 
-| `changelog_format_version_enforced` | Reading | Checks |
-| --- | --- | --- |
-| key absent | legacy (unstamped lines tolerated) | `changelog-format-version` **warns**: "enforcement not yet enabled" |
-| `true` | enforced (every line must carry `format_version`) | `changelog-format-version-gate` **errors** on any unstamped/wrong-version line |
-| `false` | legacy (explicit opt-out) | no warning; gate check skipped |
+Whether such a finding blocks is the check's own [option](checks.md#options), `rlsbl:changelog-format-version-gate`, ranked `error > warn > off` with the default `error`:
 
-There is **no enforced default**: absence is legacy *and* is surfaced as visible pressure by the warn check — never silent. Every line `rlsbl changelog add` writes carries `format_version`, so a repo that has been on the current tooling for a full release cycle is already fully stamped. To enable enforcement, confirm every line in the changes dir carries the field and set:
+| Value | What the gate does |
+| --- | --- |
+| `error` (default) | Runs, and an unstamped or wrong-version line fails the check, blocking the release. |
+| `warn` | Runs and reports the same findings as warnings, which never block. |
+| `off` | Does not run. |
 
-```jsonc
-// .rlsbl/config.json
-"changelog_format_version_enforced": true
-```
+The remediation for a finding is to add `"format_version":1` to the line (finalized `x.y.z.jsonl` files are read-only 444, so unlock, edit, and re-lock) or to re-add the entry with `rlsbl changelog add`. A repository that keeps unstamped lines on purpose writes the options entry instead, for example `rlsbl options set rlsbl:changelog-format-version-gate --current warn --ideal error --reason "..."`.
 
-The one-time bootstrap stamper that seeded historical lines has been retired — the fleet is stamped and new lines stamp themselves. Once the key is `true`, any line still lacking `format_version` hard-fails the `changelog-format-version-gate` check; the remediation is to add `"format_version":1` to that line (finalized `x.y.z.jsonl` files are read-only 444, so unlock, edit, and re-lock), or to record `false` and stay in legacy mode deliberately.
+The config key `changelog_format_version_enforced`, which used to decide this, is retired: `config-schema` and every release refuse a config still carrying it, naming the fix.
 
 ### Multiplicity rules
 
@@ -157,8 +154,7 @@ user-facing status, and cannot rewrite the commits an entry names.
 | 8 | Batch size (entries) | No single commit may appear in more entries than `max_entries_per_commit` (default 5) |
 | 9 | Version consistency | Project version matches across all target files |
 | 10 | Changelog entry | CHANGELOG.md contains an entry for the current version |
-| 11 | format_version (warn) | `changelog-format-version`: warns while `changelog_format_version_enforced` is absent (enforcement not yet enabled) |
-| 12 | format_version gate | `changelog-format-version-gate`: once enforcement is on, every JSONL line must carry a valid `format_version` |
+| 11 | format_version gate | `changelog-format-version-gate`: every JSONL line carries a valid `format_version` |
 
 Batch limits are configurable in `.rlsbl/config.json` under the `batch_limits` key:
 

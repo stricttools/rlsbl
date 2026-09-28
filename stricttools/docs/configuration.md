@@ -28,16 +28,22 @@ Project-level configuration file created by `rlsbl scaffold`. This JSON file con
 | build_timeout | int or object | Timeout in seconds for target build steps. An int applies to every target; an object is keyed by target name with an optional `default` entry. Falls back to each target's shipped default (120s for most, 300s for maven, 60s for pgdesign). |
 | test | object | Per-target test settings: which tests a target selects (`pypi.markers`) and which command runs them (`go.command`). See [test](#test) below. |
 | external_checks | array | Config-declared freeform subprocess checks that run during `rlsbl check` and the release preflight. See [external_checks](#external_checks) below. |
-| checks | map | Per-check settings for the path-capable built-in tool checks (`lint`, `format`, `type-check`). See [checks](#checks) below. |
-| strictspec_gate | object | Opt-in [strictspec certificate deploy gate](#strictspec_gate). Consumes a `strictspec diff` certificate as a `format_version` gate. See below. |
-| test_sandbox | object | Opt-in [sandboxed test runner](#test_sandbox). Declaring it makes `rlsbl scaffold` emit an executable bubblewrap runner script and turns on the `testisolation-floor` check. See below. |
-| internal_dep_floors | array | Package names of ecosystem-internal dependencies whose declared `>=` floor must keep up with the locked version. Declaring the key turns on the [`dep-floors`](#internal_dep_floors) check. See below. |
+| checks | map | Per-check settings for the path-capable built-in tool checks (`lint`, `format`, `type-check`). Each block is required while its check's option is on and refused while it is off. See [checks](#checks) below. |
+| strictspec_gate | object | Settings of the [strictspec certificate deploy gate](#strictspec_gate), which consumes a `strictspec diff` certificate as a `format_version` gate. Required while the `rlsbl:strictspec-certificate-gate` option is on and refused while it is off. See below. |
+| test_sandbox | object | Settings of the [sandboxed test runner](#test_sandbox). Required while the `rlsbl:test-sandbox` option is on, when `rlsbl scaffold` emits an executable bubblewrap runner script from it, and refused while the option is off. See below. |
+| internal_dep_floors | array | Package names of ecosystem-internal dependencies whose declared `>=` floor must keep up with the locked version. Required while the `rlsbl:dep-floors` option is on, when the [`dep-floors`](#internal_dep_floors) check polices it, and refused while the option is off. See below. |
+
+### Settings that belong to an option
+
+Whether rlsbl adopts a check that most projects do not need is an [option](checks.md#options), not a config key: `rlsbl:dep-floors`, `rlsbl:lint`, `rlsbl:format`, `rlsbl:type-check`, `rlsbl:strictspec-certificate-gate` and `rlsbl:test-sandbox` each default to `off`, and a project switches one on with `rlsbl options set`. The config keeps only what such a check reads -- the package list, the declared paths, the certificate, the runner's settings -- and `config-schema` holds the two to each other: a setting is required while its option is on, and refused while its option is off, since nothing reads it then. Each refusal names both ways out, including the exact `rlsbl options set` command. In a workspace, each option can be switched on for one member alone with `--scope <member path>`.
+
+`changelog_format_version_enforced` is retired: whether a changelog line without `format_version` blocks is the `rlsbl:changelog-format-version-gate` option, which defaults to `error`. `config-schema`, and every release, refuse a config still carrying the key; delete it, and when the project wants the check off, write the options entry the refusal names.
 
 Configuration precedence for tagging: CLI flag (`--no-tag`) > project config > user config (`~/.rlsbl/config.json`) > default (true).
 
 ### strictspec_gate
 
-The `strictspec_gate` object opts a project into the strictspec **certificate deploy gate**, a built-in preflight check (`strictspec-certificate-gate`) that consumes a [`strictspec diff`](https://github.com/stricttools/strictspec) certificate as a `format_version` deploy gate. Projects without this section are untouched — the check skips.
+The `strictspec_gate` object configures the strictspec **certificate deploy gate**, a built-in preflight check (`strictspec-certificate-gate`) that consumes a [`strictspec diff`](https://github.com/stricttools/strictspec) certificate as a `format_version` deploy gate. The check is the `rlsbl:strictspec-certificate-gate` option, off by default: a project adopts it with `rlsbl options set rlsbl:strictspec-certificate-gate --current error --ideal error --reason "..."` and this section. While the option is off the check does not run and the section is refused.
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
@@ -63,7 +69,7 @@ The certificate itself is un-gated by design (it carries `certificate_format_ver
 
 ### test_sandbox
 
-The `test_sandbox` object opts a project into the **sandboxed test runner** rlsbl distributes: the outer layer of the [testisolation](https://github.com/stricttools/testisolation) test-isolation floor. Declaring the section makes `rlsbl scaffold` render the shared runner template to `runner_path` (executable), and turns on the `testisolation-floor` check. Projects without the section are untouched — the check skips.
+The `test_sandbox` object configures the **sandboxed test runner** rlsbl distributes: the outer layer of the [testisolation](https://github.com/stricttools/testisolation) test-isolation floor. A project adopts the runner by switching the `rlsbl:test-sandbox` option on (`rlsbl options set rlsbl:test-sandbox --current on --ideal on --reason "..."`) and declaring this section: `rlsbl scaffold` then renders the shared runner template to `runner_path` (executable), and the `testisolation-floor` check holds the repo to it. While the option is off, its default, the section is refused and nothing is rendered. `testisolation-floor` counts the floor as adopted when the option is on or the testisolation plugin is a declared dependency, and skips otherwise.
 
 Inside the sandbox the real repo is bound read-only, the suite runs in a writable throwaway copy of the tree on a private tmpfs, `HOME` is throwaway, and there is no network at all — a stray push, an unresolvable commit into the dev repo, or a live API call is physically impossible rather than merely discouraged. The runner exports `TESTISOLATION_SANDBOX=1`, the variable the testisolation plugin reads to lift its bare-run refusal.
 
@@ -94,7 +100,7 @@ Run `<runner_path> --selftest` to prove the invariants (the real repo is read-on
 
 ### internal_dep_floors
 
-The `internal_dep_floors` array opts a project into the **dependency floor** convention: when a release ships work that requires new behavior from a sibling framework package, the manifest must carry a `>=` floor at that version. The development lock already resolves the new version, so the repo's own suite passes — but a consumer installing the published artifact resolves whatever the declared floor allows, and gets an older framework that lacks the behavior. Declaring the key turns on the `dep-floors` preflight check. Projects without the key are untouched — the check skips.
+The `internal_dep_floors` array names what the **dependency floor** convention polices: when a release ships work that requires new behavior from a sibling framework package, the manifest must carry a `>=` floor at that version. The development lock already resolves the new version, so the repo's own suite passes — but a consumer installing the published artifact resolves whatever the declared floor allows, and gets an older framework that lacks the behavior. The `dep-floors` preflight check is the `rlsbl:dep-floors` option, off by default: a project adopts it with `rlsbl options set rlsbl:dep-floors --current error --ideal error --reason "..."` and this key. `rlsbl rewrite uv-path-sources` and `rlsbl monorepo extract`, which write the key, write that entry too.
 
 The value is a list of package names to enforce. In a monorepo, every workspace sibling's package name is enforced too, without being listed — the workspace graph already knows which dependencies are ecosystem-internal.
 
@@ -256,7 +262,7 @@ Every config-driven check resolves its subprocess timeout per run from the confi
 
 ### checks
 
-The `checks` map configures the three **path-capable built-in checks**: `lint`, `format` and `type-check`. Each runs one Python tool over a project-declared path list, invoked through the project's own environment. A check with no entry here skips.
+The `checks` map configures the three **path-capable built-in checks**: `lint`, `format` and `type-check`. Each runs one Python tool over a project-declared path list, invoked through the project's own environment. Each is an option that defaults to `off` (`rlsbl:lint`, `rlsbl:format`, `rlsbl:type-check`): a project adopts one with `rlsbl options set rlsbl:<check> --current error --ideal error --reason "..."` and its block here, which is required while the option is on and refused while it is off.
 
 ```json
 {
@@ -285,7 +291,7 @@ All three are Python-only (they require a `pypi` target) and carry the `quality`
 
 #### Competing-scope guards
 
-Each of the three is paired with a pure, fast check named `<check>-scope-guard`. It hard-errors when the tool's own config file carries scope that competes with the declared `paths`, because such config silently changes what actually gets checked:
+Each of the three is paired with a pure, fast check named `<check>-scope-guard`. A guard is an option of its own at the usual default, and skips while its paired check is off. It hard-errors when the tool's own config file carries scope that competes with the declared `paths`, because such config silently changes what actually gets checked:
 
 - **mypy guard** (`type-check-scope-guard`)**.** mypy's `files` / `packages` / `modules` config keys are silently **overridden** by CLI paths — a scope declared there is dead but misleading. The guard reads `pyproject.toml` `[tool.mypy]`, `mypy.ini`, `.mypy.ini`, and `setup.cfg` `[mypy]`; any of those keys present is an error.
 - **ruff guards** (`lint-scope-guard`, `format-scope-guard`)**.** ruff's `include` / `extend-include` config keys silently **narrow** the directories passed explicitly on the CLI (confirmed on ruff 0.15.20). The guard reads `pyproject.toml` `[tool.ruff]`, `ruff.toml`, and `.ruff.toml`; `include` or `extend-include` present is an error. `exclude` / `extend-exclude` / `force-exclude` are **exempt** — those are bypassed by explicit paths (loud over-inclusion, not silent under-scoping).

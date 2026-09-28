@@ -251,6 +251,8 @@ internal_dep_floors: solo declared in .rlsbl-monorepo/releasables/core/config.js
 
 Those are the configs the `dep-floors` check reads -- it compares a manifest against its lock using the config resolved for that releasable, so a declaration anywhere else polices nothing. When no releasable stays behind there is no config to write, and the conversion says so rather than inventing a home for it.
 
+The check reads the key only while its option, `rlsbl:dep-floors`, is on, and the option defaults to off. So for every member of a releasable that stays, extract also writes an options entry switching it on, scoped to that member's directory and naming the extract as its reason, unless the member's option is already on. The entries are committed with the rest of the source's edit.
+
 ## Splitting one member out of a shared releasable
 
 Extract takes releasables, whole. There is no command that pulls a single member out of a releasable it shares with others, and that is deliberate: two of the steps -- which changelog entries belong to the departing member, and what version it starts at -- are judgments only a person can make. A releasable's released changelogs and release archives describe the group, not any one member of it.
