@@ -172,6 +172,53 @@ Batch limits are configurable in `.rlsbl/config.json` under the `batch_limits` k
 
 Each exclusion must have a `reason` (mandatory audit trail) plus at least one of `commits` or `entries`.
 
+## Coverage in a fork
+
+A fork declares its upstream in `.strictmetadata/upstream/upstream.toml`, a directory strictspec owns (its `manifest.toml` names `owner = "strictspec"`), validated by strictspec's built-in `upstream` schema with every field required:
+
+```toml
+format_version = 1
+host = "github.com"
+owner = "ncruces"
+repo = "wasm2go"
+branch = "main"
+```
+
+A repository without that file is not a fork. rlsbl never infers an upstream from a git remote's name.
+
+In a fork, upstream's commits are not ours to describe, so every commit reachable from upstream's history is left out of the unreleased range: coverage asks for no entry for one, and an entry naming one is out of range. The same exclusion applies to the pushed commits the pre-push hook covers and to the coverage figure `rlsbl monorepo status` prints. Upstream's history is read from two ref namespaces:
+
+| Ref | What it holds | Written by |
+| --- | --- | --- |
+| `refs/upstream/<host>/<owner>/<repo>/<branch>` | The declared branch as fetched from upstream. Local only. | The operator's `git fetch --no-tags https://<host>/<owner>/<repo> +refs/heads/<branch>:refs/upstream/<host>/<owner>/<repo>/<branch>`. rlsbl never writes it. |
+| `refs/tags-of/<host>/<owner>/<repo>/<tag>` | A tag the fork inherited from upstream, with its object unchanged. Kept here and on `origin`. | `rlsbl upstream adopt-tags`. |
+
+The branch ref is required. When the declaration exists and that ref is missing -- a fresh clone, for one -- the changelog checks refuse, printing the two fetches that restore upstream's history: the branch from upstream, and the kept tags from `origin`:
+
+```bash
+git fetch --no-tags https://github.com/ncruces/wasm2go +refs/heads/main:refs/upstream/github.com/ncruces/wasm2go/main
+git fetch --no-tags origin 'refs/tags-of/github.com/ncruces/wasm2go/*:refs/tags-of/github.com/ncruces/wasm2go/*'
+```
+
+`--no-tags` is part of both: without it git follows every upstream tag pointing into the fetched history into `refs/tags`, bringing back the inherited tags `rlsbl upstream adopt-tags` moved out. (Re-running that command moves such tags out again.) The kept tags are read whenever present; a fork whose upstream has no tags, or whose tags have not been adopted yet, has none. The branch ref records upstream as of its last fetch: re-run the first fetch after upstream moves, or commits merged from its newer history are asked for entries.
+
+A fork's inherited tags are upstream's releases, not its own, and they must leave `refs/tags` before rlsbl can read the fork's release record: an empty record beside tags under the project's version scheme is refused as an unbackfilled release history, and in a fork that refusal names `rlsbl upstream adopt-tags` before `rlsbl release backfill`, which would record upstream's releases as the fork's.
+
+### Moving inherited tags: `rlsbl upstream adopt-tags`
+
+A tag is inherited when upstream (`https://<host>/<owner>/<repo>`, read with `git ls-remote`, never a package registry) has a tag of the same name at the same object. `rlsbl upstream adopt-tags` moves each one, keeping its object (an annotated tag keeps its tag object):
+
+1. writes `refs/tags-of/<host>/<owner>/<repo>/<tag>` here;
+2. in one atomic push to `origin`, creates that ref there and deletes `refs/tags/<tag>`, each guarded by a lease on the object it observed;
+3. deletes `refs/tags/<tag>` here, guarded by its object too.
+
+Tags upstream does not have are left alone. A tag carrying an inherited tag's name at a different object -- here, on `origin`, or against a kept ref -- refuses the whole run, named, before anything is written: rlsbl does not guess which object the name should carry. An inherited tag that exists only on `origin`, with its object missing here, is refused naming the `git fetch origin tag <tag>` that brings it. The command is consequential, `--dry-run` prints the plan and writes nothing, and a re-run finishes an interrupted run or has nothing to do.
+
+```bash
+rlsbl upstream adopt-tags --dry-run
+rlsbl upstream adopt-tags --approve-consequential
+```
+
 ## Validation cache
 
 The `.validated` file in `.rlsbl/changes/` stores the HEAD SHA of the last successful validation run, enabling incremental validation that avoids re-checking unchanged state across repeated invocations. This caching reduces validation time from seconds to near-instant for projects with large commit histories. On subsequent invocations, validation short-circuits when:
