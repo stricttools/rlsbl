@@ -1,4 +1,4 @@
-"""Release checks (tag: release): the refs and the Releases hanging off them, the branch, the CI credentials, and the follow-ups a recorded conversion still owes the outside world.
+"""Release checks (tag: release): the refs and the Releases hanging off them, the branch, the CI credentials, what a private repository must not publish, and the follow-ups a recorded conversion still owes the outside world.
 
 Checks: unpublished-refs, branch-sync, ci-publish-secrets,
 private-repo-publishing, old-repo-archived, go-deprecation-published.
