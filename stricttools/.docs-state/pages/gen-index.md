@@ -1,6 +1,6 @@
 +++
 title = "API Reference"
-description = "API reference index for rlsbl covering 203 modules"
+description = "API reference index for rlsbl covering 205 modules"
 generated = true
 seeded = true
 nav_group = "API Reference"
@@ -89,6 +89,7 @@ nav_order = 90
 - [rlsbl.commands.transition_record_cmd](../rlsbl-commands-transition_record_cmd/)
 - [rlsbl.commands.undo](../rlsbl-commands-undo/)
 - [rlsbl.commands.unreleased](../rlsbl-commands-unreleased/)
+- [rlsbl.commands.upstream_cmd](../rlsbl-commands-upstream_cmd/)
 - [rlsbl.commands.watch](../rlsbl-commands-watch/)
 - [rlsbl.commands.yank](../rlsbl-commands-yank/)
 - [rlsbl.config](../rlsbl-config/)
@@ -208,6 +209,7 @@ nav_order = 90
 - [rlsbl.tool_checks](../rlsbl-tool_checks/)
 - [rlsbl.transition_record](../rlsbl-transition_record/)
 - [rlsbl.transition_record_followup](../rlsbl-transition_record_followup/)
+- [rlsbl.upstream](../rlsbl-upstream/)
 - [rlsbl.utils](../rlsbl-utils/)
 - [rlsbl.uv_workspace](../rlsbl-uv_workspace/)
 - [rlsbl.workspace](../rlsbl-workspace/)
