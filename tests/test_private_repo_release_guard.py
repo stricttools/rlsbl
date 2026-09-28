@@ -98,6 +98,58 @@ class TestTheReleaseRefusesAndTheFixClearsIt:
 
 
 
+class TestTheNpmProvenanceCases:
+    """Every case the removed npm-only provenance guard covered, on this guard."""
+
+    NPM = {"npm": {"type": "npm", "local": False, "provenance": True}}
+
+    def test_a_public_repository_passes_npm_provenance(self, tmp_path):
+        with patch(RUN_GH, return_value=PUBLIC) as gh:
+            _abort_on_private_repo_publishing(
+                [_config(self.NPM)], gh_config={},
+                workflows_dir=_workflows(tmp_path),
+            )
+        gh.assert_called_once()
+
+    def test_provenance_false_asks_nothing(self, tmp_path):
+        npm = {"npm": {**self.NPM["npm"], "provenance": False}}
+        with patch(RUN_GH) as gh:
+            _abort_on_private_repo_publishing(
+                [_config(npm)], gh_config={}, workflows_dir=_workflows(tmp_path),
+            )
+        gh.assert_not_called()
+
+    def test_a_failed_visibility_lookup_names_provenance_false(self, tmp_path):
+        import subprocess
+        with patch(RUN_GH, side_effect=subprocess.CalledProcessError(1, "gh")):
+            with pytest.raises(ReleaseValidationError) as exc:
+                _abort_on_private_repo_publishing(
+                    [_config(self.NPM)], gh_config={},
+                    workflows_dir=_workflows(tmp_path),
+                )
+        assert "could not determine" in str(exc.value)
+        assert '"provenance": false' in str(exc.value)
+
+    @pytest.mark.parametrize("answer", ["not json", '{"isPrivate": "yes"}', "{}"])
+    def test_an_unreadable_visibility_is_a_refusal(self, tmp_path, answer):
+        with patch(RUN_GH, return_value=answer):
+            with pytest.raises(ReleaseValidationError) as exc:
+                _abort_on_private_repo_publishing(
+                    [_config(self.NPM)], gh_config={},
+                    workflows_dir=_workflows(tmp_path),
+                )
+        assert "could not determine" in str(exc.value)
+
+    def test_gh_config_is_forwarded_for_repo_resolution(self, tmp_path):
+        sentinel = {"github": {"repo": "owner/name"}}
+        with patch(RUN_GH, return_value=PUBLIC) as gh:
+            _abort_on_private_repo_publishing(
+                [_config(self.NPM)], gh_config=sentinel,
+                workflows_dir=_workflows(tmp_path),
+            )
+        assert gh.call_args[0][1] is sentinel
+
+
 class TestTheAttestationFix:
 
     def test_the_attestation_refusal_clears_after_rlsbl_scaffold(self, mock_git_repo):
@@ -117,7 +169,7 @@ class TestTheAttestationFix:
 class TestTheReleaseFlow:
     """`rlsbl release run` refuses before pushing, and the fix clears it."""
 
-    def _release(self, repo, gh, pushed):
+    def _release(self, repo, gh, pushed, pipelines=None):
         from pathlib import Path
         from unittest.mock import patch as _patch
 
@@ -144,7 +196,8 @@ class TestTheReleaseFlow:
                 {"quiet": True, "watch": False},
                 ctx=ProjectContext(
                     project_root=Path(repo), workspace_root=None,
-                    config={"publish_mode": "ci", "pipelines": {}},
+                    config={"publish_mode": "ci", "targets": ["npm"],
+                            "pipelines": pipelines or {}},
                 ),
             )
 
@@ -221,6 +274,46 @@ class TestTheReleaseFlow:
         assert "this repository is PRIVATE" in err
         assert "transparency log" in err
         assert pushed == [], "refused before anything was pushed"
+
+    def test_npm_provenance_is_refused_once_with_the_regeneration_fix(
+        self, mock_git_repo, capsys,
+    ):
+        """One guard answers for npm provenance, and asks about visibility once.
+
+        Its refusal names the whole fix -- ``"provenance": false`` plus the
+        scaffold that regenerates the publish workflow -- because the config
+        change alone leaves the committed ``--provenance`` workflow in place.
+        """
+        import subprocess
+
+        from test_post_push_failure_state import _setup_npm_project
+
+        _setup_npm_project(mock_git_repo)
+        asked = []
+
+        def gh(args, *_config, **kwargs):
+            args = list(args)
+            if args[:2] == ["repo", "view"]:
+                asked.append(args)
+                return PRIVATE
+            if args[:2] == ["release", "view"]:
+                raise subprocess.CalledProcessError(1, "gh release view")
+            return ""
+
+        pushed = []
+        with pytest.raises(SystemExit) as exc:
+            self._release(mock_git_repo, gh, pushed, pipelines=NPM_PROVENANCE_ON)
+        assert exc.value.code == 1
+        err = capsys.readouterr().err
+        assert "this repository is PRIVATE" in err
+        assert '"provenance": false' in err
+        assert "rlsbl scaffold" in err
+        assert len(asked) == 1, "visibility is asked once, by one guard"
+        assert pushed == [], "refused before anything was pushed"
+
+
+NPM_PROVENANCE_ON = {"npm": {"type": "npm", "local": False, "provenance": True,
+                             "target": "npm"}}
 
 
 GO_VERIFYING = """\
