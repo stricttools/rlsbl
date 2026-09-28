@@ -1,5 +1,5 @@
 +++
-description = "Every check rlsbl runs, grouped by tag, with its severity, the option each check is and how a repository's options entries set its value, the targets it applies to, the command a test-suite run invokes, how a workspace run is scoped, and which tags and GitHub Releases the unpublished-refs check demands of each released version."
+description = "Every check rlsbl runs, grouped by tag, with its severity, the option each check is and how a repository's options entries set its value, `check` as the full report and `failing-checks` as the error-level failures alone, the hooks checks.toml declares, the targets it applies to, the command a test-suite run invokes, how a workspace run is scoped, and which tags and GitHub Releases the unpublished-refs check demands of each released version."
 +++
 
 # Check system
