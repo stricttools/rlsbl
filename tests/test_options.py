@@ -314,6 +314,37 @@ class TestPathScopes:
         results, _listed, _code = rlsbl.app.run_checks(ctx, name_glob="dep-floors")
         assert status(results) == ["off"]
 
+    def test_a_programmatic_run_reads_external_checks_for_its_context(
+        self, tmp_path, monkeypatch,
+    ):
+        """run_checks_for runs the external checks the context's project
+        declares, not those of the directory the process stands in: a release
+        run from a workspace root for one member runs that member's checks."""
+        root = self._workspace(tmp_path)
+        (root / "cli" / ".rlsbl").mkdir(parents=True)
+        (root / "cli" / ".rlsbl" / "config.json").write_text(json.dumps({
+            "publish_mode": "none",
+            "external_checks": [{
+                "name": "member-own-check", "kind": "freeform",
+                "command": "true", "tag": "preflight",
+            }],
+        }))
+        monkeypatch.chdir(root)
+        ctx = make_ctx(root / "cli")
+
+        results, _listed, _code = rlsbl.run_checks_for(
+            ctx, name_glob="member-own-check",
+        )
+        assert [(r.name, r.outcome.status) for r in results] == [
+            ("member-own-check", "pass"),
+        ]
+        # The process's own directory declares no such check, so a plain run
+        # from here afterwards does not see the member's definition.
+        results, _listed, _code = rlsbl.app.run_checks(
+            ctx, name_glob="member-own-check",
+        )
+        assert results == []
+
 
 # ---------------------------------------------------------------------------
 # The options commands

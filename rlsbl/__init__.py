@@ -599,14 +599,18 @@ def _check_context_factory(project_root=None):
     return ctx
 
 
-def _read_config_for_cwd():
-    """Read the rlsbl config for the current working directory.
+def _read_config_for_check_project():
+    """Read the rlsbl config of the project a check run answers for.
 
     Used by the external check provider to read config at materialization
-    time (called lazily by strictcli, memoized by cwd).
+    time (called lazily by strictcli, memoized by cwd). The project is the one
+    :func:`_check_project_dir` names -- the context's own project during
+    :func:`run_checks_for`, which also drops that memo around the run -- so a
+    release run from a workspace root for one member runs that member's
+    external checks, not the ones the root's config declares.
     """
     from .config import read_project_config
-    return read_project_config(os.getcwd())
+    return read_project_config(str(_check_project_dir()))
 
 
 def _abort_unless_head_descends(pre_release_sha):
@@ -631,9 +635,10 @@ def _abort_unless_head_descends(pre_release_sha):
 
 app.set_check_context(_check_context_factory)
 
-# Register the external check provider (lazily reads config per cwd).
+# Register the external check provider (lazily reads the config of the
+# project a check run answers for).
 from .external_checks import make_external_check_provider
-app.register_check_provider(make_external_check_provider(_read_config_for_cwd))
+app.register_check_provider(make_external_check_provider(_read_config_for_check_project))
 
 # Register check implementations on the strictcli check system.
 from .checks import register_checks
@@ -700,10 +705,16 @@ def run_checks_for(context, **kwargs):
     the project that context was built for.
     """
     token = _CHECK_PROJECT_DIR.set(Path(context.project_root))
+    # strictcli memoizes the external check provider on the process's cwd,
+    # which says nothing about the project this run answers for: drop the memo
+    # so the provider re-reads the context's own config, and drop it again
+    # afterwards so a later run from the cwd does not inherit these checks.
+    app.reset_check_provider_cache()
     try:
         return app.run_checks(context, **kwargs)
     finally:
         _CHECK_PROJECT_DIR.reset(token)
+        app.reset_check_provider_cache()
 
 
 # ---------------------------------------------------------------------------
