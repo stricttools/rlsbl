@@ -47,7 +47,7 @@ class TestClaimName:
         mock_run.return_value = MagicMock(returncode=0)
 
         with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
-            run_cmd("npm", ["my-pkg"], {"force-publish": True})
+            run_cmd("npm", ["my-pkg"], {"dry-run": False})
 
         mock_check.assert_called_once_with("my-pkg", "npm")
         mock_run.assert_called_once()
@@ -68,7 +68,7 @@ class TestClaimName:
         mock_run.return_value = MagicMock(returncode=0)
 
         with patch.dict(os.environ, {"PYPI_TOKEN": "tok456"}):
-            run_cmd("pypi", ["my-pkg"], {"force-publish": True})
+            run_cmd("pypi", ["my-pkg"], {"dry-run": False})
 
         mock_check.assert_called_once_with("my-pkg", "pypi")
         assert mock_run.call_count == 2
@@ -88,14 +88,37 @@ class TestClaimName:
         # Verify __init__.py was created in underscored package dir
         assert (real_tmpdir / "my_pkg" / "__init__.py").exists()
 
+    @patch("rlsbl.effects.run")
     @patch("rlsbl.commands.check._check_single_name")
-    def test_claim_taken_without_force_publish_exits(self, mock_check):
-        """check-name returns taken, no --force-publish. Exits 1 without publishing."""
+    def test_claim_taken_exits_without_publishing(self, mock_check, mock_run, capsys):
+        """check-name returns taken. Exits 1 without publishing, and the refusal
+        names no way to publish anyway: there is none."""
         mock_check.return_value = {"name": "taken-pkg", "registry": "npm", "status": "taken", "variants": None, "reason": "registered"}
 
-        with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", ["taken-pkg"], {"force-publish": False})
+        with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd("npm", ["taken-pkg"], {"dry-run": False})
         assert exc_info.value.code == 1
+        mock_run.assert_not_called()
+        err = capsys.readouterr().err
+        assert "Name 'taken-pkg' appears taken on npm: registered." in err
+        assert "--force-publish" not in err
+
+    @patch("rlsbl.effects.run")
+    @patch("rlsbl.commands.check._check_single_name")
+    def test_claim_unrecognized_status_is_a_hard_error(self, mock_check, mock_run, capsys):
+        """A status the check does not define is a hard error (exit 2), never
+        a publish, and the refusal names no way to publish anyway."""
+        mock_check.return_value = {"name": "pkg", "registry": "npm", "status": "unknown", "variants": None, "reason": None}
+
+        with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
+            with pytest.raises(SystemExit) as exc_info:
+                run_cmd("npm", ["pkg"], {"dry-run": False})
+        assert exc_info.value.code == 2
+        mock_run.assert_not_called()
+        err = capsys.readouterr().err
+        assert "unrecognized status 'unknown'" in err
+        assert "--force-publish" not in err
 
     @patch("rlsbl.commands.check._check_single_name")
     def test_claim_taken_moniker_shows_conflicting_package(self, mock_check, capsys):
@@ -112,7 +135,7 @@ class TestClaimName:
         }
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", ["selfdoc"], {"force-publish": False})
+            run_cmd("npm", ["selfdoc"], {"dry-run": False})
         assert exc_info.value.code == 1
 
         err = capsys.readouterr().err
@@ -137,7 +160,7 @@ class TestClaimName:
         }
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", ["foobar"], {"force-publish": False})
+            run_cmd("npm", ["foobar"], {"dry-run": False})
         assert exc_info.value.code == 1
 
         err = capsys.readouterr().err
@@ -145,27 +168,13 @@ class TestClaimName:
         assert "foo.bar" in err
         assert rule in err
 
-    @patch("rlsbl.effects.run")
-    @patch("rlsbl.commands.check._check_single_name")
-    def test_claim_taken_with_force_publish_publishes(self, mock_check, mock_run, real_tmpdir):
-        """check-name returns taken, --force-publish passed. Publish is attempted."""
-        mock_check.return_value = {"name": "taken-pkg", "registry": "npm", "status": "taken", "variants": None, "reason": "registered"}
-        mock_run.return_value = MagicMock(returncode=0)
-
-        with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
-            run_cmd("npm", ["taken-pkg"], {"force-publish": True})
-
-        mock_run.assert_called_once()
-        call_args = mock_run.call_args
-        assert call_args[0][0] == ["npm", "publish", "--access", "public"]
-
     @patch("rlsbl.commands.check._check_single_name")
     def test_claim_error_exits(self, mock_check):
         """check-name returns error. Exits 2 without publishing."""
         mock_check.return_value = {"name": "err-pkg", "registry": "npm", "status": "error", "variants": None, "reason": None, "error": "network timeout"}
 
         with pytest.raises(SystemExit) as exc_info:
-            run_cmd("npm", ["err-pkg"], {"force-publish": False})
+            run_cmd("npm", ["err-pkg"], {"dry-run": False})
         assert exc_info.value.code == 2
 
     @patch("rlsbl.effects.run")
@@ -177,7 +186,7 @@ class TestClaimName:
 
         with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["my-pkg"], {"force-publish": True})
+                run_cmd("npm", ["my-pkg"], {"dry-run": False})
         assert exc_info.value.code == 1
 
     @patch("rlsbl.effects.run")
@@ -193,7 +202,7 @@ class TestClaimName:
 
         with patch.dict(os.environ, {"PYPI_TOKEN": "tok456"}):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd("pypi", ["my-pkg"], {"force-publish": True})
+                run_cmd("pypi", ["my-pkg"], {"dry-run": False})
         assert exc_info.value.code == 1
 
     @patch("rlsbl.commands.check._check_single_name")
@@ -204,7 +213,7 @@ class TestClaimName:
         env = {k: v for k, v in os.environ.items() if k != "NPM_TOKEN"}
         with patch.dict(os.environ, env, clear=True):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd("npm", ["my-pkg"], {"force-publish": False})
+                run_cmd("npm", ["my-pkg"], {"dry-run": False})
         assert exc_info.value.code == 1
 
     @patch("rlsbl.commands.check._check_single_name")
@@ -215,7 +224,7 @@ class TestClaimName:
         env = {k: v for k, v in os.environ.items() if k not in ("PYPI_TOKEN", "UV_PUBLISH_TOKEN")}
         with patch.dict(os.environ, env, clear=True):
             with pytest.raises(SystemExit) as exc_info:
-                run_cmd("pypi", ["my-pkg"], {"force-publish": True})
+                run_cmd("pypi", ["my-pkg"], {"dry-run": False})
         assert exc_info.value.code == 1
 
 
@@ -326,7 +335,7 @@ class TestClaimNameConfirmation:
         }
         mock_run.return_value = MagicMock(returncode=0)
         with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
-            run_cmd("npm", ["my-pkg"], {"force-publish": False})
+            run_cmd("npm", ["my-pkg"], {"dry-run": False})
         mock_input.assert_not_called()
         mock_run.assert_called_once()
         assert mock_run.call_args[0][0] == ["npm", "publish", "--access", "public"]
@@ -341,7 +350,7 @@ class TestClaimNameConfirmation:
         }
         mock_run.return_value = MagicMock(returncode=0)
         with patch.dict(os.environ, {"NPM_TOKEN": "tok123"}):
-            run_cmd("npm", ["my-pkg"], {"force-publish": True})
+            run_cmd("npm", ["my-pkg"], {"dry-run": False})
         mock_input.assert_not_called()
         mock_run.assert_called_once()
 
@@ -383,7 +392,7 @@ class TestClaimCredentials:
         _home(monkeypatch, tmp_path,
               npmrc="//registry.npmjs.org/:_authToken=npm_secretvalue\n")
 
-        run_cmd("npm", ["my-pkg"], {"force-publish": False})
+        run_cmd("npm", ["my-pkg"], {"dry-run": False})
 
         assert mock_run.call_args[0][0] == ["npm", "publish", "--access", "public"]
         # npm reads ~/.npmrc itself: no staging .npmrc shadows it.
@@ -399,7 +408,7 @@ class TestClaimCredentials:
         _home(monkeypatch, tmp_path)
         monkeypatch.setenv("NPM_TOKEN", "npm_envsecret")
 
-        run_cmd("npm", ["my-pkg"], {"force-publish": False})
+        run_cmd("npm", ["my-pkg"], {"dry-run": False})
 
         npmrc = (real_tmpdir / ".npmrc").read_text()
         assert "${NPM_TOKEN}" in npmrc
@@ -413,7 +422,7 @@ class TestClaimCredentials:
         _home(monkeypatch, tmp_path, npmrc="registry=https://registry.npmjs.org/\n")
 
         with pytest.raises(SystemExit) as exc:
-            run_cmd("npm", ["my-pkg"], {"force-publish": False})
+            run_cmd("npm", ["my-pkg"], {"dry-run": False})
         assert exc.value.code == 1
         err = capsys.readouterr().err
         assert "NPM_TOKEN" in err and "~/.npmrc" in err
@@ -430,7 +439,7 @@ class TestClaimCredentials:
             "[pypi]\nusername = __token__\npassword = pypi-rcsecret\n"
         ))
 
-        run_cmd("pypi", ["my-pkg"], {"force-publish": False})
+        run_cmd("pypi", ["my-pkg"], {"dry-run": False})
 
         publish_call = mock_run.call_args_list[1]
         assert publish_call[0][0] == ["uv", "publish"]
@@ -448,7 +457,7 @@ class TestClaimCredentials:
         _home(monkeypatch, tmp_path, pypirc="[pypi]\npassword = pypi-rcsecret\n")
         monkeypatch.setenv("PYPI_TOKEN", "pypi-envsecret")
 
-        run_cmd("pypi", ["my-pkg"], {"force-publish": False})
+        run_cmd("pypi", ["my-pkg"], {"dry-run": False})
 
         assert mock_run.call_args_list[1][1]["env"]["UV_PUBLISH_TOKEN"] == "pypi-envsecret"
 
@@ -460,7 +469,7 @@ class TestClaimCredentials:
         _home(monkeypatch, tmp_path)
 
         with pytest.raises(SystemExit) as exc:
-            run_cmd("pypi", ["my-pkg"], {"force-publish": False})
+            run_cmd("pypi", ["my-pkg"], {"dry-run": False})
         assert exc.value.code == 1
         err = capsys.readouterr().err
         assert "UV_PUBLISH_TOKEN" in err and "PYPI_TOKEN" in err and "~/.pypirc" in err

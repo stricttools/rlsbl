@@ -448,33 +448,16 @@ class TestClaimNameAdditionalCoverage:
         assert "Unsupported target" in captured.err
 
     @patch("rlsbl.commands.check._check_single_name")
-    def test_ambiguous_status_without_force_publish_exits(self, mock_check, capsys):
+    def test_unrecognized_status_exits_2(self, mock_check, capsys):
         mock_check.return_value = {
             "name": "pkg", "registry": "npm", "status": "unknown",
             "variants": None, "reason": None,
         }
         with pytest.raises(SystemExit) as exc_info:
-            claim_run_cmd("npm", ["pkg"], {"force-publish": False})
-        assert exc_info.value.code == 1
+            claim_run_cmd("npm", ["pkg"], {"dry-run": False})
+        assert exc_info.value.code == 2
         captured = capsys.readouterr()
-        assert "Ambiguous status" in captured.err
-
-    @patch("rlsbl.effects.run")
-    @patch("rlsbl.commands.check._check_single_name")
-    def test_ambiguous_status_with_force_publish_proceeds(self, mock_check, mock_run, capsys, tmp_path):
-        mock_check.return_value = {
-            "name": "pkg", "registry": "npm", "status": "unknown",
-            "variants": None, "reason": None,
-        }
-        mock_run.return_value = MagicMock(returncode=0)
-
-        with patch("rlsbl._effects_direct.mkdtemp", return_value=str(tmp_path)), \
-             patch("rlsbl.effects.rmtree"), \
-             patch.dict(os.environ, {"NPM_TOKEN": "tok"}):
-            claim_run_cmd("npm", ["pkg"], {"force-publish": True})
-
-        captured = capsys.readouterr()
-        assert "--force-publish passed" in captured.out
+        assert "unrecognized status 'unknown'" in captured.err
 
 
 # ============================================================================

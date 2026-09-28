@@ -1237,7 +1237,7 @@ def cmd_check_name(ctx, target, delay):
 
 @app.command(
     name="claim-name",
-    help="Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first, then publishes if available. npm authenticates with NPM_TOKEN when it is set, otherwise with npm's own ~/.npmrc login; PyPI with UV_PUBLISH_TOKEN or PYPI_TOKEN when set, otherwise with the token in ~/.pypirc. With neither, the claim is refused naming both places. No token is ever printed.",
+    help="Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first and publishes only a name the check reports as available: a name reported taken is refused with exit 1, and a check that ended in an error or returned any other status is refused with exit 2. npm authenticates with NPM_TOKEN when it is set, otherwise with npm's own ~/.npmrc login; PyPI with UV_PUBLISH_TOKEN or PYPI_TOKEN when set, otherwise with the token in ~/.pypirc. With neither, the claim is refused naming both places. No token is ever printed.",
     effect="mutating",
     # Claiming a name on a public registry is the operator's call: it decides
     # what this project is called to everyone outside it. (It is also the
@@ -1256,12 +1256,10 @@ def cmd_check_name(ctx, target, delay):
     strictcli.Choice("npm", help="publish the placeholder to the npm registry"),
     strictcli.Choice("pypi", help="publish the placeholder to the Python Package Index"),
 ], help="Target package registry to publish the placeholder to")
-@strictcli.flag(name="force-publish", type=bool, negatable=False, presence="optional", help="Publish even when the availability check reports the name as taken or returns an ambiguous status. Distinct from the framework's --approve-consequential, which only skips the confirmation prompt.")
 @effects.handler
-def cmd_claim_name(ctx, target, force_publish):
+def cmd_claim_name(ctx, target):
     """Claim a package name on a registry by publishing a minimal placeholder."""
     dry_run = ctx.dry_run
-    force_publish = _opt_default(force_publish, False)
     # --target is required and choice-constrained at registration, so the
     # framework refuses an absent or unknown registry before the handler runs.
     names = _variadic_args
@@ -1272,7 +1270,7 @@ def cmd_claim_name(ctx, target, force_publish):
             file=sys.stderr,
         )
         sys.exit(1)
-    flags = {"dry-run": dry_run, "force-publish": force_publish}
+    flags = {"dry-run": dry_run}
     from .commands.claim_name import run_cmd
     run_cmd(target, names, flags)
 
