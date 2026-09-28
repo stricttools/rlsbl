@@ -64,6 +64,16 @@
         },
         {
           "level": 2,
+          "text": "Coverage in a fork",
+          "anchor": "coverage-in-a-fork"
+        },
+        {
+          "level": 3,
+          "text": "Moving inherited tags: `rlsbl upstream adopt-tags`",
+          "anchor": "moving-inherited-tags-rlsbl-upstream-adopt-tags"
+        },
+        {
+          "level": 2,
           "text": "Validation cache",
           "anchor": "validation-cache"
         },
@@ -1291,6 +1301,23 @@
       ]
     },
     {
+      "path": "cli-upstream.md",
+      "title": "rlsbl upstream",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl upstream",
+          "anchor": "rlsbl-upstream"
+        },
+        {
+          "level": 2,
+          "text": "upstream adopt-tags",
+          "anchor": "upstream-adopt-tags"
+        }
+      ]
+    },
+    {
       "path": "cli-watch.md",
       "title": "rlsbl watch",
       "type": "doc",
@@ -2247,6 +2274,21 @@
           "level": 3,
           "text": "`_check_health_script`",
           "anchor": "_check_health_script"
+        },
+        {
+          "level": 3,
+          "text": "`DeployBranchError`",
+          "anchor": "deploybrancherror"
+        },
+        {
+          "level": 3,
+          "text": "`head_is_detached`",
+          "anchor": "head_is_detached"
+        },
+        {
+          "level": 3,
+          "text": "`branch_carrying_head`",
+          "anchor": "branch_carrying_head"
         },
         {
           "level": 3,
@@ -9173,16 +9215,6 @@
         },
         {
           "level": 3,
-          "text": "`_npm_provenance_requested`",
-          "anchor": "_npm_provenance_requested"
-        },
-        {
-          "level": 3,
-          "text": "`_abort_on_npm_provenance`",
-          "anchor": "_abort_on_npm_provenance"
-        },
-        {
-          "level": 3,
           "text": "`_abort_on_private_repo_publishing`",
           "anchor": "_abort_on_private_repo_publishing"
         },
@@ -10348,6 +10380,28 @@
       ]
     },
     {
+      "path": "rlsbl-commands-upstream_cmd.md",
+      "title": "rlsbl.commands.upstream_cmd",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.commands.upstream_cmd",
+          "anchor": "rlsblcommandsupstream_cmd"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.commands.upstream_cmd`",
+          "anchor": "rlsblcommandsupstream_cmd"
+        },
+        {
+          "level": 3,
+          "text": "`run_cmd`",
+          "anchor": "run_cmd"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-commands-watch.md",
       "title": "rlsbl.commands.watch",
       "type": "doc",
@@ -11351,6 +11405,21 @@
           "level": 3,
           "text": "`_check_health_script`",
           "anchor": "_check_health_script"
+        },
+        {
+          "level": 3,
+          "text": "`DeployBranchError`",
+          "anchor": "deploybrancherror"
+        },
+        {
+          "level": 3,
+          "text": "`head_is_detached`",
+          "anchor": "head_is_detached"
+        },
+        {
+          "level": 3,
+          "text": "`branch_carrying_head`",
+          "anchor": "branch_carrying_head"
         },
         {
           "level": 3,
@@ -14781,6 +14850,26 @@
         },
         {
           "level": 3,
+          "text": "`committed_workflow_uses`",
+          "anchor": "committed_workflow_uses"
+        },
+        {
+          "level": 3,
+          "text": "`_asks_module_proxy`",
+          "anchor": "_asks_module_proxy"
+        },
+        {
+          "level": 3,
+          "text": "`_requests_provenance`",
+          "anchor": "_requests_provenance"
+        },
+        {
+          "level": 3,
+          "text": "`_uses_in`",
+          "anchor": "_uses_in"
+        },
+        {
+          "level": 3,
           "text": "`public_only_uses`",
           "anchor": "public_only_uses"
         },
@@ -14947,6 +15036,11 @@
         },
         {
           "level": 3,
+          "text": "`publishes_from_ci`",
+          "anchor": "publishes_from_ci"
+        },
+        {
+          "level": 3,
           "text": "`preflight`",
           "anchor": "preflight"
         },
@@ -14959,6 +15053,11 @@
           "level": 3,
           "text": "`_diagnosis`",
           "anchor": "_diagnosis"
+        },
+        {
+          "level": 3,
+          "text": "`_describe`",
+          "anchor": "_describe"
         },
         {
           "level": 3,
@@ -15941,6 +16040,26 @@
         },
         {
           "level": 3,
+          "text": "`latest_release_tag`",
+          "anchor": "latest_release_tag"
+        },
+        {
+          "level": 3,
+          "text": "`repair_takes_latest`",
+          "anchor": "repair_takes_latest"
+        },
+        {
+          "level": 3,
+          "text": "`tag_newer_in_history`",
+          "anchor": "tag_newer_in_history"
+        },
+        {
+          "level": 3,
+          "text": "`version_newer_than_tag`",
+          "anchor": "version_newer_than_tag"
+        },
+        {
+          "level": 3,
           "text": "`update_release`",
           "anchor": "update_release"
         },
@@ -16080,6 +16199,11 @@
           "level": 3,
           "text": "`unreleased_range`",
           "anchor": "unreleased_range"
+        },
+        {
+          "level": 3,
+          "text": "`unreleased_revs`",
+          "anchor": "unreleased_revs"
         },
         {
           "level": 3,
@@ -19958,6 +20082,168 @@
       ]
     },
     {
+      "path": "rlsbl-upstream.md",
+      "title": "rlsbl.upstream",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.upstream",
+          "anchor": "rlsblupstream"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.upstream`",
+          "anchor": "rlsblupstream"
+        },
+        {
+          "level": 3,
+          "text": "`UpstreamError`",
+          "anchor": "upstreamerror"
+        },
+        {
+          "level": 3,
+          "text": "`Upstream`",
+          "anchor": "upstream"
+        },
+        {
+          "level": 4,
+          "text": "`slug`",
+          "anchor": "slug"
+        },
+        {
+          "level": 4,
+          "text": "`url`",
+          "anchor": "url"
+        },
+        {
+          "level": 4,
+          "text": "`tags_of_prefix`",
+          "anchor": "tags_of_prefix"
+        },
+        {
+          "level": 4,
+          "text": "`kept_ref`",
+          "anchor": "kept_ref"
+        },
+        {
+          "level": 4,
+          "text": "`branch_ref`",
+          "anchor": "branch_ref"
+        },
+        {
+          "level": 4,
+          "text": "`branch_fetch_command`",
+          "anchor": "branch_fetch_command"
+        },
+        {
+          "level": 4,
+          "text": "`tags_of_fetch_command`",
+          "anchor": "tags_of_fetch_command"
+        },
+        {
+          "level": 3,
+          "text": "`repository_root`",
+          "anchor": "repository_root"
+        },
+        {
+          "level": 3,
+          "text": "`load`",
+          "anchor": "load"
+        },
+        {
+          "level": 3,
+          "text": "`load_here`",
+          "anchor": "load_here"
+        },
+        {
+          "level": 3,
+          "text": "`missing_history_message`",
+          "anchor": "missing_history_message"
+        },
+        {
+          "level": 3,
+          "text": "`history_exclusions`",
+          "anchor": "history_exclusions"
+        },
+        {
+          "level": 3,
+          "text": "`TagPlan`",
+          "anchor": "tagplan"
+        },
+        {
+          "level": 4,
+          "text": "`create_kept`",
+          "anchor": "create_kept"
+        },
+        {
+          "level": 4,
+          "text": "`push_kept`",
+          "anchor": "push_kept"
+        },
+        {
+          "level": 4,
+          "text": "`delete_origin`",
+          "anchor": "delete_origin"
+        },
+        {
+          "level": 4,
+          "text": "`delete_local`",
+          "anchor": "delete_local"
+        },
+        {
+          "level": 3,
+          "text": "`AdoptPlan`",
+          "anchor": "adoptplan"
+        },
+        {
+          "level": 4,
+          "text": "`in_state`",
+          "anchor": "in_state"
+        },
+        {
+          "level": 4,
+          "text": "`conflicts`",
+          "anchor": "conflicts"
+        },
+        {
+          "level": 4,
+          "text": "`work`",
+          "anchor": "work"
+        },
+        {
+          "level": 3,
+          "text": "`_ls_remote_tags`",
+          "anchor": "_ls_remote_tags"
+        },
+        {
+          "level": 3,
+          "text": "`no_upstream_message`",
+          "anchor": "no_upstream_message"
+        },
+        {
+          "level": 3,
+          "text": "`observe`",
+          "anchor": "observe"
+        },
+        {
+          "level": 3,
+          "text": "`refusal`",
+          "anchor": "refusal"
+        },
+        {
+          "level": 3,
+          "text": "`render`",
+          "anchor": "render"
+        },
+        {
+          "level": 3,
+          "text": "`apply`",
+          "anchor": "apply"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-utils.md",
       "title": "rlsbl.utils",
       "type": "doc",
@@ -20954,8 +21240,8 @@
         },
         {
           "level": 3,
-          "text": "`_read_config_for_cwd`",
-          "anchor": "_read_config_for_cwd"
+          "text": "`_read_config_for_check_project`",
+          "anchor": "_read_config_for_check_project"
         },
         {
           "level": 3,
@@ -21336,6 +21622,11 @@
           "level": 3,
           "text": "`cmd_transition_record`",
           "anchor": "cmd_transition_record"
+        },
+        {
+          "level": 3,
+          "text": "`cmd_upstream_adopt_tags`",
+          "anchor": "cmd_upstream_adopt_tags"
         },
         {
           "level": 3,
@@ -22753,7 +23044,7 @@
       ]
     }
   ],
-  "last_gen": "2026-09-28T22:12:41.909198+00:00",
+  "last_gen": "2026-09-28T22:59:31.386065+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
