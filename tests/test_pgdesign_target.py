@@ -1,5 +1,6 @@
 """Tests for PgdesignTarget: pgdesign.toml handling, detection, version read/write."""
 
+import json
 import os
 import subprocess
 import tempfile
@@ -303,6 +304,43 @@ class TestPgdesignTargetTomlResolution:
         assert not hasattr(PgdesignTarget, "_schema_dir")
 
 
+def _envelope(results, exit_code, diagnostics=()):
+    """The machine document `pgdesign check --json` prints (pgdesign 0.27.1:
+    strictcli's envelope, interface_version 2, the results in ``payload``)."""
+    return json.dumps({
+        "interface_version": 2, "app": "pgdesign", "app_version": "",
+        "command": "check", "exit_code": exit_code, "payload": results,
+        "dry_run": False, "writes": None, "preview": [],
+        "preview_error": None,
+        "diagnostics": [{"level": "info", "message": m} for m in diagnostics],
+    }) + "\n"
+
+
+def _validation(status, problems=()):
+    return {
+        "name": "validation", "status": status,
+        "message": {
+            "pass": "schema valid",
+            "warn": "1 validation warning(s)",
+            "fail": "validation errors found",
+        }[status],
+        "problems": [{"severity": sev, "text": text} for sev, text in problems],
+        "notes": [], "duration_ms": 12,
+    }
+
+
+_PASS = _envelope([_validation("pass")], 0)
+_WARN_ONLY = _envelope([_validation("warn", [(
+    "warn",
+    "[W002] users: orphan table: no FK relationships "
+    "(neither referencing nor referenced)",
+)])], 1)
+_FAIL = _envelope([_validation("fail", [
+    ("error", "[E201] children: FK fk_children_parent missing ON DELETE clause"),
+    ("warn", "[W002] users: orphan table"),
+])], 1)
+
+
 class TestPgdesignTargetBuild:
     """build() shells out to pgdesign to validate the schema.
 
@@ -312,51 +350,110 @@ class TestPgdesignTargetBuild:
     directory (its CheckContext root is os.Getwd(), and config discovery only
     walks UP from there) -- so the schema directory the old positional argument
     carried has to be expressed as cwd instead.
+
+    The release reads the machine output (`--json`) and fails on a result
+    whose status is `fail` only: pgdesign's warnings are reported and never
+    block, and the verdict never depends on the exit code, which is nonzero
+    on a warning too.
     """
 
-    def _capture(self, monkeypatch, returncode=0, stderr=""):
+    def _capture(self, monkeypatch, returncode=0, stdout=_PASS, stderr=""):
         calls = []
 
         def fake_run(argv, **kwargs):
             calls.append((argv, kwargs))
             return subprocess.CompletedProcess(
-                argv, returncode, stdout="", stderr=stderr
+                argv, returncode, stdout=stdout, stderr=stderr
             )
 
         monkeypatch.setattr("rlsbl.effects.run", fake_run)
         return calls
 
-    def test_build_invokes_check_tag_validation(self, monkeypatch):
-        """The shipped argv must be the check-framework form, not `validate`."""
-        calls = self._capture(monkeypatch)
+    def _build(self, **kwargs):
         target = PgdesignTarget()
         with tempfile.TemporaryDirectory() as d:
             with open(os.path.join(d, "pgdesign.toml"), "w") as f:
                 f.write(MINIMAL_TOML)
-            target.build(d, "1.2.3")
+            target.build(d, "1.2.3", **kwargs)
+
+    def test_build_invokes_check_tag_validation_as_json(self, monkeypatch):
+        """The shipped argv is the check-framework form, read as machine output."""
+        calls = self._capture(monkeypatch)
+        self._build()
         assert len(calls) == 1
         argv, _ = calls[0]
-        assert argv == [
-            "pgdesign", "check", "--tag", "validation", "--ignore-warnings",
-        ]
+        assert argv == ["pgdesign", "check", "--tag", "validation", "--json"]
 
-    def test_build_ignores_advisory_warnings(self, monkeypatch):
-        """Advisory warnings must never abort a release.
-
-        pgdesign's check framework exits nonzero on warn-severity results
-        unless `--ignore-warnings` is passed. Warnings are advisory by
-        pgdesign's own severity model; only errors are release-blocking, so
-        the release gate always passes the flag.
-        """
+    def test_build_never_passes_ignore_warnings(self, monkeypatch):
         calls = self._capture(monkeypatch)
-        target = PgdesignTarget()
-        with tempfile.TemporaryDirectory() as d:
-            with open(os.path.join(d, "pgdesign.toml"), "w") as f:
-                f.write(MINIMAL_TOML)
-            target.build(d, "1.2.3")
+        self._build()
         argv, _ = calls[0]
-        assert "--ignore-warnings" in argv
-        assert "--no-ignore-warnings" not in argv
+        assert not any("ignore-warnings" in a for a in argv)
+
+    def test_a_warn_only_outcome_does_not_fail_the_build(
+        self, monkeypatch, capsys,
+    ):
+        """pgdesign exits 1 on a warning; the release reads the statuses."""
+        self._capture(monkeypatch, returncode=1, stdout=_WARN_ONLY)
+        self._build()
+        err = capsys.readouterr().err
+        assert "[W002] users: orphan table" in err
+
+    def test_a_fail_status_fails_the_build_and_names_the_errors(
+        self, monkeypatch, capsys,
+    ):
+        self._capture(monkeypatch, returncode=1, stdout=_FAIL)
+        with pytest.raises(RuntimeError):
+            self._build()
+        err = capsys.readouterr().err
+        assert "pgdesign check --tag validation" in err
+        assert "validation: validation errors found" in err
+        assert "[E201] children: FK fk_children_parent missing ON DELETE" in err
+
+    def test_output_that_is_not_the_envelope_is_refused(
+        self, monkeypatch, capsys,
+    ):
+        """A bare result array (what pgdesign 0.26.0 printed) is not read."""
+        bare = json.dumps([_validation("pass")])
+        self._capture(monkeypatch, returncode=0, stdout=bare)
+        with pytest.raises(RuntimeError):
+            self._build()
+        err = capsys.readouterr().err
+        assert "interface_version 2" in err
+
+    def test_a_crash_with_no_json_is_refused_with_its_output(
+        self, monkeypatch, capsys,
+    ):
+        self._capture(
+            monkeypatch, returncode=2, stdout="", stderr="panic: boom",
+        )
+        with pytest.raises(RuntimeError):
+            self._build()
+        assert "panic: boom" in capsys.readouterr().err
+
+    def test_a_selection_that_matched_nothing_is_refused(
+        self, monkeypatch, capsys,
+    ):
+        """Validating nothing is not a passing validation."""
+        self._capture(
+            monkeypatch, returncode=0,
+            stdout=_envelope(None, 0, ["No checks matched the given filters."]),
+        )
+        with pytest.raises(RuntimeError):
+            self._build()
+        err = capsys.readouterr().err
+        assert "selected no checks" in err
+        assert "No checks matched the given filters." in err
+
+    def test_a_nonzero_exit_without_a_failure_or_warning_is_refused(
+        self, monkeypatch, capsys,
+    ):
+        self._capture(monkeypatch, returncode=1, stdout=_envelope(
+            [_validation("pass")], 1,
+        ))
+        with pytest.raises(RuntimeError):
+            self._build()
+        assert "exited 1" in capsys.readouterr().err
 
     def test_build_passes_schema_dir_as_cwd_root(self, monkeypatch):
         """A root-level pgdesign.toml means cwd is the project directory."""
@@ -408,34 +505,16 @@ class TestPgdesignTargetBuild:
 
     def test_build_applies_configured_timeout(self, monkeypatch):
         calls = self._capture(monkeypatch)
-        target = PgdesignTarget()
-        with tempfile.TemporaryDirectory() as d:
-            with open(os.path.join(d, "pgdesign.toml"), "w") as f:
-                f.write(MINIMAL_TOML)
-            target.build(d, "1.2.3", config={"build_timeout": 17})
-            assert calls[0][1]["timeout"] == 17
-
-    def test_build_raises_on_nonzero(self, monkeypatch):
-        self._capture(monkeypatch, returncode=1, stderr="E101: bad column")
-        target = PgdesignTarget()
-        with tempfile.TemporaryDirectory() as d:
-            with open(os.path.join(d, "pgdesign.toml"), "w") as f:
-                f.write(MINIMAL_TOML)
-            with pytest.raises(RuntimeError):
-                target.build(d, "1.2.3")
+        self._build(config={"build_timeout": 17})
+        assert calls[0][1]["timeout"] == 17
 
     def test_build_failure_message_names_the_real_command(
         self, monkeypatch, capsys
     ):
         """The diagnostic must name the command that actually ran."""
-        self._capture(monkeypatch, returncode=1, stderr="E101: bad column")
-        target = PgdesignTarget()
-        with tempfile.TemporaryDirectory() as d:
-            with open(os.path.join(d, "pgdesign.toml"), "w") as f:
-                f.write(MINIMAL_TOML)
-            with pytest.raises(RuntimeError):
-                target.build(d, "1.2.3")
+        self._capture(monkeypatch, returncode=1, stdout=_FAIL)
+        with pytest.raises(RuntimeError):
+            self._build()
         err = capsys.readouterr().err
         assert "pgdesign check --tag validation" in err
         assert "pgdesign validate" not in err
-        assert "E101: bad column" in err
