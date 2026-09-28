@@ -6,7 +6,8 @@
   },
   "en/changelog.md": {
     "content": "588c77d63020ed88beee81cd310c6566e858d1c2ba59280cbb610c50b7f6d5b8",
-    "description": "a6dd91226e9a3a12c40b1f816fd196914b344da47f97ec41b99ec62985d990ce"
+    "description": "a6dd91226e9a3a12c40b1f816fd196914b344da47f97ec41b99ec62985d990ce",
+    "source_docstring": "4fff13535641ef3e9f7c8663fb4854a94edccb3e370b2f4d2721a69393f06594"
   },
   "en/checks.md": {
     "content": "2c499efc23d39b4b89f288c35167c7598e15654dda60a805785e2ecc2bf70439",
@@ -158,7 +159,7 @@
   "en/cli-upstream.md": {
     "content": "f9258625f746ac75e75ef79a6ebbb3eeda88c18fd6040e76c8a1383cb09e2524",
     "description": "452c7a96a5a9c20684336e569020d3e93cd9e393559c8ac47b697b1fbd41b7e1",
-    "schema_hash": "842593f2ad9c6bcd1e375d44545871806f017f8b10ec0f40b0156bf4b8a7df4e",
+    "schema_hash": "3edfe4b94159f9873b85ade929cb11782d4c6b054d4591011db6c9ccdde190fa",
     "seed_hash": "452c7a96a5a9c20684336e569020d3e93cd9e393559c8ac47b697b1fbd41b7e1"
   },
   "en/cli-watch.md": {
@@ -634,7 +635,8 @@
   },
   "en/rlsbl-commands-upstream_cmd.md": {
     "content": "8ecfdd0694e911a05e325e1f55cd237ad40c30ed03e5534a3e8c6a72bd2ccf14",
-    "description": "14d4186f8d02a1cfe5719dde3151779a8112245775ff2dcf71e91511d507130b"
+    "description": "14d4186f8d02a1cfe5719dde3151779a8112245775ff2dcf71e91511d507130b",
+    "source_docstring": "6c068022cd8cbf08430f656b8c6bc60d47ef6d9f9bc37bfe8f4f1f5b90fda635"
   },
   "en/rlsbl-commands-watch.md": {
     "content": "8c1671aff235c1497ebd932a2c03355dbb1beb0645a24c09c8b64be54abbe59c",
@@ -1287,7 +1289,8 @@
   },
   "en/rlsbl-upstream.md": {
     "content": "1543fb1739c294a7ace5a706579fb8f009e6716c61ea8a20d5d5c2d33be198e1",
-    "description": "874f9c09c3824a408dac0f4243a330cadde2823fd581d317215701af90364629"
+    "description": "874f9c09c3824a408dac0f4243a330cadde2823fd581d317215701af90364629",
+    "source_docstring": "14b7ae54cec5dc7d177abc9368e63fb693876f9674d530e3e133523c289ca9ee"
   },
   "en/rlsbl-utils.md": {
     "content": "a47f1dcb0813a3326100a0a6f967b9614915f27b69c160f02ae8a8c3604f5dfe",
