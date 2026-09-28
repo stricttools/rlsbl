@@ -1019,15 +1019,18 @@ def _default_publish_workflow_checks():
     Both read the workflow files in a real commit's tree and ask GitHub about
     them, and so does the private-repository release guard's read of the
     committed workflows (neutralized to "nothing found"; the guard's config
-    findings still run). Most release-flow and watch tests run on made-up commits and mocked
-    git, where there is no tree to read. The checks are exercised against real
+    findings still run), and so does the monorepo batch's confirmation, which reads each
+    released member's release record. Most release-flow and watch tests run on made-up
+    commits and mocked git, where there is no tree to read. The checks are exercised against real
     repositories in test_publish_workflows.py and, through the release flow and
     ``rlsbl watch``, in test_publish_start_confirmation.py, and the committed
-    workflow read in test_private_repo_release_guard.py; both restore the real
-    functions over this patch.
+    workflow read in test_private_repo_release_guard.py, and the batch's in
+    test_batch_publish_start_confirmation.py; each restores the real functions
+    over this patch.
     """
     with patch("rlsbl.publish_workflows.preflight"), \
             patch("rlsbl.publish_workflows.confirm_or_exit"), \
+            patch("rlsbl.commands.monorepo.batch_release._confirm_publish_starts"), \
             patch("rlsbl.private_repo_publishing.committed_workflow_uses",
                   return_value=[]):
         yield

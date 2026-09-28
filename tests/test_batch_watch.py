@@ -182,7 +182,7 @@ class TestBatchSHACapture:
         from rlsbl.commands.monorepo import batch_release
 
         source = inspect.getsource(getattr(batch_release, func_name))
-        assert "_watch_and_verify_batch(flags, last_sha, probe_specs, log)" in source
+        assert "_watch_and_verify_batch(flags, last_sha, probe_specs, started," in source
         assert "watch_run_cmd(" not in source, (
             "the watch call belongs to the shared tail, not to the loop"
         )
