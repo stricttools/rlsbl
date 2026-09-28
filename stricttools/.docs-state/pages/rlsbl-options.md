@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.options"
-description = "A repository's entries for rlsbl's options, and the values they give rlsbl."
+description = "Loads a repository's rlsbl options entries, validates them with strictspec, gives each check its value, holds config settings to their options, and writes entries."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 125
 +++

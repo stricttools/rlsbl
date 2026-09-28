@@ -1,5 +1,5 @@
 +++
-description = "Configuration reference: config.json pipelines, per-target test settings, batch limits, dependency floors, external checks, and surfaces refusing unknown keys."
+description = "Configuration reference: config.json pipelines, per-target test settings, batch limits, the settings that belong to an option, external checks, and policed surfaces."
 +++
 
 # Configuration reference
