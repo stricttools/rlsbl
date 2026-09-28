@@ -53,12 +53,18 @@ class FakeGitHub:
     def __init__(self):
         self.runs = []
         self.created = []
+        self.published = None  # None: published just now
+        self.retention = 90    # an exception instance: the read fails
 
     def __call__(self, args, *_config, **kwargs):
         args = list(args)
         if args[:2] == ["release", "view"]:
             if "--json" in args and "author" in args:
                 return "smm-h"
+            if "--json" in args and "publishedAt" in args:
+                from datetime import datetime, timezone
+                published = self.published or datetime.now(timezone.utc)
+                return published.strftime("%Y-%m-%dT%H:%M:%SZ")
             if args[2] in self.created:
                 return ""
             raise subprocess.CalledProcessError(1, "gh release view")
@@ -69,6 +75,11 @@ class FakeGitHub:
             path = args[3]
             if path.endswith("/actions/permissions"):
                 return json.dumps({"enabled": True})
+            if path.endswith("/artifact-and-log-retention"):
+                if isinstance(self.retention, Exception):
+                    raise self.retention
+                return json.dumps({"days": self.retention,
+                                   "maximum_allowed_days": 90})
             if "/runs?" in path:
                 return json.dumps({"workflow_runs": self.runs})
             if "/actions/workflows/" in path:
@@ -345,8 +356,54 @@ class TestWatch:
         assert code == 0
         assert "no run of" not in err
 
+    def test_a_release_older_than_the_retention_reports_its_runs_expired(
+        self, mock_git_repo,
+    ):
+        """GitHub deletes workflow runs older than the repository's retention,
+        so no run found for an old release is no evidence that none started:
+        the watch says the runs expired, and names no retry, which could
+        publish a second time."""
+        from datetime import datetime, timedelta, timezone
 
-class TestThePreflight:
+        sha = self._released_repo(mock_git_repo)
+        gh = FakeGitHub()
+        gh.published = datetime.now(timezone.utc) - timedelta(days=200)
+        code, err = self._watch(sha, gh)
+        assert code == 0, err
+        assert "no run of" not in err
+        assert "90-day" in err and "deleted" in err
+        assert "rlsbl release retry" not in err
+
+    def test_an_unreadable_retention_is_a_refusal_until_github_answers(
+        self, mock_git_repo,
+    ):
+        from datetime import datetime, timedelta, timezone
+
+        sha = self._released_repo(mock_git_repo)
+        gh = FakeGitHub()
+        gh.published = datetime.now(timezone.utc) - timedelta(days=200)
+        gh.retention = RuntimeError("HTTP 403: Resource not accessible")
+        code, err = self._watch(sha, gh)
+        assert code == 1
+        assert "cannot tell" in err
+        assert "rlsbl release retry" not in err
+        # The fix the refusal names: re-run once GitHub answers.
+        gh.retention = 90
+        code, err = self._watch(sha, gh)
+        assert code == 0, err
+
+    def test_a_release_within_the_retention_still_needs_its_run(
+        self, mock_git_repo,
+    ):
+        from datetime import datetime, timedelta, timezone
+
+        sha = self._released_repo(mock_git_repo)
+        gh = FakeGitHub()
+        gh.published = datetime.now(timezone.utc) - timedelta(days=30)
+        code, err = self._watch(sha, gh)
+        assert code == 1
+        assert "no run of .github/workflows/publish.yml started" in err
+
     """The release refuses, before pushing anything, a Release that would
     start no publish workflow."""
 

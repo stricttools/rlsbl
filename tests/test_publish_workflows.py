@@ -80,6 +80,10 @@ class FakeGitHub:
         args = list(args)
         self.calls.append(args)
         if args[:2] == ["release", "view"]:
+            if "publishedAt" in args:
+                # Published just now: inside every Actions run retention.
+                from datetime import datetime, timezone
+                return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             return self.author
         if args[:3] == ["api", "--method", "GET"]:
             path = args[3]
