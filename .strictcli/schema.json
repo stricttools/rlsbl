@@ -83,7 +83,7 @@
   "project_id": "rlsbl",
   "name": "rlsbl",
   "version": "0.129.0",
-  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding. Ships 58 commands organized into 13 top-level commands and 6 command groups (release, changelog, monorepo, dev, rewrite, transition). Covers 17 release targets: npm, pypi, go, swift, swift-apple, spec, hex, deno, dart, docker, flutter, maven, native-android, native-ios, zig, pgdesign, plain.",
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding. Ships 61 commands organized into 14 top-level commands and 7 command groups (release, changelog, monorepo, dev, rewrite, transition, options). Covers 17 release targets: npm, pypi, go, swift, swift-apple, spec, hex, deno, dart, docker, flutter, maven, native-android, native-ios, zig, pgdesign, plain.",
   "proc_observe_allowlist": [
     [
       "git",
@@ -366,10 +366,10 @@
       "help": "Run project checks registered via the check framework and report results",
       "effect": "read_only",
       "payload_schema": {
-        "type": "array",
         "items": {
           "type": "object"
-        }
+        },
+        "type": "array"
       },
       "flags": [
         {
@@ -401,8 +401,43 @@
           "default": ""
         },
         {
+          "name": "hook",
+          "help": "Run the checks a hook declared in checks.toml selects (no hooks are declared)",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "default",
+          "default": ""
+        },
+        {
           "name": "list",
-          "help": "List all registered checks with their tags and exit without running",
+          "help": "List all registered checks with their tags and values and exit without running",
+          "value_schema": {
+            "type": "boolean"
+          },
+          "presence": "default",
+          "default": false,
+          "negatable": true
+        }
+      ],
+      "forwarding": {
+        "reason": "framework-internal: absorbs app-defined global flag values"
+      }
+    },
+    "failing-checks": {
+      "name": "failing-checks",
+      "help": "Run project checks and report only error-level failures, exiting nonzero when any exist",
+      "effect": "read_only",
+      "payload_schema": {
+        "items": {
+          "type": "object"
+        },
+        "type": "array"
+      },
+      "flags": [
+        {
+          "name": "all",
+          "help": "Run every registered check regardless of tag or name filters",
           "value_schema": {
             "type": "boolean"
           },
@@ -411,8 +446,35 @@
           "negatable": true
         },
         {
-          "name": "ignore-warnings",
-          "help": "Treat warn-severity results as passing so they do not cause nonzero exit",
+          "name": "tag",
+          "help": "Tag DSL expression to select checks (e.g. 'changelog & !quality')",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "default",
+          "default": ""
+        },
+        {
+          "name": "name",
+          "help": "Glob pattern to filter checks by name (e.g. 'hash-*', '*coverage*')",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "default",
+          "default": ""
+        },
+        {
+          "name": "hook",
+          "help": "Run the checks a hook declared in checks.toml selects (no hooks are declared)",
+          "value_schema": {
+            "type": "string"
+          },
+          "presence": "default",
+          "default": ""
+        },
+        {
+          "name": "list",
+          "help": "List all registered checks with their tags and values and exit without running",
           "value_schema": {
             "type": "boolean"
           },
@@ -2810,7 +2872,7 @@
         },
         "uv-path-sources": {
           "name": "uv-path-sources",
-          "help": "Convert path- and workspace-sourced Python dependencies into registry constraints floored at the version uv.lock resolves. Covers [project].dependencies, every [project.optional-dependencies] extra and every PEP 735 [dependency-groups] group, and deletes the matching [tool.uv.sources] entry so it stops overriding the new constraint. Each converted name is added to internal_dep_floors in .rlsbl/config.json. A locked version that is not published on PyPI is a hard error naming the remedy (release that dependency first), and so is a registry probe that fails to answer. Use --dry-run to print the per-dependency plan with entry counts.",
+          "help": "Convert path- and workspace-sourced Python dependencies into registry constraints floored at the version uv.lock resolves. Covers [project].dependencies, every [project.optional-dependencies] extra and every PEP 735 [dependency-groups] group, and deletes the matching [tool.uv.sources] entry so it stops overriding the new constraint. Each converted name is added to internal_dep_floors in .rlsbl/config.json, and the rlsbl:dep-floors option that key belongs to is switched on with an options entry (current and ideal error, scoped to the project when it is a workspace member) when it is off. A locked version that is not published on PyPI is a hard error naming the remedy (release that dependency first), and so is a registry probe that fails to answer. Use --dry-run to print the per-dependency plan with entry counts.",
           "effect": "mutating"
         }
       }
@@ -2903,6 +2965,186 @@
           ]
         }
       }
+    },
+    "options": {
+      "name": "options",
+      "help": "Print rlsbl's options registry, and write this repository's entries for rlsbl's options in .strictmetadata/options/ at its git root. Every rlsbl check is an option, rlsbl:<check name>, and so is rlsbl:test-sandbox: an error check ranks error > warn > off, a warning check warn > off, and `rlsbl check` and every release apply each entry's current value (off: the check does not run; warn: it runs and reports, never blocking; error: as registered). The options that stand for an adoption (rlsbl:dep-floors, rlsbl:format, rlsbl:lint, rlsbl:strictspec-certificate-gate, rlsbl:test-sandbox, rlsbl:type-check) default to off and accept a path scope naming one workspace member. Invalid entries stop every check run and every release.",
+      "commands": {
+        "registry": {
+          "name": "registry",
+          "help": "Print rlsbl's options registry: one option per check, rlsbl:<check name>, plus the options that are not checks, each with the subject file its entries are filed under, the values it ranks strongest first, its default, its scope kind, the options it requires, and what it governs. The TOML printed is the registry document rlsbl ships, in the shape of strictspec's built-in options-registry schema; with --json the same declarations are the payload. Needs no rlsbl project.",
+          "effect": "read_only",
+          "payload_schema": {
+            "type": "object",
+            "properties": {
+              "format_version": {
+                "type": "integer"
+              },
+              "option": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "subject": {
+                      "type": "string"
+                    },
+                    "values": {
+                      "type": "string"
+                    },
+                    "default": {
+                      "type": "string"
+                    },
+                    "scope": {
+                      "type": "string"
+                    },
+                    "requires": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "description": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "subject",
+                    "values",
+                    "default",
+                    "scope",
+                    "requires",
+                    "description"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "format_version",
+              "option"
+            ]
+          }
+        },
+        "set": {
+          "name": "set",
+          "help": "Write one rlsbl entry into .strictmetadata/options/<subject>.toml at the repository's git root, or update the entry already there for the same option and scope, keeping every other line of the document. The subject file is the one the option's registry declaration names. Creates .strictmetadata/options/ and its manifest.toml, naming strictspec as the owner, when absent. strictspec validates the result before anything is written -- every document's shape, and every rlsbl entry with this one in place -- and each refusal is its catalogued diagnostic: an unknown option, a value the option does not declare, a current ranked above the ideal, an entry equal to the default, an empty reason, an option switched off while an option requiring it is not. A --scope must name a workspace member's directory relative to the repository root, and only the options declaring the path scope kind accept one. Refuses an id outside the rlsbl namespace and a manifest naming another owner. The written files are committed with the Autogenerated trailer.",
+          "effect": "mutating",
+          "payload_schema": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "file": {
+                "type": "string"
+              },
+              "scope": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "action": {
+                "type": "string",
+                "enum": [
+                  "created",
+                  "updated",
+                  "unchanged"
+                ]
+              },
+              "current": {
+                "type": "string"
+              },
+              "ideal": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "class": {
+                "type": "string"
+              },
+              "written": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "committed": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "file",
+              "scope",
+              "action",
+              "current",
+              "ideal",
+              "reason",
+              "class",
+              "written",
+              "committed"
+            ]
+          },
+          "flags": [
+            {
+              "name": "current",
+              "help": "The value the repository runs the option at today: error, warn, or off for an error check; warn or off for a warning check; the values `rlsbl options registry` lists for any other option",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
+            },
+            {
+              "name": "ideal",
+              "help": "The value the repository should run the option at: one the option declares, never ranked below current, or non-existent when the right value is one rlsbl does not offer yet",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
+            },
+            {
+              "name": "reason",
+              "help": "Why the repository deviates from the option's default, in one sentence. Recorded verbatim in the entry",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
+            },
+            {
+              "name": "scope",
+              "help": "Narrow the entry to one workspace member: the member's directory relative to the repository root (e.g. 'cli'). Accepted only by the options declaring the path scope kind; omitted, the entry covers the whole repository",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "optional"
+            },
+            {
+              "name": "auto-commit",
+              "help": "Commit the written files with the Autogenerated trailer (the handler commits when neither --auto-commit nor --no-auto-commit is passed)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
+              "negatable": true
+            }
+          ],
+          "args": [
+            {
+              "name": "id",
+              "help": "The option, as rlsbl:<name> (e.g. 'rlsbl:dep-floors'); `rlsbl options registry` names every option",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
+            }
+          ]
+        }
+      }
     }
   },
   "checks": {
@@ -2914,7 +3156,9 @@
       "fast": true,
       "pure": false,
       "needs_network": true,
-      "depends_on": []
+      "depends_on": [],
+      "description": "The local branch is not behind its remote tracking branch (requires network).",
+      "subject": "release"
     },
     "changelog-batch-commits": {
       "tags": [
@@ -2925,7 +3169,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "No changelog entry references more commits than max_commits_per_entry.",
+      "subject": "changelog"
     },
     "changelog-batch-entries": {
       "tags": [
@@ -2936,7 +3182,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "No commit appears in more changelog entries than max_entries_per_commit.",
+      "subject": "changelog"
     },
     "changelog-coverage": {
       "tags": [
@@ -2949,7 +3197,9 @@
       "needs_network": false,
       "depends_on": [
         "changelog-hashes"
-      ]
+      ],
+      "description": "Every unreleased commit appears in at least one JSONL changelog entry.",
+      "subject": "changelog"
     },
     "changelog-entry": {
       "tags": [
@@ -2961,17 +3211,9 @@
       "needs_network": false,
       "depends_on": [
         "version-consistency"
-      ]
-    },
-    "changelog-format-version": {
-      "tags": [
-        "changelog"
       ],
-      "severity": "warn",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": []
+      "description": "CHANGELOG.md has an entry for the current project version.",
+      "subject": "changelog"
     },
     "changelog-format-version-gate": {
       "tags": [
@@ -2982,7 +3224,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every line of unreleased.jsonl and of every finalized x.y.z.jsonl carries a supported format_version.",
+      "subject": "changelog"
     },
     "changelog-hashes": {
       "tags": [
@@ -2993,7 +3237,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every commit hash in the JSONL changelog entries resolves in git.",
+      "subject": "changelog"
     },
     "changelog-orphans": {
       "tags": [
@@ -3004,7 +3250,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "No changelog entry has every hash unresolvable, out of range, or owned by another releasable.",
+      "subject": "changelog"
     },
     "changelog-range": {
       "tags": [
@@ -3017,7 +3265,9 @@
       "needs_network": false,
       "depends_on": [
         "changelog-hashes"
-      ]
+      ],
+      "description": "Every resolved changelog hash falls within this checkout's unreleased commit range.",
+      "subject": "changelog"
     },
     "changelog-schema": {
       "tags": [
@@ -3028,7 +3278,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every changelog entry passes schema validation: a user-facing entry carries a description and a type.",
+      "subject": "changelog"
     },
     "changelog-user-facing": {
       "tags": [
@@ -3039,7 +3291,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "At least one unreleased changelog entry is user-facing.",
+      "subject": "changelog"
     },
     "ci-publish-secrets": {
       "tags": [
@@ -3049,7 +3303,9 @@
       "fast": true,
       "pure": false,
       "needs_network": true,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every Actions secret the configured CI publish pipelines authenticate with exists on the repository (requires network).",
+      "subject": "release"
     },
     "circular-deps": {
       "tags": [
@@ -3059,7 +3315,9 @@
       "fast": false,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "No circular import dependency exists between a package's modules.",
+      "subject": "code"
     },
     "config-schema": {
       "tags": [
@@ -3069,7 +3327,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": ".rlsbl/config.json passes rlsbl's config validation: required, banned, and retired keys, section shapes, and settings whose option is off.",
+      "subject": "project"
     },
     "cross-repo-path-sources": {
       "tags": [
@@ -3079,7 +3339,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "No [tool.uv.sources] path entry in the committed pyproject.toml resolves outside the repository.",
+      "subject": "dependencies"
     },
     "dead-modules": {
       "tags": [
@@ -3089,7 +3351,9 @@
       "fast": false,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every source module, Go internal package, and npm or Dart source file has an inbound import.",
+      "subject": "code"
     },
     "dead-modules-stale": {
       "tags": [
@@ -3099,7 +3363,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every path dead-modules.toml declares still exists.",
+      "subject": "code"
     },
     "dead-workspace-packages": {
       "tags": [
@@ -3110,6 +3376,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "Every unpublished workspace library package is imported by at least one workspace sibling.",
+      "subject": "workspace",
       "scope": "workspace"
     },
     "dep-floors": {
@@ -3123,7 +3391,9 @@
       "needs_network": false,
       "depends_on": [
         "config-schema"
-      ]
+      ],
+      "description": "Every ecosystem-internal dependency declares a >= floor at the version the lockfile resolves.",
+      "subject": "dependencies"
     },
     "dep-locks": {
       "tags": [
@@ -3134,7 +3404,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every lockfile still resolves the manifest beside it.",
+      "subject": "dependencies"
     },
     "deps-dev-in-lib": {
       "tags": [
@@ -3145,6 +3417,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "No dev dependency is imported from production code.",
+      "subject": "dependencies",
       "scope": "workspace"
     },
     "deps-runtime-test-only": {
@@ -3156,6 +3430,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "No runtime dependency is imported only from test code.",
+      "subject": "dependencies",
       "scope": "workspace"
     },
     "deps-stale": {
@@ -3165,6 +3441,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "Every intra-workspace dependency constraint is satisfied by the dependency's current version.",
+      "subject": "dependencies",
       "scope": "workspace"
     },
     "deps-undeclared": {
@@ -3174,6 +3452,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "No source file imports a workspace package its member does not declare.",
+      "subject": "dependencies",
       "scope": "workspace"
     },
     "deps-unused": {
@@ -3183,6 +3463,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "Every declared workspace dependency is imported by at least one source file.",
+      "subject": "dependencies",
       "scope": "workspace"
     },
     "description-consistency": {
@@ -3193,7 +3475,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every detected target reports the same package description.",
+      "subject": "project"
     },
     "dev-only-boundary": {
       "tags": [
@@ -3204,6 +3488,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "No member that is not dev-only has a runtime dependency on a dev-only member.",
+      "subject": "workspace",
       "scope": "workspace"
     },
     "dev-overlay-drift": {
@@ -3215,7 +3501,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every rlsbl dev sync overlay is still an editable install of its declared checkout.",
+      "subject": "dependencies"
     },
     "dunder-version-missing": {
       "tags": [
@@ -3225,7 +3513,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "A PyPI project that keeps a version constant in source names it __version__.",
+      "subject": "project"
     },
     "format": {
       "tags": [
@@ -3236,7 +3526,9 @@
       "fast": false,
       "pure": false,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "ruff format --check passes over the paths declared in checks.format.paths.",
+      "subject": "code"
     },
     "format-scope-guard": {
       "tags": [
@@ -3247,7 +3539,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "ruff's config carries no include or extend-include competing with checks.format.paths.",
+      "subject": "code"
     },
     "go-companion-tags": {
       "tags": [
@@ -3258,6 +3552,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "Every releasable's publishing Go members have companion tags for the current version.",
+      "subject": "workspace",
       "scope": "workspace"
     },
     "go-deprecation-published": {
@@ -3268,7 +3564,9 @@
       "fast": false,
       "pure": false,
       "needs_network": true,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every superseded Go module path serves a Deprecated notice through the Go module proxy (requires network).",
+      "subject": "release"
     },
     "go-module-identity": {
       "tags": [
@@ -3279,7 +3577,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every go.mod's module path equals the repository's origin identity plus the module's subdirectory.",
+      "subject": "project"
     },
     "go-toolchain-declared": {
       "tags": [
@@ -3290,7 +3590,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every Go module's go.mod carries a toolchain line.",
+      "subject": "project"
     },
     "layers-violations": {
       "tags": [],
@@ -3299,6 +3601,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "No dependency edge violates the layer ordering workspace.toml declares.",
+      "subject": "code",
       "scope": "workspace:non_dev_only"
     },
     "ldflags-symbol": {
@@ -3310,7 +3614,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every -X linker flag in the tracked build configuration names an injectable string variable the Go source declares.",
+      "subject": "code"
     },
     "library-lint": {
       "tags": [
@@ -3322,6 +3628,8 @@
       "pure": false,
       "needs_network": false,
       "depends_on": [],
+      "description": "Every workspace library project passes rlsbl's library lint.",
+      "subject": "code",
       "scope": "workspace:library"
     },
     "license-consistency": {
@@ -3332,7 +3640,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every detected target reports the same license.",
+      "subject": "project"
     },
     "license-file": {
       "tags": [
@@ -3342,7 +3652,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "A LICENSE file exists, is non-empty, and has no unreplaced template variables.",
+      "subject": "project"
     },
     "lint": {
       "tags": [
@@ -3353,7 +3665,9 @@
       "fast": false,
       "pure": false,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "ruff check passes over the paths declared in checks.lint.paths.",
+      "subject": "code"
     },
     "lint-scope-guard": {
       "tags": [
@@ -3364,7 +3678,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "ruff's config carries no include or extend-include competing with checks.lint.paths.",
+      "subject": "code"
     },
     "lock": {
       "tags": [
@@ -3374,7 +3690,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "No stale release lock file is left in .rlsbl/ or .rlsbl-monorepo/.",
+      "subject": "release"
     },
     "maven-central-metadata": {
       "tags": [
@@ -3386,7 +3704,9 @@
       "fast": false,
       "pure": false,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Maven Central's publishing requirements are met: POM metadata, a sources jar, and a javadoc jar.",
+      "subject": "release"
     },
     "member-pytest-config": {
       "tags": [
@@ -3397,6 +3717,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "When the workspace root has a conftest.py, every member with a tests/ directory pins its own pytest rootdir.",
+      "subject": "tests",
       "scope": "workspace:non_dev_node"
     },
     "mirror-required": {
@@ -3408,6 +3730,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "Every member consumed by repository URL belongs to a releasable that declares a subtree_remote mirror.",
+      "subject": "workspace",
       "scope": "workspace"
     },
     "mixed-tag-schemes": {
@@ -3419,6 +3743,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "No member directory mixes Go's path-based tags with @-style tags.",
+      "subject": "workspace",
       "scope": "workspace"
     },
     "name-consistency": {
@@ -3429,7 +3755,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every detected target reports the same package name.",
+      "subject": "project"
     },
     "npm-private-mismatch": {
       "tags": [
@@ -3439,7 +3767,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "A package.json with private: true does not contradict publish_mode ci.",
+      "subject": "project"
     },
     "old-repo-archived": {
       "tags": [
@@ -3449,7 +3779,9 @@
       "fast": false,
       "pure": false,
       "needs_network": true,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every repository this one absorbed is archived on GitHub (requires network).",
+      "subject": "release"
     },
     "prepush-changelog-coverage": {
       "tags": [
@@ -3459,7 +3791,9 @@
       "fast": false,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every pushed commit has a JSONL changelog entry.",
+      "subject": "push"
     },
     "prepush-gitignore-guard": {
       "tags": [
@@ -3469,7 +3803,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "No rlsbl-managed file is gitignored.",
+      "subject": "push"
     },
     "prepush-manual-warning": {
       "tags": [
@@ -3479,7 +3815,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "No push to a release branch is made outside rlsbl release.",
+      "subject": "push"
     },
     "private-hook-stale": {
       "tags": [
@@ -3489,7 +3827,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "The post-release hook carries no leftover private asset-upload code.",
+      "subject": "release"
     },
     "publish-mode-workflow": {
       "tags": [
@@ -3499,7 +3839,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "A project with publish_mode none has no workflow that publishes to a public registry.",
+      "subject": "release"
     },
     "releasable-residue": {
       "tags": [
@@ -3510,6 +3852,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "Release state sits only where something reads it, in releasable members and in members that release nothing alike.",
+      "subject": "workspace",
       "scope": "workspace"
     },
     "requires-services": {
@@ -3522,7 +3866,9 @@
       "needs_network": false,
       "depends_on": [
         "config-schema"
-      ]
+      ],
+      "description": "The CI service containers declared under services and test_env are provisioned in the rendered CI workflow.",
+      "subject": "tests"
     },
     "root-rlsbl-conflict": {
       "tags": [
@@ -3533,6 +3879,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "A root .rlsbl/ does not coexist with .rlsbl-monorepo/.",
+      "subject": "workspace",
       "scope": "workspace"
     },
     "router-filters-fresh": {
@@ -3545,6 +3893,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "The filters of the generated ci-router.yml match a fresh derivation from the workspace.",
+      "subject": "workspace",
       "scope": "workspace"
     },
     "ruff-lint": {
@@ -3555,7 +3905,9 @@
       "fast": true,
       "pure": false,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "A Python project passes ruff's lint checks.",
+      "subject": "code"
     },
     "scaffold-conflicts": {
       "tags": [
@@ -3567,7 +3919,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Scaffold-managed files carry no unresolved merge conflict markers.",
+      "subject": "scaffold"
     },
     "scaffold-gitignore-stale": {
       "tags": [
@@ -3578,6 +3932,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "Every workspace member's .gitignore holds every rlsbl-managed entry.",
+      "subject": "scaffold",
       "scope": "workspace"
     },
     "scaffold-unreplaced-vars": {
@@ -3588,7 +3944,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Committed scaffold files carry no unreplaced rlsbl template variables.",
+      "subject": "scaffold"
     },
     "selfdoc-version-drift": {
       "tags": [
@@ -3598,7 +3956,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "The version in selfdoc.json matches the primary target's version.",
+      "subject": "project"
     },
     "stash-free": {
       "tags": [
@@ -3608,7 +3968,9 @@
       "fast": true,
       "pure": false,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "The repository carries no git stash.",
+      "subject": "release"
     },
     "strictspec-certificate-gate": {
       "tags": [
@@ -3621,7 +3983,9 @@
       "needs_network": false,
       "depends_on": [
         "config-schema"
-      ]
+      ],
+      "description": "The strictspec diff certificate named by strictspec_gate reports no violated, or unsupported and unadjudicated, claim.",
+      "subject": "release"
     },
     "strictspec-generated-format": {
       "tags": [
@@ -3632,7 +3996,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every validator strictspec.toml declares carries a GENERATED_CODE_FORMAT the linked strictspec runtime reads.",
+      "subject": "code"
     },
     "subtree-remote-reachable": {
       "tags": [
@@ -3643,6 +4009,8 @@
       "pure": false,
       "needs_network": true,
       "depends_on": [],
+      "description": "Every mirrored releasable's subtree remote is reachable (requires network).",
+      "subject": "workspace",
       "scope": "workspace"
     },
     "target-matrix-fresh": {
@@ -3654,7 +4022,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "The committed support matrix matches a fresh regeneration from rlsbl's registries.",
+      "subject": "project"
     },
     "target-version-readable": {
       "tags": [
@@ -3664,7 +4034,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every detected target reads its version without error.",
+      "subject": "project"
     },
     "test-suite": {
       "tags": [
@@ -3678,7 +4050,9 @@
       "needs_network": false,
       "depends_on": [
         "prepush-changelog-coverage"
-      ]
+      ],
+      "description": "The project's test suite passes.",
+      "subject": "tests"
     },
     "test-suite-workspace": {
       "tags": [
@@ -3692,6 +4066,8 @@
       "depends_on": [
         "prepush-changelog-coverage"
       ],
+      "description": "The test suites of the affected workspace members pass.",
+      "subject": "tests",
       "scope": "workspace:non_dev_only"
     },
     "testisolation-floor": {
@@ -3705,7 +4081,9 @@
       "needs_network": false,
       "depends_on": [
         "config-schema"
-      ]
+      ],
+      "description": "An adopted testisolation floor has a working sandbox runner that every declared CI workflow invokes.",
+      "subject": "tests"
     },
     "type-check": {
       "tags": [
@@ -3716,7 +4094,9 @@
       "fast": false,
       "pure": false,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "mypy passes over the paths declared in checks.type-check.paths.",
+      "subject": "code"
     },
     "type-check-scope-guard": {
       "tags": [
@@ -3727,7 +4107,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "mypy's config carries no files, packages, or modules competing with checks.type-check.paths.",
+      "subject": "code"
     },
     "unpublished-refs": {
       "tags": [
@@ -3739,7 +4121,9 @@
       "needs_network": true,
       "depends_on": [
         "version-consistency"
-      ]
+      ],
+      "description": "Every archived release's refs exist locally and on origin at its release commit, and its primary tag carries a GitHub Release (requires network).",
+      "subject": "release"
     },
     "unversioned-boundary": {
       "tags": [
@@ -3750,6 +4134,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "No releasable member has a runtime dependency on an unversioned member.",
+      "subject": "workspace",
       "scope": "workspace"
     },
     "version-consistency": {
@@ -3760,7 +4146,9 @@
       "fast": true,
       "pure": true,
       "needs_network": false,
-      "depends_on": []
+      "depends_on": [],
+      "description": "Every detected target reports the same project version.",
+      "subject": "project"
     },
     "workspace-ci-router": {
       "tags": [
@@ -3771,6 +4159,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "The generated ci-router.yml exists at the workspace root.",
+      "subject": "workspace",
       "scope": "workspace"
     },
     "workspace-ci-synced": {
@@ -3784,6 +4174,8 @@
       "depends_on": [
         "workspace-ci-router"
       ],
+      "description": "Each in-scope member's CI jobs are inlined into the shared ci-router.yml.",
+      "subject": "workspace",
       "scope": "workspace:non_dev_node"
     },
     "workspace-stale-entries": {
@@ -3795,6 +4187,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "No workspace.toml entry points to a missing or manifest-less directory.",
+      "subject": "workspace",
       "scope": "workspace"
     },
     "workspace-targets": {
@@ -3806,6 +4200,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "Every releasable, non-dev-only workspace member has at least one detectable target.",
+      "subject": "workspace",
       "scope": "workspace"
     },
     "workspace-unbuildable": {
@@ -3818,6 +4214,8 @@
       "pure": false,
       "needs_network": false,
       "depends_on": [],
+      "description": "Every workspace member syncs under uv sync --all-packages (pypi workspaces).",
+      "subject": "workspace",
       "scope": "workspace"
     },
     "workspace-unregistered": {
@@ -3829,6 +4227,8 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
+      "description": "No project directory with a manifest is missing from workspace.toml.",
+      "subject": "workspace",
       "scope": "workspace"
     },
     "wrapper-producer": {
@@ -3842,7 +4242,9 @@
       "needs_network": false,
       "depends_on": [
         "config-schema"
-      ]
+      ],
+      "description": "Every launcher pipeline's wraps names a real binary-artifact pipeline whose manifest keeps the shim-critical fields.",
+      "subject": "release"
     }
   },
   "infra": {
