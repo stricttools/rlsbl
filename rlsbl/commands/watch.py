@@ -62,7 +62,7 @@ def _release_tag_at(commit_sha):
     if released is None:
         return None
     root, _project, _ws_root = find_sub_project_root()
-    _proj, tag_glob, _changes_dir, _scope = resolve_release_scope(root)
+    tag_glob = resolve_release_scope(root)[1] if root is not None else None
     return released.tag(tag_glob)
 
 

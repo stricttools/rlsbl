@@ -1013,6 +1013,22 @@ def _default_tag_push_plan():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _default_publish_workflow_checks():
+    """Neutralize the publish-workflow preflight and start confirmation by default.
+
+    Both read the workflow files in a real commit's tree and ask GitHub about
+    them. Most release-flow and watch tests run on made-up commits and mocked
+    git, where there is no tree to read. The checks are exercised against real
+    repositories in test_publish_workflows.py and, through the release flow and
+    ``rlsbl watch``, in test_publish_start_confirmation.py, which restores the
+    real functions over this patch.
+    """
+    with patch("rlsbl.publish_workflows.preflight"), \
+            patch("rlsbl.publish_workflows.confirm_or_exit"):
+        yield
+
+
 # There is deliberately no push-timeout fixture here. One used to set
 # RLSBL_PUSH_TIMEOUT on every test "for determinism"; rlsbl stopped reading
 # that variable (and the rest of its family) when timeouts became
