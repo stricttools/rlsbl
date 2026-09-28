@@ -429,10 +429,8 @@ def _build_project_template_vars(project_dir, root):
             elif key not in merged:
                 # Bare: first target wins
                 merged[key] = value
-    from ..init_cmd import _private_repo_var
-    merged["privateRepo"] = _private_repo_var(
-        [entry.name for entry in target_entries],
-    )
+    from ..init_cmd import _private_repo_vars
+    merged.update(_private_repo_vars([entry.name for entry in target_entries]))
     return merged
 
 

@@ -1717,22 +1717,24 @@ def _publish_gate_var(config, registry):
     )
 
 
-def _private_repo_var(registries):
-    """The ``privateRepo`` template variable: "true" for a private repository.
+def _private_repo_vars(registries):
+    """The ``<target>.privateRepo`` template variables of a private repository.
 
-    A publish template whose step attests by default writes ``attestations:
-    false`` when it is set: attestations record the repository's name,
-    workflow, and commit in a public transparency log. Visibility is asked
-    only when a scaffolded target's publish workflow attests
-    (``publish_workflow_attests``). A repository whose visibility cannot be
-    determined (no GitHub remote, no network) is scaffolded like a public one;
-    the release refuses an attesting workflow in a private repository, so the
+    One per scaffolded target whose publish workflow attests by default
+    (``publish_workflow_attests``), set to "true" when the repository is
+    private: that target's publish template then writes ``attestations:
+    false``, because attestations record the repository's name, workflow, and
+    commit in a public transparency log. Visibility is asked only when such a
+    target is scaffolded. A repository whose visibility cannot be determined
+    (no GitHub remote, no network) is scaffolded like a public one; the
+    release refuses an attesting workflow in a private repository, so the
     question is asked again before anything is published.
     """
-    if not any(TARGETS[name].publish_workflow_attests
-               for name in registries if name in TARGETS):
-        return ""
-    return "true" if is_private_repo() is True else ""
+    attesting = [name for name in registries
+                 if name in TARGETS and TARGETS[name].publish_workflow_attests]
+    if not attesting or is_private_repo() is not True:
+        return {}
+    return {f"{name}.privateRepo": "true" for name in attesting}
 
 
 def _append_deploy_workflow_if_configured(mappings, config):
@@ -1954,7 +1956,7 @@ def run_cmd(registry, args, flags, ctx):
         )
 
         vars_dict["publishGate"] = _publish_gate_var(ctx.config, registry)
-        vars_dict["privateRepo"] = _private_repo_var([registry])
+        vars_dict.update(_private_repo_vars([registry]))
 
         # Process registry-specific templates (CI only, no publish).
         # Workspace roots skip CI templates -- the ci-router handles
@@ -3078,7 +3080,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         # own gate job; a deploy workflow rendered from the shared template
         # needs the same job as a template variable.
         vars_dict["publishGate"] = _publish_gate_var(ctx.config, primary)
-        vars_dict["privateRepo"] = _private_repo_var(registries_list)
+        vars_dict.update(_private_repo_vars(registries_list))
         # npm publish provenance flag, derived from the npm pipeline config.
         vars_dict["npm.provenance"] = _npm_provenance_var(ctx.config)
         # Sandboxed test-runner vars (empty dict while rlsbl:test-sandbox is off).

@@ -179,6 +179,13 @@ class ReleaseTarget(Protocol):
     shares_workspace_environment: bool
     """Whether workspace members of this target share ONE resolved environment."""
 
+    publish_workflow_attests: bool
+    """Whether this target's CI publish step attaches attestations by default.
+
+    Scaffold asks the repository's visibility only for such targets, and
+    switches attestations off for a private repository.
+    """
+
     supports_dep_floors: bool
     """Whether this target's manifest states dependency floors a lock resolves.
 
