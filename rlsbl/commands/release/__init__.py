@@ -71,7 +71,6 @@ from .publish import _run_selfdoc_blog_post_generate, _print_stale_dep_advisory,
 from .validate import (
     _run_selfdoc_gen, _run_selfdoc_check, _abort_on_scaffold_conflicts,
     _abort_on_cross_repo_sources, _abort_on_version_skew,
-    _abort_on_npm_provenance,
     _run_strictcli_schema_dump, validate_blog_body,
     ReleaseValidationError, HookError, _SCHEMA_DUMP_TIMEOUT,
     validate_release_targets, validate_ota_mode, validate_config_integrity,
@@ -849,7 +848,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # context is available). In releasable mode, validates each publishing
     # member's pipeline config (publish_mode != "none"); a standalone repo
     # validates the representative's config.
-    # Configs to scan for the npm provenance guard (below). Collected here so
+    # Configs to scan for the private-repository guard (below). Collected here so
     # the releasable member contexts are not resolved twice.
     _provenance_scan_configs = []
     if member_package_paths is not None and monorepo_root and _rel_cfg_dir:
@@ -887,11 +886,6 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         project_dir,
         workspace_root=str(monorepo_root) if monorepo_root else None,
     )
-
-    # npm provenance guard: an npm pipeline with provenance=true requires a
-    # public GitHub repo. Probes repo visibility only when provenance is
-    # requested (pre-mutation). gh_config drives GH_REPO resolution.
-    _abort_on_npm_provenance(_provenance_scan_configs, gh_config=config)
 
     # Private-repository guard: npm provenance, PyPI attestations, and the Go
     # module proxy need a public repository. Probes visibility only when one
