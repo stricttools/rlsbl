@@ -13,8 +13,6 @@ import dataclasses
 import subprocess
 from unittest.mock import patch
 
-import pytest
-
 from rlsbl.commands.release import run_cmd
 from rlsbl.context import ProjectContext
 from rlsbl.release_file import ReleaseConfig
