@@ -6703,6 +6703,16 @@
         },
         {
           "level": 3,
+          "text": "`_release_to_confirm`",
+          "anchor": "_release_to_confirm"
+        },
+        {
+          "level": 3,
+          "text": "`_confirm_publish_starts`",
+          "anchor": "_confirm_publish_starts"
+        },
+        {
+          "level": 3,
           "text": "`_watch_and_verify_batch`",
           "anchor": "_watch_and_verify_batch"
         },
@@ -15061,6 +15071,11 @@
         },
         {
           "level": 3,
+          "text": "`_runs_expired`",
+          "anchor": "_runs_expired"
+        },
+        {
+          "level": 3,
           "text": "`_describe`",
           "anchor": "_describe"
         },
@@ -23049,7 +23064,7 @@
       ]
     }
   ],
-  "last_gen": "2026-09-28T23:01:27.404090+00:00",
+  "last_gen": "2026-09-28T23:09:55.630807+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
