@@ -1657,6 +1657,22 @@ def _publish_gate_var(config, registry):
     )
 
 
+def _pypi_private_repo_var(registries):
+    """The ``pypi.privateRepo`` template variable: "true" for a private repository.
+
+    The PyPI publish templates write ``attestations: false`` when it is set:
+    attestations record the repository's name, workflow, and commit in a
+    public transparency log. Visibility is asked only when a PyPI target is
+    being scaffolded. A repository whose visibility cannot be determined (no
+    GitHub remote, no network) is scaffolded like a public one; the release
+    refuses an attesting workflow in a private repository, so the question is
+    asked again before anything is published.
+    """
+    if "pypi" not in registries:
+        return ""
+    return "true" if is_private_repo() is True else ""
+
+
 def _append_deploy_workflow_if_configured(mappings, config):
     """Add deploy workflow template to mappings if deploy config exists."""
     deploy_targets, _ = read_deploy_config(config)
@@ -1875,6 +1891,7 @@ def run_cmd(registry, args, flags, ctx):
         )
 
         vars_dict["publishGate"] = _publish_gate_var(ctx.config, registry)
+        vars_dict["pypi.privateRepo"] = _pypi_private_repo_var([registry])
 
         # Process registry-specific templates (CI only, no publish).
         # Workspace roots skip CI templates -- the ci-router handles
@@ -2997,6 +3014,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         # own gate job; a deploy workflow rendered from the shared template
         # needs the same job as a template variable.
         vars_dict["publishGate"] = _publish_gate_var(ctx.config, primary)
+        vars_dict["pypi.privateRepo"] = _pypi_private_repo_var(registries_list)
         # npm publish provenance flag, derived from the npm pipeline config.
         vars_dict["npm.provenance"] = _npm_provenance_var(ctx.config)
         # Sandboxed test-runner vars (empty dict while rlsbl:test-sandbox is off).

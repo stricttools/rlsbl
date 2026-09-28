@@ -75,3 +75,7 @@ jobs:
       - uses: {{action "pypa/gh-action-pypi-publish"}}
         with:
           skip-existing: true
+{{#if pypi.privateRepo}}          # A private repository: attestations would record its name,
+          # workflow, and commit in a public transparency log.
+          attestations: false
+{{/if}}

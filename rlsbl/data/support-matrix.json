@@ -883,6 +883,14 @@
         "spec"
       ]
     },
+    "private-repo-publishing": {
+      "kind": "targets",
+      "targets": [
+        "go",
+        "npm",
+        "pypi"
+      ]
+    },
     "publish-mode-workflow": {
       "kind": "universal",
       "targets": [
@@ -1717,6 +1725,18 @@
           "npm-private-mismatch",
           "no",
           "no",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "private-repo-publishing",
+          "yes",
+          "yes",
           "yes",
           "no",
           "no",

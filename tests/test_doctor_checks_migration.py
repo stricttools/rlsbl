@@ -30,6 +30,7 @@ EXPECTED_CHECKS = [
     # Networked release checks: CI credential, and the follow-ups a recorded
     # conversion still owes the outside world
     "ci-publish-secrets",
+    "private-repo-publishing",
     "old-repo-archived",
     "go-deprecation-published",
     "changelog-entry",
