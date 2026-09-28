@@ -1,5 +1,5 @@
 +++
-description = "Local development: editable installs per target, sibling overlays via dev sync, overlay drift detection, CI watching with retry and a publish-start check for released commits, and pre-push enforcement."
+description = "Local development: editable installs per target, sibling overlays via dev sync, overlay drift detection, CI watching with retry and a publish-start check that knows expired runs, and pre-push enforcement."
 +++
 
 # Development workflow
