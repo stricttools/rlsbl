@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.private_repo_publishing"
-description = "What a release from a PRIVATE repository must not publish."
+description = "Finds what a private repository's release must not publish: npm build provenance, PyPI attestations, and the Go module proxy, in configs and workflows."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 145
 +++
