@@ -71,7 +71,7 @@
     "seed_hash": "714ac7a57eb755ee99fb4bb89966aeba7cd9faaae19b83c604ca9e151162efe8"
   },
   "en/cli-index.md": {
-    "content": "2c425b9288d5878874c12fefa9cb362230f346918c696a58cf9c5e8c85791832",
+    "content": "ef287ed2399a3fcc117b665c58b5b969ca7a96642465b0e5242c0cd030c8c2f4",
     "description": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2",
     "seed_hash": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2"
   },
@@ -159,6 +159,7 @@
   "en/cli-upstream.md": {
     "content": "f9258625f746ac75e75ef79a6ebbb3eeda88c18fd6040e76c8a1383cb09e2524",
     "description": "452c7a96a5a9c20684336e569020d3e93cd9e393559c8ac47b697b1fbd41b7e1",
+    "schema_hash": "842593f2ad9c6bcd1e375d44545871806f017f8b10ec0f40b0156bf4b8a7df4e",
     "seed_hash": "452c7a96a5a9c20684336e569020d3e93cd9e393559c8ac47b697b1fbd41b7e1"
   },
   "en/cli-watch.md": {
@@ -635,7 +636,8 @@
   "en/rlsbl-commands-upstream_cmd.md": {
     "content": "8ecfdd0694e911a05e325e1f55cd237ad40c30ed03e5534a3e8c6a72bd2ccf14",
     "description": "9bf8129d82ad1467160141180e97e13a66a2a40fd996a9bf223decb868d4d3c9",
-    "seed_hash": "9bf8129d82ad1467160141180e97e13a66a2a40fd996a9bf223decb868d4d3c9"
+    "seed_hash": "9bf8129d82ad1467160141180e97e13a66a2a40fd996a9bf223decb868d4d3c9",
+    "source_docstring": "6c068022cd8cbf08430f656b8c6bc60d47ef6d9f9bc37bfe8f4f1f5b90fda635"
   },
   "en/rlsbl-commands-watch.md": {
     "content": "8c1671aff235c1497ebd932a2c03355dbb1beb0645a24c09c8b64be54abbe59c",
@@ -1289,7 +1291,8 @@
   "en/rlsbl-upstream.md": {
     "content": "1543fb1739c294a7ace5a706579fb8f009e6716c61ea8a20d5d5c2d33be198e1",
     "description": "a3edfe1fbf5aa1d9bd83317d3d79e94e588c9819ab1b17b8ebe4d7d3d5e12072",
-    "seed_hash": "a3edfe1fbf5aa1d9bd83317d3d79e94e588c9819ab1b17b8ebe4d7d3d5e12072"
+    "seed_hash": "a3edfe1fbf5aa1d9bd83317d3d79e94e588c9819ab1b17b8ebe4d7d3d5e12072",
+    "source_docstring": "14b7ae54cec5dc7d177abc9368e63fb693876f9674d530e3e133523c289ca9ee"
   },
   "en/rlsbl-utils.md": {
     "content": "a47f1dcb0813a3326100a0a6f967b9614915f27b69c160f02ae8a8c3604f5dfe",
