@@ -250,8 +250,6 @@ def _batch_patches(ci_return=None, ci_side_effect=None, push_side_effect=None):
     return [
         patch("rlsbl.commands.monorepo.batch_release.validate_gh_cli"),
         patch("rlsbl.commands.monorepo.batch_release.validate_gh_push_access"),
-        patch("rlsbl.commands.monorepo.batch_release.validate_clean_tree",
-              return_value=set()),
         patch("rlsbl.commands.monorepo.batch_release.validate_branch_and_remote",
               return_value="main"),
         patch("rlsbl.commands.release.check_gh_installed", return_value=True),

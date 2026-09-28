@@ -201,9 +201,6 @@ class TestBatchReleaseRootSelfdocIntegration:
         ), patch(
             "rlsbl.commands.monorepo.batch_release.validate_gh_push_access"
         ), patch(
-            "rlsbl.commands.monorepo.batch_release.validate_clean_tree",
-            return_value=set(),
-        ), patch(
             "rlsbl.commands.monorepo.batch_release.validate_branch_and_remote",
             return_value="main",
         ), patch(

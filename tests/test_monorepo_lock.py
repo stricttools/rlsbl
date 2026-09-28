@@ -133,7 +133,6 @@ class TestMonorepoReleaseLockPlacement:
     @patch("rlsbl.commands.release.run_gh", return_value="")
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -141,7 +140,7 @@ class TestMonorepoReleaseLockPlacement:
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     def test_monorepo_release_uses_monorepo_lock_dir(
-        self, _run_checks, _vrt, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, mock_run,
+        self, _run_checks, _vrt, _validate, _gen_cl, _gh_inst, _gh_auth, _branch, mock_run,
         _run_gh, _commit_files, _push,
         mock_git_repo,
         monkeypatch,

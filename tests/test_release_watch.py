@@ -74,7 +74,6 @@ class TestNoWatchPrintsHint:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -90,7 +89,6 @@ class TestNoWatchPrintsHint:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,
@@ -133,7 +131,6 @@ class TestWatchInvokesWatchCmd:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -149,7 +146,6 @@ class TestWatchInvokesWatchCmd:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,
@@ -214,7 +210,6 @@ class TestWatchInvokedAfterRelease:
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.commit_files_if_changed")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -244,7 +239,6 @@ class TestWatchInvokedAfterRelease:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_if,
         _commit_files,
@@ -301,7 +295,6 @@ class TestWatchInvokedAfterRelease:
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.commit_files_if_changed")
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -331,7 +324,6 @@ class TestWatchInvokedAfterRelease:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_if,
         _commit_files,

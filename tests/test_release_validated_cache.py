@@ -69,7 +69,6 @@ class TestReleaseValidatedCache:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.should_tag", return_value=False)
@@ -85,7 +84,7 @@ class TestReleaseValidatedCache:
                                                     _extract, _finalize,
                                                     _gen_ver_file, _validate, _gen_cl,
                                                     _deploy, _tag, _gh_inst,
-                                                    _gh_auth, _clean, _branch,
+                                                    _gh_auth, _branch,
                                                     _commit_files, mock_run, _tag_local,
                                                     _tag_remote, _run_gh, _push,
                                                     _lock, _unlock, _remote_exists):
@@ -121,7 +120,6 @@ class TestReleaseValidatedCache:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.should_tag", return_value=False)
@@ -133,7 +131,7 @@ class TestReleaseValidatedCache:
     def test_validated_only_dirty_still_aborts_unexpected(self, _run_checks, _vrt,
                                                           _validate, _gen_cl,
                                                           _deploy, _tag, _gh_inst,
-                                                          _gh_auth, _clean, _branch,
+                                                          _gh_auth, _branch,
                                                           _commit_files, mock_run, _tag_local,
                                                           _run_gh, _push,
                                                           _lock, _unlock, _remote_exists):

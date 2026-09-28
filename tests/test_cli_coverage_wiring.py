@@ -297,29 +297,26 @@ class TestReleaseFlagSurface:
 
     def test_release_run_flag_surface(self, tmp_path, monkeypatch):
         self._project_with_release_file(tmp_path, monkeypatch)
-        with patch("rlsbl.commands.release.run_cmd") as m:
-            result = app.test(
-                ["release", "run", "--no-allow-dirty", "--watch"]
-            )
+        with patch("rlsbl.commands.release.run_release") as m:
+            result = app.test(["release", "run", "--watch"])
         assert result.exit_code == 0, result.stderr
         release_config = m.call_args[0][0]
         assert release_config.bump == "patch"
         assert release_config.description == "d"
-        flags = m.call_args[0][1]
-        assert flags["allow-dirty"] is False
+        flags = m.call_args[0][2]
+        assert "allow-dirty" not in flags
         assert flags["watch"] is True
 
     def test_monorepo_release_run_flag_surface(self):
         result, m = _dispatch(
-            ["monorepo", "release", "run", "--no-allow-dirty", "--watch"],
-            "rlsbl.commands.monorepo._cmd_batch_release",
+            ["monorepo", "release", "run", "--watch"],
+            "rlsbl.commands.monorepo.release_batch",
         )
         assert result.exit_code == 0, result.stderr
         flags = _flags(m)
         assert flags == {
             "dry-run": False,
             "quiet": False,
-            "allow-dirty": False,
             "watch": True,
             "push-timeout": None,
             "ci-timeout": None,
@@ -329,12 +326,11 @@ class TestReleaseFlagSurface:
 
     def test_monorepo_release_run_no_watch(self):
         result, m = _dispatch(
-            ["monorepo", "release", "run", "--allow-dirty", "--no-watch"],
-            "rlsbl.commands.monorepo._cmd_batch_release",
+            ["monorepo", "release", "run", "--no-watch"],
+            "rlsbl.commands.monorepo.release_batch",
         )
         assert result.exit_code == 0, result.stderr
         flags = _flags(m)
-        assert flags["allow-dirty"] is True
         assert flags["watch"] is False
 
 

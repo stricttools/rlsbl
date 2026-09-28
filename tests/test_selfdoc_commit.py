@@ -43,7 +43,6 @@ _BASE_PATCHES = {
     "validate_config_integrity": None,
     "validate_pipeline_config": None,
     "validate_gh_cli": None,
-    "validate_clean_tree": set(),
     "validate_branch_and_remote": "main",
     "resolve_monorepo_context": (None, None, False, False, None),
     "_abort_on_scaffold_conflicts": None,

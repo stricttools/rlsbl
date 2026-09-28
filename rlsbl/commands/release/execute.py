@@ -10,6 +10,7 @@ import time
 
 from ...ci_checks import RUN_ALL_REMEDY
 from ...errors import ReleaseFileError, RlsblError
+from ...release_checkout import BranchMovedError
 from ...git_util import Ancestry, ancestry, tree_rev_spec
 from ...router_filters import any_path_matches
 
@@ -29,14 +30,6 @@ from ... import effects
 
 class ReleaseAbortError(Exception):
     """Raised when the release must abort (e.g., unexpected dirty files)."""
-
-
-class RollbackClobberError(Exception):
-    """Raised when rollback would destroy foreign commits or dirty files.
-
-    This prevents ``git reset --hard`` from silently discarding work
-    created by concurrent sessions sharing the same worktree.
-    """
 
 
 class ReleaseCIError(ReleaseAbortError):
@@ -1145,13 +1138,12 @@ def _track_release_created_commit(state_path, sha=None, cwd=None):
     produced and CI proved.
 
     Called immediately after each ``commit_files()`` /
-    ``commit_files_if_changed()`` invocation so the rollback guard can
+    ``commit_files_if_changed()`` invocation so the foreign-commit guards can
     distinguish release-created commits from foreign ones.
 
     Best-effort: failures are silently ignored. When tracking fails
-    (e.g., in test environments without a real git repo), the rollback
-    guard treats all commits as foreign and refuses rollback -- the
-    safe default.
+    (e.g., in test environments without a real git repo), the guards treat
+    the untracked commit as foreign and refuse -- the safe default.
 
     If ``sha`` is not provided, reads HEAD via ``effects.run`` directly
     (bypasses the mock-patched ``run`` function used by the release
@@ -1178,69 +1170,6 @@ def _track_release_created_commit(state_path, sha=None, cwd=None):
         pass  # Best-effort: never mask the original release error
 
 
-def _guard_rollback(pre_release_sha, state_path, cwd=None):
-    """Refuse rollback if foreign commits exist between pre_release_sha and HEAD.
-
-    Compares commits between ``pre_release_sha`` and HEAD against the
-    ``release_created_commits`` list persisted in the state file.  Any commit
-    not in ``release_created_commits`` is a foreign commit (from a concurrent
-    session).
-
-    Dirty files (uncommitted modifications) are NOT checked because the
-    release flow itself writes version-bump and changelog files before
-    committing them -- those dirty files are the expected rollback
-    target, not concurrent work.  Untracked files survive
-    ``git reset --hard`` anyway.
-
-    Uses ``effects.run`` directly (not the mock-patched ``run`` function)
-    to avoid consuming mock side-effect entries in tests.
-
-    Raises :class:`RollbackClobberError` with details and manual
-    recovery instructions when rollback is unsafe.
-    """
-    state = load_release_state(state_path)
-    release_created_commits = set((state or {}).get("release_created_commits", []))
-
-    # Find all commits between pre_release_sha and HEAD
-    try:
-        result = effects.run(
-            ["git", "rev-list", f"{pre_release_sha.strip()}..HEAD"],
-            capture_output=True, text=True, check=True,
-            cwd=cwd,
-        )
-        rev_list_output = result.stdout.strip()
-    except Exception:
-        # If rev-list fails (e.g. pre_release_sha is invalid), allow
-        # the rollback -- the guard is best-effort, and blocking here
-        # would leave the release in a worse state.
-        return
-
-    if rev_list_output:
-        all_commits = [c.strip() for c in rev_list_output.splitlines() if c.strip()]
-    else:
-        all_commits = []
-
-    foreign_commits = [c for c in all_commits if c not in release_created_commits]
-
-    if not foreign_commits:
-        return  # Safe to roll back
-
-    parts = [
-        "Rollback aborted: git reset --hard would destroy work from "
-        "concurrent sessions.",
-        f"\nForeign commits (not created by this release):",
-    ]
-    for fc in foreign_commits:
-        parts.append(f"  {fc}")
-    parts.append(
-        "\nManual recovery:"
-        f"\n  1. Inspect the commits above"
-        f"\n  2. If safe, run: git reset --hard {pre_release_sha.strip()[:10]}"
-        f"\n  3. Otherwise, cherry-pick or stash foreign work first"
-    )
-    raise RollbackClobberError("\n".join(parts))
-
-
 def _is_push_timeout_exc(exc):
     """True when a push failure was a timeout.
 
@@ -1259,22 +1188,93 @@ def _is_push_timeout_exc(exc):
 
 
 def _is_resumable_failure(exc, branch_pushed, candidate_push_attempted, completed):
-    """Decide whether a mutating-phase failure must SKIP rollback.
+    """Decide whether a mutating-phase failure leaves the release resumable.
 
-    Rollback (``git reset --hard`` to the pre-release commit) is only safe
-    while nothing has reached the remote. Three states forbid it:
+    Discarding the attempt (see :func:`_discard_unpushed_attempt`) is only
+    right while nothing has reached the remote. Three states forbid it:
 
     - the candidate push succeeded (``branch_pushed``),
     - a prior run already recorded ``BRANCH_PUSHED``,
     - the candidate push was attempted and TIMED OUT -- a timed-out push may
-      still have landed, so resetting would diverge from published history.
+      still have reached the remote, so taking the branch back would diverge
+      from published history.
 
     A non-timeout candidate-push failure (rejected ref, auth error) proves
-    nothing landed, and still rolls back.
+    nothing reached the remote, and the attempt is discarded.
     """
     if branch_pushed or "BRANCH_PUSHED" in completed:
         return True
     return candidate_push_attempted and _is_push_timeout_exc(exc)
+
+
+def _advance_live_branch(*, rerun):
+    """Move the live release branch to the release checkout's HEAD.
+
+    A no-op outside a release checkout (the library path, where the commits
+    are made on the branch directly) and when the branch is already there.
+    See :func:`rlsbl.release_checkout.advance_live_branch` for the
+    compare-and-swap and the refusals.
+    """
+    from ... import release_checkout
+
+    if release_checkout.active() is None:
+        return
+    release_checkout.advance_live_branch("HEAD", rerun=rerun)
+
+
+def _discard_unpushed_attempt(state_path, entry_state, *, resuming, version,
+                              branch, report):
+    """Throw away an attempt that failed before its candidate reached the remote.
+
+    The attempt ran in the release checkout, so its commits and files exist
+    only there, and the next release resets the checkout: nothing is reset in
+    the working tree. The one thing an attempt may have written outside it is
+    the advance of the branch immediately before its candidate push; when that
+    push was refused, the advance is taken back
+    (:func:`rlsbl.release_checkout.unwind_last_advance`) -- or, when that would
+    touch somebody else's work, left in place and said so, with the release
+    kept resumable.
+
+    The state file then describes what is on the branch: a fresh release's is
+    deleted (none of its work is there), and a resume's is put back as the
+    attempt found it (its earlier attempts' commits ARE there).
+    """
+    from ... import release_checkout
+
+    co = release_checkout.active()
+    unwound, reason = release_checkout.unwind_last_advance()
+    if not unwound:
+        print(
+            f"Error: the release candidate was not pushed, and {branch} could "
+            f"not be taken back to where the release started: {reason}.\n"
+            f"The release commit stays on {branch} and the release state is "
+            f"kept. Fix the cause of the failed push and run "
+            f"`rlsbl release resume` to push it again, or run "
+            f"`rlsbl release abandon` to record {version} as never released.",
+            file=sys.stderr,
+        )
+        return
+    if resuming:
+        save_release_state(state_path, entry_state)
+        rerun = "rlsbl release resume"
+    else:
+        clear_release_state(state_path)
+        rerun = "rlsbl release run"
+    if not report:
+        return
+    if co is None:
+        where = "Nothing reached the remote."
+    else:
+        where = (
+            f"The attempt ran in the release checkout and is discarded: "
+            f"nothing of it is on {branch} or in the working tree, and "
+            f"nothing reached the remote."
+        )
+    print(
+        f"Error: release failed before the release candidate was pushed. "
+        f"{where} Address the error above and re-run:\n  {rerun}",
+        file=sys.stderr,
+    )
 
 
 def head_sha(cwd=None):
@@ -1305,8 +1305,8 @@ def head_sha(cwd=None):
 class ForeignCommitError(RlsblError):
     """Raised when commits outside the release's own trail rode into it.
 
-    The forward twin of :class:`RollbackClobberError`: that guard refuses to
-    DESTROY a concurrent session's commits, this one refuses to SHIP them.
+    It refuses to SHIP a concurrent session's commits; nothing in the release
+    ever destroys them.
     """
 
 
@@ -1325,7 +1325,10 @@ class UnverifiedCandidateError(RlsblError):
 
 
 def foreign_commits(pin_sha, trail, cwd=None):
-    """The commits in ``pin_sha..HEAD`` that *trail* does not account for.
+    """The commits in ``pin_sha..<tip>`` that *trail* does not account for.
+
+    The tip is HEAD, or -- while a release runs in the release checkout -- the
+    release branch, which is where another session's commits appear.
 
     Returned newest-first, the order ``git rev-list`` gives them. An unusable
     range yields an empty list -- no pin, a pin this repository cannot resolve,
@@ -1340,9 +1343,14 @@ def foreign_commits(pin_sha, trail, cwd=None):
     if not pin_sha:
         return []
     trail = set(trail or ())
+    # Inside the release checkout HEAD carries only the release's own
+    # commits; what another session committed is on the BRANCH.
+    from ...release_checkout import branch_ref
+
+    tip = branch_ref() or "HEAD"
     try:
         result = effects.run(
-            ["git", "rev-list", f"{pin_sha.strip()}..HEAD"],
+            ["git", "rev-list", f"{pin_sha.strip()}..{tip}"],
             capture_output=True, text=True, check=True, cwd=cwd,
         )
     except Exception:
@@ -2331,7 +2339,6 @@ class ReleaseState:
     context: str = ""
 
     # State
-    pre_existing_dirty: set | None = None
     hook_generated: set | None = None
     # HEAD pinned at the top of the release ENTRY, before any mutation
     # (including the pre-mutating selfdoc auto-commit). Everything in
@@ -2462,7 +2469,7 @@ def _run_release_mutating(state: ReleaseState):
     releasable_tag_format_str = state.releasable_tag_format
     commit_msg = state.commit_msg
     lock_dir = state.lock_dir
-    # ``pre_existing_dirty`` and ``hook_generated`` are read off ``state`` by
+    # ``hook_generated`` is read off ``state`` by
     # the Phase-A plan builder, which owns everything they feed (the commit's
     # file list and the concurrent-change guard's expected set).
     description = state.description
@@ -2505,7 +2512,6 @@ def _run_release_mutating(state: ReleaseState):
         generate_version_file,
         get_changes_dir,
         validate_subtree_remote_ssh_host,
-        _cleanup_release_artifacts,
         upload_release_assets,
         _print_stale_dep_advisory,
         working_tree_paths,
@@ -2543,19 +2549,16 @@ def _run_release_mutating(state: ReleaseState):
 
     # Snapshot dirty files BEFORE any version-bump writes. This captures
     # everything dirtied by prior stages (generate_changelog, hooks, lint,
-    # --allow-dirty pre-existing files, etc.). Only files that become dirty
-    # AFTER this point — i.e. during the version bump — are candidates for
-    # the "unexpected modified files" abort.
+    # etc.). Only files that become dirty AFTER this point — i.e. during the
+    # version bump — are candidates for the "unexpected modified files" abort.
     #
     # A preview has no such snapshot to take: the stages above RECORDED their
-    # mutations instead of making them, so git would report the tree as it was
-    # before the release started -- which is exactly ``pre_existing_dirty``.
-    # (It would not even report that: an observe issued after a recorded
-    # mutation answers with the framework's stale carrier.) The guard that
+    # mutations instead of making them, and an observe issued after a recorded
+    # mutation answers with the framework's stale carrier. The guard that
     # consumes the snapshot does not run in a preview either, because there is
     # nothing written for it to judge.
     if _previewing:
-        baseline_dirty = set(state.pre_existing_dirty or ())
+        baseline_dirty = set()
     else:
         baseline_dirty = set(working_tree_paths())
 
@@ -2610,11 +2613,10 @@ def _run_release_mutating(state: ReleaseState):
     if should_tag(flags, ctx.config):
         print("  Will add 'rlsbl' keyword to project manifests")
 
-    # Capture HEAD before any version-bump writes so we can roll back on failure.
-    # This must happen before write_version() so that git reset --hard reverts
-    # the uncommitted version-bumped files if the release aborts.
+    # HEAD before any version-bump writes: the commit this attempt builds on,
+    # recorded in the state file.
     #
-    # A preview has nothing to roll back -- it performs no write -- so it takes
+    # A preview performs no write, so it takes
     # the release's own entry pin rather than issuing an observe that a
     # recorded mutation has already made stale.
     pre_release_sha = (
@@ -2682,6 +2684,10 @@ def _run_release_mutating(state: ReleaseState):
         "blog": state.blog,
     })
     save_release_state(_state_path, _state_dict)
+    # The record as this attempt found it. A resume whose attempt fails before
+    # its candidate reaches the remote puts it back: the attempt's own commits
+    # never reached the branch, so markers it recorded for them would lie.
+    _entry_state = json.loads(json.dumps(_state_dict))
     # Refuse-on-drift, checkpoint 1 of 4 (mutating entry). Re-checked before
     # the candidate push, immediately after the CI gate (the long window, and
     # the last moment before anything irreversible), and before the final
@@ -2696,14 +2702,13 @@ def _run_release_mutating(state: ReleaseState):
     _completed = set(_state_dict.get("completed_steps", []))
 
     # Track whether the candidate push succeeded. Once commits are on the
-    # remote, a local `git reset --hard` would create divergent state.
-    # Set to True after push_if_needed() returns successfully.
+    # remote, the attempt can only go forward: taking the branch back would
+    # diverge from published history. Set to True after the push returns.
     branch_pushed = False
     # True once the candidate push has been ATTEMPTED. A push that timed out
-    # may still have landed on the remote, so a timeout at this point must not
-    # trigger `git reset --hard` (that is exactly how divergent local/remote
-    # state was created before). A non-timeout push failure proves nothing
-    # landed and still rolls back.
+    # may still have reached the remote, so a timeout leaves the release
+    # resumable rather than discarding it. A non-timeout push failure proves
+    # nothing reached the remote, and the attempt is discarded.
     candidate_push_attempted = False
     # The commit CI verified: the tag target, the CI-SHA release-notes marker,
     # and the post-release watch all address it explicitly. Assigned inside the
@@ -2711,12 +2716,11 @@ def _run_release_mutating(state: ReleaseState):
     verified_sha = None
 
     def _handle_resumable_push_failure(_exc) -> bool:
-        """Classify a post-candidate-push failure as RESUMABLE (no rollback).
+        """Classify a post-candidate-push failure as RESUMABLE.
 
-        Once the release candidate is on the remote, a local rollback would
-        diverge from published history, so the entire rollback family is
-        skipped — no clobber guard, no ``git reset --hard``, no tag deletion,
-        no artifact cleanup, no state clearing. The failure is recorded and
+        Once the release candidate is on the remote, taking anything back
+        would diverge from published history, so nothing is: no branch
+        unwind, no tag deletion, no state clearing. The failure is recorded and
         ``rlsbl release resume`` re-attempts from the failed step via
         idempotent guards.
 
@@ -2819,55 +2823,10 @@ def _run_release_mutating(state: ReleaseState):
             )
         return False
 
-    def _warn_rollback_residuals():
-        """Postcondition check: warn if the working tree is not clean after a
-        pre-TAGGED rollback.
-
-        A correct rollback (``git reset --hard`` + orphan-artifact cleanup)
-        must leave the working tree byte-identical to the pre-release HEAD.
-        If ``git status --porcelain`` still reports changes, something was not
-        fully reverted (e.g. a residual generated file). This is a warning,
-        not a fatal error -- the original release failure is the primary
-        signal -- but it names every leftover path so manual cleanup is
-        possible before retrying.
-
-        Transient release-machinery files that are not rollback residuals are
-        excluded: the advisory lock file (``.rlsbl/lock``, released by the
-        caller's ``finally`` after this handler) and the in-progress state
-        file (already removed by ``clear_release_state`` above, but excluded
-        defensively).
-        """
-        try:
-            residual_paths = working_tree_paths()
-        except Exception:
-            return
-        if not residual_paths:
-            return
-        # Transient paths that are not rollback residuals, as absolute paths.
-        _transient_abs = {
-            os.path.abspath(os.path.join(project_dir, lock_dir, "lock")),
-            os.path.abspath(_state_path),
-        }
-        leftover_paths = []
-        for _p in residual_paths:
-            _abs = os.path.abspath(os.path.join(_git_root, _p.rstrip("/")))
-            if _abs in _transient_abs:
-                continue
-            leftover_paths.append(_p)
-        if not leftover_paths:
-            return
-        print(
-            "Warning: rollback left residual working-tree changes; "
-            "may need manual cleanup before retrying:",
-            file=sys.stderr,
-        )
-        for _p in sorted(leftover_paths):
-            print(f"  {_p}", file=sys.stderr)
-
     # Everything from version-bump writes through commit/tag/push is wrapped
-    # in a single try block so that any failure (including ReleaseAbortError
-    # from the unexpected-files check) triggers rollback of version-bumped
-    # files via git reset --hard.
+    # in a single try block so that a failure before the candidate reaches the
+    # remote (including ReleaseAbortError from the unexpected-files check)
+    # discards the attempt, and one after it leaves the release resumable.
     try:
         # ---- Phase A: version bump through candidate push ----
         #
@@ -2880,10 +2839,11 @@ def _run_release_mutating(state: ReleaseState):
         # to end: with no observe left after the first recorded mutation, there
         # is nothing for the framework's stale carrier to truncate.
         #
-        # Rollback stays here, in the caller: a failing step raises into the
-        # handlers below (reset to the pre-release pin plus orphan cleanup).
-        # It is never a plan step, and a preview -- which executes nothing --
-        # needs none.
+        # Undo stays here, in the caller: a failing step raises into the
+        # handlers below, which discard the attempt (it ran in the release
+        # checkout) and take back the branch advance a refused candidate push
+        # leaves. It is never a plan step, and a preview -- which executes
+        # nothing -- needs none.
         _phase_a_inputs = phase_a.BuildInputs(
             state=state, ctx=ctx, log=log,
             project_dir=project_dir, git_root=_git_root,
@@ -2942,7 +2902,7 @@ def _run_release_mutating(state: ReleaseState):
             files_to_commit = _phase_a_plan.files_to_commit
             # Recorded before the push is issued: a push that times out may
             # still have landed, and the resumable-failure classifier below
-            # must not roll back over a candidate that reached the remote.
+            # must not discard an attempt whose candidate reached the remote.
             candidate_push_attempted = any(
                 s.kind == phase_a.PUSH_CANDIDATE for s in _phase_a_plan.steps
             )
@@ -2962,6 +2922,11 @@ def _run_release_mutating(state: ReleaseState):
                 # so tags and GitHub Releases existed for versions that never
                 # reached their registries, with no re-run that could ever go
                 # green. Two real batch releases half-published that way.
+                # The member's commits join the branch now, unpushed, so the
+                # next member builds on them and a later run finds them there.
+                _advance_live_branch(
+                    rerun="re-run `rlsbl monorepo release run`",
+                )
                 log("Deferring the candidate push and CI gate to the batch "
                     "orchestrator")
                 return
@@ -3190,6 +3155,7 @@ def _run_release_mutating(state: ReleaseState):
                     finalize_files.append(md_path)
             commit_files(f"chore: finalize changelog for {new_version}", finalize_files, cwd=_git_root)
             _track_release_created_commit(_state_path)
+            _advance_live_branch(rerun=RERUN_RESUME)
             log(f"Committed finalized changelog files")
             save_step(_state_path, "CHANGELOG_FINALIZED")
             _completed.add("CHANGELOG_FINALIZED")
@@ -3338,6 +3304,8 @@ def _run_release_mutating(state: ReleaseState):
                         cwd=_git_root,
                     )
                     _track_release_created_commit(_state_path)
+            # Covers the stale-exclusion cleanup commit above as well.
+            _advance_live_branch(rerun=RERUN_RESUME)
             save_step(_state_path, "RELEASE_FILE_FINALIZED")
             _completed.add("RELEASE_FILE_FINALIZED")
 
@@ -3485,101 +3453,53 @@ def _run_release_mutating(state: ReleaseState):
             log(f"Pushed to origin/{branch}")
             save_step(_state_path, "PUSHED")
             _completed.add("PUSHED")
-    except ForeignCommitError as e:
-        # A concurrent session's commits rode onto the branch mid-release.
-        # Never roll back: those commits are exactly what must be preserved
-        # (the rollback guard refuses the same thing from the other side).
-        # Nothing was tagged or released, so the version survives.
+    except (ForeignCommitError, BranchMovedError) as e:
+        # Commits this release did not make are on the branch. Never rolled
+        # back: those commits are what must be preserved. Before the
+        # candidate is on the remote, a fresh release's own work never reached
+        # the branch either, so its attempt is discarded and a fresh release
+        # takes the commits in; once it is (or on a resume), the state stays
+        # for `rlsbl release resume`.
+        if not (state.resuming or _is_resumable_failure(
+                e, branch_pushed, candidate_push_attempted, _completed)):
+            _discard_unpushed_attempt(
+                _state_path, _entry_state, resuming=False, version=new_version,
+                branch=branch, report=False,
+            )
         print(f"Error: {e}", file=sys.stderr)
         raise
     except ReleaseCIError as e:
         # CI did not pass on the pushed candidate. The candidate commit is on
-        # the remote, so there is nothing to roll back; and no tag, GitHub
+        # the remote, so there is nothing to take back; and no tag, GitHub
         # Release or finalized changelog was created, so there is nothing to
         # clean up. State is preserved for `rlsbl release resume`.
         print(f"Error: {e}", file=sys.stderr)
         raise
-    except ReleaseAbortError as e:
-        if _is_resumable_failure(e, branch_pushed, candidate_push_attempted,
-                                 _completed):
-            # Post-candidate-push failure: canonical resumable state. Preserve
-            # everything and record a failed marker instead of rolling back
-            # (which would diverge from the already-published candidate).
-            # A recovered tag-push retry falls through into the post-push
-            # steps below; otherwise re-raise to abort with resume guidance.
-            if not _handle_resumable_push_failure(e):
-                raise
-            # Recovered: the retry cleared the outstanding push. Fall through
-            # (no rollback) so the post-push steps below the try/except run.
-        else:
-            # Pre-push failure -- safe to roll back locally,
-            # but only if no foreign commits or dirty files would be destroyed.
-            _guard_rollback(pre_release_sha, _state_path)
-            run("git", ["reset", "--hard", pre_release_sha])
-            # State file is useless after local rollback -- clean it up.
-            from ...release_file import get_releases_dir as _get_releases_dir
-            _cleanup_release_artifacts(
-                project_dir, new_version, changes_dir=state.changes_dir,
-                releases_dir=_get_releases_dir(project_dir, releasable_dir=_releasable_cfg_dir),
-            )
-            clear_release_state(_state_path)
-            print(str(e), file=sys.stderr)
-            print(
-                f"Local state has been rolled back to {pre_release_sha[:10]}.",
-                file=sys.stderr,
-            )
-            _warn_rollback_residuals()
-            raise
     except Exception as e:
         if _is_resumable_failure(e, branch_pushed, candidate_push_attempted,
                                  _completed):
-            # Post-candidate-push failure (push failed / timed out): canonical
-            # resumable state. Preserve everything and record a failed
-            # marker instead of rolling back. A recovered tag-push
+            # Post-candidate-push failure (push failed / timed out, or a
+            # ReleaseAbortError after it): canonical resumable state. Preserve
+            # everything and record a failed marker. A recovered tag-push
             # retry falls through into the post-push steps below; otherwise
             # re-raise to abort with resume guidance.
             if not _handle_resumable_push_failure(e):
                 raise
             # Recovered: the retry cleared the outstanding push. Fall through
-            # (no rollback) so the post-push steps below the try/except run.
+            # so the post-push steps below the try/except run.
         else:
-            # Pre-push failure -- safe to roll back locally,
-            # but only if no foreign commits or dirty files would be destroyed.
-            _guard_rollback(pre_release_sha, _state_path)
-            # Delete tag (may not exist yet) and reset commits so the working
-            # tree looks like it did before the release attempt.
-            try:
-                run("git", ["tag", "-d", tag])
-            except Exception:
-                pass
-            # Clean up companion tags (best-effort)
-            for ctag in state.companion_tags:
-                try:
-                    run("git", ["tag", "-d", ctag])
-                except Exception:
-                    pass
-            run("git", ["reset", "--hard", pre_release_sha])
-            # State file is useless after local rollback -- clean it up.
-            from ...release_file import get_releases_dir as _get_releases_dir
-            _cleanup_release_artifacts(
-                project_dir, new_version, changes_dir=state.changes_dir,
-                releases_dir=_get_releases_dir(project_dir, releasable_dir=_releasable_cfg_dir),
-            )
-            clear_release_state(_state_path)
-            if hasattr(e, 'stderr') and e.stderr:
+            # Before the candidate reached the remote. The release ran in the
+            # release checkout, so there is nothing to reset: the attempt is
+            # discarded, and only an advance of the branch this attempt made
+            # (the candidate push itself failed) is taken back.
+            if not isinstance(e, ReleaseAbortError) and getattr(e, "stderr", None):
                 print(f"Command error: {e.stderr.strip()}", file=sys.stderr)
-            print(
-                f"Error: release failed. Local state has been rolled back to {pre_release_sha[:10]}.",
-                file=sys.stderr,
+            if isinstance(e, ReleaseAbortError):
+                print(str(e), file=sys.stderr)
+            _discard_unpushed_attempt(
+                _state_path, _entry_state, resuming=state.resuming,
+                version=new_version, branch=branch, report=True,
             )
-            print(
-                "No push happened (the failure occurred before the release "
-                "candidate was pushed), so nothing on the remote needs fixing. "
-                "Address the error above and re-run:\n"
-                "  rlsbl release run",
-                file=sys.stderr,
-            )
-            _warn_rollback_residuals()
             raise
 
     # The CI-verified commit: the tag target, the publish gate's subject, and
@@ -4147,6 +4067,7 @@ def _run_release_mutating(state: ReleaseState):
             did_commit = commit_files_if_changed("snapshot", [rel_path], skip_message="Snapshot unchanged.", autogenerated=True, cwd=monorepo_root)
             if did_commit:
                 _track_release_created_commit(_state_path)
+                _advance_live_branch(rerun=RERUN_RESUME)
             log(f"Regenerated monorepo snapshot (post-hoc): {rel_path}")
         except Exception as e:
             print(f"Warning: snapshot regeneration failed: {e}", file=sys.stderr)

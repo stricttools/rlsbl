@@ -73,7 +73,6 @@ _STUBS = {
     "validate_ota_mode": None,
     "validate_gh_cli": None,
     "validate_gh_push_access": None,
-    "validate_clean_tree": set(),
     "validate_branch_and_remote": "main",
     "resolve_monorepo_context": (None, None, False, False, None),
     "validate_blog_body": (None, None),

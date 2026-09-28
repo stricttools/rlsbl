@@ -1,4 +1,4 @@
-"""Exit-code regression pins for the four release abort classes.
+"""Exit-code regression pins for the release abort classes.
 
 Every one of these aborts was, at some point in this project's history, a
 path that printed a warning and let ``rlsbl release run`` return 0 -- a
@@ -13,10 +13,13 @@ unrelated reason).
 
 Covered classes:
 
-- unclean working tree            -> ``ReleaseValidationError``
 - a previous release in progress  -> ``ReleaseValidationError``
 - CI never ran on the candidate   -> ``ReleaseCIError``
 - selfdoc check failed            -> ``HookError``
+
+An uncommitted change to a path the release writes is refused before
+``run_cmd`` starts, by the release command's way into the release checkout;
+``tests/test_release_checkout.py`` pins its exit code and message.
 """
 
 import json
@@ -133,12 +136,6 @@ def _base_patches(stack):
 # ---------------------------------------------------------------------------
 
 
-def _stage_unclean_tree(repo, stack):
-    # A tracked file modified after the last commit: validate_clean_tree
-    # refuses without --allow-dirty.
-    (repo / "feature.txt").write_text("uncommitted edit\n")
-
-
 def _stage_release_in_progress(repo, stack):
     # A partial (not provably complete) state file: the run must refuse and
     # point at `rlsbl release resume`, never start a second release.
@@ -203,7 +200,6 @@ def _stage_selfdoc_check_failure(repo, stack):
 
 # id -> (stage fn, expected stderr fragment)
 ABORT_CLASSES = {
-    "unclean_tree": (_stage_unclean_tree, "working tree is not clean"),
     "release_in_progress": (
         _stage_release_in_progress, "a previous release is in progress"),
     "ci_never_ran": (
@@ -245,7 +241,6 @@ class TestReleaseAbortExitCodes:
         """The table is the spec: adding an abort class without a row here
         is how these regressions came back last time."""
         assert set(ABORT_CLASSES) == {
-            "unclean_tree",
             "release_in_progress",
             "ci_never_ran",
             "selfdoc_check",

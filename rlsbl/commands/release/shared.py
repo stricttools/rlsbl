@@ -23,8 +23,15 @@ def load_release_env(config):
         return None
 
     from ...config import load_env_file
+    from ...release_checkout import live_path
 
-    load_env_file(env_file)
+    # A relative env_file names a file beside the working tree the operator
+    # keeps it in (it is never committed), so it resolves there even while
+    # the release runs in the release checkout.
+    expanded = os.path.expanduser(env_file)
+    if not os.path.isabs(expanded):
+        expanded = live_path(os.path.abspath(expanded))
+    load_env_file(expanded)
     # Historical alias: the shared env file names the Cloudflare account
     # ``CF_ACCOUNT_ID``; wrangler and the Cloudflare SDKs read
     # ``CLOUDFLARE_ACCOUNT_ID``. Mirrored, never overwritten.
@@ -33,7 +40,7 @@ def load_release_env(config):
     return env_file
 
 
-def build_release_flags(dry_run, quiet, allow_dirty, watch=False,
+def build_release_flags(dry_run, quiet, watch=False,
                         push_timeout=None, ci_timeout=None,
                         check_timeout=None, hook_timeout=None):
     """Build the standard release flags dict from CLI arguments.
@@ -46,7 +53,6 @@ def build_release_flags(dry_run, quiet, allow_dirty, watch=False,
     return {
         "dry-run": dry_run,
         "quiet": quiet,
-        "allow-dirty": allow_dirty,
         "watch": bool(watch),
         "push-timeout": push_timeout,
         "ci-timeout": ci_timeout,

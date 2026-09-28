@@ -1097,7 +1097,6 @@ class TestReleaseEnvFile:
              patch(f"{MOD_RELEASE}.validate_config_integrity"), \
              patch(f"{MOD_RELEASE}.validate_pipeline_config"), \
              patch(f"{MOD_RELEASE}.validate_gh_cli"), \
-             patch(f"{MOD_RELEASE}.validate_clean_tree", return_value=set()), \
              patch(f"{MOD_RELEASE}.validate_branch_and_remote", return_value="main"), \
              patch(f"{MOD_RELEASE}.resolve_monorepo_context", return_value=(None, None, False, False, None)), \
              patch(f"{MOD_RELEASE}._abort_on_scaffold_conflicts"), \
@@ -2340,7 +2339,6 @@ class TestBatchReleaseReleasablesMissing:
     @patch(f"{MOD_BATCH}.get_batch_release_file_path", return_value="/ws/batch.toml")
     @patch(f"{MOD_BATCH}.read_batch_release_file")
     @patch(f"{MOD_BATCH}.validate_gh_cli")
-    @patch(f"{MOD_BATCH}.validate_clean_tree", return_value=set())
     @patch(f"{MOD_BATCH}.validate_branch_and_remote", return_value="main")
     @patch(f"{MOD_BATCH}.load_workspace", return_value=[])
     def test_missing_releasables(self, *mocks):
@@ -2348,7 +2346,7 @@ class TestBatchReleaseReleasablesMissing:
 
         batch = MagicMock()
         batch.packages = {"missing-rel": MagicMock()}
-        mocks[4].return_value = batch
+        mocks[3].return_value = batch
 
         with patch("os.path.exists", return_value=True), patch(f"{MOD_BATCH}._run_root_selfdoc"):
             with patch("rlsbl.workspace.load_releasables", return_value=[]):
@@ -2364,7 +2362,6 @@ class TestBatchReleaseReleasableCycle:
     @patch(f"{MOD_BATCH}.get_batch_release_file_path", return_value="/ws/batch.toml")
     @patch(f"{MOD_BATCH}.read_batch_release_file")
     @patch(f"{MOD_BATCH}.validate_gh_cli")
-    @patch(f"{MOD_BATCH}.validate_clean_tree", return_value=set())
     @patch(f"{MOD_BATCH}.validate_branch_and_remote", return_value="main")
     @patch(f"{MOD_BATCH}.load_workspace", return_value=[])
     @patch(f"{MOD_BATCH}.WorkspaceGraph")
@@ -2376,7 +2373,7 @@ class TestBatchReleaseReleasableCycle:
         rel.name = "core"
         batch = MagicMock()
         batch.packages = {"core": MagicMock()}
-        mocks[4].return_value = batch
+        mocks[3].return_value = batch
 
         graph_inst = MagicMock()
         graph_inst.topological_order.side_effect = CycleError("cycle!")
@@ -2396,7 +2393,6 @@ class TestBatchReleaseReleasableNoMembers:
     @patch(f"{MOD_BATCH}.get_batch_release_file_path", return_value="/ws/batch.toml")
     @patch(f"{MOD_BATCH}.read_batch_release_file")
     @patch(f"{MOD_BATCH}.validate_gh_cli")
-    @patch(f"{MOD_BATCH}.validate_clean_tree", return_value=set())
     @patch(f"{MOD_BATCH}.validate_branch_and_remote", return_value="main")
     @patch(f"{MOD_BATCH}.load_workspace", return_value=[])
     @patch(f"{MOD_BATCH}.WorkspaceGraph")
@@ -2410,7 +2406,7 @@ class TestBatchReleaseReleasableNoMembers:
         rel.name = "core"
         batch = MagicMock()
         batch.packages = {"core": rc}
-        mocks[4].return_value = batch
+        mocks[3].return_value = batch
 
         graph_inst = MagicMock()
         graph_inst.topological_order.return_value = []
@@ -2432,7 +2428,6 @@ class TestBatchReleaseReleasableFailure:
     @patch(f"{MOD_BATCH}.get_batch_release_file_path", return_value="/ws/batch.toml")
     @patch(f"{MOD_BATCH}.read_batch_release_file")
     @patch(f"{MOD_BATCH}.validate_gh_cli")
-    @patch(f"{MOD_BATCH}.validate_clean_tree", return_value=set())
     @patch(f"{MOD_BATCH}.validate_branch_and_remote", return_value="main")
     @patch(f"{MOD_BATCH}.load_workspace", return_value=[])
     @patch(f"{MOD_BATCH}.WorkspaceGraph")
@@ -2446,7 +2441,7 @@ class TestBatchReleaseReleasableFailure:
         rel.name = "core"
         batch = MagicMock()
         batch.packages = {"core": rc}
-        mocks[4].return_value = batch
+        mocks[3].return_value = batch
 
         graph_inst = MagicMock()
         graph_inst.topological_order.return_value = ["pkg-a"]

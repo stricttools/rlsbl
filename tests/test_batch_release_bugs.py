@@ -34,7 +34,7 @@ from rlsbl.commands.monorepo.batch_release import _cmd_batch_release
 
 
 class TestBatchModeSkipsValidation:
-    """validate_gh_cli, validate_clean_tree, and validate_branch_and_remote
+    """validate_gh_cli and validate_branch_and_remote
     should NOT be called when batch-mode is True, because the batch
     orchestrator already validated them upfront."""
 
@@ -62,7 +62,6 @@ class TestBatchModeSkipsValidation:
         )
 
     @patch("rlsbl.commands.release.validate_branch_and_remote")
-    @patch("rlsbl.commands.release.validate_clean_tree")
     @patch("rlsbl.commands.release.validate_gh_cli")
     @patch("rlsbl.commands.release.validate_pipeline_config")
     @patch("rlsbl.commands.release.validate_config_integrity")
@@ -75,18 +74,17 @@ class TestBatchModeSkipsValidation:
         mock_validate_config,
         mock_validate_pipeline,
         mock_validate_gh,
-        mock_validate_clean,
         mock_validate_branch,
         tmp_path,
     ):
-        """When batch-mode=True, the three environment validators must not be called."""
+        """When batch-mode=True, the environment validators must not be called."""
         ctx = self._make_ctx(tmp_path)
         rc = self._make_release_config()
         flags = {"batch-mode": True, "quiet": True}
 
         # We expect _run_cmd_inner to proceed past validation and fail somewhere
         # later (e.g., resolving monorepo context or computing version).
-        # That's fine -- we only care that the three validators are NOT called.
+        # That's fine -- we only care that the validators are NOT called.
         mock_validate_targets.return_value = set()
 
         with pytest.raises(Exception):
@@ -94,11 +92,9 @@ class TestBatchModeSkipsValidation:
             _run_cmd_inner(rc, flags, ctx=ctx)
 
         mock_validate_gh.assert_not_called()
-        mock_validate_clean.assert_not_called()
         mock_validate_branch.assert_not_called()
 
     @patch("rlsbl.commands.release.validate_branch_and_remote")
-    @patch("rlsbl.commands.release.validate_clean_tree")
     @patch("rlsbl.commands.release.validate_gh_cli")
     @patch("rlsbl.commands.release.validate_pipeline_config")
     @patch("rlsbl.commands.release.validate_config_integrity")
@@ -111,24 +107,21 @@ class TestBatchModeSkipsValidation:
         mock_validate_config,
         mock_validate_pipeline,
         mock_validate_gh,
-        mock_validate_clean,
         mock_validate_branch,
         tmp_path,
     ):
-        """When batch-mode is not set, the three environment validators MUST be called."""
+        """When batch-mode is not set, the environment validators MUST be called."""
         ctx = self._make_ctx(tmp_path)
         rc = self._make_release_config()
         flags = {"quiet": True}
 
         mock_validate_targets.return_value = set()
-        mock_validate_clean.return_value = set()
         mock_validate_branch.return_value = "main"
 
         with pytest.raises(Exception):
             _run_cmd_inner(rc, flags, ctx=ctx)
 
         mock_validate_gh.assert_called_once()
-        mock_validate_clean.assert_called_once()
         mock_validate_branch.assert_called_once()
 
 

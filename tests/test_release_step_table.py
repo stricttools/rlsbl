@@ -28,7 +28,6 @@ from rlsbl.commands.release.release_state import (
     is_state_complete,
     save_step,
 )
-from rlsbl.commands.release.rollback import _cleanup_release_artifacts
 from rlsbl.commands.release.steps import (
     MUTATING_PHASE,
     POST_RELEASE_PHASE,
@@ -46,8 +45,6 @@ from rlsbl.commands.release.steps import (
     StepContext,
     StepInverseError,
     all_plan_kinds,
-    no_artifacts,
-    rollback_artifacts,
 )
 from rlsbl.targets import TARGETS
 
@@ -125,10 +122,6 @@ class TestEveryStepDecides:
         # a callable that was renamed or removed.
         assert callable(_resolve(step.perform.performer))
 
-    @pytest.mark.parametrize("step", RELEASE_STEP_TABLE, ids=lambda s: s.name)
-    def test_declares_the_files_it_creates(self, step):
-        assert callable(step.artifacts)
-
     def test_a_step_with_no_inverse_declaration_is_refused(self):
         with pytest.raises(TypeError, match="inverse"):
             ReleaseStep(
@@ -137,7 +130,6 @@ class TestEveryStepDecides:
                 perform=DirectlyIssued(performer="rlsbl.utils:run"),
                 inverse=None,
                 probe=NoLocalProbe("n/a"),
-                artifacts=no_artifacts,
             )
 
     def test_a_step_with_no_probe_declaration_is_refused(self):
@@ -148,7 +140,6 @@ class TestEveryStepDecides:
                 perform=DirectlyIssued(performer="rlsbl.utils:run"),
                 inverse=NoInverse("n/a"),
                 probe=None,
-                artifacts=no_artifacts,
             )
 
     def test_a_step_with_a_bare_callable_inverse_is_refused(self):
@@ -162,7 +153,6 @@ class TestEveryStepDecides:
                 perform=DirectlyIssued(performer="rlsbl.utils:run"),
                 inverse=lambda ctx: None,
                 probe=NoLocalProbe("n/a"),
-                artifacts=no_artifacts,
             )
 
     def test_an_unknown_phase_is_refused(self):
@@ -173,7 +163,6 @@ class TestEveryStepDecides:
                 perform=DirectlyIssued(performer="rlsbl.utils:run"),
                 inverse=NoInverse("n/a"),
                 probe=NoLocalProbe("n/a"),
-                artifacts=no_artifacts,
             )
 
     def test_a_plan_issued_step_names_its_kinds(self):
@@ -451,13 +440,13 @@ class TestForwardThenInverse:
 class TestInversePreconditions:
     """An inverse refuses rather than guessing when its precondition fails."""
 
-    def test_reset_refuses_without_a_recorded_pin(self, tmp_path):
+    def test_take_back_refuses_without_a_recorded_pin(self, tmp_path):
         repo = _make_project(tmp_path)
         ctx = _context(repo, pin=None)
         with pytest.raises(StepInverseError, match="did not record"):
             STEPS_BY_NAME["COMMITTED"].inverse.undo(ctx)
 
-    def test_reset_refuses_a_pin_that_is_not_an_ancestor(self, tmp_path):
+    def test_take_back_refuses_a_pin_that_is_not_an_ancestor(self, tmp_path):
         repo = _make_project(tmp_path)
         other = tmp_path / "other"
         init_repo(other)
@@ -465,11 +454,27 @@ class TestInversePreconditions:
         git(other, "add", "f.txt")
         git(other, "-c", "commit.gpgsign=false", "commit", "-q", "-m", "unrelated")
         foreign = git(other, "rev-parse", "HEAD")
-        # A SHA this repository does not contain: resetting to it would be a
+        # A SHA this repository does not contain: moving the branch to it would be a
         # guess about a branch that moved outside the release.
         ctx = _context(repo, pin=foreign)
         with pytest.raises(StepInverseError):
             STEPS_BY_NAME["COMMITTED"].inverse.undo(ctx)
+
+    def test_take_back_leaves_an_edited_file_and_the_branch_alone(self, tmp_path):
+        """The commit inverse never overwrites an uncommitted edit: a file the
+        release commit changed and someone edited since stops it, and nothing
+        is written -- neither the branch nor any file."""
+        repo = _make_project(tmp_path)
+        ctx = _context(repo, pin=git(repo, "rev-parse", "HEAD"))
+        _forward_committed(repo, ctx)
+        release_commit = git(repo, "rev-parse", "HEAD")
+        (repo / "pyproject.toml").write_text("edited since\n", encoding="utf-8")
+        (repo / "README.md").write_text("unrelated edit\n", encoding="utf-8")
+        with pytest.raises(StepInverseError, match="pyproject.toml"):
+            STEPS_BY_NAME["COMMITTED"].inverse.undo(ctx)
+        assert git(repo, "rev-parse", "HEAD") == release_commit
+        assert (repo / "pyproject.toml").read_text() == "edited since\n"
+        assert (repo / "README.md").read_text() == "unrelated edit\n"
 
     def test_version_inverse_refuses_without_a_previous_version(self, tmp_path):
         repo = _make_project(tmp_path)
@@ -517,39 +522,6 @@ class TestProbesAreLocal:
         repo = _make_project(tmp_path)
         ctx = _context(repo, pin=git(repo, "rev-parse", "HEAD"), tag="v1.1.0")
         assert isinstance(step.probe.observe(ctx), ArtifactState)
-
-
-# ---------------------------------------------------------------------------
-# The rollback sweep reads the table
-# ---------------------------------------------------------------------------
-
-
-class TestRollbackReadsTheTable:
-    """The pre-push orphan sweep is the table's artifact declarations."""
-
-    def test_candidates_are_the_declared_artifacts(self, tmp_path):
-        repo = _make_project(tmp_path)
-        ctx = _context(repo)
-        declared = rollback_artifacts(ctx)
-        assert declared == (
-            os.path.join(ctx.changes_dir, "1.1.0.jsonl"),
-            os.path.join(ctx.changes_dir, "1.1.0.md"),
-            os.path.join(ctx.releases_dir, "v1.1.0.toml"),
-            os.path.join(ctx.releases_dir, "v1.1.0.md"),
-        )
-
-    def test_sweep_removes_every_declared_orphan(self, tmp_path):
-        repo = _make_project(tmp_path)
-        ctx = _context(repo)
-        for path in rollback_artifacts(ctx):
-            with open(path, "w", encoding="utf-8") as f:
-                f.write("orphan\n")
-        _cleanup_release_artifacts(
-            str(repo), "1.1.0",
-            changes_dir=ctx.changes_dir, releases_dir=ctx.releases_dir,
-        )
-        for path in rollback_artifacts(ctx):
-            assert not os.path.exists(path), f"{path} was left behind"
 
 
 class TestSnapshotProbe:

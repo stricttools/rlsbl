@@ -72,9 +72,7 @@ class TestPreReleaseHookOutput:
     @patch("rlsbl.utils.local_tag_state", new=tag_state_present)
     @patch("rlsbl.commands.release.tag_exists_locally", side_effect=[False])
     @patch("rlsbl.commands.release.run")
-    @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -87,9 +85,7 @@ class TestPreReleaseHookOutput:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
-        _commit_files,
         mock_run,
         _tag_local,
         _run_gh,
@@ -132,7 +128,7 @@ class TestPreReleaseHookOutput:
 
         result = app.test([
             "--dry-run", "release", "run",
-            "--no-watch", "--allow-dirty",
+            "--no-watch",
         ])
 
         assert not sentinel.exists(), (
@@ -150,7 +146,6 @@ class TestPreReleaseHookOutput:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -165,7 +160,6 @@ class TestPreReleaseHookOutput:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,
@@ -222,7 +216,6 @@ class TestPreReleaseHookOutput:
             patch("rlsbl.commands.release.run") as mock_run,
             patch("rlsbl.commands.release.commit_files", return_value=True),
             patch("rlsbl.commands.release.get_current_branch", return_value="main"),
-            patch("rlsbl.commands.release.is_clean_tree", return_value=True),
             patch("rlsbl.commands.release.check_gh_auth", return_value=True),
             patch("rlsbl.commands.release.check_gh_installed", return_value=True),
             patch("rlsbl.commands.release.generate_changelog"),
@@ -259,7 +252,6 @@ class TestPostReleaseHookOutput:
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -274,7 +266,6 @@ class TestPostReleaseHookOutput:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         _push,
@@ -359,7 +350,6 @@ class TestWatchSHABeforePostHook:
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -374,7 +364,6 @@ class TestWatchSHABeforePostHook:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         _push,
@@ -489,7 +478,6 @@ class TestHookTimeout:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -504,7 +492,6 @@ class TestHookTimeout:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,
@@ -546,7 +533,6 @@ class TestHookCwdStandalone:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -559,7 +545,6 @@ class TestHookCwdStandalone:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,
@@ -600,7 +585,6 @@ class TestHookCwdStandalone:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -613,7 +597,6 @@ class TestHookCwdStandalone:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,
@@ -651,7 +634,6 @@ class TestHookCwdStandalone:
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -666,7 +648,6 @@ class TestHookCwdStandalone:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         _push,
@@ -742,7 +723,6 @@ class TestHookCwdMonorepo:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -755,7 +735,6 @@ class TestHookCwdMonorepo:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,
@@ -817,7 +796,6 @@ class TestHookCwdMonorepo:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -830,7 +808,6 @@ class TestHookCwdMonorepo:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         mock_run,
@@ -886,7 +863,6 @@ class TestHookCwdMonorepo:
     @patch("rlsbl.commands.release.push_if_needed")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -901,7 +877,6 @@ class TestHookCwdMonorepo:
         _gen_cl,
         _gh_inst,
         _gh_auth,
-        _clean,
         _branch,
         _commit_files,
         _push,

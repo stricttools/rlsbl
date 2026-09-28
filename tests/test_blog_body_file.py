@@ -6,7 +6,6 @@ import stat
 import pytest
 
 from rlsbl.commands.release import (
-    _cleanup_release_artifacts,
     archive_blog_body,
     validate_blog_body,
     ReleaseValidationError,
@@ -121,64 +120,6 @@ class TestBlogBodyArchival:
         result = archive_blog_body(str(releases_dir), "2.0.0")
 
         assert result is None, "no blog body path when the file does not exist"
-
-
-class TestBlogBodyCleanup:
-    """Tests for blog body file cleanup during rollback."""
-
-    def test_cleanup_removes_archived_body(self, tmp_path):
-        """v{version}.md in releases/ is removed during cleanup."""
-        releases_dir = tmp_path / ".rlsbl" / "releases"
-        changes_dir = tmp_path / ".rlsbl" / "changes"
-        releases_dir.mkdir(parents=True, exist_ok=True)
-        changes_dir.mkdir(parents=True)
-
-        version = "1.2.3"
-        body_file = releases_dir / f"v{version}.md"
-        body_file.write_text("Blog content.\n")
-        body_file.chmod(0o444)
-
-        assert body_file.exists()
-        _cleanup_release_artifacts(str(tmp_path), version)
-        assert not body_file.exists(), "archived blog body should be removed during cleanup"
-
-    def test_cleanup_tolerates_missing_body(self, tmp_path):
-        """Cleanup does not crash when blog body archive is missing."""
-        releases_dir = tmp_path / ".rlsbl" / "releases"
-        changes_dir = tmp_path / ".rlsbl" / "changes"
-        releases_dir.mkdir(parents=True, exist_ok=True)
-        changes_dir.mkdir(parents=True)
-
-        _cleanup_release_artifacts(str(tmp_path), "1.2.3")
-        # No error raised
-
-    def test_cleanup_removes_body_alongside_other_artifacts(self, tmp_path):
-        """All four artifact files are removed together."""
-        changes_dir = tmp_path / ".rlsbl" / "changes"
-        releases_dir = tmp_path / ".rlsbl" / "releases"
-        changes_dir.mkdir(parents=True)
-        releases_dir.mkdir(parents=True, exist_ok=True)
-
-        version = "3.0.0"
-        jsonl = changes_dir / f"{version}.jsonl"
-        md = changes_dir / f"{version}.md"
-        toml = releases_dir / f"v{version}.toml"
-        body = releases_dir / f"v{version}.md"
-
-        jsonl.write_text('{"commits":["abc"],"user_facing":false}\n')
-        jsonl.chmod(0o444)
-        md.write_text("## 3.0.0\n\n- stuff\n")
-        toml.write_text('bump = "major"\n')
-        toml.chmod(0o444)
-        body.write_text("Blog body.\n")
-        body.chmod(0o444)
-
-        _cleanup_release_artifacts(str(tmp_path), version)
-
-        assert not jsonl.exists()
-        assert not md.exists()
-        assert not toml.exists()
-        assert not body.exists()
 
 
 class TestBlogBodyUnfinalize:

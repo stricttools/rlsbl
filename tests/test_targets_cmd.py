@@ -131,7 +131,6 @@ class TestMultiTargetRelease:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -145,7 +144,7 @@ class TestMultiTargetRelease:
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     def test_secondary_targets_called_when_detected(
-        self, _run_checks, _vrt, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _tag_local, _tag_remote, _run_gh, _push, _remote_exists, monkeypatch
+        self, _run_checks, _vrt, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _branch, _commit_files, mock_run, _tag_local, _tag_remote, _run_gh, _push, _remote_exists, monkeypatch
     ):
         """When a secondary target (spec) is detected, its build is called."""
         # Create version.json so spec target is detected
@@ -178,7 +177,6 @@ class TestMultiTargetRelease:
     @patch("rlsbl.commands.release.run")
     @patch("rlsbl.commands.release.commit_files", return_value=True)
     @patch("rlsbl.commands.release.get_current_branch", return_value="main")
-    @patch("rlsbl.commands.release.is_clean_tree", return_value=True)
     @patch("rlsbl.commands.release.check_gh_auth", return_value=True)
     @patch("rlsbl.commands.release.check_gh_installed", return_value=True)
     @patch("rlsbl.commands.release.generate_changelog")
@@ -192,7 +190,7 @@ class TestMultiTargetRelease:
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     @patch("rlsbl.app.run_checks", return_value=([], [], 0))
     def test_secondary_target_failure_aborts_release(
-        self, _run_checks, _vrt, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _clean, _branch, _commit_files, mock_run, _tag_local, _run_gh, _push, _remote_exists, monkeypatch
+        self, _run_checks, _vrt, _selfdoc_gen, _selfdoc_check, _changes_dir, _extract, _finalize, _gen_ver_file, _validate, _gen_cl, _gh_inst, _gh_auth, _branch, _commit_files, mock_run, _tag_local, _run_gh, _push, _remote_exists, monkeypatch
     ):
         """If a secondary target's build raises, release aborts with rollback."""
         # Create version.json so spec target is detected

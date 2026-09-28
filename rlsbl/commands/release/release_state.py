@@ -103,10 +103,17 @@ def get_state_path(project_dir: str, *, releasable_dir: str | None = None) -> st
     This is the ONLY function that may derive the state file location.
     Pass ``releasable_dir`` (from :func:`resolve_releasable_dir` or an
     already-resolved releasable config dir) for releasable releases.
+
+    The state file is the operator's, not the commit's: it is never committed,
+    and ``rlsbl release run``, ``resume``, ``abandon`` and ``status`` all read
+    it in the working tree. Asked from inside the release checkout, the path
+    is therefore the working tree's.
     """
-    return os.path.join(
+    from ...release_checkout import live_path
+
+    return live_path(os.path.join(
         get_state_dir(project_dir, releasable_dir=releasable_dir), STATE_FILENAME,
-    )
+    ))
 
 
 def get_scrub_result_path(project_dir: str, *, releasable_dir: str | None = None) -> str:
@@ -322,8 +329,9 @@ def clear_release_state(state_path: str) -> None:
     """Delete the state file and its parent dir if empty (no-op if already absent).
 
     This is an unconditional removal — used by the success epilogue (after
-    :func:`is_state_complete` verification), rollback paths (state is
-    useless after a local rollback), and PR-mode handoff (only the local
+    :func:`is_state_complete` verification), the discard of an attempt that
+    failed before its candidate push (nothing of it is on the branch), and
+    PR-mode handoff (only the local
     mutating phase is tracked; publishing happens in CI).
     """
     try:
@@ -331,8 +339,8 @@ def clear_release_state(state_path: str) -> None:
     except FileNotFoundError:
         pass
     # Remove parent directory if it's now empty (best-effort).
-    # The state file may have created .rlsbl/releases/ which would be
-    # left as an untracked directory after git reset --hard.
+    # The state file may have created .rlsbl/releases/, which would
+    # otherwise be left behind as an empty untracked directory.
     try:
         parent = os.path.dirname(state_path)
         if parent and os.path.isdir(parent) and not os.listdir(parent):

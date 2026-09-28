@@ -20,7 +20,7 @@ from ...release_file import (
     get_batch_release_file_path,
     read_batch_release_file,
 )
-from ...errors import ConfigError, GitError, ReleaseFileError
+from ...errors import ConfigError, GitError, ReleaseFileError, RlsblError
 from ...lock import rlsbl_lock
 from ...utils import commit_files, run, working_tree_paths
 from ...workspace import find_workspace_root, load_workspace
@@ -51,7 +51,6 @@ from ..release.validate import (
     _run_selfdoc_gen,
     _run_selfdoc_check,
     validate_branch_and_remote,
-    validate_clean_tree,
     validate_gh_cli,
     validate_gh_push_access,
 )
@@ -101,12 +100,30 @@ def _run_root_selfdoc(flags, workspace_root, log):
         log("Committed root-level selfdoc-generated files")
 
 
+_BATCH_RERUN = "re-run `rlsbl monorepo release run`"
+
+
+def _advance_branch():
+    """Bring the live branch up to the release checkout's HEAD, if it lags.
+
+    The batch's own commits (the resolved plan, the root docs, the archive of
+    the batch file) are made in the release checkout like every member's; this
+    is how they reach the branch -- by the compare-and-swap advance of
+    :mod:`rlsbl.release_checkout`. A no-op outside a release checkout.
+    """
+    from ... import release_checkout
+
+    if release_checkout.active() is not None:
+        release_checkout.advance_live_branch(
+            "HEAD", rerun=_BATCH_RERUN, what="The batch release",
+        )
+
+
 def _batch_release_flags(flags, **extra):
     """Per-item release flags for the batch loop."""
     release_flags = {
         "dry-run": flags.get("dry-run", False),
         "quiet": flags.get("quiet", False),
-        "allow-dirty": flags.get("allow-dirty", False),
         "skip-lock": True,
         "batch-mode": True,
         # The branch the orchestrator already resolved and validated.
@@ -347,6 +364,7 @@ def _publish_batch_candidate(workspace_root, pending, flags, log, *,
             log=log,
         )
 
+    _advance_branch()
     push_if_needed(branch, config=push_config, cwd=workspace_root, sha=sha)
     log(
         f"Pushed the batch release candidate {sha[:12]} to origin/{branch} "
@@ -543,8 +561,49 @@ def _releasable_release_order(batch_names, releasables, projects, graph):
     return sorted(batch_names, key=lambda n: releasable_positions.get(n, 0))
 
 
+def release_batch(flags, project_root):
+    """``rlsbl monorepo release run``: the batch, run in the release checkout.
+
+    The whole batch runs in the release checkout (see
+    :mod:`rlsbl.release_checkout`), entered once for all of its members: the
+    orchestrator's own commits (the resolved plan, the root docs, the batch
+    file's archive) and every member's are made there and reach the branch
+    through its compare-and-swap advance. An uncommitted change to a path the
+    batch writes refuses it before anything runs; every other one is listed
+    and left alone.
+    """
+    from pathlib import Path
+
+    from ...context import create_context
+    from ..release.in_checkout import run_in_release_checkout, workspace_scope
+
+    workspace_root = find_workspace_root(str(project_root))
+    if workspace_root is None:
+        _cmd_batch_release(flags, project_root)
+        return
+    ws = Path(workspace_root)
+    try:
+        run_in_release_checkout(
+            create_context(ws, workspace_root=ws), flags,
+            lambda run_ctx, run_flags: _cmd_batch_release(
+                run_flags, run_ctx.workspace_root,
+            ),
+            scope=workspace_scope(workspace_root),
+            rerun="re-run `rlsbl monorepo release run`",
+            lock_dir=".rlsbl-monorepo", lock_root=workspace_root,
+            log=print if not flags.get("quiet") else (lambda _m: None),
+        )
+    except (ReleaseValidationError, RlsblError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 def _cmd_batch_release(flags, project_root):
-    """Execute a batch release of multiple monorepo packages or releasables."""
+    """Execute a batch release of multiple monorepo packages or releasables.
+
+    Runs in the tree *project_root* names; ``rlsbl monorepo release run``
+    hands it the release checkout (:func:`release_batch`).
+    """
     start = str(project_root)
     workspace_root = find_workspace_root(start)
     if workspace_root is None:
@@ -620,7 +679,6 @@ def _cmd_batch_release(flags, project_root):
     try:
         validate_gh_cli()
         validate_gh_push_access()
-        validate_clean_tree(flags)
         # Resolved ONCE, here, before anything the batch does is recorded or
         # performed. The branch is fixed for the whole run, and each member's
         # release would otherwise re-read it -- which under a preview happens
@@ -952,6 +1010,10 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
             _archive_batch_if_complete(
                 batch_path, plan, workspace_root, log, flags=flags,
             )
+            # Whatever the batch committed and nothing has pushed (the root
+            # docs when no member released, say) joins the branch unpushed,
+            # where it would have been made before the checkout.
+            _advance_branch()
 
     # Log completion BEFORE the watch tail: the tail exits the process on a
     # red CI or a missing artifact, and would skip the announcement.
@@ -1007,6 +1069,7 @@ def _abort_on_completed_plan(plan, plan_path, batch_path, workspace_root):
             cwd=workspace_root,
             expected_root=workspace_root,
         )
+        _advance_branch()
     print(
         f"\nError: {plan_rel} is a completed plan -- every item it names is "
         f"already released, so this run had nothing to do.\n"
@@ -1283,6 +1346,7 @@ def _push_finalized_batch_file(workspace_root, flags, log, *, pin_sha):
         {"push_timeout": flags["push-timeout"]}
         if flags.get("push-timeout") else None
     )
+    _advance_branch()
     push_if_needed(
         branch, config=push_config, cwd=workspace_root, sha=finalize_sha,
     )

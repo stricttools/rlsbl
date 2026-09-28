@@ -42,7 +42,6 @@ from ...utils import (
     get_hook_timeout,
     get_push_timeout,
     has_staged_or_modified,
-    is_clean_tree,
     push_if_needed,
     remote_branch_exists,
     remote_tag_commit,
@@ -105,7 +104,6 @@ from .execute import (
     require_adopted_commits_covered,
     ReleaseAbortError,
     ReleaseCIError,
-    RollbackClobberError,
     ReleaseState,
     resolve_target_paths,
     resolve_release_targets,
@@ -219,6 +217,72 @@ def run_cmd(release_config: "ReleaseConfig", flags: dict | None = None, *,
             print(f"Command error: {e.stderr.strip()}", file=sys.stderr)
         print(f"Error: push failed ({e})", file=sys.stderr)
         sys.exit(1)
+
+
+def _exit_on_entry_error(fn):
+    """Run *fn*, turning an expected failure to enter the checkout into exit 1.
+
+    The release's own failures are handled inside ``run_cmd``/``resume_cmd``;
+    this covers the refusals raised before either starts (the dirty-tree
+    refusal, a checkout that cannot be prepared, a detached HEAD).
+    """
+    try:
+        return fn()
+    except (ReleaseValidationError, RlsblError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def run_release(release_config, release_path, flags, *, ctx):
+    """``rlsbl release run``: the release, run in the release checkout.
+
+    *release_config* is the release file as the working tree holds it, read
+    by the command for its error reporting; in the checkout the COMMITTED file
+    at *release_path* (absolute, in the working tree) is what the release
+    reads. The two agree, because an uncommitted release file is inside the
+    paths the release writes and refuses the release before it starts.
+    """
+    from ... import release_checkout
+    from ...release_file import read_release_file
+    from .in_checkout import project_scope, run_in_release_checkout
+
+    def body(run_ctx, run_flags):
+        config = release_config
+        co = release_checkout.active()
+        if co is not None:
+            committed = co.to_checkout(release_path)
+            if not os.path.exists(committed):
+                raise ReleaseValidationError(
+                    f"{os.path.relpath(release_path, co.live_root)} is not "
+                    f"committed, and a release runs from what is committed. "
+                    f"Commit it and re-run `rlsbl release run`."
+                )
+            config = read_release_file(committed)
+        run_cmd(config, run_flags, ctx=run_ctx)
+
+    _exit_on_entry_error(lambda: run_in_release_checkout(
+        ctx, flags, body,
+        scope=project_scope(ctx.project_root, ctx.workspace_root),
+        rerun="re-run `rlsbl release run`",
+        lock_dir=".rlsbl-monorepo" if ctx.workspace_root else ".rlsbl",
+        lock_root=ctx.workspace_root or ctx.project_root,
+        log=print if not flags.get("quiet") else (lambda _m: None),
+    ))
+
+
+def resume_release(saved_state, flags, *, ctx):
+    """``rlsbl release resume``: the resume, run in the release checkout."""
+    from .in_checkout import project_scope, run_in_release_checkout
+
+    _exit_on_entry_error(lambda: run_in_release_checkout(
+        ctx, flags,
+        lambda run_ctx, run_flags: resume_cmd(saved_state, run_flags, ctx=run_ctx),
+        scope=project_scope(ctx.project_root, ctx.workspace_root),
+        rerun="run `rlsbl release resume`",
+        lock_dir=".rlsbl-monorepo" if ctx.workspace_root else ".rlsbl",
+        lock_root=ctx.workspace_root or ctx.project_root,
+        log=print if not flags.get("quiet") else (lambda _m: None),
+    ))
 
 
 def resume_cmd(saved_state: dict, flags: dict | None = None, *, ctx):
@@ -522,7 +586,6 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
             commit_msg=commit_msg,
             description=description,
             context=context,
-            pre_existing_dirty=set(),
             hook_generated=set(),
             pin_sha=_pin_sha,
             resuming=True,
@@ -724,8 +787,10 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # mode. A standalone repo validates the single representative.
     # (Moved below, after member_package_paths is known.)
 
-    # In batch mode the batch orchestrator already validated gh CLI,
-    # clean tree, and branch/remote upfront -- skip redundant checks.
+    # In batch mode the batch orchestrator already validated gh CLI and
+    # branch/remote upfront -- skip redundant checks. Which uncommitted
+    # changes may stand is decided once, before the release enters the
+    # release checkout (see in_checkout.run_in_release_checkout).
     # Batch mode does not support release-from-dev (the orchestrator
     # always runs from the release branch).
     # Managed-repo hygiene, ahead of the batch-mode split so a batch member
@@ -734,7 +799,6 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     validate_no_stash(str(project_root))
 
     if flags.get("batch-mode", False):
-        pre_existing_dirty = set()
         # The orchestrator resolved and validated the branch once, before the
         # first member ran; re-reading it per member is both redundant and
         # unanswerable under a preview (an observe after a recorded mutation).
@@ -744,7 +808,6 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     else:
         validate_gh_cli()
         validate_gh_push_access(config)
-        pre_existing_dirty = validate_clean_tree(flags)
         branch = str(validate_branch_and_remote(flags, config=config, cwd=str(project_root)))
 
     # --- Resolve context ---
@@ -1391,7 +1454,6 @@ def _run_cmd_inner(release_config, flags, *, ctx):
             commit_msg=commit_msg,
             description=release_config.description,
             context=release_config.context,
-            pre_existing_dirty=pre_existing_dirty,
             hook_generated=hook_generated,
             pin_sha=_pin_sha,
             git_root=_git_root,
@@ -1416,6 +1478,11 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     if flutter_targets:
         mode = release_config.targets.get(flutter_targets[0], {}).get("mode")
         if mode == "build":
-            update_last_build_release(project_dir, new_version)
+            # Recorded in the working tree's config, uncommitted, as it always
+            # was: the release checkout is reset by the next release.
+            from ... import release_checkout as _release_checkout
+            update_last_build_release(
+                _release_checkout.live_path(project_dir), new_version,
+            )
 
 

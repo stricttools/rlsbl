@@ -14,7 +14,7 @@ from .commands import (
 # Re-exported from constraints module for backward compatibility.
 from ...constraints import _evaluate_constraint, _parse_version_tuple  # noqa: F401
 
-from .batch_release import _cmd_batch_release
+from .batch_release import _cmd_batch_release, release_batch
 from .batch_release_init import _cmd_batch_release_init
 
 from .graph import _cmd_graph
@@ -61,6 +61,7 @@ __all__ = [
     "_cmd_release_order",
     "_cmd_check_names",
     "_cmd_batch_release",
+    "release_batch",
     "_cmd_batch_release_init",
     "_cmd_graph",
     "_cmd_impact",

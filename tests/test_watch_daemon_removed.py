@@ -37,11 +37,11 @@ class TestDaemonFlagsRejected:
     """Every removed flag must be an unknown-flag parse error."""
 
     @pytest.mark.parametrize("argv", [
-        ["release", "run", "--no-allow-dirty", "--watch-async"],
-        ["release", "run", "--no-allow-dirty", "--no-watch-async"],
+        ["release", "run", "--watch-async"],
+        ["release", "run", "--no-watch-async"],
         ["release", "resume", "--watch-async"],
         ["release", "retry", "--watch-async"],
-        ["monorepo", "release", "run", "--no-allow-dirty", "--watch-async"],
+        ["monorepo", "release", "run", "--watch-async"],
         ["watch", "--stop"],
         ["watch", "--as-daemon-child"],
     ])
@@ -105,7 +105,7 @@ class TestWatchModuleSurface:
     def test_build_release_flags_has_no_watch_async(self):
         params = inspect.signature(build_release_flags).parameters
         assert "watch_async" not in params
-        flags = build_release_flags(False, False, False, watch=True)
+        flags = build_release_flags(False, False, watch=True)
         assert "watch-async" not in flags
         assert flags["watch"] is True
 

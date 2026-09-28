@@ -582,11 +582,11 @@ class TestPreviewCannotPush:
 
 
 # ---------------------------------------------------------------------------
-# 5. Rollback is an executor concern, never a plan step
+# 5. Undo is an executor concern, never a plan step
 # ---------------------------------------------------------------------------
 
 
-class TestRollbackIsNotAPlanStep:
+class TestUndoIsNotAPlanStep:
 
     def test_no_step_kind_undoes_anything(self):
         kinds = {
@@ -598,10 +598,11 @@ class TestRollbackIsNotAPlanStep:
             if any(word in k for word in ("rollback", "revert", "reset", "undo"))
         ]
         assert not forbidden, (
-            f"Phase A declares undo steps {forbidden}. Rollback belongs to the "
-            "executor's caller -- reset to the pre-release pin plus orphan "
-            "cleanup -- so that a failure at any step unwinds the same way, "
-            "and so a preview (which executes nothing) needs none."
+            f"Phase A declares undo steps {forbidden}. Undo belongs to the "
+            "executor's caller -- discarding the attempt, which ran in the "
+            "release checkout, and taking back a refused candidate push's "
+            "branch advance -- so that a failure at any step unwinds the same "
+            "way, and so a preview (which executes nothing) needs none."
         )
 
     def test_the_executor_never_resets(self):

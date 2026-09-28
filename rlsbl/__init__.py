@@ -724,17 +724,16 @@ release_group = app.group("release", help="Release orchestration commands coveri
     # publish. Shipping this project's next version to the public is the
     # operator's call, never an agent's.
     consequential=True,
-    help="Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or infra) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. Supports dry-run preview, --approve-consequential to skip the confirmation prompt in non-interactive contexts, and --allow-dirty to skip the clean working tree check.",
+    help="Bump version, validate the JSONL changelog, run tests and lint, commit, tag, push, and create a GitHub Release. Reads the bump type (patch, minor, major, or infra) and target selection from .rlsbl/releases/unreleased.toml, which can be scaffolded with rlsbl release init. The release runs in the release checkout, a detached checkout of the release branch's committed tip under the repository's git directory: producers, tests, hooks, the version bump and the release commit all happen there, the branch advances only from the commit the release started at, and only the files the release's own commits change are written into the working tree. An uncommitted change to one of those files refuses the release, naming it; every other uncommitted change is listed and left alone. Supports dry-run preview, which reports those changes instead of refusing, and --approve-consequential to skip the confirmation prompt in non-interactive contexts.",
 )
 @strictcli.flag(name="push-timeout", type=int, presence="optional", help="Timeout in seconds for each git push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default.")
 @strictcli.flag(name="ci-timeout", type=int, presence="optional", help="Timeout in seconds for the release CI gate (the wait for CI to conclude on the pushed release candidate). Overrides the ci_timeout config key; when omitted, ci_timeout applies, else the shipped default.")
 @strictcli.flag(name="check-timeout", type=int, presence="optional", help="Timeout in seconds for each preflight check subprocess (tests, lint, external checks). Overrides the check_timeout config key; when omitted, check_timeout applies, else the shipped default.")
 @strictcli.flag(name="hook-timeout", type=int, presence="optional", help="Timeout in seconds for each release hook. Overrides the hook_timeout config key; when omitted, hook_timeout applies, else no timeout.")
 @strictcli.flag(name="watch", type=bool, presence="required", help="After release, automatically watch CI runs to completion (--no-watch to skip)")
-@strictcli.flag(name="allow-dirty", type=bool, presence="required", help="Skip the clean working tree check and allow releasing with uncommitted changes")
 @strictcli.flag(name="releasable", type=str, presence="optional", help="Which releasable to release. Required when running at a monorepo workspace root, where the directory names the whole workspace rather than one releasable; rejected anywhere else, since the directory already names it.")
 @effects.handler
-def cmd_release_run(ctx, allow_dirty, watch, releasable, push_timeout, ci_timeout, check_timeout, hook_timeout):
+def cmd_release_run(ctx, watch, releasable, push_timeout, ci_timeout, check_timeout, hook_timeout):
     """Execute the release flow: validate, bump, test, commit, tag, push, and create GitHub Release."""
     dry_run = ctx.dry_run
     quiet = ctx.quiet
@@ -798,13 +797,13 @@ def cmd_release_run(ctx, allow_dirty, watch, releasable, push_timeout, ci_timeou
         sys.exit(1)
 
     from .commands.release.shared import build_release_flags
-    flags = build_release_flags(dry_run, quiet, allow_dirty, watch=watch,
+    flags = build_release_flags(dry_run, quiet, watch=watch,
                                 push_timeout=push_timeout,
                                 ci_timeout=ci_timeout,
                                 check_timeout=check_timeout,
                                 hook_timeout=hook_timeout)
-    from .commands.release import run_cmd
-    run_cmd(release_config, flags, ctx=ctx)
+    from .commands.release import run_release
+    run_release(release_config, os.path.abspath(release_path), flags, ctx=ctx)
 
 
 @release_group.command(
@@ -897,13 +896,13 @@ def cmd_release_resume(ctx, watch, push_timeout, ci_timeout, check_timeout, hook
         )
 
     from .commands.release.shared import build_release_flags
-    flags = build_release_flags(dry_run, quiet, allow_dirty=False, watch=watch,
+    flags = build_release_flags(dry_run, quiet, watch=watch,
                                 push_timeout=push_timeout,
                                 ci_timeout=ci_timeout,
                                 check_timeout=check_timeout,
                                 hook_timeout=hook_timeout)
-    from .commands.release import resume_cmd
-    resume_cmd(saved, flags, ctx=ctx)
+    from .commands.release import resume_release
+    resume_release(saved, flags, ctx=ctx)
 
 
 @release_group.command(
@@ -2569,28 +2568,27 @@ mono_release = mono.group("release", help="Release commands for monorepo workspa
     # `release run` once per package. Shipping this workspace's next versions
     # to the public is the operator's call, never an agent's.
     consequential=True,
-    help="Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. Supports --dry-run, --approve-consequential and --allow-dirty flags.",
+    help="Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. The whole batch runs in the release checkout, a detached checkout of the release branch's committed tip, as rlsbl release run does: an uncommitted change to a path the batch writes (the workspace's release state, a member's version files, the workspace changelog) refuses it, naming the path, and every other uncommitted change is listed and left alone. Supports --dry-run, which reports those changes instead of refusing, and --approve-consequential.",
 )
 @strictcli.flag(name="push-timeout", type=int, presence="optional", help="Timeout in seconds for each git push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default.")
 @strictcli.flag(name="ci-timeout", type=int, presence="optional", help="Timeout in seconds for the release CI gate (the wait for CI to conclude on the pushed release candidate). Overrides the ci_timeout config key; when omitted, ci_timeout applies, else the shipped default.")
 @strictcli.flag(name="check-timeout", type=int, presence="optional", help="Timeout in seconds for each preflight check subprocess (tests, lint, external checks). Overrides the check_timeout config key; when omitted, check_timeout applies, else the shipped default.")
 @strictcli.flag(name="hook-timeout", type=int, presence="optional", help="Timeout in seconds for each release hook. Overrides the hook_timeout config key; when omitted, hook_timeout applies, else no timeout.")
 @strictcli.flag(name="watch", type=bool, presence="required", help="After batch release, automatically watch CI runs to completion (--no-watch to skip)")
-@strictcli.flag(name="allow-dirty", type=bool, presence="required", help="Skip the clean working tree check and allow releasing with uncommitted changes")
 @effects.handler
-def cmd_mono_release_run(ctx, allow_dirty, watch, push_timeout, ci_timeout, check_timeout, hook_timeout):
+def cmd_mono_release_run(ctx, watch, push_timeout, ci_timeout, check_timeout, hook_timeout):
     """Execute a batch release of multiple monorepo packages in topological order."""
     dry_run = ctx.dry_run
     quiet = ctx.quiet
     from .commands.release.shared import build_release_flags
-    flags = build_release_flags(dry_run, quiet, allow_dirty, watch=watch,
+    flags = build_release_flags(dry_run, quiet, watch=watch,
                                 push_timeout=push_timeout,
                                 ci_timeout=ci_timeout,
                                 check_timeout=check_timeout,
                                 hook_timeout=hook_timeout)
     root = _require_project_root()
-    from .commands.monorepo import _cmd_batch_release
-    _cmd_batch_release(flags, project_root=root)
+    from .commands.monorepo import release_batch
+    release_batch(flags, project_root=root)
 
 
 @mono_release.command(
