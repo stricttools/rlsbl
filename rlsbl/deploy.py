@@ -267,6 +267,74 @@ def _check_health_script(config, deploy_host, user="root"):
     return False, f"Script health check failed (exit {returncode}): {stderr or stdout}"
 
 
+class DeployBranchError(Exception):
+    """A detached HEAD whose commit no allowed branch is known to carry."""
+
+
+def _git_observe(args, cwd):
+    return effects.run(["git", *args], cwd=cwd, capture_output=True,
+                       text=True, check=False)
+
+
+def head_is_detached(cwd):
+    """Is HEAD at *cwd* detached (a tag or commit checkout, not a branch)?"""
+    result = _git_observe(["symbolic-ref", "-q", "HEAD"], cwd)
+    return result.returncode != 0
+
+
+def branch_carrying_head(cwd, only_on):
+    """The first *only_on* branch whose origin history reaches detached HEAD.
+
+    The scaffolded deploy workflow starts from a published Release and checks
+    out its tag, so there is no current branch to hold against ``only_on``.
+    The equivalent question for a detached HEAD is whether the commit is on
+    an allowed branch: reachable from ``refs/remotes/origin/<branch>``. The
+    remote-tracking ref is asked, not a local branch, because origin's branch
+    is what was released from; a local branch may carry unpushed commits.
+
+    Raises :class:`DeployBranchError` naming the fix when no allowed branch
+    reaches HEAD, or when the checkout lacks the history to answer.
+    """
+    sha = _git_observe(["rev-parse", "HEAD"], cwd).stdout.strip()
+    shallow = _git_observe(
+        ["rev-parse", "--is-shallow-repository"], cwd,
+    ).stdout.strip() == "true"
+    present = []
+    for branch in only_on:
+        ref = f"refs/remotes/origin/{branch}"
+        if _git_observe(["rev-parse", "--verify", "-q", ref], cwd).returncode:
+            continue
+        present.append(branch)
+        result = _git_observe(["merge-base", "--is-ancestor", sha, ref], cwd)
+        if result.returncode == 0:
+            return branch
+    allowed = ", ".join(only_on)
+    if shallow or not present:
+        missing = [b for b in only_on if b not in present]
+        why = []
+        if missing:
+            why.append(
+                "it has no " + ", ".join(f"origin/{b}" for b in missing)
+            )
+        if shallow:
+            why.append("its history is shallow")
+        raise DeployBranchError(
+            f"HEAD is detached at {sha[:12]}, and this checkout cannot show "
+            f"whether an allowed branch ({allowed}) carries it: "
+            f"{' and '.join(why)}. In the deploy workflow, check out with "
+            f"`fetch-depth: 0` (`rlsbl scaffold` writes it; commit the "
+            f"regenerated workflow). In a local checkout, run "
+            f"`git fetch --unshallow origin {only_on[0]}` "
+            f"(`git fetch origin {only_on[0]}` if it is not shallow)."
+        )
+    raise DeployBranchError(
+        f"HEAD is detached at {sha[:12]}, which is reachable from none of the "
+        f"allowed branches ({', '.join(f'origin/{b}' for b in only_on)}). "
+        f"Deploy a release tagged on one of them, or add the branch that "
+        f"carries this commit to the target's only_on in .rlsbl/config.json."
+    )
+
+
 def deploy_target(target_config, current_branch):
     """Deploy to a single target. Returns a DeployResult."""
     name = target_config["name"]
