@@ -256,3 +256,23 @@ class TestThePreflight:
         gh.runs = [{"event": "release", "head_branch": "v1.0.1", "id": 9}]
         self._release_with_ci_pipeline(mock_git_repo, gh)
         assert gh.created == ["v1.0.1"]
+
+    def test_a_ci_pipeline_that_ships_no_publish_workflow_is_not_refused(
+        self, mock_git_repo, capsys,
+    ):
+        """Only a pipeline whose CI publish IS a scaffolded workflow needs one.
+
+        A cloudflare-pages pipeline with ``"local": false`` has no CI template:
+        rlsbl scaffolds nothing for it (its site is deployed by whatever the
+        repository wires up, Cloudflare's own git integration included), so the
+        refusal's fix, `rlsbl scaffold`, could never clear it.
+        """
+        from test_post_push_failure_state import _setup_npm_project
+
+        _setup_npm_project(mock_git_repo)
+        self.CI_PIPELINE = {"docs": {"type": "cloudflare-pages", "local": False,
+                                     "target": None}}
+        gh = FakeGitHub()
+        self._release_with_ci_pipeline(mock_git_repo, gh)
+        assert "no workflow in .github/workflows/" not in capsys.readouterr().err
+        assert gh.created == ["v1.0.1"]
