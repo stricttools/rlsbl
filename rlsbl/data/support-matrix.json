@@ -268,28 +268,6 @@
         "spec"
       ]
     },
-    "changelog-format-version": {
-      "kind": "universal",
-      "targets": [
-        "pypi",
-        "go",
-        "npm",
-        "dart",
-        "deno",
-        "hex",
-        "zig",
-        "swift",
-        "swift-apple",
-        "maven",
-        "native-android",
-        "native-ios",
-        "docker",
-        "flutter",
-        "pgdesign",
-        "plain",
-        "spec"
-      ]
-    },
     "changelog-format-version-gate": {
       "kind": "universal",
       "targets": [
