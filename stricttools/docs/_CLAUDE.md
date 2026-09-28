@@ -17,7 +17,11 @@ This project uses [rlsbl](https://github.com/stricttools/rlsbl) for release orch
 
 - Run `rlsbl release init` to scaffold `.rlsbl/releases/unreleased.toml`
 - Edit the release file: set bump type (patch/minor/major), include/exclude targets
-- Run `rlsbl release run --no-allow-dirty --watch --approve-consequential` to execute the release
+- Run `rlsbl release run --watch --approve-consequential` to execute the release. It runs in
+  the release checkout (`.git/rlsbl/release-checkout`), a detached checkout of the branch
+  tip: an uncommitted change to a path the release writes refuses it by name, every other
+  uncommitted change is listed and left alone, and the branch advances only by
+  compare-and-swap from where the release started
 - CI handles publishing automatically via the publish workflow
 - Never publish manually -- always use `rlsbl release run`
 - Use `rlsbl release run --dry-run` to preview without making changes
@@ -28,7 +32,7 @@ This project uses [rlsbl](https://github.com/stricttools/rlsbl) for release orch
   declares itself `consequential`, and `--approve-consequential` skips that prompt. A few
   commands refuse `--dry-run` outright with a reason (`commit`, `release init`,
   `monorepo init`, `monorepo remove`, `monorepo release init`).
-- Release-specific required flags: `--allow-dirty`/`--no-allow-dirty`, `--watch`/`--no-watch` (no defaults -- must choose explicitly)
+- Release-specific required flag: `--watch`/`--no-watch` (no default -- must choose explicitly)
 - Every flag and positional argument declares its presence: `required`, `optional`, or a
   `default` value. On a `mutating` command a value default is a registration-time hard
   error -- absence must never resolve to a value the invocation did not state -- so
@@ -79,7 +83,9 @@ rlsbl's:
 
 ## Release pipeline order
 
-During `rlsbl release run`, the validation and build steps run in this order:
+During `rlsbl release run`, the validation and build steps run in this order, all of them
+in the release checkout (a detached checkout of the committed branch tip), never in the
+working tree:
 
 1. Pre-checks hook (`.rlsbl/hooks/pre-checks.sh`)
 2. Strictcli schema dump (`--dump-schema`, for projects using strictcli)

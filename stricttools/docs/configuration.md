@@ -417,7 +417,6 @@ Some CLI flags override config.json keys for a single invocation, providing temp
 | Flag | Config key | Scope | Effect |
 | --- | --- | --- | --- |
 | `--no-tag` | `tag` | project + user | Disables ecosystem tagging for this invocation |
-| `--allow-dirty` | (none) | release only | Skips clean working tree check |
 | `--watch`/`--no-watch` | (none) | release only | Controls CI monitoring after push |
 | `--push-timeout` | `push_timeout` | release only | Push timeout in seconds for this invocation (omit it and the config key applies, else the shipped 300s) |
 | `--ci-timeout` | `ci_timeout` | release only | CI-gate timeout in seconds for this invocation (omit it and the config key applies, else the shipped 3600s) |

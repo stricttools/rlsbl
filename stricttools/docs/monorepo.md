@@ -607,7 +607,7 @@ rlsbl monorepo release init
 #   description = "Update CLI to use new async core API"
 
 # Release in dependency order (core first, then cli)
-rlsbl monorepo release run --no-allow-dirty --watch --approve-consequential
+rlsbl monorepo release run --watch --approve-consequential
 #   Release order: core, cli
 #   Releasing core 0.1.0 -> 0.2.0 ...
 #     Validating ... OK
