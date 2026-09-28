@@ -353,16 +353,32 @@ def _scheme_tags(tag_glob: str | None, cwd: str | None, *,
 
 
 def _unbackfilled_release_record_error(releases_dir: str, tag_glob: str | None,
-                               tags: list[str]) -> ReleaseRecordError:
+                               tags: list[str], *,
+                               upstream=None) -> ReleaseRecordError:
     """Build the EMPTY-RELEASE RECORD error for a repository that has clearly released.
 
     The remedy is the whole-repository backfill rather than the single-version
     recovery the missing-release-commit error prints: there is no archive to edit here,
     and the versions to materialize are however many the repository shipped.
+
+    In a fork (*upstream* is its :class:`rlsbl.upstream.Upstream`), the tags
+    may be upstream's releases, which a backfill would adopt as this
+    repository's own; the error names ``rlsbl upstream adopt-tags`` first.
     """
     glob = tag_glob or "v*"
     evidence = ", ".join(tags[:_TAG_EVIDENCE])
     more = " (and others)" if len(tags) > _TAG_EVIDENCE else ""
+    fork = ""
+    if upstream is not None:
+        fork = (
+            f"  This repository is a fork of {upstream.url}: tags it inherited\n"
+            f"  from upstream are upstream's releases, not its own, and a backfill\n"
+            f"  would record them as this repository's. Move them out of refs/tags\n"
+            f"  first -- preview, then apply:\n"
+            f"    rlsbl upstream adopt-tags --dry-run\n"
+            f"    rlsbl upstream adopt-tags --approve-consequential\n"
+            f"  and backfill only if tags remain after that.\n"
+        )
     return ReleaseRecordError(
         f"the release record is empty, but this repository has version tags: "
         f"{releases_dir}\n"
@@ -374,6 +390,7 @@ def _unbackfilled_release_record_error(releases_dir: str, tag_glob: str | None,
         f"  Answering from an empty release record here would report this repository's\n"
         f"  ENTIRE history as unreleased and silently widen every range computed\n"
         f"  from it, so rlsbl refuses instead of answering.\n"
+        f"{fork}"
         f"  Backfill the archives -- preview first, then write:\n"
         f"    rlsbl release backfill --dry-run\n"
         f"    rlsbl release backfill --approve-consequential\n"
@@ -399,7 +416,11 @@ def _require_backfilled_release_record(releases_dir: str, versions: list[str],
     tags = _scheme_tags(tag_glob, cwd)
     if not tags:
         return
-    raise _unbackfilled_release_record_error(releases_dir, tag_glob, tags)
+    from .upstream import load_here
+
+    raise _unbackfilled_release_record_error(
+        releases_dir, tag_glob, tags, upstream=load_here(cwd),
+    )
 
 
 class VersionFate(Enum):
@@ -571,6 +592,25 @@ def unreleased_range(releases_dir: str, *, tag_glob: str | None = None,
     if entry is None:
         return "HEAD"
     return f"{entry.candidate_sha}..HEAD"
+
+
+def unreleased_revs(releases_dir: str, *, tag_glob: str | None = None,
+                    cwd: str | None = None) -> list[str]:
+    """The ``git log`` revision arguments for this checkout's unreleased
+    commits that are this repository's own.
+
+    :func:`unreleased_range`, and in a fork (a repository declaring its
+    upstream) everything reachable from upstream's history left out: those
+    commits are upstream's to describe, not ours
+    (:func:`rlsbl.upstream.history_exclusions`, which refuses a fork whose
+    upstream refs are missing).
+    """
+    from .upstream import history_exclusions
+
+    return [
+        unreleased_range(releases_dir, tag_glob=tag_glob, cwd=cwd),
+        *history_exclusions(cwd),
+    ]
 
 
 def release_at_commit(releases_dir: str, sha: str, *,

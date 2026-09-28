@@ -84,10 +84,14 @@ def _get_unreleased_commit_count(proj, workspace_root, all_projects):
     last_release = release_commit.version if release_commit else None
 
     # Get commits in range
+    from ...upstream import history_exclusions
+
     range_spec = f"{release_commit.candidate_sha}..HEAD" if release_commit else "HEAD"
+    # In a fork, upstream's history is not ours to release.
+    exclusions = history_exclusions(workspace_root)
     try:
         result = effects.run(
-            ["git", "log", "--format=%H", range_spec],
+            ["git", "log", "--format=%H", range_spec, *exclusions],
             capture_output=True, text=True, timeout=30,
             cwd=workspace_root,
         )

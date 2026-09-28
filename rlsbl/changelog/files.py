@@ -373,10 +373,10 @@ def _warn_stale_entries(src: str, tag_glob: str) -> None:
     """
     # Local imports to avoid circular dependency at module load time.
     from .resolve import resolve_hashes, _git_log_hashes
-    from ..release_record import releases_dir_for_changes_dir, unreleased_range
+    from ..release_record import releases_dir_for_changes_dir, unreleased_revs
 
     releases_dir = releases_dir_for_changes_dir(os.path.dirname(src))
-    range_spec = unreleased_range(releases_dir, tag_glob=tag_glob)
+    range_spec = unreleased_revs(releases_dir, tag_glob=tag_glob)
     in_range = set(_git_log_hashes(range_spec))
 
     # Re-parse the file with line numbers, mirroring parse_jsonl's logic.

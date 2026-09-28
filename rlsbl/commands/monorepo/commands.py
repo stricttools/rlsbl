@@ -512,8 +512,12 @@ def _coverage_column(release_commit, changes_dir, scope):
     from ...changelog.validate import filter_exempt_commits
     from ...git_util import filter_commits_for_scope
 
+    from ...upstream import history_exclusions
+
     range_spec = f"{release_commit.candidate_sha}..HEAD" if release_commit else "HEAD"
-    commits = _git_log_hashes(range_spec)
+    # In a fork, upstream's history is not ours to cover -- the same
+    # exclusion the coverage check applies.
+    commits = _git_log_hashes([range_spec, *history_exclusions()])
     # Scope first, then exempt -- the order the authoritative coverage check
     # uses, so an unrelated package's changelog churn is never counted here.
     if scope is not None:
