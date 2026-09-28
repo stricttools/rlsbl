@@ -1187,12 +1187,20 @@ def cmd_scaffold(ctx, target, publish_mode, auto_commit, skip_shared, auto_tag):
             "Run 'rlsbl scaffold' again after reviewing .rlsbl/config.json.",
             file=sys.stderr,
         )
-    if len(regs) > 1:
-        from .commands.init_cmd import run_cmd_multi
-        run_cmd_multi(regs, [], flags, ctx=ctx)
-    else:
-        from .commands.init_cmd import run_cmd
-        run_cmd(regs[0], [], flags, ctx=ctx)
+    from .errors import ConfigError
+    try:
+        if len(regs) > 1:
+            from .commands.init_cmd import run_cmd_multi
+            run_cmd_multi(regs, [], flags, ctx=ctx)
+        else:
+            from .commands.init_cmd import run_cmd
+            run_cmd(regs[0], [], flags, ctx=ctx)
+    except ConfigError as e:
+        # The refusals scaffold raises before it writes anything (tracked
+        # files in a scratch directory, a core.hooksPath elsewhere) name their
+        # own fix; they end the command, not with a traceback.
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 # ---------------------------------------------------------------------------
