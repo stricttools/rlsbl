@@ -540,7 +540,7 @@ class TestRetryFileReleasable:
         rel_releases = Path(get_releasable_dir(str(tmp_project), "alpha")) / "releases"
         rel_releases.mkdir(parents=True, exist_ok=True)
         (rel_releases / "retry.toml").write_text(
-            'version = "1.0.0"\ndispatch = ["publish.yml"]\nref = "main"\n'
+            'version = "1.0.0"\ndispatch = ["publish.yml"]\nref = "alpha@v1.0.0"\n'
         )
         monkeypatch.chdir(core)
 

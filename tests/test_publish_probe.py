@@ -610,7 +610,7 @@ class TestRecoveryDispatch(unittest.TestCase):
         config = RetryConfig(
             version="1.0.0",
             dispatch=["publish.yml"],
-            ref="main",
+            ref="v1.0.0",
             tag="v1.0.0",
         )
 
