@@ -26,7 +26,9 @@ class NpmPipeline(TokenPipeline):
             f'npm pipeline "{self.name}" declares "provenance": true, and npm '
             f"build provenance needs a public source repository.",
             'Set "provenance": false on that pipeline in .rlsbl/config.json '
-            "(or drop the pipeline).",
+            "(or drop the pipeline), run `rlsbl scaffold` (`rlsbl monorepo "
+            "sync` in a monorepo) to regenerate the publish workflow without "
+            "--provenance, and commit both.",
         )
 
     def template_dir(self) -> str | None:

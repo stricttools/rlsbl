@@ -46,9 +46,11 @@ class GoPipeline(BasePipeline):
         return (
             f'Go pipeline "{self.name}" {how}, which cannot fetch a private '
             f"module and caches every version it is asked about permanently.",
-            'Set "publish_mode": "none" in .rlsbl/config.json: the release '
-            "then tags and creates GitHub Releases without publishing, and "
-            "consumers fetch the module with GOPRIVATE set.",
+            'Set "publish_mode": "none" in .rlsbl/config.json and run `rlsbl '
+            "scaffold` (`rlsbl monorepo sync` in a monorepo), which removes the "
+            "publish workflow, then commit both: the release then tags and "
+            "creates GitHub Releases without publishing, and consumers fetch "
+            "the module with GOPRIVATE set.",
         )
 
     def template_dir(self) -> str | None:

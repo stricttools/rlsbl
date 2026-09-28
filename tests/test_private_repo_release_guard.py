@@ -209,3 +209,95 @@ class TestTheReleaseFlow:
         assert "this repository is PRIVATE" in err
         assert "transparency log" in err
         assert pushed == [], "refused before anything was pushed"
+
+
+GO_VERIFYING = """\
+name: Publish
+on:
+  release:
+    types: [published]
+jobs:
+  verify-module:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify module is available on proxy
+        run: |
+          MODULE="example.com/lib"
+          GOPROXY=proxy.golang.org go list -m "${MODULE}@v${VERSION}"
+"""
+
+NPM_PROVENANCE = """\
+name: Publish
+on:
+  release:
+    types: [published]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm publish --provenance --access public ${{ steps.dist-tag.outputs.tag }}
+"""
+
+
+class TestTheConfigFixAloneLeavesTheCommittedWorkflow:
+    """The config fix changes what the NEXT scaffold renders, not the committed
+    publish workflow a Release starts. A private repository whose committed
+    workflow still asks the Go module proxy for the module, or still publishes
+    with --provenance, uses exactly what the refusal named -- after the tag is
+    public. So the workflow is judged too, and the fix names the scaffold that
+    regenerates (or removes) it."""
+
+    def test_the_go_refusal_names_the_scaffold_that_removes_the_workflow(self):
+        (use,) = config_uses_of(GO_LIBRARY)
+        assert '"publish_mode": "none"' in use.fix
+        assert "rlsbl scaffold" in use.fix
+
+    def test_the_npm_refusal_names_the_scaffold_that_regenerates_the_workflow(self):
+        (use,) = config_uses_of(
+            {"npm": {"type": "npm", "local": False, "provenance": True}},
+        )
+        assert '"provenance": false' in use.fix
+        assert "rlsbl scaffold" in use.fix
+
+    def test_a_committed_proxy_verification_is_refused_until_removed(self, tmp_path):
+        wf = _workflows(tmp_path, GO_VERIFYING)
+        fixed_config = [_config(GO_LIBRARY, publish_mode="none")]
+        with patch(RUN_GH, return_value=PRIVATE):
+            with pytest.raises(ReleaseValidationError) as exc:
+                _abort_on_private_repo_publishing(
+                    fixed_config, gh_config={}, workflows_dir=wf,
+                )
+            assert "Go module proxy" in str(exc.value)
+            assert "rlsbl scaffold" in str(exc.value)
+            os.remove(os.path.join(wf, "publish.yml"))
+            _abort_on_private_repo_publishing(
+                fixed_config, gh_config={}, workflows_dir=wf,
+            )
+
+    def test_a_committed_provenance_flag_is_refused_until_regenerated(self, tmp_path):
+        npm = {"npm": {"type": "npm", "local": False, "provenance": False}}
+        wf = _workflows(tmp_path, NPM_PROVENANCE)
+        with patch(RUN_GH, return_value=PRIVATE):
+            with pytest.raises(ReleaseValidationError) as exc:
+                _abort_on_private_repo_publishing(
+                    [_config(npm)], gh_config={}, workflows_dir=wf,
+                )
+            assert "--provenance" in str(exc.value)
+            assert "rlsbl scaffold" in str(exc.value)
+            _workflows(tmp_path, NPM_PROVENANCE.replace("--provenance ", ""))
+            _abort_on_private_repo_publishing(
+                [_config(npm)], gh_config={}, workflows_dir=wf,
+            )
+
+    def test_a_public_repository_is_not_asked_about_either(self, tmp_path):
+        wf = _workflows(tmp_path, GO_VERIFYING)
+        with patch(RUN_GH, return_value=PUBLIC):
+            _abort_on_private_repo_publishing(
+                [_config(GO_LIBRARY)], gh_config={}, workflows_dir=wf,
+            )
+
+
+def config_uses_of(pipelines):
+    from rlsbl.private_repo_publishing import config_uses
+
+    return config_uses([_config(pipelines)])

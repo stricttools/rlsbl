@@ -82,7 +82,7 @@ def _attests(step) -> bool:
 
 
 def workflow_uses(workflows_dir) -> list[PublicOnlyUse]:
-    """The PyPI publish steps under *workflows_dir* that would attest."""
+    """The publish steps under *workflows_dir* that need a public repository."""
     if not workflows_dir or not os.path.isdir(workflows_dir):
         return []
     files = []
@@ -95,7 +95,7 @@ def workflow_uses(workflows_dir) -> list[PublicOnlyUse]:
 
 
 def committed_workflow_uses(git_root, commit) -> list[PublicOnlyUse]:
-    """The PyPI publish steps in *commit*'s ``.github/workflows`` that would attest.
+    """The publish steps in *commit*'s ``.github/workflows`` that need a public repository.
 
     What a release publishes is the committed tree it tags, never the working
     tree: a workflow regenerated with ``attestations: false`` but not
@@ -116,22 +116,68 @@ def committed_workflow_uses(git_root, commit) -> list[PublicOnlyUse]:
     return _uses_in(files)
 
 
+def _asks_module_proxy(step) -> bool:
+    """Does this workflow step ask the Go module proxy for a module version?
+
+    The shape rlsbl's Go library publish workflow verifies with: ``go list -m``
+    against ``proxy.golang.org``. Downloading dependencies through the proxy
+    asks it for public modules only, and is not this.
+    """
+    run = str(step.get("run") or "")
+    return "proxy.golang.org" in run and "go list -m" in run
+
+
+def _requests_provenance(step) -> bool:
+    """Does this workflow step publish with build provenance?"""
+    run = str(step.get("run") or "")
+    return "--provenance" in run and "publish" in run
+
+
+#: What each committed-workflow finding is, and its fix. The config fix alone
+#: changes what the NEXT scaffold renders, not the workflow a Release starts,
+#: so every fix names the regeneration and the commit.
+_WORKFLOW_FINDINGS = (
+    (
+        _attests,
+        "publishes to PyPI with attestations, which record this repository's "
+        "name, workflow, and commit in a public transparency log.",
+        REGENERATE_WORKFLOWS,
+    ),
+    (
+        _asks_module_proxy,
+        "asks the Go module proxy for the released module, which cannot fetch "
+        "a private module.",
+        'Set "publish_mode": "none" in .rlsbl/config.json, run `rlsbl '
+        "scaffold` (`rlsbl monorepo sync` in a monorepo) to remove the publish "
+        "workflow, and commit both.",
+    ),
+    (
+        _requests_provenance,
+        "publishes with --provenance, and npm build provenance needs a public "
+        "source repository.",
+        'Set "provenance": false on the pipeline in .rlsbl/config.json, run '
+        "`rlsbl scaffold` (`rlsbl monorepo sync` in a monorepo) to regenerate "
+        "the workflow without --provenance, and commit both.",
+    ),
+)
+
+
 def _uses_in(files) -> list[PublicOnlyUse]:
-    """The attesting PyPI publish steps in *files*, ``(filename, text)`` pairs."""
+    """The publish steps in *files*, ``(filename, text)`` pairs, that need a public repository."""
     uses = []
     yaml = YAML(typ="safe")
     for filename, text in files:
         workflow = yaml.load(text) or {}
         jobs = workflow.get("jobs") if isinstance(workflow, dict) else None
         for job_name, job in (jobs or {}).items():
-            steps = (job or {}).get("steps") or []
-            if any(isinstance(s, dict) and _attests(s) for s in steps):
-                uses.append(PublicOnlyUse(
-                    f".github/workflows/{filename} (job {job_name}) publishes to "
-                    f"PyPI with attestations, which record this repository's "
-                    f"name, workflow, and commit in a public transparency log.",
-                    REGENERATE_WORKFLOWS,
-                ))
+            steps = [s for s in ((job or {}).get("steps") or [])
+                     if isinstance(s, dict)]
+            for finds, what, fix in _WORKFLOW_FINDINGS:
+                if any(finds(s) for s in steps):
+                    uses.append(PublicOnlyUse(
+                        f".github/workflows/{filename} (job {job_name}) {what}",
+                        fix,
+                    ))
     return uses
 
 
