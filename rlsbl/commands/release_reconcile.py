@@ -331,6 +331,8 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
         markerless_body,
         notes_file,
         publication,
+        repair_takes_latest,
+        tag_newer_in_history,
         update_release,
         view_body_args,
     )
@@ -412,15 +414,25 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
                 file=sys.stderr,
             )
 
+        # A repair never moves the badge onto an older release, and gives it
+        # to the newest one (a release whose own Release step failed).
+        def _moves_latest(tag_name=tag_name, version=version):
+            return repair_takes_latest(
+                tag_name, prerelease=is_prerelease(version),
+                is_newer=lambda latest: tag_newer_in_history(
+                    tag_name, latest, git=run,
+                ),
+                gh=gh, config=ctx.config,
+            )
+
         try:
             if pub is not None:
                 if exists:
                     update_release(pub, gh=gh, config=ctx.config,
                                    directory=str(project_root))
                 else:
-                    # A repair: the badge stays on the newest release.
                     create_release(pub, gh=gh, config=ctx.config,
-                                   moves_latest=False,
+                                   moves_latest=_moves_latest(),
                                    directory=str(project_root))
             else:
                 # Markerless: the same document minus the release commit it does not
@@ -436,7 +448,7 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
                         args = create_argv(
                             tag_name, tag_name, path,
                             prerelease=is_prerelease(version),
-                            moves_latest=False,
+                            moves_latest=_moves_latest(),
                         )
                     gh(args, config=ctx.config)
             written += 1
@@ -1681,8 +1693,15 @@ def apply_item(item, *, ctx, releases_dir, changelog_path, push_timeout,
     pub = _release_publication_for(
         action, changelog_path=changelog_path, releases_dir=releases_dir,
     )
-    # A repair: materializing an absent Release never moves the badge.
-    create_release(pub, gh=gh, config=ctx.config, moves_latest=False)
+    # A repair never moves the badge onto an older release, and gives it to
+    # the newest one (a release whose own Release step failed).
+    from ..release_publication import repair_takes_latest, tag_newer_in_history
+    moves_latest = repair_takes_latest(
+        action.tag, prerelease=pub.prerelease,
+        is_newer=lambda latest: tag_newer_in_history(action.tag, latest, git=git),
+        gh=gh, config=ctx.config, log=log,
+    )
+    create_release(pub, gh=gh, config=ctx.config, moves_latest=moves_latest)
     log(f"Created GitHub Release {action.tag}")
 
 
