@@ -195,7 +195,7 @@ Steps 15 and 16 are the **candidate push and the CI gate**: everything above the
 
 | Step | Action | Abort on failure |
 | --- | --- | --- |
-| 1 | Verify `gh` auth, refuse uncommitted changes to the paths the release writes, and enter the release checkout at the branch tip | Yes |
+| 1 | Verify `gh` auth, refuse uncommitted changes to the paths the release writes, and enter the release checkout at the branch tip. Before anything is pushed, refuse a release whose GitHub Release would start no publish workflow (a project publishing from CI with no workflow at HEAD that starts on `release: published`, GitHub Actions disabled, or such a workflow disabled), and a private repository whose publishing needs a public one (`private-repo-publishing`) | Yes |
 | 2 | Read `unreleased.toml` for bump type, description, context, and target selection | Yes |
 | 3 | Validate JSONL changelog (every structural check) | Yes |
 | 4 | Generate CHANGELOG.md from all JSONL files | Yes |
@@ -214,14 +214,14 @@ Steps 15 and 16 are the **candidate push and the CI gate**: everything above the
 | 17 | Finalize JSONL: rename `unreleased.jsonl` to `x.y.z.jsonl` (chmod 444), create fresh `unreleased.jsonl`, regenerate CHANGELOG.md, generate `x.y.z.md`, commit | Yes (state preserved, resumable) |
 | 18 | Archive the release file to `v{version}.toml`, **recorded at the CI-verified commit and the released trees**, and regenerate `x.y.z.md` from the archived metadata | Yes (state preserved, resumable) |
 | 19 | Tag the **CI-verified commit** (plus Go companion tags in releasable mode) | Yes (state preserved, resumable) |
-| 20 | Push the finalization commits and the tags | Yes (state preserved, resumable) |
-| 21 | Create GitHub Release with the version's changelog section as notes | Yes (state preserved, resumable) |
+| 20 | Push the finalization commits, then the tags, **one tag per push, the primary tag first**: GitHub creates no events at all for a push carrying more than three tags | Yes (state preserved, resumable) |
+| 21 | Create GitHub Release with the version's changelog section as notes, with `--verify-tag` (a tag the remote lacks is refused, never created at the default branch head) and GitHub's default "Latest" badge | Yes (state preserved, resumable) |
 | 22 | Upload assets if pipeline has `assets` or `custom_assets` configured | Yes (state preserved, resumable) |
 | 23 | Run pipeline `publish` for each configured pipeline (skipped for `publish_mode: "none"`) | Yes (state preserved, resumable) |
 | 24 | Deploy configured targets | No (failure recorded and named in the completion summary) |
 | 25 | Run `post-release.sh` hook | No (failure recorded and named in the completion summary) |
 | 26 | Regenerate the monorepo snapshot post-hoc, if the pre-push slot at step 14 was forfeit | No (failure recorded and named in the completion summary) |
-| 27 | Print `Watch CI: rlsbl watch <sha>` | -- |
+| 27 | Confirm, with `--watch` and `--no-watch` alike, that every workflow at the tagged commit a published Release starts shows a run for the tag within five minutes (GitHub reports no error when one does not start); then watch CI, or print `Watch CI: rlsbl watch <sha>` | Yes (exit 1 naming what was found; the tag and the Release stay) |
 
 The tag at step 19 is placed on the commit CI verified at step 16, **not** on HEAD: the finalization commits from steps 17-18 sit on top of it and are pushed alongside it at step 20. This is what makes "the tag points at a CI-green tree" true rather than approximately true.
 
