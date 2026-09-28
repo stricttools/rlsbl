@@ -21,5 +21,5 @@ Run project checks and report only error-level failures, exiting nonzero when an
 | `--all`, `--no-all` |  | bool | default: `false` |  | Run every registered check regardless of tag or name filters |
 | `--tag` |  | str | default: `` |  | Tag DSL expression to select checks (e.g. 'changelog & !quality') |
 | `--name` |  | str | default: `` |  | Glob pattern to filter checks by name (e.g. 'hash-*', '*coverage*') |
-| `--hook` |  | str | default: `` |  | Run the checks a hook declared in checks.toml selects (no hooks are declared) |
+| `--hook` |  | str | default: `` |  | Run the checks a hook declared in checks.toml selects: pre-push (tag 'prepush'), pre-release (tag 'preflight') |
 | `--list`, `--no-list` |  | bool | default: `false` |  | List all registered checks with their tags and values and exit without running |
