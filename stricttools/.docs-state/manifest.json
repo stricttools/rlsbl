@@ -9173,6 +9173,16 @@
         },
         {
           "level": 3,
+          "text": "`_npm_provenance_requested`",
+          "anchor": "_npm_provenance_requested"
+        },
+        {
+          "level": 3,
+          "text": "`_abort_on_npm_provenance`",
+          "anchor": "_abort_on_npm_provenance"
+        },
+        {
+          "level": 3,
           "text": "`_abort_on_private_repo_publishing`",
           "anchor": "_abort_on_private_repo_publishing"
         },
@@ -22743,7 +22753,7 @@
       ]
     }
   ],
-  "last_gen": "2026-09-28T21:26:06.987194+00:00",
+  "last_gen": "2026-09-28T22:12:41.909198+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
