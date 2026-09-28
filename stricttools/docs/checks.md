@@ -89,7 +89,7 @@ Every check is an option, `rlsbl:<check name>`, and so are the checks strictcli 
 | Tag | Purpose | Check count |
 | --- | --- | --- |
 | `project` | Project-level metadata, config schema, version consistency | 28 |
-| `release` | Released-version refs, branch sync, CI credentials, and conversion follow-ups | 6 |
+| `release` | Released-version refs, branch sync, CI credentials, private-repository publishing, and conversion follow-ups | 7 |
 | `changelog` | JSONL changelog validation and structure | 10 |
 | `workspace` | Monorepo workspace integrity and dependency rules | 19 |
 | `quality` | Code quality, dependency analysis, scaffold hygiene | 16 |
