@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.publish_workflows"
-description = "The workflows a published GitHub Release starts, and whether they did."
+description = "Finds the workflows a published GitHub Release starts, refuses a release whose Release would start none, and confirms each one's run started for the tag."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 148
 +++
