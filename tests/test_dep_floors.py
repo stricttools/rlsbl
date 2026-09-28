@@ -132,12 +132,22 @@ def _text(result):
 
 
 class TestAdoptionGate:
-    def test_skips_when_config_key_absent(self, tmp_path):
+    """The check runs only while rlsbl:dep-floors is on (strictcli does not run
+    an off check), so what it sees is always an adopted project."""
+
+    def test_a_missing_config_key_is_an_error_naming_the_key(self, tmp_path):
         _pyproject(tmp_path, ["strictcli"])
         _uv_lock(tmp_path, {"strictcli": "0.36.0"})
         result = _run(tmp_path, _config(names=None))
-        assert result.status == "skip"
-        assert CONFIG_KEY in result.message
+        assert result.status == "fail"
+        assert CONFIG_KEY in _text(result)
+        assert "rlsbl:dep-floors is on" in _text(result)
+
+    def test_declaring_the_key_clears_the_error(self, tmp_path):
+        _pyproject(tmp_path, ["strictcli>=0.36.0"])
+        _uv_lock(tmp_path, {"strictcli": "0.36.0"})
+        assert _run(tmp_path, _config(names=None)).status == "fail"
+        assert _run(tmp_path, _config()).status == "pass"
 
     def test_empty_list_is_adopted_but_enforces_nothing(self, tmp_path):
         _pyproject(tmp_path, ["strictcli"])
@@ -507,7 +517,6 @@ class TestInternalNames:
             str(pkg),
             workspace_names=workspace_package_names(tmp_path),
         )
-        assert verdict.adopted
         assert not verdict.ok
         assert "core>=0.4.0" in " ".join(verdict.problems)
 

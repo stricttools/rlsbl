@@ -270,6 +270,43 @@ def non_list_targets_ban_message(location, value):
     )
 
 
+#: The config key that once decided whether an unstamped changelog line
+#: blocks. That is the ``rlsbl:changelog-format-version-gate`` option now.
+RETIRED_FORMAT_VERSION_KEY = "changelog_format_version_enforced"
+
+
+def retired_format_version_key_message():
+    """The refusal of a config still carrying the retired enforcement key."""
+    from .options import set_command
+
+    return (
+        f"{RETIRED_FORMAT_VERSION_KEY} is retired: whether a changelog line "
+        f"without format_version blocks is now the option "
+        f"rlsbl:changelog-format-version-gate, which defaults to error. Delete "
+        f"{RETIRED_FORMAT_VERSION_KEY} from .rlsbl/config.json. If this "
+        f"repository wants enforcement off, also write the options entry: "
+        + set_command(
+            "changelog-format-version-gate", "off", "error",
+            "<why this repository reads changelog lines without format_version>",
+        )
+    )
+
+
+def validate_option_settings(config, project_dir):
+    """Every adoption setting must agree with its option.
+
+    A setting an option governs (``internal_dep_floors``, ``checks.lint``,
+    ``test_sandbox``, ...) is required while the option is on and refused
+    while it is off, since nothing reads it then. Raises :class:`ConfigError`
+    naming every disagreement, or the refusal of the repository's options.
+    """
+    from .options import settings_problems
+
+    problems = settings_problems(config, project_dir)
+    if problems:
+        raise ConfigError("\n".join(problems))
+
+
 def validate_config_schema(config, *, project_dir=None):
     """Consolidated config schema validation -- single entry point for all
     banned keys and structural invariants.
@@ -281,12 +318,18 @@ def validate_config_schema(config, *, project_dir=None):
        list.  Use ``publish_mode: "none"`` to suppress publishing instead.
     3. ``release.mode`` -- hard error if the key exists.  PR mode was
        removed; even ``mode = "imperative"`` is dead config.
+    4. ``changelog_format_version_enforced`` -- hard error if the key exists;
+       the ``rlsbl:changelog-format-version-gate`` option replaced it.
+    5. With *project_dir*, every adoption setting agrees with its option
+       (:func:`validate_option_settings`), which loads -- and so validates --
+       the repository's options.
 
     Called early in the release flow before any mutations.
 
     Args:
         config: the project config dict.
-        project_dir: unused (kept for call-site compatibility).
+        project_dir: the project the config belongs to, whose options decide
+            which adoption settings it may carry.
 
     Raises:
         ConfigError on any violation.
@@ -306,6 +349,14 @@ def validate_config_schema(config, *, project_dir=None):
             'release.mode is no longer supported (PR mode has been removed). '
             'Remove the "release" section from .rlsbl/config.json.'
         )
+
+    # 4. The retired format-version enforcement key
+    if RETIRED_FORMAT_VERSION_KEY in config:
+        raise ConfigError(retired_format_version_key_message())
+
+    # 5. Adoption settings agree with their options
+    if project_dir is not None:
+        validate_option_settings(config, project_dir)
 
 
 def _detect_go_artifact_kind(project_root=".") -> str:

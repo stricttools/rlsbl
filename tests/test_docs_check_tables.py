@@ -212,3 +212,20 @@ def test_a_framework_check_is_in_no_tag_section():
     live = set(_framework_checks())
     for heading in list(TAG_SECTIONS.values()) + ["Untagged checks"]:
         assert not (_row_names(_section(heading)) & live), heading
+
+
+def test_documented_severities_match_checks_toml():
+    """Every row's severity column says what checks.toml registers.
+
+    The page disagreed with the registry on three checks before this held it
+    to it; checks.toml is the authority.
+    """
+    checks = _checks()
+    text = _docs_text()
+    seen = set()
+    for m in re.finditer(r"^\| `([a-z][a-z0-9-]*)` \| (error|warn) \|", text, re.M):
+        name, severity = m.group(1), m.group(2)
+        if name in checks:
+            assert severity == checks[name]["severity"], name
+            seen.add(name)
+    assert seen == set(checks)

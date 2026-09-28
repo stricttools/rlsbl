@@ -1,5 +1,6 @@
 """rlsbl: Release orchestration and project scaffolding for npm, PyPI, Go, Deno, Zig, Swift, Hex, Docker, Maven, and more, automating version bumps, changelogs, tags, GitHub Releases, and CI/CD."""
 
+import contextvars
 import os
 import subprocess
 import sys
@@ -630,6 +631,70 @@ app.register_check_provider(make_external_check_provider(_read_config_for_cwd))
 from .checks import register_checks
 from . import effects
 register_checks(app)
+
+
+# ---------------------------------------------------------------------------
+# Check values from the repository's options
+# ---------------------------------------------------------------------------
+
+# The project a programmatic check run answers for, when the caller built its
+# context for a project other than the current directory (the release's
+# preflight, run for the member it resolved). Unset, the check command's own
+# position decides (_check_project_dir).
+_CHECK_PROJECT_DIR = contextvars.ContextVar("rlsbl_check_project_dir", default=None)
+
+
+def _check_project_dir():
+    """The directory whose options give this check run its values.
+
+    The same position the check-context factory builds its context for: the
+    current directory, or -- at a workspace root with ``--releasable`` -- the
+    releasable's representative member.
+    """
+    override = _CHECK_PROJECT_DIR.get()
+    if override is not None:
+        return override
+    here = Path.cwd()
+    if _check_releasable is None:
+        return here
+    from .workspace import find_workspace_root
+
+    workspace_root = find_workspace_root(str(here))
+    if workspace_root is None or not _at_workspace_root(workspace_root):
+        # The context factory refuses the selector here, naming why.
+        return here
+    project = _releasable_representative(
+        workspace_root, _check_releasable, invocation="rlsbl check", verb="check",
+    )
+    return Path(workspace_root) / project["path"]
+
+
+def _check_value_resolver(name):
+    """Each check's value from the repository's options (rlsbl.options).
+
+    Invalid options stop the run before any check starts: strictcli reports
+    the ValueError as the check command's own error.
+    """
+    from .options import OptionsError, check_value
+
+    try:
+        return check_value(name, _check_project_dir())
+    except OptionsError as e:
+        raise ValueError(str(e)) from e
+
+
+app.set_check_value_resolver(_check_value_resolver)
+
+
+def run_checks_for(context, **kwargs):
+    """``app.run_checks`` for *context*, with each check's value resolved for
+    the project that context was built for.
+    """
+    token = _CHECK_PROJECT_DIR.set(Path(context.project_root))
+    try:
+        return app.run_checks(context, **kwargs)
+    finally:
+        _CHECK_PROJECT_DIR.reset(token)
 
 
 # ---------------------------------------------------------------------------
@@ -2808,7 +2873,7 @@ def cmd_rewrite_project_name(ctx, from_, to):
     )
 
 
-@rewrite.command(name="uv-path-sources", help="Convert path- and workspace-sourced Python dependencies into registry constraints floored at the version uv.lock resolves. Covers [project].dependencies, every [project.optional-dependencies] extra and every PEP 735 [dependency-groups] group, and deletes the matching [tool.uv.sources] entry so it stops overriding the new constraint. Each converted name is added to internal_dep_floors in .rlsbl/config.json. A locked version that is not published on PyPI is a hard error naming the remedy (release that dependency first), and so is a registry probe that fails to answer. Use --dry-run to print the per-dependency plan with entry counts.", effect="mutating")
+@rewrite.command(name="uv-path-sources", help="Convert path- and workspace-sourced Python dependencies into registry constraints floored at the version uv.lock resolves. Covers [project].dependencies, every [project.optional-dependencies] extra and every PEP 735 [dependency-groups] group, and deletes the matching [tool.uv.sources] entry so it stops overriding the new constraint. Each converted name is added to internal_dep_floors in .rlsbl/config.json, and the rlsbl:dep-floors option that key belongs to is switched on with an options entry (current and ideal error, scoped to the project when it is a workspace member) when it is off. A locked version that is not published on PyPI is a hard error naming the remedy (release that dependency first), and so is a registry probe that fails to answer. Use --dry-run to print the per-dependency plan with entry counts.", effect="mutating")
 @effects.handler
 def cmd_rewrite_uv_path_sources(ctx):
     """Turn path/workspace-sourced dependencies into locked registry floors."""
@@ -2929,6 +2994,140 @@ def cmd_transition_record(
         },
         ctx=ctx,
     )
+
+
+# ---------------------------------------------------------------------------
+# options group
+# ---------------------------------------------------------------------------
+
+from .options_registry import ADOPTION_OPTIONS as _ADOPTION_OPTIONS, NON_CHECK_OPTIONS as _NON_CHECK_OPTIONS
+
+# The option lists in this help are derived from the registry's generator, so
+# they cannot drift from the options it declares.
+options_group = app.group("options", help=(
+    "Print rlsbl's options registry, and write this repository's entries for "
+    "rlsbl's options in .strictmetadata/options/ at its git root. Every rlsbl "
+    "check is an option, rlsbl:<check name>, and so is "
+    + ", ".join(f"rlsbl:{n}" for n in sorted(_NON_CHECK_OPTIONS))
+    + ": an error check ranks error > warn > off, a warning check warn > off, "
+    "and `rlsbl check` and every release apply each entry's current value "
+    "(off: the check does not run; warn: it runs and reports, never blocking; "
+    "error: as registered). The options that stand for an adoption ("
+    + ", ".join(f"rlsbl:{n}" for n in _ADOPTION_OPTIONS)
+    + ") default to off and accept a path scope naming one workspace member. "
+    "Invalid entries stop every check run and every release."
+))
+
+_OPTIONS_REGISTRY_PAYLOAD_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "format_version": {"type": "integer"},
+        "option": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "subject": {"type": "string"},
+                    "values": {"type": "string"},
+                    "default": {"type": "string"},
+                    "scope": {"type": "string"},
+                    "requires": {"type": "array", "items": {"type": "string"}},
+                    "description": {"type": "string"},
+                },
+                "required": ["name", "subject", "values", "default", "scope", "requires", "description"],
+            },
+        },
+    },
+    "required": ["format_version", "option"],
+}
+
+
+@options_group.command(name="registry", help="Print rlsbl's options registry: one option per check, rlsbl:<check name>, plus the options that are not checks, each with the subject file its entries are filed under, the values it ranks strongest first, its default, its scope kind, the options it requires, and what it governs. The TOML printed is the registry document rlsbl ships, in the shape of strictspec's built-in options-registry schema; with --json the same declarations are the payload. Needs no rlsbl project.", effect="read_only", payload_schema=_OPTIONS_REGISTRY_PAYLOAD_SCHEMA)
+@effects.handler
+def cmd_options_registry(ctx):
+    """Print the shipped options registry."""
+    import tomllib
+
+    from .options import checked_registry, registry_text
+    from .options_registry import FORMAT_VERSION
+
+    # Validated before it is published: a registry strictspec refuses raises.
+    checked_registry()
+    text = registry_text()
+    options = tomllib.loads(text)["option"]
+    ctx.payload({"format_version": FORMAT_VERSION, "option": options})
+    if not ctx.json:
+        print(text, end="")
+
+
+_OPTIONS_SET_PAYLOAD_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "string"},
+        "file": {"type": "string"},
+        "scope": {"type": ["string", "null"]},
+        "action": {"type": "string", "enum": ["created", "updated", "unchanged"]},
+        "current": {"type": "string"},
+        "ideal": {"type": "string"},
+        "reason": {"type": "string"},
+        "class": {"type": "string"},
+        "written": {"type": "array", "items": {"type": "string"}},
+        "committed": {"type": "boolean"},
+    },
+    "required": ["id", "file", "scope", "action", "current", "ideal", "reason", "class", "written", "committed"],
+}
+
+
+@options_group.command(name="set", help="Write one rlsbl entry into .strictmetadata/options/<subject>.toml at the repository's git root, or update the entry already there for the same option and scope, keeping every other line of the document. The subject file is the one the option's registry declaration names. Creates .strictmetadata/options/ and its manifest.toml, naming strictspec as the owner, when absent. strictspec validates the result before anything is written -- every document's shape, and every rlsbl entry with this one in place -- and each refusal is its catalogued diagnostic: an unknown option, a value the option does not declare, a current ranked above the ideal, an entry equal to the default, an empty reason, an option switched off while an option requiring it is not. A --scope must name a workspace member's directory relative to the repository root, and only the options declaring the path scope kind accept one. Refuses an id outside the rlsbl namespace and a manifest naming another owner. The written files are committed with the Autogenerated trailer.", effect="mutating", payload_schema=_OPTIONS_SET_PAYLOAD_SCHEMA)
+@strictcli.arg(name="id", help="The option, as rlsbl:<name> (e.g. 'rlsbl:dep-floors'); `rlsbl options registry` names every option", presence="required")
+@strictcli.flag(name="current", type=str, presence="required", help="The value the repository runs the option at today: error, warn, or off for an error check; warn or off for a warning check; the values `rlsbl options registry` lists for any other option")
+@strictcli.flag(name="ideal", type=str, presence="required", help="The value the repository should run the option at: one the option declares, never ranked below current, or non-existent when the right value is one rlsbl does not offer yet")
+@strictcli.flag(name="reason", type=str, presence="required", help="Why the repository deviates from the option's default, in one sentence. Recorded verbatim in the entry")
+@strictcli.flag(name="scope", type=str, presence="optional", help="Narrow the entry to one workspace member: the member's directory relative to the repository root (e.g. 'cli'). Accepted only by the options declaring the path scope kind; omitted, the entry covers the whole repository")
+@strictcli.flag(name="auto-commit", type=bool, presence="optional", help="Commit the written files with the Autogenerated trailer (the handler commits when neither --auto-commit nor --no-auto-commit is passed)")
+@effects.handler
+def cmd_options_set(ctx, id, current, ideal, reason, scope, auto_commit):
+    """Write one entry for an rlsbl option."""
+    _refuse_empty_args(id=id)
+    _refuse_empty_flags(current=current, ideal=ideal, reason=reason, scope=scope)
+    from .options import OptionsError, repository_root, set_entry
+    from .utils import commit_files
+
+    auto_commit = _opt_default(auto_commit, True)
+    here = Path.cwd()
+    try:
+        result = set_entry(here, id, current, ideal, reason, scope=scope)
+    except OptionsError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    committed = False
+    if not ctx.dry_run and auto_commit and result.written:
+        commit_files(
+            f"rlsbl options set {id}", result.written,
+            autogenerated=True, cwd=repository_root(here),
+        )
+        committed = True
+    ctx.payload({
+        "id": result.id, "file": result.file, "scope": result.scope,
+        "action": result.action, "current": result.current,
+        "ideal": result.ideal, "reason": result.reason,
+        "class": result.class_, "written": result.written,
+        "committed": committed,
+    })
+    if ctx.json:
+        return
+    scoped = f" (scope {result.scope!r})" if result.scope is not None else ""
+    summary = f"current {result.current}, ideal {result.ideal} ({result.class_})"
+    if ctx.dry_run:
+        print(f"Dry run: would write {result.id}{scoped} in {result.file}: {summary}.")
+    elif result.action == "unchanged":
+        print(f"{result.file} already holds {result.id}{scoped}: {summary}.")
+    else:
+        print(
+            f"{result.action.capitalize()} {result.id}{scoped} in {result.file}: "
+            f"{summary}." + (" Committed." if committed else "")
+        )
 
 
 # ---------------------------------------------------------------------------

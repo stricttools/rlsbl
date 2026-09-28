@@ -10,8 +10,12 @@ environment.  They are configured in ``.rlsbl/config.json``::
       "type-check": {"paths": ["mypackage", "tests", "docs"]}
     }
 
-A check with no entry skips.  ``paths`` is required when an entry is present;
-``cwd`` is optional and resolves against the project root.
+Each check is also an option, ``rlsbl:lint``, ``rlsbl:format`` and
+``rlsbl:type-check``, and each defaults to off: a project adopts a check by
+switching its option on (``rlsbl options set``) and declaring its block.  The
+block is required while the option is on and refused while it is off
+(``config-schema``).  ``paths`` is required in a block; ``cwd`` is optional and
+resolves against the project root.
 
 Why the paths are declared rather than inferred
 -----------------------------------------------
@@ -350,15 +354,34 @@ def resolve_check_budget(ctx):
     return get_check_timeout(getattr(ctx, "config", None))
 
 
+def _undeclared(reporter, check_name, value):
+    """The finding for a tool check whose option is on but whose block is
+    absent -- the disagreement ``config-schema`` also reports.
+    """
+    msg = (
+        f"rlsbl:{check_name} is {value.value} ({value.source}), but "
+        f".rlsbl/config.json declares no {CONFIG_KEY}.{check_name}. Declare "
+        f'"{CONFIG_KEY}": {{"{check_name}": {{"paths": [...]}}}}, or switch '
+        f"the option off by deleting its entry."
+    )
+    reporter.error(msg)
+    return reporter.found(msg)
+
+
 def run_tool_check(ctx, reporter, check_name):
-    """Run one declared tool check, or skip when it is not configured."""
+    """Run one declared tool check.
+
+    It runs only while its option is on (strictcli does not run an off
+    check), so a missing block here is an error, never a skip.
+    """
     import subprocess
+
+    from .options import option_value
 
     entry = declared_entry(ctx.config, check_name)
     if entry is None:
-        return reporter.skipped(
-            f"not configured (declare .rlsbl/config.json "
-            f'"{CONFIG_KEY}.{check_name}.paths")'
+        return _undeclared(
+            reporter, check_name, option_value(check_name, ctx.project_root),
         )
     check_cwd = resolve_cwd(ctx, entry.get("cwd"))
     budget = resolve_check_budget(ctx)
@@ -488,10 +511,20 @@ def scope_conflicts(check_name, root):
 
 
 def run_scope_guard(ctx, reporter, check_name):
-    """Run the competing-scope guard paired with *check_name*."""
+    """Run the competing-scope guard paired with *check_name*.
+
+    The guard keeps its own option at the uniform default, and skips while its
+    paired check is off: there is no declared scope for a tool config to
+    compete with.
+    """
+    from .options import OFF, option_value
+
+    paired = option_value(check_name, ctx.project_root)
+    if paired.value == OFF:
+        return reporter.skipped(f"rlsbl:{check_name} is off ({paired.source})")
     entry = declared_entry(ctx.config, check_name)
     if entry is None:
-        return reporter.skipped(f"{check_name} is not configured")
+        return _undeclared(reporter, check_name, paired)
     root = resolve_cwd(ctx, entry.get("cwd"))
     conflicts = scope_conflicts(check_name, root)
     if not conflicts:

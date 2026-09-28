@@ -93,6 +93,11 @@ MUST_NOT_PROMPT = [
     # which does prompt. `graph` is mutating only because `--output` writes the
     # rendering to the file the caller just named.
     "monorepo remove", "monorepo graph",
+    # `options set` mirrors selfdoc's own `options set`: an entry deviates
+    # from a family default only with a reason recorded beside it, strictspec
+    # validates it before it is written, and a hand edit is accepted the same
+    # way.
+    "options set",
     "monorepo release init",
     "dev install", "dev sync", "dev status",
     # These rewrite commands sweep the working tree and nothing else. Renaming a

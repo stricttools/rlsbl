@@ -1,9 +1,10 @@
 """strictspec diff-certificate deploy gate.
 
 rlsbl can consume a strictspec ``strictspec diff`` CERTIFICATE as a
-``format_version`` deploy gate. The gate is feature-flagged by CONFIG PRESENCE:
-a project opts in by adding a ``strictspec_gate`` section to ``.rlsbl/config.json``;
-projects without it are untouched (the built-in check skips).
+``format_version`` deploy gate. A project opts in by switching the
+``rlsbl:strictspec-certificate-gate`` option on and adding the
+``strictspec_gate`` section it then requires to ``.rlsbl/config.json``; while the
+option is off (its default) the check does not run and the section is refused.
 
 Grade semantics (strictspec spec/appendix-certificates.md Part A, decision 25):
 
@@ -152,7 +153,8 @@ def evaluate_certificate_gate(config, project_root):
     """Evaluate the strictspec certificate deploy gate against *config*.
 
     Returns a :class:`GateVerdict`. When the ``strictspec_gate`` section is
-    absent, the verdict is ``skipped`` (opt-out; no behavior change). A missing
+    absent, the verdict is ``skipped`` (the check itself reports that as an
+    error, since it runs only while its option is on). A missing
     certificate file, malformed certificate, or malformed/missing adjudication
     file raises :class:`ConfigError` (a hard error -- if configured, it must
     work). Otherwise the verdict reflects the claim grades.
@@ -165,8 +167,9 @@ def evaluate_certificate_gate(config, project_root):
     if not os.path.isfile(cert_path):
         raise ConfigError(
             f"{CONFIG_KEY}.certificate points to {cert_path}, which does not "
-            f"exist. Produce it with `strictspec diff` (or remove the "
-            f"{CONFIG_KEY} section to opt out)."
+            f"exist. Produce it with `strictspec diff` (or opt out: delete "
+            f"the rlsbl:strictspec-certificate-gate options entry and the "
+            f"{CONFIG_KEY} section)."
         )
 
     cert = _load_certificate(cert_path)

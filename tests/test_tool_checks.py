@@ -15,6 +15,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from conftest import set_option
+
 from rlsbl import app, tool_checks
 from rlsbl.context import ProjectContext
 from rlsbl.tool_checks import (
@@ -34,6 +36,12 @@ def _ctx(root, config):
 
 def _run(name, root, config):
     return app._check_defs[name].impl(_ctx(root, config))
+
+
+def _switch_on(root, *names):
+    """Switch the named tool checks' options on for the project at *root*."""
+    for name in names:
+        set_option(root, name, "error")
 
 
 # ---------------------------------------------------------------------------
@@ -139,10 +147,16 @@ class TestInvocationShape:
 
 
 class TestExecution:
-    def test_an_unconfigured_check_skips(self, tmp_project):
+    def test_a_check_switched_on_without_its_block_is_an_error(self, tmp_project):
+        """The check runs only while its option is on, so a missing block is
+        the disagreement config-schema reports too, never a skip."""
+        _switch_on(tmp_project, *TOOL_CHECKS)
         for name in TOOL_CHECKS:
             result = _run(name, tmp_project, {"publish_mode": "ci"})
-            assert result.status == "skip", name
+            assert result.status == "fail", name
+            text = " ".join(p.text for p in result.problems)
+            assert f"rlsbl:{name} is error" in text
+            assert f"declares no checks.{name}" in text
 
     def test_a_configured_check_runs_the_declared_paths(
         self, tmp_project, monkeypatch,
@@ -204,12 +218,23 @@ class TestExecution:
 
 
 class TestScopeGuards:
-    def test_guard_skips_when_the_check_is_not_configured(self, tmp_project):
+    def test_guard_skips_while_its_paired_check_is_off(self, tmp_project):
         for name in TOOL_CHECKS:
             result = _run(guard_name(name), tmp_project, {"publish_mode": "ci"})
             assert result.status == "skip", name
+            assert f"rlsbl:{name} is off" in result.message
+
+    def test_guard_of_a_check_on_without_its_block_names_the_fix(self, tmp_project):
+        _switch_on(tmp_project, "lint")
+        config = {"publish_mode": "ci"}
+        result = _run("lint-scope-guard", tmp_project, config)
+        assert result.status == "fail"
+        # Declaring the block the finding names clears it.
+        config["checks"] = {"lint": {"paths": ["pkg"]}}
+        assert _run("lint-scope-guard", tmp_project, config).status == "pass"
 
     def test_mypy_config_scope_fails_the_type_check_guard(self, tmp_project):
+        _switch_on(tmp_project, "type-check")
         (tmp_project / "pyproject.toml").write_text(
             '[project]\nname = "p"\nversion = "0.1.0"\n\n'
             '[tool.mypy]\nfiles = "src"\n'
@@ -223,6 +248,7 @@ class TestScopeGuards:
 
     @pytest.mark.parametrize("check_name", ["lint", "format"])
     def test_ruff_include_fails_the_ruff_guards(self, tmp_project, check_name):
+        _switch_on(tmp_project, check_name)
         (tmp_project / "pyproject.toml").write_text(
             '[project]\nname = "p"\nversion = "0.1.0"\n\n'
             '[tool.ruff]\ninclude = ["src/**"]\n'
@@ -237,6 +263,7 @@ class TestScopeGuards:
     def test_ruff_exclude_is_exempt(self, tmp_project):
         """An explicit path bypasses exclude -- loud over-inclusion, not
         silent under-scoping."""
+        _switch_on(tmp_project, "lint")
         (tmp_project / "pyproject.toml").write_text(
             '[project]\nname = "p"\nversion = "0.1.0"\n\n'
             '[tool.ruff]\nexclude = ["build"]\n'
@@ -296,6 +323,7 @@ class TestReproducesTheAdapterConsumer:
               "claudewheel", "tests", "scripts", "docs"]
 
     def test_every_scope_guard_fires(self, tmp_project):
+        _switch_on(tmp_project, "type-check", "lint", "format")
         (tmp_project / "pyproject.toml").write_text(
             '[project]\nname = "claudewheel"\nversion = "0.1.0"\n\n'
             '[tool.mypy]\npackages = "claudewheel"\n\n'

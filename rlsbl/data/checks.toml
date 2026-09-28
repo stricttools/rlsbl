@@ -29,6 +29,8 @@ app = "rlsbl"
 # the network to answer at all, never whether it may mutate.
 
 [checks.lock]
+description = "No stale release lock file is left in .rlsbl/ or .rlsbl-monorepo/."
+subject = "release"
 tags = ["project"]
 severity = "warn"
 fast = true
@@ -37,6 +39,8 @@ needs_network = false
 depends_on = []
 
 [checks.version-consistency]
+description = "Every detected target reports the same project version."
+subject = "project"
 tags = ["project"]
 severity = "error"
 fast = true
@@ -45,6 +49,8 @@ needs_network = false
 depends_on = []
 
 [checks.name-consistency]
+description = "Every detected target reports the same package name."
+subject = "project"
 tags = ["project"]
 severity = "warn"
 fast = true
@@ -53,6 +59,8 @@ needs_network = false
 depends_on = []
 
 [checks.license-consistency]
+description = "Every detected target reports the same license."
+subject = "project"
 tags = ["project"]
 severity = "warn"
 fast = true
@@ -61,6 +69,8 @@ needs_network = false
 depends_on = []
 
 [checks.description-consistency]
+description = "Every detected target reports the same package description."
+subject = "project"
 tags = ["project"]
 severity = "warn"
 fast = true
@@ -69,6 +79,8 @@ needs_network = false
 depends_on = []
 
 [checks.private-hook-stale]
+description = "The post-release hook carries no leftover private asset-upload code."
+subject = "release"
 tags = ["project"]
 severity = "error"
 fast = true
@@ -77,6 +89,8 @@ needs_network = false
 depends_on = []
 
 [checks.config-schema]
+description = ".rlsbl/config.json passes rlsbl's config validation: required, banned, and retired keys, section shapes, and settings whose option is off."
+subject = "project"
 tags = ["project"]
 severity = "error"
 fast = true
@@ -85,6 +99,8 @@ needs_network = false
 depends_on = []
 
 [checks.license-file]
+description = "A LICENSE file exists, is non-empty, and has no unreplaced template variables."
+subject = "project"
 tags = ["project"]
 severity = "error"
 fast = true
@@ -93,6 +109,8 @@ needs_network = false
 depends_on = []
 
 [checks.unpublished-refs]
+description = "Every archived release's refs exist locally and on origin at its release commit, and its primary tag carries a GitHub Release (requires network)."
+subject = "release"
 tags = ["release"]
 severity = "error"
 fast = false
@@ -101,6 +119,8 @@ needs_network = true
 depends_on = ["version-consistency"]
 
 [checks.branch-sync]
+description = "The local branch is not behind its remote tracking branch (requires network)."
+subject = "release"
 tags = ["release"]
 severity = "error"
 fast = true
@@ -127,6 +147,8 @@ depends_on = []
 # secret's value is not
 # retrievable through the API, and rlsbl never puts a credential on a pipe.
 [checks.ci-publish-secrets]
+description = "Every Actions secret the configured CI publish pipelines authenticate with exists on the repository (requires network)."
+subject = "release"
 tags = ["release"]
 severity = "error"
 fast = true
@@ -139,6 +161,8 @@ depends_on = []
 # Skips when the transition record holds no absorb. rlsbl never archives it: the
 # finding prints the `gh repo archive` command.
 [checks.old-repo-archived]
+description = "Every repository this one absorbed is archived on GitHub (requires network)."
+subject = "release"
 tags = ["release"]
 severity = "error"
 fast = false
@@ -152,6 +176,8 @@ depends_on = []
 # for the old path's latest go.mod. Skips when the record holds no such
 # transition; rlsbl never commits into the retired repository.
 [checks.go-deprecation-published]
+description = "Every superseded Go module path serves a Deprecated notice through the Go module proxy (requires network)."
+subject = "release"
 tags = ["release"]
 severity = "error"
 fast = false
@@ -160,6 +186,8 @@ needs_network = true
 depends_on = []
 
 [checks.changelog-entry]
+description = "CHANGELOG.md has an entry for the current project version."
+subject = "changelog"
 tags = ["changelog"]
 severity = "error"
 fast = true
@@ -168,6 +196,8 @@ needs_network = false
 depends_on = ["version-consistency"]
 
 [checks.library-lint]
+description = "Every workspace library project passes rlsbl's library lint."
+subject = "code"
 tags = ["quality", "preflight"]
 severity = "error"
 fast = false
@@ -181,6 +211,8 @@ scope = "workspace:library"
 # ---------------------------------------------------------------------------
 
 [checks.changelog-hashes]
+description = "Every commit hash in the JSONL changelog entries resolves in git."
+subject = "changelog"
 tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
@@ -189,6 +221,8 @@ needs_network = false
 depends_on = []
 
 [checks.changelog-range]
+description = "Every resolved changelog hash falls within this checkout's unreleased commit range."
+subject = "changelog"
 tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
@@ -197,6 +231,8 @@ needs_network = false
 depends_on = ["changelog-hashes"]
 
 [checks.changelog-coverage]
+description = "Every unreleased commit appears in at least one JSONL changelog entry."
+subject = "changelog"
 tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
@@ -205,6 +241,8 @@ needs_network = false
 depends_on = ["changelog-hashes"]
 
 [checks.changelog-orphans]
+description = "No changelog entry has every hash unresolvable, out of range, or owned by another releasable."
+subject = "changelog"
 tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
@@ -213,6 +251,8 @@ needs_network = false
 depends_on = []
 
 [checks.changelog-schema]
+description = "Every changelog entry passes schema validation: a user-facing entry carries a description and a type."
+subject = "changelog"
 tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
@@ -221,6 +261,8 @@ needs_network = false
 depends_on = []
 
 [checks.changelog-user-facing]
+description = "At least one unreleased changelog entry is user-facing."
+subject = "changelog"
 tags = ["changelog", "preflight-changelog"]
 severity = "warn"
 fast = true
@@ -229,6 +271,8 @@ needs_network = false
 depends_on = []
 
 [checks.changelog-batch-commits]
+description = "No changelog entry references more commits than max_commits_per_entry."
+subject = "changelog"
 tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
@@ -237,6 +281,8 @@ needs_network = false
 depends_on = []
 
 [checks.changelog-batch-entries]
+description = "No commit appears in more changelog entries than max_entries_per_commit."
+subject = "changelog"
 tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
@@ -244,18 +290,9 @@ pure = true
 needs_network = false
 depends_on = []
 
-# A pure nudge (not in preflight-changelog): the absent-key warning is visible
-# pressure under `rlsbl check`, never a release blocker. The actual enforcement
-# is the error-severity changelog-format-version-gate, which IS in preflight.
-[checks.changelog-format-version]
-tags = ["changelog"]
-severity = "warn"
-fast = true
-pure = true
-needs_network = false
-depends_on = []
-
 [checks.changelog-format-version-gate]
+description = "Every line of unreleased.jsonl and of every finalized x.y.z.jsonl carries a supported format_version."
+subject = "changelog"
 tags = ["changelog", "preflight-changelog"]
 severity = "error"
 fast = true
@@ -281,6 +318,8 @@ depends_on = []
 # preflight context carries one member, and a partial member list derives the
 # wrong excludes.
 [checks.router-filters-fresh]
+description = "The filters of the generated ci-router.yml match a fresh derivation from the workspace."
+subject = "workspace"
 tags = ["workspace", "preflight"]
 severity = "error"
 fast = true
@@ -290,6 +329,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.workspace-ci-router]
+description = "The generated ci-router.yml exists at the workspace root."
+subject = "workspace"
 tags = ["workspace"]
 severity = "error"
 fast = true
@@ -299,6 +340,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.workspace-ci-synced]
+description = "Each in-scope member's CI jobs are inlined into the shared ci-router.yml."
+subject = "workspace"
 tags = ["workspace"]
 severity = "error"
 fast = true
@@ -308,6 +351,8 @@ depends_on = ["workspace-ci-router"]
 scope = "workspace:non_dev_node"
 
 [checks.workspace-targets]
+description = "Every releasable, non-dev-only workspace member has at least one detectable target."
+subject = "workspace"
 tags = ["workspace"]
 severity = "error"
 fast = true
@@ -317,6 +362,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.workspace-unregistered]
+description = "No project directory with a manifest is missing from workspace.toml."
+subject = "workspace"
 tags = ["workspace"]
 severity = "error"
 fast = true
@@ -326,6 +373,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.workspace-stale-entries]
+description = "No workspace.toml entry points to a missing or manifest-less directory."
+subject = "workspace"
 tags = ["workspace"]
 severity = "error"
 fast = true
@@ -335,6 +384,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.dev-only-boundary]
+description = "No member that is not dev-only has a runtime dependency on a dev-only member."
+subject = "workspace"
 tags = ["workspace"]
 severity = "error"
 fast = true
@@ -344,6 +395,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.unversioned-boundary]
+description = "No releasable member has a runtime dependency on an unversioned member."
+subject = "workspace"
 tags = ["workspace"]
 severity = "error"
 fast = true
@@ -353,6 +406,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.dead-workspace-packages]
+description = "Every unpublished workspace library package is imported by at least one workspace sibling."
+subject = "workspace"
 tags = ["workspace"]
 severity = "warn"
 fast = false
@@ -362,6 +417,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.subtree-remote-reachable]
+description = "Every mirrored releasable's subtree remote is reachable (requires network)."
+subject = "workspace"
 tags = ["workspace"]
 severity = "error"
 fast = false
@@ -375,6 +432,8 @@ scope = "workspace"
 # declares a mirror. Structural and offline -- it reads workspace.toml and the
 # members' declared targets, nothing else.
 [checks.mirror-required]
+description = "Every member consumed by repository URL belongs to a releasable that declares a subtree_remote mirror."
+subject = "workspace"
 tags = ["workspace"]
 severity = "error"
 fast = true
@@ -391,6 +450,8 @@ scope = "workspace"
 # manifest; this check is in "preflight" so the ordinary release path reports
 # the broken manifest as its own finding instead of only as a router failure.
 [checks.workspace-unbuildable]
+description = "Every workspace member syncs under uv sync --all-packages (pypi workspaces)."
+subject = "workspace"
 tags = ["workspace", "preflight"]
 severity = "error"
 fast = false
@@ -400,6 +461,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.layers-violations]
+description = "No dependency edge violates the layer ordering workspace.toml declares."
+subject = "code"
 tags = []
 severity = "error"
 fast = true
@@ -413,6 +476,8 @@ scope = "workspace:non_dev_only"
 # ---------------------------------------------------------------------------
 
 [checks.deps-unused]
+description = "Every declared workspace dependency is imported by at least one source file."
+subject = "dependencies"
 tags = []
 severity = "error"
 fast = false
@@ -422,6 +487,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.deps-undeclared]
+description = "No source file imports a workspace package its member does not declare."
+subject = "dependencies"
 tags = []
 severity = "error"
 fast = false
@@ -431,6 +498,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.deps-stale]
+description = "Every intra-workspace dependency constraint is satisfied by the dependency's current version."
+subject = "dependencies"
 tags = []
 severity = "error"
 fast = false
@@ -440,6 +509,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.deps-runtime-test-only]
+description = "No runtime dependency is imported only from test code."
+subject = "dependencies"
 tags = ["quality"]
 severity = "warn"
 fast = false
@@ -449,6 +520,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.deps-dev-in-lib]
+description = "No dev dependency is imported from production code."
+subject = "dependencies"
 tags = ["quality"]
 severity = "error"
 fast = false
@@ -458,6 +531,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.dead-modules]
+description = "Every source module, Go internal package, and npm or Dart source file has an inbound import."
+subject = "code"
 tags = ["quality"]
 severity = "warn"
 fast = false
@@ -466,6 +541,8 @@ needs_network = false
 depends_on = []
 
 [checks.dead-modules-stale]
+description = "Every path dead-modules.toml declares still exists."
+subject = "code"
 tags = ["quality"]
 severity = "error"
 fast = true
@@ -474,6 +551,8 @@ needs_network = false
 depends_on = []
 
 [checks.circular-deps]
+description = "No circular import dependency exists between a package's modules."
+subject = "code"
 tags = ["quality"]
 severity = "warn"
 fast = false
@@ -482,6 +561,8 @@ needs_network = false
 depends_on = []
 
 [checks.scaffold-unreplaced-vars]
+description = "Committed scaffold files carry no unreplaced rlsbl template variables."
+subject = "scaffold"
 tags = ["quality"]
 severity = "error"
 fast = true
@@ -490,6 +571,8 @@ needs_network = false
 depends_on = []
 
 [checks.ruff-lint]
+description = "A Python project passes ruff's lint checks."
+subject = "code"
 tags = ["quality"]
 severity = "error"
 fast = true
@@ -509,6 +592,8 @@ depends_on = []
 # ---------------------------------------------------------------------------
 
 [checks.lint]
+description = "ruff check passes over the paths declared in checks.lint.paths."
+subject = "code"
 tags = ["quality", "preflight"]
 severity = "error"
 fast = false
@@ -517,6 +602,8 @@ needs_network = false
 depends_on = []
 
 [checks.lint-scope-guard]
+description = "ruff's config carries no include or extend-include competing with checks.lint.paths."
+subject = "code"
 tags = ["quality", "preflight"]
 severity = "error"
 fast = true
@@ -525,6 +612,8 @@ needs_network = false
 depends_on = []
 
 [checks.format]
+description = "ruff format --check passes over the paths declared in checks.format.paths."
+subject = "code"
 tags = ["quality", "preflight"]
 severity = "error"
 fast = false
@@ -533,6 +622,8 @@ needs_network = false
 depends_on = []
 
 [checks.format-scope-guard]
+description = "ruff's config carries no include or extend-include competing with checks.format.paths."
+subject = "code"
 tags = ["quality", "preflight"]
 severity = "error"
 fast = true
@@ -541,6 +632,8 @@ needs_network = false
 depends_on = []
 
 [checks.type-check]
+description = "mypy passes over the paths declared in checks.type-check.paths."
+subject = "code"
 tags = ["quality", "preflight"]
 severity = "error"
 fast = false
@@ -549,6 +642,8 @@ needs_network = false
 depends_on = []
 
 [checks.type-check-scope-guard]
+description = "mypy's config carries no files, packages, or modules competing with checks.type-check.paths."
+subject = "code"
 tags = ["quality", "preflight"]
 severity = "error"
 fast = true
@@ -561,6 +656,8 @@ depends_on = []
 # ---------------------------------------------------------------------------
 
 [checks.publish-mode-workflow]
+description = "A project with publish_mode none has no workflow that publishes to a public registry."
+subject = "release"
 tags = ["project"]
 severity = "error"
 fast = true
@@ -569,6 +666,8 @@ needs_network = false
 depends_on = []
 
 [checks.npm-private-mismatch]
+description = "A package.json with private: true does not contradict publish_mode ci."
+subject = "project"
 tags = ["project"]
 severity = "error"
 fast = true
@@ -577,6 +676,8 @@ needs_network = false
 depends_on = []
 
 [checks.target-version-readable]
+description = "Every detected target reads its version without error."
+subject = "project"
 tags = ["project"]
 severity = "error"
 fast = true
@@ -585,6 +686,8 @@ needs_network = false
 depends_on = []
 
 [checks.dunder-version-missing]
+description = "A PyPI project that keeps a version constant in source names it __version__."
+subject = "project"
 tags = ["project"]
 severity = "error"
 fast = true
@@ -593,6 +696,8 @@ needs_network = false
 depends_on = []
 
 [checks.selfdoc-version-drift]
+description = "The version in selfdoc.json matches the primary target's version."
+subject = "project"
 tags = ["project"]
 severity = "error"
 fast = true
@@ -601,6 +706,8 @@ needs_network = false
 depends_on = []
 
 [checks.scaffold-conflicts]
+description = "Scaffold-managed files carry no unresolved merge conflict markers."
+subject = "scaffold"
 tags = ["project", "prepush", "release"]
 severity = "error"
 fast = true
@@ -614,6 +721,8 @@ depends_on = []
 # and this reports it before any of them is reached. Not pure -- it shells out
 # to `git stash list`.
 [checks.stash-free]
+description = "The repository carries no git stash."
+subject = "release"
 tags = ["project"]
 severity = "error"
 fast = true
@@ -622,6 +731,8 @@ needs_network = false
 depends_on = []
 
 [checks.cross-repo-path-sources]
+description = "No [tool.uv.sources] path entry in the committed pyproject.toml resolves outside the repository."
+subject = "dependencies"
 tags = ["project"]
 severity = "error"
 fast = true
@@ -638,6 +749,8 @@ depends_on = []
 # one. Pure (imports and serializes; no subprocess or network). In "preflight"
 # so a stale matrix blocks the release that would publish it.
 [checks.target-matrix-fresh]
+description = "The committed support matrix matches a fresh regeneration from rlsbl's registries."
+subject = "project"
 tags = ["project", "preflight"]
 severity = "error"
 fast = true
@@ -649,6 +762,8 @@ depends_on = []
 # test_env), the rendered CI workflow(s) on disk must actually provision them.
 # Pure filesystem read (config + workflow YAML), no subprocess/network.
 [checks.requires-services]
+description = "The CI service containers declared under services and test_env are provisioned in the rendered CI workflow."
+subject = "tests"
 tags = ["project"]
 severity = "error"
 fast = true
@@ -661,6 +776,8 @@ depends_on = ["config-schema"]
 # pure). In "preflight" so it blocks a LOCAL release when an overlay was wiped;
 # skips cleanly on CI (the gitignored sentinel never exists there).
 [checks.dev-overlay-drift]
+description = "Every rlsbl dev sync overlay is still an editable install of its declared checkout."
+subject = "dependencies"
 tags = ["project", "preflight"]
 severity = "error"
 fast = true
@@ -673,6 +790,8 @@ depends_on = []
 # ---------------------------------------------------------------------------
 
 [checks.prepush-changelog-coverage]
+description = "Every pushed commit has a JSONL changelog entry."
+subject = "push"
 tags = ["prepush"]
 severity = "error"
 fast = false
@@ -681,6 +800,8 @@ needs_network = false
 depends_on = []
 
 [checks.prepush-gitignore-guard]
+description = "No rlsbl-managed file is gitignored."
+subject = "push"
 tags = ["prepush"]
 severity = "error"
 fast = true
@@ -689,6 +810,8 @@ needs_network = false
 depends_on = []
 
 [checks.prepush-manual-warning]
+description = "No push to a release branch is made outside rlsbl release."
+subject = "push"
 tags = ["prepush"]
 severity = "error"
 fast = true
@@ -697,6 +820,8 @@ needs_network = false
 depends_on = []
 
 [checks.test-suite]
+description = "The project's test suite passes."
+subject = "tests"
 tags = ["prepush", "quality", "preflight"]
 severity = "error"
 fast = false
@@ -705,6 +830,8 @@ needs_network = false
 depends_on = ["prepush-changelog-coverage"]
 
 [checks.test-suite-workspace]
+description = "The test suites of the affected workspace members pass."
+subject = "tests"
 tags = ["prepush", "workspace"]
 severity = "error"
 fast = false
@@ -718,6 +845,8 @@ scope = "workspace:non_dev_only"
 # ---------------------------------------------------------------------------
 
 [checks.maven-central-metadata]
+description = "Maven Central's publishing requirements are met: POM metadata, a sources jar, and a javadoc jar."
+subject = "release"
 tags = ["quality", "maven", "preflight"]
 severity = "error"
 fast = false
@@ -730,6 +859,8 @@ depends_on = []
 # ---------------------------------------------------------------------------
 
 [checks.scaffold-gitignore-stale]
+description = "Every workspace member's .gitignore holds every rlsbl-managed entry."
+subject = "scaffold"
 tags = ["workspace"]
 severity = "warn"
 fast = true
@@ -739,6 +870,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.root-rlsbl-conflict]
+description = "A root .rlsbl/ does not coexist with .rlsbl-monorepo/."
+subject = "workspace"
 tags = ["workspace"]
 severity = "error"
 fast = true
@@ -748,6 +881,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.go-companion-tags]
+description = "Every releasable's publishing Go members have companion tags for the current version."
+subject = "workspace"
 tags = ["workspace"]
 severity = "error"
 fast = true
@@ -757,6 +892,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.releasable-residue]
+description = "Release state sits only where something reads it, in releasable members and in members that release nothing alike."
+subject = "workspace"
 tags = ["workspace"]
 severity = "error"
 fast = true
@@ -766,6 +903,8 @@ depends_on = []
 scope = "workspace"
 
 [checks.member-pytest-config]
+description = "When the workspace root has a conftest.py, every member with a tests/ directory pins its own pytest rootdir."
+subject = "tests"
 tags = ["workspace"]
 severity = "error"
 fast = true
@@ -775,6 +914,8 @@ depends_on = []
 scope = "workspace:non_dev_node"
 
 [checks.mixed-tag-schemes]
+description = "No member directory mixes Go's path-based tags with @-style tags."
+subject = "workspace"
 tags = ["workspace"]
 severity = "error"
 fast = true
@@ -788,6 +929,8 @@ scope = "workspace"
 # ---------------------------------------------------------------------------
 
 [checks.wrapper-producer]
+description = "Every launcher pipeline's wraps names a real binary-artifact pipeline whose manifest keeps the shim-critical fields."
+subject = "release"
 tags = ["project", "preflight"]
 severity = "error"
 fast = true
@@ -800,6 +943,8 @@ depends_on = ["config-schema"]
 # when the project has no strictspec_gate section. Pure (parses committed JSON/
 # TOML, no subprocess or network). In "preflight" so it blocks a release.
 [checks.strictspec-certificate-gate]
+description = "The strictspec diff certificate named by strictspec_gate reports no violated, or unsupported and unadjudicated, claim."
+subject = "release"
 tags = ["project", "preflight"]
 severity = "error"
 fast = true
@@ -815,6 +960,8 @@ depends_on = ["config-schema"]
 # (reads committed JSON/TOML/YAML text, no subprocess or network). In
 # "preflight" so a broken floor blocks a release.
 [checks.testisolation-floor]
+description = "An adopted testisolation floor has a working sandbox runner that every declared CI workflow invokes."
+subject = "tests"
 tags = ["project", "preflight"]
 severity = "error"
 fast = true
@@ -832,6 +979,8 @@ depends_on = ["config-schema"]
 # TOML/JSON, no subprocess or network). In "preflight" so a lagging floor
 # blocks the release that would ship it.
 [checks.dep-floors]
+description = "Every ecosystem-internal dependency declares a >= floor at the version the lockfile resolves."
+subject = "dependencies"
 tags = ["project", "preflight"]
 severity = "error"
 fast = true
@@ -858,6 +1007,8 @@ depends_on = ["config-schema"]
 # the generated files and the linked runtime's declared range). In "preflight"
 # because this class broke a release attempt.
 [checks.strictspec-generated-format]
+description = "Every validator strictspec.toml declares carries a GENERATED_CODE_FORMAT the linked strictspec runtime reads."
+subject = "code"
 tags = ["project", "preflight"]
 severity = "error"
 fast = true
@@ -872,6 +1023,8 @@ depends_on = []
 # one. Pure (reads go.mod plus read-only local git). In "preflight" so a module
 # path the repository no longer serves cannot be published.
 [checks.go-module-identity]
+description = "Every go.mod's module path equals the repository's origin identity plus the module's subdirectory."
+subject = "project"
 tags = ["project", "preflight"]
 severity = "error"
 fast = true
@@ -886,6 +1039,8 @@ depends_on = []
 # (reads go.mod). In "preflight" so a release cannot ship a module whose CI
 # verdict came from the wrong Go.
 [checks.go-toolchain-declared]
+description = "Every Go module's go.mod carries a toolchain line."
+subject = "project"
 tags = ["project", "preflight"]
 severity = "error"
 fast = true
@@ -903,6 +1058,8 @@ depends_on = []
 # source and read-only local git). In "preflight" so a release cannot publish
 # binaries whose injected version goes nowhere.
 [checks.ldflags-symbol]
+description = "Every -X linker flag in the tracked build configuration names an injectable string variable the Go source declares."
+subject = "code"
 tags = ["project", "preflight"]
 severity = "error"
 fast = true
@@ -911,6 +1068,8 @@ needs_network = false
 depends_on = []
 
 [checks.dep-locks]
+description = "Every lockfile still resolves the manifest beside it."
+subject = "dependencies"
 tags = ["project", "preflight"]
 severity = "error"
 fast = true

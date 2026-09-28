@@ -23,8 +23,7 @@ from rlsbl.changelog.schema import (
     serialize_entry,
     validate_schema,
 )
-from rlsbl.changelog.files import read_changelog_format_version_enforced
-from rlsbl.errors import ChangelogError, ConfigError
+from rlsbl.errors import ChangelogError
 
 
 class TestSerializeStampsFormatVersion:
@@ -130,30 +129,3 @@ class TestValidateSchemaStillNative:
             ChangelogEntry(commits=["a"], user_facing=True, description="X", type="performance")
         )
         assert any("invalid type" in e and "performance" in e for e in errs)
-
-
-class TestEnforcementConfigReader:
-    def test_absent_is_legacy_and_reports_absent(self):
-        enforced, present = read_changelog_format_version_enforced({})
-        assert enforced is False
-        assert present is False
-
-    def test_true(self):
-        enforced, present = read_changelog_format_version_enforced(
-            {"changelog_format_version_enforced": True}
-        )
-        assert enforced is True
-        assert present is True
-
-    def test_false(self):
-        enforced, present = read_changelog_format_version_enforced(
-            {"changelog_format_version_enforced": False}
-        )
-        assert enforced is False
-        assert present is True
-
-    def test_non_bool_is_hard_error(self):
-        with pytest.raises(ConfigError):
-            read_changelog_format_version_enforced(
-                {"changelog_format_version_enforced": "yes"}
-            )

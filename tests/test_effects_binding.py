@@ -102,6 +102,8 @@ EXPECTED_EFFECTS = {
     # Mutating, previewable, and consequential -- what a repository's history
     # IS is a human's call, not an agent's.
     "transition.record": "mutating",
+    "options.registry": "read_only",
+    "options.set": "mutating",
 }
 
 

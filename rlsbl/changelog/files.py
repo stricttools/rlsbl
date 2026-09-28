@@ -10,7 +10,7 @@ import stat
 import sys
 
 from .schema import ChangelogEntry, parse_entry, parse_jsonl, serialize_entry
-from ..errors import ChangelogError, ConfigError
+from ..errors import ChangelogError
 from ..workspace_types import project_is_releasable
 from ..release_file import archive_sort_key, is_release_version
 from .. import effects
@@ -661,35 +661,3 @@ def load_filter_repo_commit_map(path: str) -> "tuple[dict[str, str], list[str]]"
                 continue
             sha_map[old] = new
     return sha_map, pruned
-
-
-# Config key that flips a repo from legacy (mixed-format tolerant) to enforced
-# (every changelog line must carry format_version). There is NO enforced default
-# value: absence is legacy AND is itself reported by a warn-level check, so the
-# transition is visible, never silent. A repo sets this to true once every line
-# in its changes dir(s) carries format_version.
-CHANGELOG_FORMAT_VERSION_ENFORCED_KEY = "changelog_format_version_enforced"
-
-
-def read_changelog_format_version_enforced(config: dict) -> "tuple[bool, bool]":
-    """Read the ``changelog_format_version_enforced`` flag from a config dict.
-
-    Returns ``(enforced, key_present)``:
-
-    - key ABSENT -> ``(False, False)``: legacy mode. There is no enforced
-      default; the absence is surfaced by the ``changelog-format-version`` warn
-      check ("enforcement not yet enabled").
-    - key present and boolean -> ``(value, True)``.
-
-    A present-but-non-boolean value is a hard error (:class:`ConfigError`) --
-    invalid config is never silently coerced.
-    """
-    if CHANGELOG_FORMAT_VERSION_ENFORCED_KEY not in config:
-        return (False, False)
-    value = config[CHANGELOG_FORMAT_VERSION_ENFORCED_KEY]
-    if not isinstance(value, bool):
-        raise ConfigError(
-            f"{CHANGELOG_FORMAT_VERSION_ENFORCED_KEY} in .rlsbl/config.json must "
-            f"be a boolean, got {value!r} (type {type(value).__name__})."
-        )
-    return (value, True)

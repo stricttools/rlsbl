@@ -25,6 +25,8 @@ import textwrap
 import pytest
 import tomlkit
 
+from conftest import run_git, set_option
+
 from rlsbl.commands.rewrite.uv_path_sources import (
     CONFIG_ITEM_KEY,
     UvPathSourceError,
@@ -35,6 +37,8 @@ from rlsbl.commands.rewrite.uv_path_sources import (
     observe,
     path_sourced_names,
 )
+from rlsbl.config import validate_config_schema
+from rlsbl.options import option_value
 from rlsbl.dep_rewrite import (
     SECTIONS_ALL,
     detect_uv_path_sources,
@@ -42,6 +46,10 @@ from rlsbl.dep_rewrite import (
     floor_dep_entries,
     remove_uv_sources,
 )
+
+
+#: Preview key of the item that switches rlsbl:dep-floors on.
+OPTION_ITEM_KEY = ".strictmetadata/options/dependencies.toml"
 
 
 def _published(name, version):
@@ -58,6 +66,7 @@ def _write(root, rel, text):
 def _project(tmp_path, manifest, lock, config="{}\n"):
     root = tmp_path / "proj"
     root.mkdir()
+    run_git(root, "init", "-q")
     (root / ".rlsbl").mkdir()
     _write(root, ".rlsbl/config.json", config)
     _write(root, "pyproject.toml", textwrap.dedent(manifest))
@@ -259,10 +268,27 @@ class TestObserve:
             core = { path = "../core" }
         """, LOCK)
         preview = observe(root, probe=lambda n, v: None)
-        assert preview.keys == ("core", CONFIG_ITEM_KEY)
+        assert preview.keys == ("core", CONFIG_ITEM_KEY, OPTION_ITEM_KEY)
         config_item = preview.by_key(CONFIG_ITEM_KEY)
         assert config_item.state == "declare_floors"
         assert "core" in config_item.summary
+        option_item = preview.by_key(OPTION_ITEM_KEY)
+        assert option_item.state == "switch_on_dep_floors"
+        assert "rlsbl:dep-floors: off (rlsbl:dep-floors default)" in option_item.facts
+
+    def test_an_option_already_on_is_left_alone(self, tmp_path):
+        root = _project(tmp_path, """\
+            [project]
+            name = "app"
+            dependencies = ["core"]
+
+            [tool.uv.sources]
+            core = { path = "../core" }
+        """, LOCK)
+        set_option(root, "dep-floors", "warn", ideal="error")
+        item = observe(root, probe=lambda n, v: None).by_key(OPTION_ITEM_KEY)
+        assert item.state == "dep_floors_already_on"
+        assert item.actions == ()
 
     def test_an_already_declared_floor_needs_no_config_write(self, tmp_path):
         root = _project(tmp_path, """\
@@ -400,6 +426,14 @@ class TestApply:
 
         config = json.loads((root / ".rlsbl" / "config.json").read_text())
         assert config["internal_dep_floors"] == ["core", "helper"]
+        # The key is read only while rlsbl:dep-floors is on, so the command
+        # switches it on, naming itself in the entry's reason.
+        value = option_value("dep-floors", root)
+        assert value.value == "error"
+        assert value.entry.ideal == "error"
+        assert value.entry.scope is None
+        assert "rlsbl rewrite uv-path-sources" in value.entry.reason
+        assert validate_config_schema(config | {"publish_mode": "ci"}, project_dir=str(root)) is None
 
     def test_the_config_key_is_created_when_absent(self, tmp_path):
         root = _project(tmp_path, """\
@@ -658,6 +692,7 @@ def _workspace(
     """A uv workspace: root manifest + root lock, one member, no member lock."""
     ws = tmp_path / "ws"
     ws.mkdir()
+    run_git(ws, "init", "-q")
     table = "[tool.uv.workspace]\nmembers = " + json.dumps(members) + "\n"
     if exclude is not None:
         table += "exclude = " + json.dumps(exclude) + "\n"
@@ -679,7 +714,7 @@ class TestLockLocation:
         """The member has no lock of its own; the workspace root's lock rules."""
         ws, member = _workspace(tmp_path, members=["packages/*"])
         preview = observe(member, probe=_published)
-        assert preview.keys == ("core", CONFIG_ITEM_KEY)
+        assert preview.keys == ("core", CONFIG_ITEM_KEY, OPTION_ITEM_KEY)
         for item in preview.items:
             apply_item(item, member)
 
@@ -688,6 +723,9 @@ class TestLockLocation:
             "core>=1.2.3", "requests>=2.0",
         ]
         assert "tool" not in doc
+        # A uv workspace is not an rlsbl workspace: the repository's one rlsbl
+        # project gets an entry with no scope.
+        assert option_value("dep-floors", member).entry.scope is None
         # The rewrite stays inside the member: the workspace root is only read.
         assert "[tool.uv.workspace]" in (ws / "pyproject.toml").read_text()
 

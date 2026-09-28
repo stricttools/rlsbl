@@ -860,7 +860,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # Changelog preflight: run preflight-changelog checks via the check system
     # Under --dry-run, pure checks execute; impure checks are listed as "would run".
     if True:
-        from rlsbl import app as _rlsbl_app
+        from rlsbl import run_checks_for as _rlsbl_run_checks_for
         from pathlib import Path as _Path
 
         _is_dry = flags.get("dry-run", False)
@@ -898,7 +898,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         # produces a warning when no user-facing entries exist, which
         # is expected for infra).
         _cl_ignore_warn = (bump_type == "infra")
-        _cl_results, _cl_impure, _cl_exit = _rlsbl_app.run_checks(
+        _cl_results, _cl_impure, _cl_exit = _rlsbl_run_checks_for(
             _changelog_ctx, tag_expr="preflight-changelog",
             ignore_warnings=_cl_ignore_warn,
             pure_only=_is_dry,
@@ -1101,7 +1101,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         # (the hook then owns testing/linting).
         # Under --dry-run, pure checks execute; impure checks are listed.
         if True:
-            from rlsbl import app as _rlsbl_app
+            from rlsbl import app as _rlsbl_app, run_checks_for as _rlsbl_run_checks_for
             from ...check_context import WorkspaceCheckContext
             from ...external_checks import run_external_preflight_checks
             from pathlib import Path as _Path
@@ -1161,7 +1161,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                             log(_member_summary)
                 else:
                     # One run covering built-in + external preflight checks.
-                    results, _impure_listed, exit_code = _rlsbl_app.run_checks(
+                    results, _impure_listed, exit_code = _rlsbl_run_checks_for(
                         member_ctx, tag_expr="preflight",
                         pure_only=_pf_dry,
                     )
@@ -1211,7 +1211,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         # (the hook then owns testing/linting).
         # Under --dry-run, pure checks execute; impure checks are listed.
         if True:
-            from rlsbl import app as _rlsbl_app
+            from rlsbl import app as _rlsbl_app, run_checks_for as _rlsbl_run_checks_for
             from ...context import ProjectContext as _ProjectContext
             from ...external_checks import run_external_preflight_checks
             from pathlib import Path as _Path
@@ -1251,7 +1251,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
                     log(_pf_summary)
             else:
                 # One run covering built-in + external preflight checks.
-                results, _impure_listed, exit_code = _rlsbl_app.run_checks(
+                results, _impure_listed, exit_code = _rlsbl_run_checks_for(
                     standalone_ctx, tag_expr="preflight",
                     pure_only=_pf_dry,
                 )

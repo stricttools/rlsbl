@@ -382,13 +382,16 @@ class BaseTarget:
             scratch_mechanisms({self.name} | self._extract_target_names(ctx))
         ))
         mappings.extend(self._lint_config_mappings(ctx))
-        # Sandboxed test runner: emitted only for projects that declared the
-        # test_sandbox config family (the testisolation floor's outer layer).
+        # Sandboxed test runner: emitted only while the project's
+        # rlsbl:test-sandbox option is on (the testisolation floor's outer
+        # layer), from its test_sandbox settings.
         from ..test_sandbox import runner_mapping
 
-        runner = runner_mapping(getattr(ctx, "config", None))
-        if runner is not None:
-            mappings.append(runner)
+        config = getattr(ctx, "config", None)
+        if config is not None:
+            runner = runner_mapping(config, ctx.project_root)
+            if runner is not None:
+                mappings.append(runner)
         return mappings
 
     def _lint_config_mappings(self, ctx):

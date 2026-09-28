@@ -173,7 +173,6 @@ def purity_project(tmp_path):
         json.dumps({
             "publish_mode": "none",
             "targets": ["pypi"],
-            "changelog_format_version_enforced": True,
         }),
         encoding="utf-8",
     )

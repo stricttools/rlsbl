@@ -314,6 +314,44 @@ def run_git(repo, *args):
     _git(repo, *args)
 
 
+def set_option(project_dir, name, current, *, ideal=None, scope=None,
+               reason="the test fixture adopts it"):
+    """File the options entry ``rlsbl:<name>`` for *project_dir*'s repository.
+
+    Options live at a repository's git root, so a directory inside no
+    repository is made one first (``git init``). *ideal* defaults to
+    *current*. Returns rlsbl's write result.
+    """
+    from rlsbl.options import repository_root, set_entry
+
+    if repository_root(project_dir) is None:
+        _git(project_dir, "init", "-q")
+    return set_entry(
+        project_dir, f"rlsbl:{name}", current, ideal or current, reason,
+        scope=scope,
+    )
+
+
+def run_named_options_command(message, cwd, monkeypatch,
+                              reason="the fix-instruction test executes it"):
+    """Execute the ``rlsbl options set`` command a message names, as written.
+
+    The one liberty taken is the reason: a message names its placeholder in
+    angle brackets, and the caller's own words replace it. Runs through the
+    real CLI from *cwd* and returns strictcli's test result.
+    """
+    import re
+    import shlex
+
+    import rlsbl
+
+    match = re.search(r'rlsbl options set [^\n"]*--reason "[^"]*"', message)
+    assert match, f"no rlsbl options set command in: {message}"
+    command = re.sub(r"<[^>]*>", reason, match.group(0))
+    monkeypatch.chdir(cwd)
+    return rlsbl.app.test(shlex.split(command)[1:])
+
+
 def git_head(repo):
     """Get HEAD hash."""
     return _git(repo, "rev-parse", "HEAD")
@@ -1180,7 +1218,7 @@ def monorepo_fixture(tmp_path, monkeypatch):
     run_git(tmp_path, "add", "python/post_tag.txt", "go/post_tag.txt")
     run_git(tmp_path, "commit", "-q", "-m", "post-tag change")
     _post_tag_sha = git_head(tmp_path)
-    _uf_entry = json.dumps({"commits": [_post_tag_sha], "user_facing": True, "description": "test", "type": "feature"}) + "\n"
+    _uf_entry = json.dumps({"format_version": 1, "commits": [_post_tag_sha], "user_facing": True, "description": "test", "type": "feature"}) + "\n"
     (python_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text(_uf_entry)
     (go_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text(_uf_entry)
     for proj in projects:

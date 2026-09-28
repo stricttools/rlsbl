@@ -34,6 +34,8 @@
   "monorepo.snapshot-check",
   "monorepo.status",
   "monorepo.sync",
+  "options.registry",
+  "options.set",
   "pre-push-check",
   "prs",
   "release.backfill",

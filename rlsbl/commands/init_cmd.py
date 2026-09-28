@@ -1846,9 +1846,9 @@ def run_cmd(registry, args, flags, ctx):
         vars_dict["year"] = str(datetime.now().year)
         # npm publish provenance flag, derived from the npm pipeline config.
         vars_dict["npm.provenance"] = _npm_provenance_var(ctx.config)
-        # Sandboxed test-runner vars (empty dict when test_sandbox is absent).
+        # Sandboxed test-runner vars (empty dict while rlsbl:test-sandbox is off).
         from ..test_sandbox import template_vars as _test_sandbox_vars
-        vars_dict.update(_test_sandbox_vars(ctx.config))
+        vars_dict.update(_test_sandbox_vars(ctx.config, ctx.project_root))
         # Whether a scratch directory also carries a Go module file, which is
         # what keeps the go command from building a probe planted there.
         from ..scratch_dirs import scratch_mechanisms, scratch_template_vars
@@ -2988,9 +2988,9 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         vars_dict["year"] = str(datetime.now().year)
         # npm publish provenance flag, derived from the npm pipeline config.
         vars_dict["npm.provenance"] = _npm_provenance_var(ctx.config)
-        # Sandboxed test-runner vars (empty dict when test_sandbox is absent).
+        # Sandboxed test-runner vars (empty dict while rlsbl:test-sandbox is off).
         from ..test_sandbox import template_vars as _test_sandbox_vars
-        vars_dict.update(_test_sandbox_vars(ctx.config))
+        vars_dict.update(_test_sandbox_vars(ctx.config, ctx.project_root))
         # Whether a scratch directory also carries a Go module file, which is
         # what keeps the go command from building a probe planted there.
         from ..scratch_dirs import scratch_mechanisms, scratch_template_vars
