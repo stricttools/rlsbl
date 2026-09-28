@@ -2201,6 +2201,11 @@
           "anchor": "branch-restrictions"
         },
         {
+          "level": 3,
+          "text": "Why reachability, and why from `only_on`",
+          "anchor": "why-reachability-and-why-from-only_on"
+        },
+        {
           "level": 2,
           "text": "Flags",
           "anchor": "flags"
@@ -23044,7 +23049,7 @@
       ]
     }
   ],
-  "last_gen": "2026-09-28T22:59:31.386065+00:00",
+  "last_gen": "2026-09-28T23:01:27.404090+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
