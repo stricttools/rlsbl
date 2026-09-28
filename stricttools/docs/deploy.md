@@ -1,5 +1,5 @@
 +++
-description = "SSH-based deployment system with configurable health checks, automatic rollback on failure, and branch restrictions for safe remote deploys."
+description = "SSH deploys with health checks, rollback on failure, and branch restrictions that also hold a Release tag checkout to its branch on origin."
 +++
 
 # Deploy

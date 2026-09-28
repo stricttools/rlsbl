@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.commands.release_retry"
-description = "File-driven release retry that reads retry.toml, verifies the GitHub Release exists, and dispatches CI/CD workflows via gh workflow run."
+description = "File-driven release retry that reads or writes retry.toml, verifies the GitHub Release exists, and dispatches its CI/CD workflows at the release tag."
 generated = true
 nav_group = "API Reference"
 nav_order = 68
