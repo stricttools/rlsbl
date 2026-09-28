@@ -1280,15 +1280,12 @@ def _announce_unpushed_finalize(exc, workspace_root):
     failed release and must not be reported as one -- re-running or resuming
     would find nothing to do. What it IS is the branch left one commit ahead
     of its remote, which the next release's preflight will meet. So it is
-    stated out loud, on stderr (``--quiet`` cannot swallow it), naming the one
-    command that resolves it.
+    stated out loud, on stderr (``--quiet`` cannot swallow it), naming the
+    rlsbl command that publishes it. rlsbl's messages never tell a person to
+    push by hand, and no rlsbl command publishes this one commit on its own:
+    the next release's candidate push carries the branch, this commit
+    included.
     """
-    from ...utils import get_current_branch
-
-    try:
-        branch = get_current_branch(cwd=workspace_root)
-    except Exception:
-        branch = "<branch>"
     print(
         f"\nUNRESOLVED: the batch finalize commit was not pushed.\n"
         f"{exc}\n"
@@ -1297,9 +1294,13 @@ def _announce_unpushed_finalize(exc, workspace_root):
         f"remains is the archive commit for the batch release file, which is\n"
         f"committed locally but not published, leaving the branch one commit\n"
         f"ahead of its remote.\n"
-        f"  Resolve with: git push origin {branch}\n"
+        f"  The next release publishes it: its candidate push carries the\n"
+        f"  branch, this commit included. Run `rlsbl monorepo release run`\n"
+        f"  when there is something to release; no rlsbl command publishes\n"
+        f"  this commit on its own.\n"
         f"  (if the message above names commits this release did not create,\n"
-        f"  move them off the branch or record them first)",
+        f"  the next release carries them too, and its changelog coverage\n"
+        f"  asks for their entries)",
         file=sys.stderr,
     )
 
