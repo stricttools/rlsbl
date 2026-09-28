@@ -81,7 +81,7 @@ def _setup_npm_project(repo):
     _git(repo, "add", "feature.txt")
     _git(repo, "commit", "-q", "-m", "add feature")
 
-    entry = {
+    entry = {"format_version": 1, 
         "commits": [_git_head(repo)],
         "user_facing": True,
         "description": "**New feature.** A shiny new thing.",

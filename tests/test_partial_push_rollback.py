@@ -83,7 +83,7 @@ def _setup_releasable_npm_project(repo):
     _git(repo, "commit", "-q", "-m", "add feature")
     feature_sha = _git_head(repo)
 
-    entry = {
+    entry = {"format_version": 1, 
         "commits": [feature_sha],
         "user_facing": True,
         "description": "**Add feature.** New feature available.",
@@ -218,7 +218,7 @@ def _setup_rerelease_with_committed_finalize(repo):
     _git(repo, "commit", "-q", "-m", "add feature")
     feature_sha = _git_head(repo)
 
-    entry = {
+    entry = {"format_version": 1, 
         "commits": [feature_sha],
         "user_facing": True,
         "description": "**Add feature.** New feature available.",

@@ -107,7 +107,7 @@ class TestChangelogCoveragePassesWhenCovered:
 
         # Add a JSONL entry covering the commit
         changes = prepush_repo / ".rlsbl" / "changes"
-        entry = json.dumps({
+        entry = json.dumps({"format_version": 1, 
             "commits": [head_sha],
             "user_facing": True,
             "description": "new feature",

@@ -144,7 +144,7 @@ def _setup_releasable_workspace(root):
     feature_sha = _git_head(root)
 
     # Cover it in the releasable-level changelog
-    entry = {
+    entry = {"format_version": 1, 
         "commits": [feature_sha],
         "user_facing": True,
         "description": "**New feature.** A shiny new thing.",
