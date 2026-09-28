@@ -319,7 +319,7 @@ class TestDependsOnOrdering:
         ctx.push_stdin = _make_push_stdin(prepush_repo, head_sha, base_sha)
 
         # Run all prepush checks via the check system
-        results, _impure, exit_code = app.run_checks(ctx, tag_expr="prepush", ignore_warnings=True)
+        results, _impure, exit_code = app.run_checks(ctx, tag_expr="prepush")
         results_dict = {cr.name: cr for cr in results}
 
         # changelog-coverage must have failed

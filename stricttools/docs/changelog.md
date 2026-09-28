@@ -149,7 +149,7 @@ user-facing status, and cannot rewrite the commits an entry names.
 | 3 | Commit coverage | Every unreleased commit appears in at least one entry. Commits that only touch `.rlsbl/changes/` or `CHANGELOG.md` are auto-exempted. |
 | 4 | Orphan detection | Entries with no hash that is both resolvable and in this scope's range. The finding counts the unresolvable, the out-of-range and the out-of-scope hashes apart, and its remedy names a real `rlsbl changelog remap` or `rlsbl changelog remove` invocation carrying the entry's own identifier. |
 | 5 | Schema conformance | User-facing entries have `description` and `type`; type is one of `feature`/`fix`/`breaking` |
-| 6 | User-facing requirement | At least one entry must be user-facing (warning in check mode, hard error during release) |
+| 6 | User-facing requirement | At least one entry must be user-facing (warning in check mode; every release except `infra` refuses to run without one) |
 | 7 | Batch size (commits) | No single entry may reference more commits than `max_commits_per_entry` (default 5) |
 | 8 | Batch size (entries) | No single commit may appear in more entries than `max_entries_per_commit` (default 5) |
 | 9 | Version consistency | Project version matches across all target files |
@@ -317,7 +317,7 @@ Never fabricate a user-facing entry to bypass the user-facing requirement. If a 
 
 ## Pre-push enforcement
 
-The `.git/hooks/pre-push` hook captures git's push refs and runs `rlsbl check --tag prepush` on every branch push, to verify changelog completeness before commits reach the remote. This is a hard enforcement point that blocks pushes with uncovered commits, preventing incomplete changelogs from reaching the main branch:
+The `.git/hooks/pre-push` hook captures git's push refs and runs `rlsbl failing-checks --hook pre-push` on every branch push, to verify changelog completeness before commits reach the remote. This is a hard enforcement point that blocks pushes with uncovered commits, preventing incomplete changelogs from reaching the main branch:
 
 1. Checks that every pushed commit has a JSONL entry (hard error — blocks the push)
 2. Hard-errors when a push targets a release branch but did not originate from `rlsbl release run`

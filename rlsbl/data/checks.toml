@@ -28,6 +28,17 @@ app = "rlsbl"
 # `needs_network` is orthogonal and unchanged: it says whether the check needs
 # the network to answer at all, never whether it may mutate.
 
+# Hooks: each names the check selection a git hook or the release runs, so the
+# installed pre-push hook runs `rlsbl failing-checks --hook pre-push` and never
+# spells a tag expression of its own. The release's check step runs the
+# pre-release hook's selection (rlsbl.checks.hook_selection).
+
+[hooks.pre-push]
+tag = "prepush"
+
+[hooks.pre-release]
+tag = "preflight"
+
 [checks.lock]
 description = "No stale release lock file is left in .rlsbl/ or .rlsbl-monorepo/."
 subject = "release"

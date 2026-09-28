@@ -88,9 +88,7 @@ class TestOneResolutionPerContext:
         monkeypatch.chdir(tmp_path)
         ctx = _ctx(tmp_path)
 
-        results, _impure, _exit = app.run_checks(
-            ctx, tag_expr="changelog", ignore_warnings=True,
-        )
+        results, _impure, _exit = app.run_checks(ctx, tag_expr="changelog")
 
         # The run really did exercise the changelog checks (otherwise a count of
         # one would be vacuous).

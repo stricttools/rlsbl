@@ -3,7 +3,8 @@
 rlsbl installs a `.git/hooks/pre-push` hook in scaffolded projects. The hook
 content has changed over time (older versions were 44-line standalone bash
 scripts; the current version captures push stdin and delegates to
-`rlsbl check --tag prepush`).
+`rlsbl failing-checks --hook pre-push`, the selection `[hooks.pre-push]` in
+rlsbl's checks.toml declares).
 
 To safely upgrade an old hook without clobbering a user-customized one, we
 compare its content hash against the set of every hook version rlsbl has
@@ -21,6 +22,10 @@ import hashlib
 #   refs/backups/* -- safegit's backup slots
 # Both are tool-owned namespaces; enforcing on them would block the tools that
 # own them. Anything else (a push with no branch refs at all) exits 0 too.
+#
+# The hook names only the hook: which checks it runs is `[hooks.pre-push]` in
+# rlsbl's checks.toml, and `failing-checks` blocks only on error-level
+# failures, so a check an options entry softened to warn never blocks a push.
 CURRENT_PRE_PUSH_HOOK = """\
 #!/usr/bin/env bash
 # rlsbl pre-push hook. Enforces on refs/heads/* only; refs/tags/* and
@@ -36,7 +41,7 @@ if [ "$enforce" -eq 0 ]; then
   exit 0
 fi
 export RLSBL_PUSH_STDIN="$stdin_data"
-exec rlsbl check --tag prepush
+exec rlsbl failing-checks --hook pre-push
 """
 
 
@@ -153,9 +158,30 @@ _PRE_PUSH_HOOK_V4 = '#!/usr/bin/env bash\nexec rlsbl pre-push-check\n'
 # unconditionally (no ref-namespace filtering).
 _PRE_PUSH_HOOK_V5 = '#!/usr/bin/env bash\nexport RLSBL_PUSH_STDIN="$(cat)"\nexec rlsbl check --tag prepush\n'
 
-# Version 6 (current): namespace-aware -- enforces on refs/heads/*, exits 0 for
-# refs/tags/* and refs/backups/*.
-_PRE_PUSH_HOOK_V6 = CURRENT_PRE_PUSH_HOOK
+# Version 6: namespace-aware -- enforces on refs/heads/*, exits 0 for
+# refs/tags/* and refs/backups/* -- running the full `check` report on the
+# prepush tag it spelled itself, so a warning blocked the push.
+_PRE_PUSH_HOOK_V6 = """\
+#!/usr/bin/env bash
+# rlsbl pre-push hook. Enforces on refs/heads/* only; refs/tags/* and
+# refs/backups/* are tool-owned namespaces and exit 0.
+stdin_data="$(cat)"
+enforce=0
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    refs/heads/*) enforce=1 ;;
+  esac
+done <<< "$stdin_data"
+if [ "$enforce" -eq 0 ]; then
+  exit 0
+fi
+export RLSBL_PUSH_STDIN="$stdin_data"
+exec rlsbl check --tag prepush
+"""
+
+# Version 7 (current): namespace-aware, running `failing-checks` for the
+# declared pre-push hook.
+_PRE_PUSH_HOOK_V7 = CURRENT_PRE_PUSH_HOOK
 
 
 def compute_hook_hash(content):
@@ -180,6 +206,7 @@ PRE_PUSH_HOOK_HASHES = frozenset({
     compute_hook_hash(_PRE_PUSH_HOOK_V4),
     compute_hook_hash(_PRE_PUSH_HOOK_V5),
     compute_hook_hash(_PRE_PUSH_HOOK_V6),
+    compute_hook_hash(_PRE_PUSH_HOOK_V7),
 })
 
 

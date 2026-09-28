@@ -28,10 +28,11 @@ def _all_commands():
     return dict(_walk(rlsbl.app._commands, rlsbl.app._groups))
 
 
-# The complete classification table.  ``check`` is strictcli's own
-# auto-registered command and is read_only by the framework.
+# The complete classification table.  ``check`` and ``failing-checks`` are
+# strictcli's own auto-registered commands and are read_only by the framework.
 EXPECTED_EFFECTS = {
     "check": "read_only",
+    "failing-checks": "read_only",
     "status": "read_only",
     "scaffold": "mutating",
     "check-name": "read_only",
@@ -113,7 +114,7 @@ class TestEveryHandlerBindsTheChokepoint:
             name
             for name, cmd in _all_commands().items()
             # strictcli's own commands are the framework's, not rlsbl's.
-            if name != "check"
+            if name not in ("check", "failing-checks")
             and not getattr(cmd.handler, "__rlsbl_effects_handler__", False)
         ]
         assert unbound == [], (

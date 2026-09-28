@@ -70,6 +70,7 @@ def _check(argv):
         return rlsbl.app.test(remaining)
     finally:
         rlsbl._check_releasable = None
+        rlsbl._check_command = "check"
 
 
 class TestProjectScopedChecksAtTheRoot:
@@ -220,3 +221,48 @@ class TestStandaloneIsUnchanged:
 
         combined = result.stdout + result.stderr
         assert "--releasable" not in combined, combined
+
+
+class TestFailingChecksTakesTheSelectorToo:
+    """`failing-checks` runs the same selection as `check`, at the same scope.
+
+    The pre-push hook runs `failing-checks` at the root of every repository, so
+    it has to accept the releasable selector `check` accepts, and a refusal it
+    prints has to name the command that was run.
+    """
+
+    def test_the_selector_is_lifted_for_failing_checks(
+        self, workspace, monkeypatch,
+    ):
+        monkeypatch.setattr(rlsbl, "_check_command", "check")
+        with patch.object(
+            sys, "argv",
+            ["rlsbl", "failing-checks", "--tag", "changelog",
+             "--releasable", "core"],
+        ):
+            selector = rlsbl._extract_check_releasable()
+            remaining = list(sys.argv[1:])
+
+        assert selector == "core"
+        assert remaining == ["failing-checks", "--tag", "changelog"]
+
+    def test_the_root_refusal_names_failing_checks(self, workspace):
+        result = _check(["failing-checks", "--tag", "changelog"])
+
+        assert result.exit_code == 1
+        combined = result.stdout + result.stderr
+        assert "rlsbl failing-checks --releasable core" in combined, combined
+
+    def test_running_the_named_fix_clears_the_refusal(self, workspace):
+        refused = _check(["failing-checks", "--tag", "changelog"])
+        assert "rlsbl failing-checks --releasable core" in (
+            refused.stdout + refused.stderr
+        )
+
+        result = _check(
+            ["failing-checks", "--tag", "changelog", "--releasable", "core"],
+        )
+
+        combined = result.stdout + result.stderr
+        assert "--releasable" not in combined, combined
+        assert "workspace root" not in combined, combined
