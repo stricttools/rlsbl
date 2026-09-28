@@ -942,7 +942,7 @@ def cmd_release_init(ctx):
     # registry publish the release itself would have. Re-dispatching a
     # publication is the operator's call.
     consequential=True,
-    help="Dispatch CI/CD workflows for a completed release via gh workflow run. Reads the dispatch list and ref from .rlsbl/releases/retry.toml, which is auto-scaffolded with sensible defaults if missing. Verifies the GitHub Release exists before dispatching. Each workflow in the dispatch list is triggered against the configured ref (defaults to the release tag).",
+    help="Dispatch CI/CD workflows for a completed release via gh workflow run. Reads the dispatch list and ref from .rlsbl/releases/retry.toml, which is written with the release tag as the ref when missing. Verifies the GitHub Release exists before dispatching. Each workflow in the dispatch list is triggered at the release tag; a ref naming anything else, a branch included, is refused before anything is dispatched, because a run started there cannot be tied to the release.",
 )
 @strictcli.flag(name="watch", type=bool, presence="required", help="After retry, automatically watch CI runs to completion (--no-watch to skip)")
 @effects.handler
