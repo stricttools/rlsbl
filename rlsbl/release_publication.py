@@ -287,13 +287,35 @@ def view_body_args(tag, *, repo=None):
             *_repo_args(repo)]
 
 
-def create_args(pub: ReleasePublication, notes_path, *, repo=None):
-    """argv creating the Release *pub* describes, notes read from a file."""
-    args = ["release", "create", pub.tag, "--title", pub.release_title,
-            "--notes-file", notes_path, *_repo_args(repo)]
-    if pub.prerelease:
+def create_argv(tag, title, notes_path, *, prerelease, moves_latest, repo=None):
+    """argv creating one Release, notes read from a file.
+
+    ``--verify-tag`` is on every creation: without it ``gh`` creates a tag the
+    remote does not have at the default branch's head and publishes the
+    Release there, so ``release: published`` fires for a commit nobody
+    released. With it the creation is refused instead.
+
+    *moves_latest* states whether this Release may take the repository's
+    "Latest" badge. A real release passes True and keeps GitHub's default (the
+    newest release shows as Latest); a repair that re-creates an old Release
+    passes False, which becomes ``--latest=false``, so the badge never moves
+    onto a version that is not the newest.
+    """
+    args = ["release", "create", tag, "--title", title,
+            "--notes-file", notes_path, "--verify-tag", *_repo_args(repo)]
+    if prerelease:
         args.append("--prerelease")
+    if not moves_latest:
+        args.append("--latest=false")
     return args
+
+
+def create_args(pub: ReleasePublication, notes_path, *, moves_latest, repo=None):
+    """argv creating the Release *pub* describes (see :func:`create_argv`)."""
+    return create_argv(
+        pub.tag, pub.release_title, notes_path, prerelease=pub.prerelease,
+        moves_latest=moves_latest, repo=repo,
+    )
 
 
 def edit_notes_args(tag, notes_path, *, repo=None):
@@ -346,11 +368,15 @@ def notes_file(body, *, directory="."):
                 effects.remove(path)
 
 
-def create_release(pub: ReleasePublication, *, gh, config=None, repo=None,
-                   directory="."):
-    """Create the Release *pub* describes. Returns the argv that was run."""
+def create_release(pub: ReleasePublication, *, gh, moves_latest, config=None,
+                   repo=None, directory="."):
+    """Create the Release *pub* describes. Returns the argv that was run.
+
+    *moves_latest* is :func:`create_argv`'s: True for a real release, False
+    for a repair.
+    """
     with notes_file(pub.body, directory=directory) as path:
-        args = create_args(pub, path, repo=repo)
+        args = create_args(pub, path, moves_latest=moves_latest, repo=repo)
         gh(args, config=config)
     return args
 

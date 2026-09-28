@@ -1274,6 +1274,8 @@ def _apply_tag(plan, remote, root, project_path, *, notes_dir):
         # Unscoped: --repo names the MIRROR, so this must not inherit the
         # monorepo's own GH_REPO.
         gh=lambda args, config=None: run_gh_unscoped(args),
+        # A repair: materializing a version never moves the mirror's badge.
+        moves_latest=False,
         directory=notes_dir,
         log=print,
     )

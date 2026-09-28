@@ -324,6 +324,7 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
     from ..release_publication import (
         release_commit_from_record,
         release_notices_from_record,
+        create_argv,
         create_release,
         edit_all_args,
         is_prerelease,
@@ -417,7 +418,9 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
                     update_release(pub, gh=gh, config=ctx.config,
                                    directory=str(project_root))
                 else:
+                    # A repair: the badge stays on the newest release.
                     create_release(pub, gh=gh, config=ctx.config,
+                                   moves_latest=False,
                                    directory=str(project_root))
             else:
                 # Markerless: the same document minus the release commit it does not
@@ -430,10 +433,11 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
                             prerelease=is_prerelease(version),
                         )
                     else:
-                        args = ["release", "create", tag_name, "--title",
-                                tag_name, "--notes-file", path]
-                        if is_prerelease(version):
-                            args.append("--prerelease")
+                        args = create_argv(
+                            tag_name, tag_name, path,
+                            prerelease=is_prerelease(version),
+                            moves_latest=False,
+                        )
                     gh(args, config=ctx.config)
             written += 1
         except Exception as e:
@@ -1677,7 +1681,8 @@ def apply_item(item, *, ctx, releases_dir, changelog_path, push_timeout,
     pub = _release_publication_for(
         action, changelog_path=changelog_path, releases_dir=releases_dir,
     )
-    create_release(pub, gh=gh, config=ctx.config)
+    # A repair: materializing an absent Release never moves the badge.
+    create_release(pub, gh=gh, config=ctx.config, moves_latest=False)
     log(f"Created GitHub Release {action.tag}")
 
 
