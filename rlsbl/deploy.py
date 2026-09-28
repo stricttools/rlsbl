@@ -278,8 +278,10 @@ def _git_observe(args, cwd):
 
 def head_is_detached(cwd):
     """Is HEAD at *cwd* detached (a tag or commit checkout, not a branch)?"""
+    # Exit 1 is git's "HEAD is not a symbolic ref"; any other failure (not a
+    # repository) is no answer, and the branch lookup reports it.
     result = _git_observe(["symbolic-ref", "-q", "HEAD"], cwd)
-    return result.returncode != 0
+    return result.returncode == 1
 
 
 def branch_carrying_head(cwd, only_on):
