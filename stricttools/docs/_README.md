@@ -104,7 +104,7 @@ Created files are committed automatically by default.
 | `.rlsbl/hooks/pre-checks.sh` | User-customizable pre-checks validation |
 | `.rlsbl/hooks/pre-release.sh` | User-customizable pre-release validation |
 | `.rlsbl/hooks/post-release.sh` | User-customizable post-release actions |
-| `.git/hooks/pre-push` | Captures push refs, runs `rlsbl check --tag prepush` |
+| `.git/hooks/pre-push` | Captures push refs, runs `rlsbl failing-checks --hook pre-push` |
 | `.rlsbl/bases/` | Three-way merge bases for scaffold |
 
 **Three-way merge:** Bases are stored at scaffold time. On re-run, user customizations and template updates merge via `git merge-file`. Conflicts get git-style conflict markers.
@@ -180,7 +180,7 @@ boundary alias tag). A write from anywhere else is not rlsbl's.
 
 ## Pre-push hook
 
-The `.git/hooks/pre-push` hook captures push refs from git and runs `rlsbl check --tag prepush`, which enforces:
+The `.git/hooks/pre-push` hook captures push refs from git and runs `rlsbl failing-checks --hook pre-push`: the checks `[hooks.pre-push]` in rlsbl's `checks.toml` selects (the `prepush` tag), blocking only on error-level failures, so a check an options entry softened to `warn` never blocks a push. It enforces:
 
 1. **Changelog coverage** -- every pushed commit must have a JSONL entry
 2. **Gitignore guard** -- rlsbl-managed files must not be gitignored

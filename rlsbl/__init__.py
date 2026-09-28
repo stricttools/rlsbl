@@ -55,13 +55,20 @@ _variadic_args: list[str] = []
 # standalone mode. Command handlers can pass this to create_context().
 _resolved_project = None
 
-# `rlsbl check --releasable <name>`: which releasable the check run is scoped
-# to, or None. Populated by main() before app.run(), from the same argv
-# pre-parse that lifts variadic positionals out -- `check` is the framework's
-# own auto-registered command, so rlsbl cannot declare a flag on it and the
-# selector is lifted out of argv here instead. The check-context factory is its
-# only reader.
+# `rlsbl check --releasable <name>` (and the same on `failing-checks`): which
+# releasable the check run is scoped to, or None. Populated by main() before
+# app.run(), from the same argv pre-parse that lifts variadic positionals out --
+# both check commands are the framework's own auto-registered commands, so
+# rlsbl cannot declare a flag on them and the selector is lifted out of argv
+# here instead. The check-context factory is its only reader.
 _check_releasable: str | None = None
+
+# The framework's check commands, which take the releasable selector.
+_CHECK_COMMANDS = ("check", "failing-checks")
+
+# Which of those this invocation runs, so a refusal names the command that was
+# typed. Set by _extract_check_releasable; "check" when neither is running.
+_check_command: str = "check"
 
 
 def detect_registries():
@@ -491,8 +498,9 @@ app = strictcli.App(
     handshake_env={
         "RLSBL_PUSH_STDIN": (
             "Pre-push ref lines (`<local ref> <local sha> <remote ref> "
-            "<remote sha>`) for `rlsbl check --tag prepush`, when the caller "
-            "has already consumed git's hook stdin."
+            "<remote sha>`) for the checks the pre-push hook selects "
+            "(`rlsbl failing-checks --hook pre-push`), when the caller has "
+            "already consumed git's hook stdin."
         ),
     },
     checks_path=Path(__file__).parent / "data" / "checks.toml",
@@ -555,7 +563,7 @@ def _check_context_factory(project_root=None):
                 else:
                     project = _releasable_representative(
                         workspace_root, selector,
-                        invocation="rlsbl check", verb="check",
+                        invocation=f"rlsbl {_check_command}", verb="check",
                     )
                     root = Path(workspace_root) / project["path"]
             elif selector is not None:
@@ -664,7 +672,8 @@ def _check_project_dir():
         # The context factory refuses the selector here, naming why.
         return here
     project = _releasable_representative(
-        workspace_root, _check_releasable, invocation="rlsbl check", verb="check",
+        workspace_root, _check_releasable,
+        invocation=f"rlsbl {_check_command}", verb="check",
     )
     return Path(workspace_root) / project["path"]
 
@@ -1753,7 +1762,7 @@ def cmd_watch(ctx, target, run_id, sha=None):
 # pre-push-check
 # ---------------------------------------------------------------------------
 
-@app.command(name="pre-push-check", help="Removed. This command no longer performs any check: it always exits 1 with instructions. The pre-push hook now runs `rlsbl check --tag prepush` instead, so a repo whose hook still calls pre-push-check needs `rlsbl scaffold` to regenerate it.", effect="read_only")
+@app.command(name="pre-push-check", help="Removed. This command no longer performs any check: it always exits 1 with instructions. The pre-push hook now runs `rlsbl failing-checks --hook pre-push` instead, so a repo whose hook still calls pre-push-check needs `rlsbl scaffold` to regenerate it.", effect="read_only")
 @effects.handler
 def cmd_pre_push_check(ctx):
     """Removed command stub that directs users to re-scaffold."""
@@ -3384,8 +3393,9 @@ def _extract_variadic_args():
 def _extract_check_releasable():
     """Lift ``rlsbl check --releasable <name>`` out of ``sys.argv``.
 
-    ``check`` is strictcli's own auto-registered command: its five flags are the
-    framework's, and a consumer cannot declare a sixth on it. The selector is
+    ``check`` and ``failing-checks`` are strictcli's own auto-registered
+    commands: their flags are the framework's, and a consumer cannot declare
+    another on them. The selector is
     therefore parsed here and removed from argv before the app sees it, the same
     shape ``_extract_variadic_args`` already uses for the positionals strictcli
     cannot express. It follows that ``--releasable`` does not appear in
@@ -3393,7 +3403,8 @@ def _extract_check_releasable():
     root prints the full invocation instead.
 
     Returns the name, or None when the flag was not passed (and for every
-    command other than ``check``). A supplied-but-empty value and a trailing
+    command other than the two check commands). Records which check command
+    runs in ``_check_command``, so a refusal names it. A supplied-but-empty value and a trailing
     ``--releasable`` with nothing after it are hard errors here: an empty value
     is a statement, and it is not the statement that the flag was omitted.
 
@@ -3404,14 +3415,17 @@ def _extract_check_releasable():
     before the command is one of those, and all four are booleans carrying no
     value of their own.
     """
+    global _check_command
     argv = sys.argv[1:]
     command_at = next(
         (i for i, tok in enumerate(argv) if not tok.startswith("-")), None,
     )
-    if command_at is None or argv[command_at] != "check":
+    if command_at is None or argv[command_at] not in _CHECK_COMMANDS:
+        _check_command = "check"
         return None
 
-    new_argv = [sys.argv[0], *argv[:command_at], "check"]
+    _check_command = argv[command_at]
+    new_argv = [sys.argv[0], *argv[:command_at], _check_command]
     value = None
     i = command_at + 1
     while i < len(argv):

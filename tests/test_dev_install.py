@@ -888,4 +888,4 @@ def test_pre_push_check_help_says_it_is_removed():
     help_text = app._commands["pre-push-check"].help
     assert help_text.startswith("Removed.")
     assert "CHANGELOG.md" not in help_text
-    assert "check --tag prepush" in help_text
+    assert "failing-checks --hook pre-push" in help_text

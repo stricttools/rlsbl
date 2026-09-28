@@ -22,7 +22,24 @@ rlsbl check --name version-consistency
 
 # Scope a run to one releasable (required at a monorepo workspace root)
 rlsbl check --tag changelog --releasable core
+
+# Run the checks a declared hook selects
+rlsbl check --hook pre-push
+
+# Report only the error-level failures, exiting 1 only when one exists
+rlsbl failing-checks --hook pre-push
 ```
+
+### Full report and failing checks
+
+`rlsbl check` is the full report: every selected check's result, and a nonzero exit on any failure or warning. `rlsbl failing-checks` takes the same selection flags (`--all`, `--tag`, `--name`, `--hook`, and `--releasable`), applies each check's [option](#options) value, prints only the error-level failures, and exits 1 only when one exists; a check at `warn`, registered that way or softened by an options entry, never appears in it.
+
+`--hook <name>` runs the selection a `[hooks.<name>]` table in rlsbl's `checks.toml` declares, and cannot be combined with `--all`, `--tag`, or `--name`:
+
+| Hook | Selection | Run by |
+| --- | --- | --- |
+| `pre-push` | tag `prepush` | the installed `.git/hooks/pre-push`, as `rlsbl failing-checks --hook pre-push` |
+| `pre-release` | tag `preflight` | the check step of `rlsbl release run`, which blocks on error-level failures only |
 
 ### Where a check run is scoped
 
@@ -34,7 +51,7 @@ Two families are untouched at the root, because it is the position they are mean
 
 `--releasable` is refused anywhere the directory already answers -- a member directory, or a standalone repository.
 
-`check` is strictcli's own auto-registered command and its flags are the framework's, so rlsbl lifts `--releasable` out of argv before the app parses it, exactly as it does for the positional arguments strictcli cannot express. It is therefore absent from `rlsbl check --help` and from the dumped CLI schema; this page and the refusal itself are where it is documented.
+`check` and `failing-checks` are strictcli's own auto-registered commands and their flags are the framework's, so rlsbl lifts `--releasable` out of argv before the app parses it, exactly as it does for the positional arguments strictcli cannot express. It is therefore absent from `rlsbl check --help`, from `rlsbl failing-checks --help`, and from the dumped CLI schema; this page and the refusal itself are where it is documented.
 
 ## Check results
 
@@ -163,7 +180,7 @@ It replaced three narrower checks (`local-tag`, `remote-tag`, `github-release`) 
 | `changelog-coverage` | error | Every unreleased commit appears in at least one JSONL entry |
 | `changelog-orphans` | error | No entries whose every hash is unresolvable, out of range, or owned by another releasable (stale from rebased/amended commits, or cross-filed) |
 | `changelog-schema` | error | User-facing entries have `description` and `type`; type is one of `feature`/`fix`/`breaking` |
-| `changelog-user-facing` | warn | At least one entry is user-facing (hard error during release, warning in check mode) |
+| `changelog-user-facing` | warn | At least one entry is user-facing (warning in check mode; every release except `infra` refuses to run without one) |
 | `changelog-batch-commits` | error | No single entry references more commits than `max_commits_per_entry` (default 5) |
 | `changelog-batch-entries` | error | No single commit appears in more entries than `max_entries_per_commit` (default 5) |
 | `changelog-entry` | error | `CHANGELOG.md` contains an entry for the current project version |
@@ -228,7 +245,7 @@ Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-ha
 | `test-suite` | error | Runs project tests (`pytest` / `go test` / `npm test`), or the command the [`test`](configuration.md#test) config block names for the target |
 | `test-suite-workspace` | error | Runs tests for affected workspace projects (monorepo only) |
 
-`scaffold-conflicts` (see project checks) is also tagged `prepush`. Dependencies: `test-suite` and `test-suite-workspace` both depend on `prepush-changelog-coverage` -- fast checks fail first, so the test suite is skipped if changelog coverage fails. `test-suite` is also tagged `quality`, so it runs under both `rlsbl check --tag prepush` and `rlsbl check --tag quality`.
+`scaffold-conflicts` (see project checks) is also tagged `prepush`. Dependencies: `test-suite` and `test-suite-workspace` both depend on `prepush-changelog-coverage` -- fast checks fail first, so the test suite is skipped if changelog coverage fails. `test-suite` is also tagged `quality`, so it runs under both `rlsbl check --tag prepush` and `rlsbl check --tag quality`. The `pre-push` hook declared in `checks.toml` selects the `prepush` tag; the installed git hook runs it as `rlsbl failing-checks --hook pre-push`.
 
 Both test-suite checks are overlay-preserving: when the project runs on `rlsbl dev sync` overlays, their `uv sync` excludes every overlaid package and the suite runs with `uv run --no-sync`. See [the dev workflow](dev-workflow.md) for why a bare sync would otherwise wipe the overlays it is about to test.
 
@@ -368,8 +385,9 @@ rlsbl check --tag workspace
 ### Pre-push check output
 
 ```bash
-# Triggered automatically by git push, or run manually:
-rlsbl check --tag prepush
+# git push runs `rlsbl failing-checks --hook pre-push`, which prints only the
+# error-level failures. The same selection as the full report:
+rlsbl check --hook pre-push
 #   prepush-changelog-coverage .... pass
 #   prepush-gitignore-guard ....... pass
 #   prepush-manual-warning ........ skip  (not a release branch push)

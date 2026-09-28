@@ -127,3 +127,51 @@ class TestInstallOrUpdate:
 
         # No hook installed
         assert not os.path.exists(".git/hooks/pre-push")
+
+
+# The namespace-aware hook scaffold installed before hooks were declared in
+# checks.toml: it spelled the prepush tag itself and ran the full `check`
+# report, so a warning blocked the push.
+_NAMESPACE_AWARE_CHECK_TAG_HOOK = """\
+#!/usr/bin/env bash
+# rlsbl pre-push hook. Enforces on refs/heads/* only; refs/tags/* and
+# refs/backups/* are tool-owned namespaces and exit 0.
+stdin_data="$(cat)"
+enforce=0
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    refs/heads/*) enforce=1 ;;
+  esac
+done <<< "$stdin_data"
+if [ "$enforce" -eq 0 ]; then
+  exit 0
+fi
+export RLSBL_PUSH_STDIN="$stdin_data"
+exec rlsbl check --tag prepush
+"""
+
+
+class TestTheHookRunsItsDeclaredSelection:
+    """The installed hook names only the hook: failing-checks --hook pre-push."""
+
+    def test_the_current_hook_runs_failing_checks_for_the_pre_push_hook(self):
+        assert "exec rlsbl failing-checks --hook pre-push\n" in CURRENT_PRE_PUSH_HOOK
+        assert "--tag" not in CURRENT_PRE_PUSH_HOOK
+
+    def test_the_check_tag_hook_is_upgraded_by_scaffold(
+        self, mock_git_repo, capsys,
+    ):
+        hook = mock_git_repo / ".git" / "hooks" / "pre-push"
+        hook.parent.mkdir(parents=True, exist_ok=True)
+        hook.write_text(_NAMESPACE_AWARE_CHECK_TAG_HOOK)
+
+        _install_or_update_pre_push_hook()
+
+        assert hook.read_text() == CURRENT_PRE_PUSH_HOOK
+        assert "Updated pre-push hook" in capsys.readouterr().out
+
+    def test_the_named_hook_is_declared(self):
+        from rlsbl.checks import hook_selection
+
+        assert hook_selection("pre-push") == "prepush"
+        assert hook_selection("pre-release") == "preflight"

@@ -351,26 +351,46 @@ def _repository_scoped_check_names():
     the repository root of every workspace, and refusing there would block
     every monorepo push.
     """
-    import tomllib
-
-    path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                        "data", "checks.toml")
-    with open(path, "rb") as f:
-        data = tomllib.load(f)
+    data = _load_rlsbl_checks_toml()
     return frozenset(
         name for name, spec in (data.get("checks") or {}).items()
         if "prepush" in (spec.get("tags") or [])
     )
 
 
+def _load_rlsbl_checks_toml():
+    """rlsbl's own ``data/checks.toml``, parsed."""
+    import tomllib
+
+    path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                        "data", "checks.toml")
+    with open(path, "rb") as f:
+        return tomllib.load(f)
+
+
+def hook_selection(name):
+    """The tag expression ``[hooks.<name>]`` in rlsbl's checks.toml selects.
+
+    The one declaration of what a hook runs: ``rlsbl failing-checks --hook
+    <name>`` runs it through strictcli, and the release's check step runs the
+    ``pre-release`` hook's selection through this. A name checks.toml does not
+    declare is a KeyError, never a guessed selection.
+    """
+    hooks = _load_rlsbl_checks_toml().get("hooks") or {}
+    return hooks[name]["tag"]
+
+
 def _unselected_refusal(names):
     """The one-line refusal a project-scoped check raises at a workspace root."""
     if names:
-        routes = " / ".join(f"rlsbl check --releasable {name}" for name in names)
+        import rlsbl
+
+        command = f"rlsbl {rlsbl._check_command}"
+        routes = " / ".join(f"{command} --releasable {name}" for name in names)
         return (
             f"a workspace root names the workspace, not a releasable in it, so "
             f"this check has no project to answer for. Run {routes}, or run "
-            f"`rlsbl check` from a member directory."
+            f"`{command}` from a member directory."
         )
     return (
         "a workspace root names the workspace, not a releasable in it, and "

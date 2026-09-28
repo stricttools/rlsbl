@@ -1,7 +1,8 @@
-"""End-to-end tests for the V5 pre-push hook template.
+"""End-to-end tests for the pre-push hook template.
 
 Verifies that the hook script is syntactically valid bash, correctly sets
-RLSBL_PUSH_STDIN from git's piped stdin, and invokes ``rlsbl check --tag prepush``.
+RLSBL_PUSH_STDIN from git's piped stdin, and invokes
+``rlsbl failing-checks --hook pre-push``.
 """
 
 import os
@@ -12,8 +13,8 @@ import textwrap
 from rlsbl.hook_hashes import CURRENT_PRE_PUSH_HOOK
 
 
-class TestV5HookIsValidBash:
-    """The V5 hook template must be syntactically correct bash."""
+class TestHookIsValidBash:
+    """The hook template must be syntactically correct bash."""
 
     def test_bash_syntax_check(self, tmp_path):
         hook_file = tmp_path / "pre-push"
@@ -26,20 +27,20 @@ class TestV5HookIsValidBash:
         assert result.returncode == 0, f"bash -n failed: {result.stderr}"
 
 
-class TestV5HookSetsEnvVar:
+class TestHookSetsEnvVar:
     """The hook must capture stdin into RLSBL_PUSH_STDIN before exec-ing."""
 
     def test_rlsbl_push_stdin_from_piped_input(self, tmp_path):
         """Pipe fake push stdin to the hook and verify RLSBL_PUSH_STDIN is set.
 
-        We replace ``exec rlsbl check --tag prepush`` with a stub that prints
+        We replace ``exec rlsbl failing-checks --hook pre-push`` with a stub that prints
         the env var so we can capture it.
         """
         stdin_data = "refs/heads/main abc123 refs/heads/main def456"
 
         # Build a modified hook that prints the env var instead of exec-ing rlsbl
         modified_hook = CURRENT_PRE_PUSH_HOOK.replace(
-            'exec rlsbl check --tag prepush',
+            'exec rlsbl failing-checks --hook pre-push',
             'echo "$RLSBL_PUSH_STDIN"',
         )
         hook_file = tmp_path / "pre-push"
@@ -56,15 +57,15 @@ class TestV5HookSetsEnvVar:
         assert result.stdout.strip() == stdin_data
 
 
-class TestV5HookInvokesCheckTagPrepush:
-    """The hook content must delegate to ``rlsbl check --tag prepush``."""
+class TestHookInvokesFailingChecksForThePrePushHook:
+    """The hook must delegate to ``rlsbl failing-checks --hook pre-push``."""
 
     def test_hook_contains_check_command(self):
-        assert "rlsbl check --tag prepush" in CURRENT_PRE_PUSH_HOOK
+        assert "rlsbl failing-checks --hook pre-push" in CURRENT_PRE_PUSH_HOOK
 
     def test_hook_uses_exec(self):
         """The hook should use exec so rlsbl replaces the shell process."""
-        assert "exec rlsbl check --tag prepush" in CURRENT_PRE_PUSH_HOOK
+        assert "exec rlsbl failing-checks --hook pre-push" in CURRENT_PRE_PUSH_HOOK
 
     def test_hook_invokes_rlsbl_binary(self, tmp_path):
         """Replace rlsbl with a fake binary and verify it gets called with
@@ -100,5 +101,5 @@ class TestV5HookInvokesCheckTagPrepush:
         )
         assert result.returncode == 0, f"hook exited {result.returncode}: {result.stderr}"
         lines = result.stdout.strip().splitlines()
-        assert "ARGS=check --tag prepush" in lines
+        assert "ARGS=failing-checks --hook pre-push" in lines
         assert f"STDIN_VAR={stdin_data.strip()}" in lines
