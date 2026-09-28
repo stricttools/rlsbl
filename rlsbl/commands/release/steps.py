@@ -862,13 +862,3 @@ def step_names(phase=None):
 def all_plan_kinds():
     """Every Phase-A plan kind the table declares, in step order."""
     return tuple(k for s in RELEASE_STEP_TABLE for k in s.plan_kinds)
-
-
-def rollback_artifacts(ctx):
-    """Every repository path the table says a release creates, in step order.
-
-    The pre-push rollback's orphan sweep: after ``git reset --hard`` returns
-    the branch to the pre-release commit, files a finalization created are left
-    untracked because they never existed in the pre-release history.
-    """
-    return tuple(p for s in RELEASE_STEP_TABLE for p in s.artifacts(ctx))
