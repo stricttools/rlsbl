@@ -96,11 +96,23 @@ def _fake_gh(args, **_kwargs):
 
 @contextmanager
 def _github_stubbed():
-    """The GitHub half of a release, stubbed; git and the remote are real."""
+    """The GitHub half of a release, stubbed; git and the remote are real.
+
+    The release's git runners are pinned to the real ones for the duration:
+    these tests are about what really reaches the branch, the working tree and
+    the remote, so no stand-in another test left on the release package's
+    late-bound names may answer for them.
+    """
+    from rlsbl import utils
+
     with (
         patch("rlsbl.commands.release.validate_gh_cli"),
         patch("rlsbl.commands.release.validate_gh_push_access"),
         patch("rlsbl.commands.release.run_gh", side_effect=_fake_gh),
+        patch("rlsbl.commands.release.run", utils.run),
+        patch("rlsbl.commands.release.push_if_needed", utils.push_if_needed),
+        patch("rlsbl.commands.release.resolve_tag_push_plan",
+              utils.resolve_tag_push_plan),
     ):
         yield
 
