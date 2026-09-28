@@ -63,6 +63,10 @@ GATE_POLL_SECONDS = "15"
 # in HEAD-drift scenarios would poll the wrong commit and time out).
 GATE_MARKER_ATTEMPTS = "5"
 GATE_MARKER_RETRY_SECONDS = "5"
+# The gate job's own `timeout-minutes`: the poll deadline plus a margin for the
+# marker-read retries that run before the deadline clock starts. Without it a
+# hung step would hold the job until GitHub's 360-minute default.
+GATE_JOB_TIMEOUT_MINUTES = int(GATE_TIMEOUT_MINUTES) + 5
 
 # One publish pipeline per tag: a dispatch retry at the same tag queues
 # behind an in-flight run instead of racing it. Publishes are never
@@ -195,6 +199,15 @@ grace_deadline=$(( start + GATE_GRACE_MINUTES * 60 ))
 
 while :; do
   if ! resp="$(gh api --paginate "repos/$GITHUB_REPOSITORY/commits/$sha/check-runs?per_page=100")"; then
+    # The deadline holds here too: a checks API that keeps failing (a rate
+    # limit, an endpoint answering 404) must not hold the job until GitHub's
+    # own six-hour job limit.
+    if [ "$(now)" -ge "$deadline" ]; then
+      echo "::error::Publish gate: the checks API request for $sha kept failing for $GATE_TIMEOUT_MINUTES minutes."
+      echo "Without the check runs the gate cannot tell whether CI passed, so it refuses to publish."
+      echo "Check the API response above and this job's checks:read permission, then re-dispatch this publish workflow at the tag ref: gh workflow run <publish workflow> --ref $GITHUB_REF_NAME"
+      exit 1
+    fi
     echo "Checks API request failed; retrying in ${GATE_POLL_SECONDS}s..."
     sleep "$GATE_POLL_SECONDS"
     continue
@@ -360,6 +373,7 @@ def build_gate_job(check_regex: str | None = None, resolver_script: str | None =
     return {
         "name": "Gate on CI",
         "runs-on": "ubuntu-latest",
+        "timeout-minutes": GATE_JOB_TIMEOUT_MINUTES,
         # Job-level permissions: exactly what the gate needs, regardless of
         # (restrictive) workflow-level permission blocks around it.
         # - checks:read   -> poll the release commit's CI check-runs.
