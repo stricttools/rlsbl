@@ -182,7 +182,7 @@ class TestPublishVersion:
         split, tag_outcome, release_outcome = mp.publish_version(
             remote=remote, root=str(root), subtree_path="packages/lib",
             version="1.0.0", tag="v1.0.0", release_commit_sha=second,
-            notes="### Features\n- a thing", gh=gh, directory=str(tmp_path),
+            notes="### Features\n- a thing", gh=gh, moves_latest=True, directory=str(tmp_path),
         )
 
         assert tag_outcome == "pushed"
@@ -207,7 +207,7 @@ class TestPublishVersion:
         split, _t, _r = mp.publish_version(
             remote=remote, root=str(root), subtree_path="packages/lib",
             version="1.0.0", tag="v1.0.0", release_commit_sha=second,
-            notes="notes", gh=gh, directory=str(tmp_path),
+            notes="notes", gh=gh, moves_latest=True, directory=str(tmp_path),
         )
         body = gh.bodies["v1.0.0"]
         assert f"<!-- rlsbl-ci-sha: {split} -->" in body
@@ -222,7 +222,7 @@ class TestPublishVersion:
         common = dict(
             remote=remote, root=str(root), subtree_path="packages/lib",
             version="1.0.0", tag="v1.0.0", release_commit_sha=second, notes="notes",
-            gh=gh, directory=str(tmp_path),
+            gh=gh, moves_latest=True, directory=str(tmp_path),
         )
         mp.publish_version(**common)
         _split, tag_outcome, release_outcome = mp.publish_version(**common)
@@ -239,7 +239,7 @@ class TestPublishVersion:
         split, _t, release_outcome = mp.publish_version(
             remote=remote, root=str(root), subtree_path="packages/lib",
             version="1.0.0", tag="v1.0.0", release_commit_sha=second,
-            notes="notes", gh=gh, directory=str(tmp_path),
+            notes="notes", gh=gh, moves_latest=True, directory=str(tmp_path),
         )
         assert release_outcome == "reconciled"
         assert "hand-written notes" in gh.bodies["v1.0.0"]

@@ -251,8 +251,13 @@ def ensure_tag(remote, commit, tag, cwd, *, existing=None, timeout=PUSH_TIMEOUT)
 # ---------------------------------------------------------------------------
 
 
-def publish_release(pub, *, gh, repo, directory="."):
+def publish_release(pub, *, gh, repo, moves_latest, directory="."):
     """Create the mirror's Release for *pub*, or reconcile the existing one.
+
+    *moves_latest* is True when the release flow publishes its own new
+    version, and False when ``rlsbl monorepo mirror`` materializes a version
+    the mirror is missing -- a repair, which never moves the mirror's "Latest"
+    badge.
 
     Returns ``"created"``, ``"reconciled"`` (the body gained or corrected its
     marker) or ``"already-correct"``.
@@ -260,7 +265,8 @@ def publish_release(pub, *, gh, repo, directory="."):
     try:
         body = read_release_body(pub.tag, gh=gh, repo=repo)
     except Exception:
-        create_release(pub, gh=gh, repo=repo, directory=directory)
+        create_release(pub, gh=gh, repo=repo, moves_latest=moves_latest,
+                       directory=directory)
         return "created"
     if pub.reconciled_body(body) is None:
         return "already-correct"
@@ -297,6 +303,7 @@ def publish_version(
     release_commit_sha,
     notes="",
     gh,
+    moves_latest,
     existing_tags=None,
     directory=".",
     log=None,
@@ -306,6 +313,8 @@ def publish_version(
     *release_commit_sha* is the release record's release commit -- the MONOREPO commit the
     version shipped from. The mirror's commit for it is derived here, and it is
     that commit the tag names and the Release's marker carries.
+
+    *moves_latest* is :func:`publish_release`'s.
 
     Returns ``(split_sha, tag_outcome, release_outcome)``. Raises
     :class:`MirrorPublicationError` on anything it cannot do; the caller decides
@@ -332,7 +341,8 @@ def publish_version(
         notices=(),
     )
     release_outcome = publish_release(
-        pub, gh=gh, repo=remote, directory=directory,
+        pub, gh=gh, repo=remote, moves_latest=moves_latest,
+        directory=directory,
     )
     say(f"Mirror Release {tag}: {release_outcome}")
     return split_sha, tag_outcome, release_outcome

@@ -65,8 +65,10 @@ class TestThePrereleaseFlag:
         assert _pub(version=version).prerelease is expected
 
     def test_the_flag_reaches_the_argv(self):
-        assert "--prerelease" in create_args(_pub("1.0.0-rc.1"), "notes.md")
-        assert "--prerelease" not in create_args(_pub("1.0.0"), "notes.md")
+        assert "--prerelease" in create_args(_pub("1.0.0-rc.1"), "notes.md",
+                                             moves_latest=True)
+        assert "--prerelease" not in create_args(_pub("1.0.0"), "notes.md",
+                                                 moves_latest=True)
 
 
 class TestMarkerReconciliation:
@@ -99,10 +101,10 @@ class TestTheGhSurface:
         assert "--repo" not in view_body_args("v1.0.0")
 
     def test_create_names_title_and_notes_file(self):
-        args = create_args(_pub(), "/tmp/notes.md")
+        args = create_args(_pub(), "notes.md", moves_latest=True)
         assert args[:3] == ["release", "create", "v1.2.3"]
         assert args[args.index("--title") + 1] == "v1.2.3"
-        assert args[args.index("--notes-file") + 1] == "/tmp/notes.md"
+        assert args[args.index("--notes-file") + 1] == "notes.md"
 
     def test_ensure_marker_writes_only_when_needed(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -145,7 +147,7 @@ class TestTheGhSurface:
 
         from rlsbl.release_publication import create_release
 
-        create_release(_pub(), gh=gh)
+        create_release(_pub(), gh=gh, moves_latest=True)
         assert seen["body"] == _pub().body
         assert not os.path.exists(seen["path"])
 

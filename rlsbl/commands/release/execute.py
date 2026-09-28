@@ -3671,7 +3671,8 @@ def _run_release_mutating(state: ReleaseState):
             # pre-release version earns) is the publication's own.
             from ...release_publication import create_args as _create_args
 
-            gh_release_args = _create_args(_pub, notes_file)
+            # A real release keeps GitHub's "Latest" default.
+            gh_release_args = _create_args(_pub, notes_file, moves_latest=True)
             gh_release_succeeded = False
             for attempt in range(2):
                 try:
@@ -3708,7 +3709,7 @@ def _run_release_mutating(state: ReleaseState):
                 print(
                     f"Error: GitHub Release creation failed for {tag}. "
                     f"The tag and commit are on the remote.\n"
-                    f"  To create the release: gh release create {tag} --title {tag} --notes-file {notes_path}\n"
+                    f"  To create the release: gh release create {tag} --title {tag} --notes-file {notes_path} --verify-tag\n"
                     f"  To roll back: rlsbl release undo",
                     file=sys.stderr,
                 )
@@ -3823,6 +3824,8 @@ def _run_release_mutating(state: ReleaseState):
                             # `.rlsbl-notes-*.tmp` there is a file in somebody's
                             # working tree.
                             directory=os.path.dirname(_state_path) or ".",
+                            # This release's own version: a real release.
+                            moves_latest=True,
                             log=log,
                         )
                         log(
