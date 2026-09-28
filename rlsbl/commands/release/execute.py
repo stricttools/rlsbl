@@ -2747,11 +2747,12 @@ def _run_release_mutating(state: ReleaseState):
                 time.sleep(1)
                 try:
                     if resolve_tag_push_plan(_all_tags):
-                        run(
-                            "git",
-                            ["push", "--no-verify", "origin", tag] + list(state.companion_tags),
-                            timeout=_retry_timeout,
-                        )
+                        # One tag per push, primary first: see the PUSHED step.
+                        for _one_tag in _all_tags:
+                            run(
+                                "git", ["push", "--no-verify", "origin", _one_tag],
+                                timeout=_retry_timeout,
+                            )
                     log(f"Tag push succeeded on retry {_attempt + 1}")
                     save_step(_state_path, "PUSHED")
                     _completed.add("PUSHED")
@@ -3456,11 +3457,18 @@ def _run_release_mutating(state: ReleaseState):
             # refs. This replaces the old bare tag_exists_on_remote skip that
             # silently swallowed ls-remote failures and pushed regardless of the
             # remote tag's commit.
+            #
+            # Each tag goes in a push of its own, the primary first. GitHub
+            # creates no events at all -- no workflow runs, no webhooks --
+            # for a push carrying more than three tags, and a release with
+            # several Go modules carries more. A tag already on the remote at
+            # the same commit is a no-op push that fires nothing.
             _all_tags = [tag] + list(state.companion_tags)
             if resolve_tag_push_plan(_all_tags):
                 import subprocess as _subprocess
                 try:
-                    run("git", ["push", "--no-verify", "origin", tag] + state.companion_tags, timeout=push_timeout)
+                    for _one_tag in _all_tags:
+                        run("git", ["push", "--no-verify", "origin", _one_tag], timeout=push_timeout)
                 except _subprocess.TimeoutExpired as _e:
                     from ...errors import GitError
                     raise GitError(
