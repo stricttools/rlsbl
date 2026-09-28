@@ -1640,6 +1640,23 @@ def _resolve_publish_mode(flags, ctx):
     return "ci"
 
 
+def _publish_gate_var(config, registry):
+    """The ``{{publishGate}}`` template variable: the gate job as YAML.
+
+    Publish and deploy workflows wait for this repository's CI check runs on
+    the release commit; the filter covers every scaffolded target's CI job
+    names.
+    """
+    from ..publish_gate import (
+        ci_check_regex_for_targets,
+        gate_job_template_snippet,
+        gate_targets_from_config,
+    )
+    return gate_job_template_snippet(
+        ci_check_regex_for_targets(gate_targets_from_config(config, registry))
+    )
+
+
 def _append_deploy_workflow_if_configured(mappings, config):
     """Add deploy workflow template to mappings if deploy config exists."""
     deploy_targets, _ = read_deploy_config(config)
@@ -1857,17 +1874,7 @@ def run_cmd(registry, args, flags, ctx):
             scratch_template_vars(scratch_mechanisms(_scratch_targets))
         )
 
-        # Publish gate: publish workflows wait for this repo's CI check
-        # runs on the release commit. The filter covers every scaffolded
-        # target's CI job names.
-        from ..publish_gate import (
-            ci_check_regex_for_targets,
-            gate_job_template_snippet,
-            gate_targets_from_config,
-        )
-        vars_dict["publishGate"] = gate_job_template_snippet(
-            ci_check_regex_for_targets(gate_targets_from_config(ctx.config, registry))
-        )
+        vars_dict["publishGate"] = _publish_gate_var(ctx.config, registry)
 
         # Process registry-specific templates (CI only, no publish).
         # Workspace roots skip CI templates -- the ci-router handles
@@ -2986,6 +2993,10 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         vars_dict = _merge_template_vars(registries_list, primary, target_paths, ctx)
         from datetime import datetime
         vars_dict["year"] = str(datetime.now().year)
+        # The deploy template's gate. The merged publish workflow builds its
+        # own gate job; a deploy workflow rendered from the shared template
+        # needs the same job as a template variable.
+        vars_dict["publishGate"] = _publish_gate_var(ctx.config, primary)
         # npm publish provenance flag, derived from the npm pipeline config.
         vars_dict["npm.provenance"] = _npm_provenance_var(ctx.config)
         # Sandboxed test-runner vars (empty dict while rlsbl:test-sandbox is off).
