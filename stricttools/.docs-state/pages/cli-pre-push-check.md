@@ -10,6 +10,6 @@ nav_order = 12
 
 # rlsbl pre-push-check
 
-Removed. This command no longer performs any check: it always exits 1 with instructions. The pre-push hook now runs `rlsbl check --tag prepush` instead, so a repo whose hook still calls pre-push-check needs `rlsbl scaffold` to regenerate it.
+Removed. This command no longer performs any check: it always exits 1 with instructions. The pre-push hook now runs `rlsbl failing-checks --hook pre-push` instead, so a repo whose hook still calls pre-push-check needs `rlsbl scaffold` to regenerate it.
 
 **Effect:** read_only

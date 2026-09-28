@@ -401,6 +401,11 @@
         },
         {
           "level": 3,
+          "text": "Full report and failing checks",
+          "anchor": "full-report-and-failing-checks"
+        },
+        {
+          "level": 3,
           "text": "Where a check run is scoped",
           "anchor": "where-a-check-run-is-scoped"
         },
@@ -3678,6 +3683,11 @@
         },
         {
           "level": 3,
+          "text": "`_error_level_failures`",
+          "anchor": "_error_level_failures"
+        },
+        {
+          "level": 3,
           "text": "`run_cmd`",
           "anchor": "run_cmd"
         },
@@ -4882,6 +4892,16 @@
           "level": 3,
           "text": "`_repository_scoped_check_names`",
           "anchor": "_repository_scoped_check_names"
+        },
+        {
+          "level": 3,
+          "text": "`_load_rlsbl_checks_toml`",
+          "anchor": "_load_rlsbl_checks_toml"
+        },
+        {
+          "level": 3,
+          "text": "`hook_selection`",
+          "anchor": "hook_selection"
         },
         {
           "level": 3,
@@ -9068,6 +9088,11 @@
         },
         {
           "level": 3,
+          "text": "`validate_user_facing_entries`",
+          "anchor": "validate_user_facing_entries"
+        },
+        {
+          "level": 3,
           "text": "`print_dry_run_summary`",
           "anchor": "print_dry_run_summary"
         },
@@ -9172,6 +9197,11 @@
           "level": 3,
           "text": "`_format_preflight_summary`",
           "anchor": "_format_preflight_summary"
+        },
+        {
+          "level": 3,
+          "text": "`_error_level_failures`",
+          "anchor": "_error_level_failures"
         },
         {
           "level": 3,
@@ -17861,6 +17891,11 @@
         },
         {
           "level": 3,
+          "text": "`_validation_verdict`",
+          "anchor": "_validation_verdict"
+        },
+        {
+          "level": 3,
           "text": "`machine_go_version`",
           "anchor": "machine_go_version"
         },
@@ -20923,6 +20958,11 @@
         },
         {
           "level": 3,
+          "text": "`_refuse_repeated_commits_flag`",
+          "anchor": "_refuse_repeated_commits_flag"
+        },
+        {
+          "level": 3,
           "text": "`_extract_check_releasable`",
           "anchor": "_extract_check_releasable"
         },
@@ -22307,7 +22347,7 @@
       ]
     }
   ],
-  "last_gen": "2026-09-28T17:45:23.082481+00:00",
+  "last_gen": "2026-09-28T18:23:07.236717+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [

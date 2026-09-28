@@ -49,7 +49,7 @@ All commands auto-detect targets (versioning) from project files (`package.json`
 | `claim-name` | Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first and publishes only a name the check reports as available: a name reported taken is refused with exit 1, and a check that ended in an error or returned any other status is refused with exit 2. npm authenticates with NPM_TOKEN when it is set, otherwise with npm's own ~/.npmrc login; PyPI with UV_PUBLISH_TOKEN or PYPI_TOKEN when set, otherwise with the token in ~/.pypirc. With neither, the claim is refused naming both places. No token is ever printed. |
 | `discover` | Search GitHub for repositories tagged with the rlsbl topic and list them. Use --mine to filter results to only your own repositories. Requires the gh CLI to be authenticated. |
 | `watch` | Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline. |
-| `pre-push-check` | Removed. This command no longer performs any check: it always exits 1 with instructions. The pre-push hook now runs `rlsbl check --tag prepush` instead, so a repo whose hook still calls pre-push-check needs `rlsbl scaffold` to regenerate it. |
+| `pre-push-check` | Removed. This command no longer performs any check: it always exits 1 with instructions. The pre-push hook now runs `rlsbl failing-checks --hook pre-push` instead, so a repo whose hook still calls pre-push-check needs `rlsbl scaffold` to regenerate it. |
 | `prs` | List all open pull requests for the current repository using the GitHub CLI. Shows PR number, title, author, and branch for a quick overview of pending work. |
 | `unreleased` | List the commits between this checkout's nearest release commit and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release. |
 | `targets` | List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, etc.) are active based on manifest files found. |
@@ -169,7 +169,7 @@ Created files are committed automatically by default.
 | `.rlsbl/hooks/pre-checks.sh` | User-customizable pre-checks validation |
 | `.rlsbl/hooks/pre-release.sh` | User-customizable pre-release validation |
 | `.rlsbl/hooks/post-release.sh` | User-customizable post-release actions |
-| `.git/hooks/pre-push` | Captures push refs, runs `rlsbl check --tag prepush` |
+| `.git/hooks/pre-push` | Captures push refs, runs `rlsbl failing-checks --hook pre-push` |
 | `.rlsbl/bases/` | Three-way merge bases for scaffold |
 
 **Three-way merge:** Bases are stored at scaffold time. On re-run, user customizations and template updates merge via `git merge-file`. Conflicts get git-style conflict markers.
@@ -256,7 +256,7 @@ boundary alias tag). A write from anywhere else is not rlsbl's.
 
 ## Pre-push hook
 
-The `.git/hooks/pre-push` hook captures push refs from git and runs `rlsbl check --tag prepush`, which enforces:
+The `.git/hooks/pre-push` hook captures push refs from git and runs `rlsbl failing-checks --hook pre-push`: the checks `[hooks.pre-push]` in rlsbl's `checks.toml` selects (the `prepush` tag), blocking only on error-level failures, so a check an options entry softened to `warn` never blocks a push. It enforces:
 
 1. **Changelog coverage** -- every pushed commit must have a JSONL entry
 2. **Gitignore guard** -- rlsbl-managed files must not be gitignored

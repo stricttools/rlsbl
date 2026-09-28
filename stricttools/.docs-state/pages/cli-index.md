@@ -24,7 +24,7 @@ Version: :-: var key="project.version"
 - [claim-name](../cli-claim-name/) -- Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first and publishes only a name the check reports as available: a name reported taken is refused with exit 1, and a check that ended in an error or returned any other status is refused with exit 2. npm authenticates with NPM_TOKEN when it is set, otherwise with npm's own ~/.npmrc login; PyPI with UV_PUBLISH_TOKEN or PYPI_TOKEN when set, otherwise with the token in ~/.pypirc. With neither, the claim is refused naming both places. No token is ever printed.
 - [discover](../cli-discover/) -- Search GitHub for repositories tagged with the rlsbl topic and list them. Use --mine to filter results to only your own repositories. Requires the gh CLI to be authenticated.
 - [watch](../cli-watch/) -- Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status. Defaults to HEAD if no SHA is provided. Useful after rlsbl release to monitor the publish pipeline.
-- [pre-push-check](../cli-pre-push-check/) -- Removed. This command no longer performs any check: it always exits 1 with instructions. The pre-push hook now runs `rlsbl check --tag prepush` instead, so a repo whose hook still calls pre-push-check needs `rlsbl scaffold` to regenerate it.
+- [pre-push-check](../cli-pre-push-check/) -- Removed. This command no longer performs any check: it always exits 1 with instructions. The pre-push hook now runs `rlsbl failing-checks --hook pre-push` instead, so a repo whose hook still calls pre-push-check needs `rlsbl scaffold` to regenerate it.
 - [prs](../cli-prs/) -- List all open pull requests for the current repository using the GitHub CLI. Shows PR number, title, author, and branch for a quick overview of pending work.
 - [unreleased](../cli-unreleased/) -- List the commits between this checkout's nearest release commit and HEAD, and check whether each has a corresponding changelog entry. Outputs a coverage report in plain text or JSON to help prepare the next release.
 - [targets](../cli-targets/) -- List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, etc.) are active based on manifest files found.
@@ -58,4 +58,4 @@ These flags are owned by the strictcli framework, not by the app. No command may
 
 | Env var | Description |
 | --- | --- |
-| `RLSBL_PUSH_STDIN` | Pre-push ref lines (`<local ref> <local sha> <remote ref> <remote sha>`) for `rlsbl check --tag prepush`, when the caller has already consumed git's hook stdin. |
+| `RLSBL_PUSH_STDIN` | Pre-push ref lines (`<local ref> <local sha> <remote ref> <remote sha>`) for the checks the pre-push hook selects (`rlsbl failing-checks --hook pre-push`), when the caller has already consumed git's hook stdin. |
