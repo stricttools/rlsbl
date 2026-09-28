@@ -1800,3 +1800,168 @@ def multi_releasable_monorepo_factory(tmp_path, monkeypatch):
         return _create_multi_releasable_monorepo(tmp_path, **kwargs)
 
     return factory
+
+
+# ---------------------------------------------------------------------------
+# Nested workspaces: a member whose path lies inside another member's path
+# ---------------------------------------------------------------------------
+
+#: The module path prefix every Go member of a nested workspace carries.
+NESTED_GO_PREFIX = "github.com/example/nested"
+
+
+def _write_go_member(root, path, *, requires=(), imports=(), main=False):
+    """Write a Go module at *path* whose module path is derived from it."""
+    directory = root / path
+    directory.mkdir(parents=True, exist_ok=True)
+    lines = [f"module {NESTED_GO_PREFIX}/{path}", "", "go 1.22", ""]
+    for dep in requires:
+        lines.append(f"require {NESTED_GO_PREFIX}/{dep} v0.1.0")
+    (directory / "go.mod").write_text("\n".join(lines) + "\n")
+    package = "main" if main else path.rsplit("/", 1)[-1]
+    body = [f"package {package}", ""]
+    if imports:
+        body.append("import (")
+        body.extend(f'\t"{NESTED_GO_PREFIX}/{imp}"' for imp in imports)
+        body.append(")")
+        body.append("")
+        uses = "; ".join(f"_ = {imp.rsplit('/', 1)[-1]}.F" for imp in imports)
+        body.append(f"func use() {{ {uses} }}")
+        body.append("")
+    body.append("// F is exported.")
+    body.append("func F() int { return 1 }")
+    if main:
+        body.append("")
+        body.append("func main() {}")
+    (directory / f"{package if not main else 'main'}.go").write_text(
+        "\n".join(body) + "\n"
+    )
+    (directory / "VERSION").write_text("0.1.0\n")
+
+
+def _write_python_member(root, path, dist_name):
+    """Write a hatchling Python package at *path*."""
+    directory = root / path
+    directory.mkdir(parents=True, exist_ok=True)
+    module = dist_name.replace("-", "_")
+    (directory / "pyproject.toml").write_text(
+        "[project]\n"
+        f'name = "{dist_name}"\n'
+        'version = "0.1.0"\n'
+        "dependencies = []\n\n"
+        "[build-system]\n"
+        'requires = ["hatchling"]\n'
+        'build-backend = "hatchling.build"\n'
+    )
+    (directory / module).mkdir(exist_ok=True)
+    (directory / module / "__init__.py").write_text(f'"""{dist_name}."""\n')
+    (directory / "tests").mkdir(exist_ok=True)
+    (directory / "tests" / "test_it.py").write_text(
+        "def test_it():\n    assert True\n"
+    )
+
+
+def _write_npm_member(root, path, package_name):
+    """Write an npm package at *path*."""
+    directory = root / path
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "package.json").write_text(json.dumps({
+        "name": package_name,
+        "version": "0.1.0",
+        "scripts": {"test": "true"},
+    }, indent=2) + "\n")
+    (directory / "index.js").write_text("module.exports = 1;\n")
+
+
+#: The shapes :func:`make_nested_workspace` builds. Each is (members,
+#: releasables); a member is ``(path, name, releasable)``.
+NESTED_SHAPES = {
+    # A Go chain: each nested module is its own releasable. draw/cmd imports
+    # draw; kernel/vulkan imports kernel. Tag formats are the Go path form.
+    "go": (
+        [
+            ("draw", "draw", "draw"),
+            ("draw/cmd", "drawcmd", "drawcmd"),
+            ("kernel", "kernel", "kernel"),
+            ("kernel/vulkan", "vulkan", "vulkan"),
+        ],
+        [
+            {"name": "draw", "tag_format": "draw/v{version}"},
+            {"name": "drawcmd", "tag_format": "draw/cmd/v{version}"},
+            {"name": "kernel", "tag_format": "kernel/v{version}"},
+            {"name": "vulkan", "tag_format": "kernel/vulkan/v{version}"},
+        ],
+    ),
+    # A Python parent holding a nested Python package and a nested npm package.
+    "python": (
+        [
+            ("sdk", "sdk", "sdk"),
+            ("sdk/python", "sdkpython", "sdkpython"),
+            ("sdk/npm", "sdknpm", "sdknpm"),
+        ],
+        [
+            {"name": "sdk"},
+            {"name": "sdkpython"},
+            {"name": "sdknpm"},
+        ],
+    ),
+    # A Go parent and its nested Go child in ONE releasable.
+    "shared": (
+        [
+            ("gfx", "gfx", "gfx"),
+            ("gfx/shader", "shader", "gfx"),
+        ],
+        [
+            {"name": "gfx", "tag_format": "gfx/v{version}"},
+        ],
+    ),
+}
+
+
+def make_nested_workspace(root, shape, *, commit=True):
+    """Build a git repository at *root* holding a workspace with nested members.
+
+    *shape* names one of :data:`NESTED_SHAPES`. The root member is the default
+    dev node. Every file is committed once (unless *commit* is false), so
+    attribution and tag tests have a history to read. Returns the member list
+    as :func:`rlsbl.workspace.load_workspace` reads it.
+    """
+    from rlsbl.workspace import load_workspace
+
+    members, releasables = NESTED_SHAPES[shape]
+    root.mkdir(parents=True, exist_ok=True)
+    if shape == "go":
+        _write_go_member(root, "draw")
+        _write_go_member(
+            root, "draw/cmd", requires=("draw",), imports=("draw",), main=True,
+        )
+        _write_go_member(root, "kernel")
+        _write_go_member(
+            root, "kernel/vulkan", requires=("kernel",), imports=("kernel",),
+        )
+    elif shape == "python":
+        _write_python_member(root, "sdk", "sgsdk")
+        _write_python_member(root, "sdk/python", "sgsdk-python")
+        _write_npm_member(root, "sdk/npm", "sgsdk-js")
+    elif shape == "shared":
+        _write_go_member(root, "gfx")
+        _write_go_member(root, "gfx/shader")
+    else:
+        raise ValueError(f"unknown nested shape {shape!r}")
+
+    make_workspace(
+        root,
+        [
+            {"path": path, "name": name, "releasable": releasable}
+            for path, name, releasable in members
+        ],
+        releasables=releasables,
+    )
+    if commit:
+        if not (root / ".git").exists():
+            _git(root, "init", "-q", "-b", "main")
+            _git(root, "config", "user.email", "nested@example.invalid")
+            _git(root, "config", "user.name", "nested")
+        _git(root, "add", "-A")
+        _git(root, "commit", "-q", "-m", "initial nested workspace")
+    return load_workspace(str(root))
