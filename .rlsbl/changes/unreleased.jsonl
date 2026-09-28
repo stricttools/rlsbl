@@ -49,3 +49,4 @@
 {"format_version":1,"id":"18d99c36789a16db1460eafff1ac47cd873571299573f020","commits":["74f32fbb5accfe06f10a5f33a4195cf1c6828eca"],"user_facing":false}
 {"format_version":1,"id":"18d99c45403d52b08524df4d15a84cb493e93ac9f55ac6f5","commits":["51ff48c3a77c7a55d62ef917aaa4c5849a04287b"],"user_facing":false}
 {"format_version":1,"id":"18d99c47b1997ed73fa3ac0be8d5456d8a3b48328bd325c5","commits":["229f272a26a8a7b12c06fd699794478acaea49f9"],"user_facing":true,"description":"**A release run from a workspace root runs the released member's external checks.** It ran the external checks declared in the workspace root's config instead, because the check provider read the config of the current directory.","type":"fix"}
+{"format_version":1,"id":"18d99c53e45962c257cacc5e1956485b9abd8999f855525b","commits":["f24e194efe3dfc3c559d08ad6f64de077d31ee52"],"user_facing":false}
