@@ -114,7 +114,7 @@ class TestRootMemberName:
         write_raw(tmp_path, workspace_toml(
             '[[projects]]\npath = "."\nname = "root"\ndev_only = true\n'
             'releasable = false\n\n'
-            '[[projects]]\npath = "./"\nname = "root"\ndev_only = true\n'
+            '[[projects]]\npath = "."\nname = "root"\ndev_only = true\n'
             'releasable = false\n',
             root_member="",
         ))
@@ -135,11 +135,9 @@ class TestRootMemberName:
         projects = load_workspace(str(tmp_path))
         assert projects[0]["name"] == ROOT_MEMBER_NAME
 
-    @pytest.mark.parametrize("spelling", ['""', '"."', '"./"'])
-    def test_root_path_spellings_normalize(self, tmp_path, spelling):
+    def test_the_root_path_is_dot(self, tmp_path):
         write_raw(tmp_path, workspace_toml(
-            f'[[projects]]\npath = {spelling}\ndev_only = true\n'
-            'releasable = false\n',
+            '[[projects]]\npath = "."\ndev_only = true\nreleasable = false\n',
             root_member="",
         ))
         projects = load_workspace(str(tmp_path))
@@ -196,26 +194,6 @@ class TestMemberPathUniqueness:
         assert "projects[1]" in message
         assert "'a'" in message
         assert "exactly one member per path" in message
-
-    def test_paths_differing_only_in_spelling_are_an_error(self, tmp_path):
-        """`a` and `./a` are the same territory, so they collide at load."""
-        write_raw(tmp_path, workspace_toml(
-            '[[projects]]\npath = "a"\nname = "a"\nreleasable = false\n\n'
-            '[[projects]]\npath = "./a"\nname = "dotted"\nreleasable = false\n',
-        ))
-        with pytest.raises(WorkspaceError) as exc:
-            load_workspace(str(tmp_path))
-        message = str(exc.value)
-        assert "exactly one member per path" in message
-        # Both spellings are named, so the operator can find the two lines.
-        assert "./a" in message
-
-    def test_declared_paths_are_normalized_at_load(self, tmp_path):
-        write_raw(tmp_path, workspace_toml(
-            '[[projects]]\npath = "./a/"\nname = "a"\nreleasable = false\n',
-        ))
-        projects = load_workspace(str(tmp_path))
-        assert [p["path"] for p in projects if p["name"] == "a"] == ["a"]
 
     def test_distinct_nested_paths_still_load(self, tmp_path):
         write_raw(tmp_path, workspace_toml(

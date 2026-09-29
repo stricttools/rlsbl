@@ -153,17 +153,18 @@ class TestSaveWorkspace:
         ]
 
 
-class TestLoadWorkspacePathNormalization:
-    """load_workspace must strip trailing slashes from project paths."""
+class TestLoadWorkspacePathSpelling:
+    """load_workspace refuses a trailing slash, naming the spelling to write."""
 
-    def test_strips_trailing_slash(self, tmp_project):
+    def test_refuses_a_trailing_slash(self, tmp_project):
         ws_dir = tmp_project / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
             workspace_toml('[[projects]]\npath = "auth-gateway/"\nname = "auth-gateway"\n')
         )
-        result = declared(load_workspace(str(tmp_project)))
-        assert result[0]["path"] == "auth-gateway"
+        with pytest.raises(WorkspaceError) as exc:
+            load_workspace(str(tmp_project))
+        assert "Write it as 'auth-gateway'" in str(exc.value)
 
     def test_passes_through_when_no_trailing_slash(self, tmp_project):
         ws_dir = tmp_project / ".rlsbl-monorepo"
@@ -174,14 +175,15 @@ class TestLoadWorkspacePathNormalization:
         result = declared(load_workspace(str(tmp_project)))
         assert result[0]["path"] == "auth-gateway"
 
-    def test_strips_trailing_slash_on_nested_path(self, tmp_project):
+    def test_refuses_a_trailing_slash_on_a_nested_path(self, tmp_project):
         ws_dir = tmp_project / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text(
             workspace_toml('[[projects]]\npath = "packages/foo/"\nname = "foo"\n')
         )
-        result = declared(load_workspace(str(tmp_project)))
-        assert result[0]["path"] == "packages/foo"
+        with pytest.raises(WorkspaceError) as exc:
+            load_workspace(str(tmp_project))
+        assert "Write it as 'packages/foo'" in str(exc.value)
 
 
 class TestWorkspaceExtraKeys:

@@ -319,7 +319,7 @@ class TestRootMemberAlreadyPresent:
             "releasables = []\n\n"
             '[[projects]]\npath = "."\nname = "root"\ndev_only = true\n'
             "releasable = false\n\n"
-            '[[projects]]\npath = "./"\nname = "other"\nreleasable = false\n',
+            '[[projects]]\npath = "."\nname = "other"\nreleasable = false\n',
         )
         code, output = migrate(tmp_path, dev_node=True)
         assert code == 1
