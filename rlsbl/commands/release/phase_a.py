@@ -528,8 +528,6 @@ def build_phase_a_plan(inp: BuildInputs) -> PhaseAPlan:
 
     # A lockfile whose tool is missing would ship stale: refuse, naming the
     # tool, before anything is written.
-    rerun = ("run `rlsbl release resume`" if state.resuming
-             else "re-run `rlsbl release run`")
     owed_syncs = []
     try:
         for paths in lock_targets:
@@ -553,7 +551,10 @@ def build_phase_a_plan(inp: BuildInputs) -> PhaseAPlan:
                 _devnode_lock_syncs(inp.monorepo_root, bumped_dirs, log)
             )
     except LockfileToolMissingError as exc:
-        raise ReleaseAbortError(exc.message(rerun)) from exc
+        raise ReleaseAbortError(exc.message(
+            "run `rlsbl release resume`" if state.resuming
+            else "re-run `rlsbl release run`"
+        )) from exc
 
     for sync in owed_syncs:
         steps.append(PlanStep(
