@@ -1036,6 +1036,24 @@ def _default_publish_workflow_checks():
         yield
 
 
+@pytest.fixture(autouse=True)
+def _default_upload_private_paths():
+    """Neutralize the upload-private-paths preflight check by default.
+
+    Release-flow fixtures build bare npm and Go projects whose committed
+    ``.rlsbl/`` would ship in the package, so the check refuses every one of
+    them before the step the test is about. The check is exercised in
+    test_upload_private_paths.py (including a release refused by it) and
+    test_upload_private_path_scaffold.py, which restore the real function
+    over this patch.
+    """
+    with patch(
+        "rlsbl.checks.upload_private_paths.upload_private_path_problems",
+        return_value=[],
+    ):
+        yield
+
+
 # There is deliberately no push-timeout fixture here. One used to set
 # RLSBL_PUSH_TIMEOUT on every test "for determinism"; rlsbl stopped reading
 # that variable (and the rest of its family) when timeouts became

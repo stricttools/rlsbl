@@ -74,6 +74,12 @@ def _texts(result):
     return [p.text for p in result.problems]
 
 
+@pytest.fixture(autouse=True)
+def _default_upload_private_paths():
+    """The real check, over conftest's default that neutralizes it."""
+    yield
+
+
 # ---------------------------------------------------------------------------
 # npm
 # ---------------------------------------------------------------------------
