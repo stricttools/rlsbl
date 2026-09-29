@@ -40,6 +40,9 @@
     ],
     "ci_workflows": [
       ".github/workflows/ci-pypi.yml"
+    ],
+    "carry_ignored": [
+      ".rlsbl-test-tools"
     ]
   }
 }

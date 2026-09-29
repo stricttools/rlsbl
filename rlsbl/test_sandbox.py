@@ -17,7 +17,8 @@ and declaring a ``test_sandbox`` section in ``.rlsbl/config.json``::
       "caches": ["uv", "go", "python_user_base"],
       "prewarm": ["scripts/test-prewarm.sh"],
       "extra_env": {"LEGACY_SANDBOX_VAR": "1"},
-      "ci_workflows": [".github/workflows/ci.yml"]
+      "ci_workflows": [".github/workflows/ci.yml"],
+      "carry_ignored": [".rlsbl-test-tools"]
     }
 
 ``rlsbl scaffold`` then renders ``templates/shared/test-sandbox.sh.tpl`` to
@@ -37,6 +38,11 @@ Design notes:
   access, before the sandbox is entered. It exists so a repo can warm a
   toolchain cache that the offline in-sandbox build then hits. Each entry is a
   shell command line; a non-zero exit aborts the run.
+* **The working copy is git's view of the tree**: tracked files, untracked
+  files that are not ignored, and ``.git``. Gitignored bulk (experiment
+  scratch, build output) stays out, since it can outgrow the temp filesystem.
+  A gitignored path the suite does read -- typically what a ``prewarm``
+  command stages -- is declared in ``carry_ignored`` and copied when present.
 """
 
 from __future__ import annotations
@@ -67,6 +73,7 @@ OPTIONAL_KEYS = (
     "prewarm",
     "extra_env",
     "ci_workflows",
+    "carry_ignored",
 )
 ALLOWED_KEYS = REQUIRED_KEYS + OPTIONAL_KEYS
 
@@ -194,6 +201,12 @@ def validate_test_sandbox_config(config):
         for path in section["ci_workflows"]:
             _require_relative(path, "ci_workflows entry")
 
+    if "carry_ignored" in section:
+        _require_str_list(section["carry_ignored"], "carry_ignored")
+        for path in section["carry_ignored"]:
+            _require_relative(path, "carry_ignored entry")
+            _reject_single_quote(path, "carry_ignored entry")
+
     if "extra_env" in section:
         extra = section["extra_env"]
         if not isinstance(extra, dict):
@@ -289,6 +302,9 @@ def template_vars(config, project_dir):
         f"  --setenv {name} {value}" for name, value in sorted(extra_env.items())
     )
     prewarm_lines = "\n".join(prewarm)
+    carry_words = " ".join(
+        f"'{path}'" for path in section.get("carry_ignored") or []
+    )
 
     return {
         "sandboxRunnerPath": section["runner_path"],
@@ -298,6 +314,7 @@ def template_vars(config, project_dir):
         "sandboxCaches": " ".join(caches),
         "sandboxPrewarm": prewarm_lines,
         "sandboxExtraEnv": extra_env_lines,
+        "sandboxCarryIgnored": carry_words,
         # The dev-overlay block is uv-specific (it excludes packages from
         # `uv sync` and installs them editable), so it is rendered only for
         # repos that declared the uv cache. Everyone else gets the runner
