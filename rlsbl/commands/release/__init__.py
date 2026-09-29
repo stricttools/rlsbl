@@ -138,6 +138,7 @@ def _abort_on_untidy_go_modules(target_paths, *, member_package_paths,
     from .execute import (
         UntidyGoModuleError,
         _target_lockfile_syncs,
+        refuse_go_work_sync_changes,
         refuse_untidy_go_modules,
         release_lock_targets,
     )
@@ -150,6 +151,7 @@ def _abort_on_untidy_go_modules(target_paths, *, member_package_paths,
         owed.extend(_target_lockfile_syncs(paths, lambda _msg: None))
     try:
         refuse_untidy_go_modules(owed)
+        refuse_go_work_sync_changes(owed)
     except UntidyGoModuleError as exc:
         raise ReleaseValidationError(str(exc)) from exc
 
