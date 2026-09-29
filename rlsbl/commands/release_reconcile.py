@@ -343,7 +343,10 @@ def _is_companion_tag(tag_name, version, *, ctx, workspace_projects, tag_schemes
     root = str(ctx.workspace_root)
     for rel in load_releasables(root, workspace_projects):
         members = members_of(rel.name, workspace_projects)
-        if not members:
+        # A companion is a member directory's own tag, so a releasable none
+        # of whose members' paths prefixes the tag owns no companion by that
+        # name, and its members' configs are not read for it.
+        if not any(tag_name.startswith(p["path"].rstrip("/") + "/") for p in members):
             continue
         context = ref_context(
             repo_root=root,
