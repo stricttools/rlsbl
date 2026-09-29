@@ -71,19 +71,43 @@ jobs:
 """
 
 
+def _mark_scaffolded(proj_dir, targets=("npm",)):
+    """Give *proj_dir* the ``.rlsbl/config.json`` a scaffolded member has.
+
+    A member carrying its own hand-written ``ci.yml`` is one rlsbl already
+    manages: ``rlsbl scaffold`` refuses to merge into a ``ci.yml`` it has no
+    merge base for, so ``monorepo add`` scaffolds only a member without this
+    file.
+    """
+    rlsbl_dir = os.path.join(str(proj_dir), ".rlsbl")
+    os.makedirs(rlsbl_dir, exist_ok=True)
+    with open(os.path.join(rlsbl_dir, "config.json"), "w") as f:
+        json.dump({
+            "targets": list(targets),
+            "publish_mode": "ci",
+            "pipelines": {
+                t: {"type": t, "local": False, "target": t} for t in targets
+            },
+        }, f)
+
+
 def _make_project(base_path, subdir, name=None, ci=True, publish=False):
     """Create a minimal npm project with optional CI and publish workflows."""
     proj_dir = os.path.join(str(base_path), subdir)
     os.makedirs(proj_dir, exist_ok=True)
     pkg_name = name or os.path.basename(subdir)
     with open(os.path.join(proj_dir, "package.json"), "w") as f:
-        json.dump({"name": pkg_name, "version": "0.1.0"}, f)
+        json.dump(
+            {"name": pkg_name, "version": "0.1.0", "engines": {"node": ">=22"}},
+            f,
+        )
 
     if ci:
         wf_dir = os.path.join(proj_dir, ".github", "workflows")
         os.makedirs(wf_dir, exist_ok=True)
         with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
             f.write(CI_WORKFLOW)
+        _mark_scaffolded(proj_dir)
 
     if publish:
         wf_dir = os.path.join(proj_dir, ".github", "workflows")
@@ -569,6 +593,7 @@ class TestSwiftSubtreeWarning:
         os.makedirs(wf_dir, exist_ok=True)
         with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
             f.write(CI_WORKFLOW)
+        _mark_scaffolded(proj_dir, targets=("swift",))
         _cmd_add(["swiftpkg"], {"releasable": "false"}, project_root=".")
         subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
         subprocess.run(
