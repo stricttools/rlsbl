@@ -1620,10 +1620,14 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
     for rlsbl_file in [MANAGED_FILES, os.path.join(".rlsbl", "version"), config_file]:
         if os.path.exists(rlsbl_file) and rlsbl_file not in files_to_commit:
             files_to_commit.append(rlsbl_file)
-    # Include any base files that were saved for the created targets
+    # Include any base files that were saved for the created targets, and the
+    # bases seeded for files left as they were (a file already matching its
+    # template gets its base written without being rewritten): a base this
+    # run wrote and did not commit would stay untracked.
     bases_dir = _bases_dir()
     if os.path.isdir(bases_dir):
-        for target, _ in created:
+        seeded = [t for t, s in skipped if "base seeded" in s]
+        for target in [t for t, _ in created] + seeded:
             base_path = os.path.join(bases_dir, target)
             if os.path.exists(base_path) and base_path not in files_to_commit:
                 files_to_commit.append(base_path)

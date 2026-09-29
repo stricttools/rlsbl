@@ -129,8 +129,20 @@ def _cmd_add(args, flags, project_root, dry_run=False):
     if problem is not None:
         print(f"Error: {problem}", file=sys.stderr)
         sys.exit(1)
-    if not os.path.isdir(path):
-        print(f"Error: '{path}' is not a directory.", file=sys.stderr)
+
+    # A member path is repository-relative, so it is resolved from the
+    # workspace root, never from wherever the command happens to run.
+    root = find_workspace_root(str(project_root))
+    if root is None:
+        print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
+        sys.exit(1)
+    abs_path = os.path.join(root, path)
+    if not os.path.isdir(abs_path):
+        print(
+            f"Error: '{path}' is not a directory under the workspace root "
+            f"{root}.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     explicit_target = flags.get("target")
@@ -140,9 +152,9 @@ def _cmd_add(args, flags, project_root, dry_run=False):
             valid = ", ".join(sorted(TARGETS))
             print(f"Valid targets: {valid}", file=sys.stderr)
             sys.exit(1)
-        target_entries = [TargetEntry(name=explicit_target, path=path)]
+        target_entries = [TargetEntry(name=explicit_target, path=abs_path)]
     else:
-        target_entries = detect_targets(path)
+        target_entries = detect_targets(abs_path)
         if not target_entries:
             print(f"Error: No release target detected in '{path}'. Initialize a project first.", file=sys.stderr)
             print("Hint: create a project manifest (e.g., package.json, pyproject.toml, go.mod, version.json) in the directory.", file=sys.stderr)
@@ -213,17 +225,10 @@ def _cmd_add(args, flags, project_root, dry_run=False):
             releasable_value = releasable_raw
         # Empty string means flag not passed (default="")
 
-    start = str(project_root)
-    root = find_workspace_root(start)
-    if root is None:
-        print("Error: No workspace found. Run 'rlsbl monorepo init' first.", file=sys.stderr)
-        sys.exit(1)
-
     projects = load_workspace(root)
 
-    norm_path = path.rstrip("/")
     for proj in projects:
-        if proj["path"].rstrip("/") == norm_path:
+        if proj["path"] == path:
             print(f"Error: Project at '{path}' already exists in workspace.", file=sys.stderr)
             sys.exit(1)
         if proj["name"] == name:
@@ -312,7 +317,7 @@ def _cmd_add(args, flags, project_root, dry_run=False):
                 f"  Would create releasable '{created_releasable.name}' "
                 f"(tag format: {created_releasable.tag_format})"
             )
-        project_rlsbl = os.path.join(path, ".rlsbl", "config.json")
+        project_rlsbl = os.path.join(abs_path, ".rlsbl", "config.json")
         if not os.path.exists(project_rlsbl):
             print(f"  Would scaffold '{name}' (no .rlsbl/config.json present)")
         else:
@@ -341,10 +346,10 @@ def _cmd_add(args, flags, project_root, dry_run=False):
         print(f"Skipped commit (--no-auto-commit). Run `safegit commit -- {ws_file}` manually.")
     else:
         # Commit workspace.toml
-        commit_files(f"monorepo: add {name}", [ws_file], allow_failure=True)
+        commit_files(f"monorepo: add {name}", [ws_file], allow_failure=True, cwd=root)
 
     # Auto-scaffold if not already scaffolded
-    project_rlsbl = os.path.join(path, ".rlsbl", "config.json")
+    project_rlsbl = os.path.join(abs_path, ".rlsbl", "config.json")
     if not os.path.exists(project_rlsbl):
         print(f"Scaffolding {name}...")
         try:
@@ -359,7 +364,7 @@ def _cmd_add(args, flags, project_root, dry_run=False):
                 cmd.append("--no-auto-commit")
             effects.run(
                 cmd,
-                cwd=path,
+                cwd=abs_path,
                 check=False,
             )
         except Exception as e:
