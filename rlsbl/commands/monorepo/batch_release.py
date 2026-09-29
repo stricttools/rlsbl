@@ -1145,6 +1145,32 @@ def _batch_release_releasables(flags, workspace_root, batch_path, batch_config,
                                 workspace_root, log)
 
 
+def _is_the_plans_own_batch_file(batch_path, plan_path, workspace_root):
+    """Is *batch_path* the file the completed plan was resolved from?
+
+    The plan is committed once, when it is resolved from the batch file. A
+    batch file with no uncommitted change whose committed content is the one
+    it had at that commit is the file the batch ran; one written or edited
+    since is the next batch's.
+    """
+    def git_out(*args):
+        result = effects.run(
+            ["git", *args], cwd=workspace_root, capture_output=True, text=True,
+        )
+        return result.stdout.strip() if result.returncode == 0 else None
+
+    batch_rel = os.path.relpath(os.path.realpath(batch_path), os.path.realpath(workspace_root))
+    plan_rel = os.path.relpath(os.path.realpath(plan_path), os.path.realpath(workspace_root))
+    if git_out("status", "--porcelain", "--", batch_rel) != "":
+        return False
+    resolved_at = git_out("log", "-1", "--format=%H", "--", plan_rel)
+    if not resolved_at:
+        return False
+    then = git_out("rev-parse", f"{resolved_at}:{batch_rel}")
+    now = git_out("rev-parse", f"HEAD:{batch_rel}")
+    return then is not None and then == now
+
+
 def _abort_on_completed_plan(plan, plan_path, batch_path, workspace_root):
     """Every item in the resolved plan is already released: stop, nonzero.
 
@@ -1179,6 +1205,22 @@ def _abort_on_completed_plan(plan, plan_path, batch_path, workspace_root):
             file=sys.stderr,
         )
         sys.exit(1)
+
+    if _is_the_plans_own_batch_file(batch_path, plan_path, workspace_root):
+        # The batch that ran from this file finished; only its archive commit
+        # failed. Finish that archive, as the batch's last step would have.
+        try:
+            _finalize_batch_file(batch_path, print)
+        except ReleaseValidationError as exc:
+            print(f"\nError: {exc}", file=sys.stderr)
+            sys.exit(1)
+        _advance_branch()
+        print(
+            f"Finished the archive of {batch_rel} and {plan_rel}: every item "
+            f"of the batch they ran is released, and nothing else was left "
+            f"to do."
+        )
+        sys.exit(0)
 
     versioned_stem = f"batch-{time.strftime('%Y%m%d-%H%M%S')}"
     plan_mode = _mode_of(plan_path)
@@ -1537,8 +1579,7 @@ def _finalize_batch_file(batch_path, log):
             f"every item of the batch is released, but committing the archive "
             f"of {batch_rel} failed ({_commit_detail(exc)}). {batch_rel} and "
             f"its plan are restored. Fix what the commit reports, then "
-            f"{_BATCH_RERUN}: it finds the completed plan, archives it, and "
-            f"leaves {batch_rel} to you, to delete as the finished batch's "
-            f"file."
+            f"{_BATCH_RERUN}: it finds the completed plan and finishes the "
+            f"archive of {batch_rel} and the plan."
         ) from exc
     log(f"Finalized batch release file: {versioned_name}")
