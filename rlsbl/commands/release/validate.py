@@ -1734,6 +1734,45 @@ _PRE_HELP_JSON_STRICTCLI = {
     ),
 }
 
+def _go_strictcli_upgrade(project_dir, upgrade):
+    """The upgrade a Go program on a strictcli without ``help --json`` needs.
+
+    A program still requiring strictcli's former module path imports its
+    packages under that path, and ``go get`` on the new path does not move
+    them: the path migration comes first, through
+    ``rlsbl rewrite go-module-path``, and the upgrade after it. The rewrite
+    keeps the required version, which the new path never published, so that
+    requirement is dropped before ``go get`` adds the latest one.
+    """
+    from ...module_paths import go_import_under_module
+    from ...strictcli_detect import (
+        STRICTCLI_GO_CURRENT,
+        STRICTCLI_GO_FORMER,
+        go_strictcli_requirements,
+    )
+
+    former = [
+        path for path in go_strictcli_requirements(project_dir)
+        if go_import_under_module(path, STRICTCLI_GO_FORMER)
+    ]
+    if not former:
+        return upgrade
+    steps = []
+    for old in former:
+        new = STRICTCLI_GO_CURRENT + old[len(STRICTCLI_GO_FORMER):]
+        steps.append(
+            f"this program requires strictcli under its former module path "
+            f"{old}, which moved to {new}, and `go get` does not move its "
+            f"imports. Migrate the path first: run `rlsbl rewrite "
+            f"go-module-path --from-module {old} --to-module {new}` in the "
+            f"repository, then in {project_dir} drop the requirement it "
+            f"carried over, whose version was published under the former path "
+            f"only (`go mod edit -droprequire={new}`), and run "
+            f"`go get {new}@latest` and `go mod tidy`; commit the result"
+        )
+    return "; ".join(steps)
+
+
 #: What every strictcli without a ``help`` command answers ``help --json``
 #: with, on stderr, alongside exit 1. Read off real Go, Python, and TypeScript
 #: programs on the releases named above.
@@ -1802,6 +1841,8 @@ def _run_strictcli_schema_dump(flags, log, project_dir=".", version=None):
     if completed.returncode != 0:
         if _NO_HELP_COMMAND in stderr:
             last, upgrade = _PRE_HELP_JSON_STRICTCLI[lang]
+            if lang == "go":
+                upgrade = _go_strictcli_upgrade(project_dir, upgrade)
             raise ReleaseValidationError(
                 f"`{' '.join(cmd)}` exited {completed.returncode}: {stderr}\n"
                 f"This program's strictcli predates `help --json`, the command "
