@@ -359,9 +359,15 @@ def _resolve_all_changelog_contexts(ctx):
         single = _get_changelog_context(ctx)
         return [single] if single is not None else []
 
-    # CWD is the workspace root: iterate all releasables
+    # CWD is the workspace root: iterate the releasable `--releasable` named,
+    # or every releasable when none was named.
+    selected = getattr(ctx, "releasable", None)
+    releasables = (
+        [r for r in ctx.releasables if r.name == selected.name]
+        if selected is not None else ctx.releasables
+    )
     contexts = []
-    for rel in ctx.releasables:
+    for rel in releasables:
         changes_dir = get_releasable_changes_dir(ws_root, rel.name)
         if not os.path.isdir(changes_dir):
             continue

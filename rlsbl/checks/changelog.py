@@ -22,6 +22,11 @@ def _changes_dirs_for_ctx(ctx):
     return [changes_dir for changes_dir, _tag, _scope, _entries in _get_all_changelog_contexts(ctx)]
 
 
+def _changelog_label(changes_dir):
+    """The releasable a releasable's changes directory belongs to, by name."""
+    return os.path.basename(os.path.dirname(os.path.normpath(changes_dir)))
+
+
 def _scope_is_releasable(scope):
     """Does any member in *scope* produce releases (and therefore a changelog)?
 
@@ -176,7 +181,12 @@ def register_changelog_checks(app):
         if not all_contexts:
             return reporter.skipped("no .rlsbl/changes/ directory")
 
-        all_details = []
+        # Several changelogs (the workspace root with no --releasable) report
+        # side by side, so each line names the changelog it is about: one
+        # commit uncovered in two releasables is two findings, not one line
+        # printed twice.
+        labelled = len(all_contexts) > 1
+        all_details = []  # (is_informational, text)
         all_passed = True
         checked_any = False
         for changes_dir, tag_glob, scope, entries in all_contexts:
@@ -190,21 +200,24 @@ def register_changelog_checks(app):
             )
             if not passed:
                 all_passed = False
-                all_details.extend(details)
+                prefix = f"{_changelog_label(changes_dir)}: " if labelled else ""
+                all_details.extend(
+                    (d.startswith("skipped "), prefix + d) for d in details
+                )
 
         if not checked_any:
             return reporter.skipped("non-releasable project")
 
         if all_passed:
             return reporter.passed("all unreleased commits covered")
-        # Filter out informational "skipped N ..." lines from the fail count
-        fail_details = [d for d in all_details if not d.startswith("skipped ")]
-        for detail in all_details:
-            if detail.startswith("skipped "):
+        # Informational "skipped N ..." lines do not count as failures.
+        fail_count = sum(1 for info, _d in all_details if not info)
+        for info, detail in all_details:
+            if info:
                 reporter.warn(detail)
             else:
                 reporter.error(detail)
-        return reporter.found(f"{len(fail_details)} uncovered commit(s)")
+        return reporter.found(f"{fail_count} uncovered commit(s)")
 
     @app.error_check("changelog-orphans")
     def check_changelog_orphans(ctx, reporter):

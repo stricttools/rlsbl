@@ -586,6 +586,12 @@ def _check_context_factory(project_root=None):
             graph=graph,
             releasables=releasables,
             unselected_releasables=unselected,
+            # The releasable `--releasable` named. For a root member it is the
+            # only thing telling the root member's releasable apart from the
+            # whole workspace, since both stand at the workspace root.
+            releasable=next(
+                (r for r in releasables if r.name == selector), None,
+            ) if selector is not None else None,
         )
         wctx.push_stdin = push_stdin
         return wctx
