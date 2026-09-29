@@ -9,6 +9,7 @@ from .base import (
     BaseTarget,
     ManifestRenamePlan,
     TemplateVars,
+    UploadListing,
 )
 from ..errors import ConfigError, VersionError
 from ..scratch_dirs import RUNNER_CHOSEN_BY_PROJECT
@@ -244,6 +245,39 @@ class NpmTarget(BaseTarget):
         output = json.dumps(pkg, indent=indent, ensure_ascii=False) + trailing_newline
         effects.atomic_write_text(pkg_path, output)
         return [self.version_file()]
+
+    def offline_upload_listing(self, dir_path):
+        """The tarball `npm pack` would publish, listed without packing it.
+
+        ``--dry-run --ignore-scripts --offline``: nothing is packed, no
+        lifecycle script runs, and nothing is fetched. npm still writes its
+        cache and logs, so it is pointed at a throwaway cache directory.
+        """
+        with effects.observe_scratch_dirs():
+            cache = effects.mkdtemp(prefix="rlsbl-npm-pack-")
+            try:
+                result = effects.run(
+                    ["npm", "pack", "--dry-run", "--json", "--ignore-scripts",
+                     "--offline", "--logs-max=0"],
+                    cwd=dir_path, capture_output=True, text=True, timeout=120,
+                    env=dict(os.environ, npm_config_cache=cache),
+                )
+            finally:
+                effects.rmtree(cache, ignore_errors=True)
+        if result.returncode != 0:
+            raise ConfigError(
+                f"`npm pack --dry-run` failed in {dir_path}: "
+                f"{(result.stderr or result.stdout or '').strip()}"
+            )
+        listing = json.loads(result.stdout)
+        return UploadListing(
+            label="`npm pack`",
+            files=tuple(entry["path"] for entry in listing[0]["files"]),
+            remedy=(
+                'List only the member\'s own files in package.json\'s "files" '
+                "field (or exclude the nested member in .npmignore)."
+            ),
+        )
 
     def version_file(self, dir_path=None):
         """Return the version file name for npm projects."""

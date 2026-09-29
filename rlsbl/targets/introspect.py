@@ -303,6 +303,13 @@ TARGET_AXES: tuple[TargetAxis, ...] = (
         _prop("shares_workspace_environment"),
     ),
     TargetAxis(
+        "lists_upload_offline",
+        "Lists the files its published upload carries without the network "
+        "(overrides offline_upload_listing), so a member's upload can be "
+        "checked for a nested member's files before a release starts.",
+        _prop("lists_upload_offline"),
+    ),
+    TargetAxis(
         "scratch_test_exclusion",
         "How this ecosystem's own test runner is told to skip the scaffolded "
         "scratch directories, so a probe left in one cannot break the suite.",
@@ -347,6 +354,9 @@ NON_AXIS_ATTRIBUTES: dict[str, str] = {
                      "it composes -- tag_format, monorepo_tag_format, "
                      "companion_tags -- are each already an axis; the assembly "
                      "is per-version, not per-target, so it has no cell.",
+    "offline_upload_listing": "operation: lists the files one directory's "
+                              "upload would carry (the fact is "
+                              "lists_upload_offline).",
     "find_circular_dependencies": "operation: scans sources for import cycles "
                                   "(the fact is supports_circular_dep_analysis).",
     "find_dead_modules": "operation: scans sources for unreachable modules "
