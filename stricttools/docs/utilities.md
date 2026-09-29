@@ -1,5 +1,5 @@
 +++
-description = "Utility commands: project status, unreleased-commit coverage, target detection, ecosystem discovery, pull requests, and the framework's --json envelope."
+description = "Utility commands: project status, unreleased-commit coverage, target detection, ecosystem discovery, pull requests, copying the npm token into NPM_TOKEN secrets, and the framework's --json envelope."
 +++
 
 # Utility commands
@@ -196,3 +196,28 @@ rlsbl prs
 ### Use case
 
 Run before releasing to check for in-flight work that might conflict with or depend on the release. This is especially important in monorepo workflows where multiple contributors may have PRs targeting different sub-projects, and a release could invalidate their base versions.
+
+## `rlsbl secrets sync-npm-token`
+
+Copy the npm token in `~/.npmrc` into the `NPM_TOKEN` Actions secret that an npm publish workflow authenticates with. When the token is replaced (it expired, or was rotated), every repository's copy goes stale at once, and the next release's CI npm publish fails against the registry after the release has already tagged and pushed. The `npm-token-synced` check (see [checks](checks.md)) refuses such a release in its preflight and names this command.
+
+### Usage
+
+```
+rlsbl secrets sync-npm-token --dry-run
+rlsbl secrets sync-npm-token --approve-consequential
+rlsbl secrets sync-npm-token --all --dry-run
+rlsbl secrets sync-npm-token --all --approve-consequential
+```
+
+### Behavior
+
+- Reads the token from the `//registry.npmjs.org/:_authToken=<token>` line of `~/.npmrc`, and refuses when there is none (log in with `npm login` first)
+- Asks npm whether it accepts the token (`GET https://registry.npmjs.org/-/whoami`, the token as a bearer credential), refuses when it does not, and prints the npm user it authenticates
+- Without `--all`, the target is the current repository, named by its `origin` remote; a repository without an `NPM_TOKEN` secret is refused, because the command never creates the secret
+- With `--all`, the targets are every repository the authenticated `gh` account can see -- its own and those of every organization it belongs to -- that already has an `NPM_TOKEN` secret; the others are counted and left alone, and archived repositories are named and skipped, since GitHub refuses writes to them
+- Sets each target with `gh secret set NPM_TOKEN --repo <owner/repo>`, the token piped on stdin, and prints the repository with its outcome (`NPM_TOKEN set`, `would set NPM_TOKEN` under `--dry-run`, or `failed: <reason>`)
+- Exits 1 when any target could not be read or set
+- The token is never printed and never passed as an argument
+
+The command is `consequential`: it asks before it runs, and `--approve-consequential` answers in advance. Preview with `--dry-run` first: the npm and GitHub reads run, and every `gh secret set` is listed instead of performed.
