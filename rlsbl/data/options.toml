@@ -318,7 +318,7 @@ values = "error > warn > off"
 default = "error"
 scope = "none"
 requires = []
-description = "Every releasable's publishing Go members have companion tags for the current version."
+description = "Every releasable's publishing Go members have companion tags for its latest released version."
 
 [[option]]
 name = "go-deprecation-published"

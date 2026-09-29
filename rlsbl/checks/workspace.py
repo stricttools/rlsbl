@@ -1304,7 +1304,8 @@ def register_workspace_checks(app):
         from ..errors import RlsblError
         from ..targets.base import BaseTarget
         from ..targets.refs import ref_context
-        from ..workspace import get_releasable_dir, read_releasable_version
+        from ..release_record import latest_released_version
+        from ..workspace import get_releasable_dir
 
         if not ctx.releasables:
             return reporter.skipped("no releasables defined")
@@ -1319,10 +1320,19 @@ def register_workspace_checks(app):
             if not member_projs:
                 continue
 
+            # The version the release record holds as the releasable's latest
+            # RELEASE: a version file that names a version nothing released
+            # yet (0.0.0 before a first release) owes no tag at all, and a
+            # released version owes the tags of the members its record lists.
             try:
-                version = read_releasable_version(root, rel.name)
+                releases = os.path.join(get_releasable_dir(root, rel.name), "releases")
+                version = (
+                    latest_released_version(releases) if os.path.isdir(releases) else None
+                )
             except Exception as e:
-                config_errors.append(f"{rel.name}: cannot read releasable version: {e}")
+                config_errors.append(f"{rel.name}: cannot read the release record: {e}")
+                continue
+            if version is None:
                 continue
 
             # Which refs a released version owns is ``expected_refs``' answer,

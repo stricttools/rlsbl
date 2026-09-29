@@ -3546,7 +3546,7 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
-      "description": "Every releasable's publishing Go members have companion tags for the current version.",
+      "description": "Every releasable's publishing Go members have companion tags for its latest released version.",
       "subject": "workspace",
       "scope": "workspace"
     },

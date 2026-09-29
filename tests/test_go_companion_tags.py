@@ -474,6 +474,15 @@ class TestGoCompanionTagsCheck:
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text("")
         write_releasable_version(str(repo), "myrel", "1.0.0")
+        # The check asks about the latest RELEASED version, which the
+        # release record holds, with the member paths that release shipped.
+        from rlsbl.release_file import write_archived_release_file
+        write_archived_release_file(
+            str(repo / ".rlsbl-monorepo" / "releasables" / "myrel" / "releases"),
+            "1.0.0", bump="patch", include=[], description="release 1.0.0",
+            candidate_sha="a" * 40,
+            tree_hashes={"packages/golib": "b" * 40, "packages/jslib": "b" * 40},
+        )
 
         (repo / "README.md").write_text("test\n")
         _run_git(repo, "add", ".")
@@ -519,6 +528,15 @@ class TestGoCompanionTagsCheck:
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text("")
         write_releasable_version(str(repo), "myrel", "1.0.0")
+        # The check asks about the latest RELEASED version, which the
+        # release record holds, with the member paths that release shipped.
+        from rlsbl.release_file import write_archived_release_file
+        write_archived_release_file(
+            str(repo / ".rlsbl-monorepo" / "releasables" / "myrel" / "releases"),
+            "1.0.0", bump="patch", include=[], description="release 1.0.0",
+            candidate_sha="a" * 40,
+            tree_hashes={"packages/golib": "b" * 40, "packages/jslib": "b" * 40},
+        )
 
         (repo / "README.md").write_text("test\n")
         _run_git(repo, "add", ".")
@@ -568,6 +586,15 @@ class TestGoCompanionTagsCheck:
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text("")
         write_releasable_version(str(repo), "myrel", "1.0.0")
+        # The check asks about the latest RELEASED version, which the
+        # release record holds, with the member paths that release shipped.
+        from rlsbl.release_file import write_archived_release_file
+        write_archived_release_file(
+            str(repo / ".rlsbl-monorepo" / "releasables" / "myrel" / "releases"),
+            "1.0.0", bump="patch", include=[], description="release 1.0.0",
+            candidate_sha="a" * 40,
+            tree_hashes={"packages/golib": "b" * 40, "packages/jslib": "b" * 40},
+        )
 
         (repo / "README.md").write_text("test\n")
         _run_git(repo, "add", ".")
@@ -619,6 +646,15 @@ class TestGoCompanionTagsCheck:
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text("")
         write_releasable_version(str(repo), "myrel", "1.0.0")
+        # The check asks about the latest RELEASED version, which the
+        # release record holds, with the member paths that release shipped.
+        from rlsbl.release_file import write_archived_release_file
+        write_archived_release_file(
+            str(repo / ".rlsbl-monorepo" / "releasables" / "myrel" / "releases"),
+            "1.0.0", bump="patch", include=[], description="release 1.0.0",
+            candidate_sha="a" * 40,
+            tree_hashes={"packages/golib": "b" * 40, "packages/jslib": "b" * 40},
+        )
 
         (repo / "README.md").write_text("test\n")
         _run_git(repo, "add", ".")
@@ -668,6 +704,15 @@ class TestGoCompanionTagsCheck:
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text("")
         write_releasable_version(str(repo), "myrel", "1.0.0")
+        # The check asks about the latest RELEASED version, which the
+        # release record holds, with the member paths that release shipped.
+        from rlsbl.release_file import write_archived_release_file
+        write_archived_release_file(
+            str(repo / ".rlsbl-monorepo" / "releasables" / "myrel" / "releases"),
+            "1.0.0", bump="patch", include=[], description="release 1.0.0",
+            candidate_sha="a" * 40,
+            tree_hashes={"packages/golib": "b" * 40, "packages/jslib": "b" * 40},
+        )
 
         (repo / "README.md").write_text("test\n")
         _run_git(repo, "add", ".")
@@ -686,10 +731,11 @@ class TestGoCompanionTagsCheck:
         assert "golib" in result.problems[0].text
         assert "config" in result.problems[0].text.lower()
 
-    def test_fails_when_releasable_version_unreadable(self, tmp_path):
-        """A releasable whose version file cannot be read must produce a
+    def test_fails_when_the_release_record_is_unreadable(self, tmp_path):
+        """A releasable whose release record cannot be read must produce a
         check FAILURE naming the releasable, not a silent skip -- same
-        no-silent-skip rule as the member-config-error failure."""
+        no-silent-skip rule as the member-config-error failure. (A releasable
+        with no record at all has released nothing, and owes no tag.)"""
         from rlsbl.workspace import Releasable, WorkspaceProject
 
         from conftest import capture_all_checks
@@ -711,10 +757,13 @@ class TestGoCompanionTagsCheck:
             "targets": ["go"],
         }))
 
-        # Workspace exists but the releasable version file is never written.
+        # The releasable's release record holds an archive that does not parse.
         ws_dir = repo / ".rlsbl-monorepo"
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text("")
+        releases = ws_dir / "releasables" / "myrel" / "releases"
+        releases.mkdir(parents=True)
+        (releases / "v1.0.0.toml").write_text("this is [not toml\n")
 
         (repo / "README.md").write_text("test\n")
         _run_git(repo, "add", ".")
@@ -731,7 +780,7 @@ class TestGoCompanionTagsCheck:
         result = check_fn(ctx)
         assert result.status == "fail"
         assert "myrel" in result.problems[0].text
-        assert "version" in result.problems[0].text.lower()
+        assert "release record" in result.problems[0].text.lower()
 
     def test_fails_when_member_targets_unresolvable(self, tmp_path):
         """A member whose config exists but resolves no targets anywhere must
@@ -766,6 +815,15 @@ class TestGoCompanionTagsCheck:
         ws_dir.mkdir()
         (ws_dir / "workspace.toml").write_text("")
         write_releasable_version(str(repo), "myrel", "1.0.0")
+        # The check asks about the latest RELEASED version, which the
+        # release record holds, with the member paths that release shipped.
+        from rlsbl.release_file import write_archived_release_file
+        write_archived_release_file(
+            str(repo / ".rlsbl-monorepo" / "releasables" / "myrel" / "releases"),
+            "1.0.0", bump="patch", include=[], description="release 1.0.0",
+            candidate_sha="a" * 40,
+            tree_hashes={"packages/golib": "b" * 40, "packages/jslib": "b" * 40},
+        )
 
         (repo / "README.md").write_text("test\n")
         _run_git(repo, "add", ".")
