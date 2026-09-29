@@ -62,6 +62,9 @@ def test_a_private_path_is_named_by_its_rule(rel, rule, directory):
     "tests/screenshots/expected.png",
     "docs/experiments.md",
     "src/pkg/environment.py",
+    # Go's fixture directory: a test's expected tree may hold any of them.
+    "internal/gen/testdata/expected/.strictmetadata/docs/index.md",
+    "testdata/CLAUDE.md",
 ])
 def test_an_ordinary_path_is_not_private(rel):
     assert private_match(rel) is None
