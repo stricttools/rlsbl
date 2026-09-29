@@ -338,9 +338,36 @@ ENV_ARGS+=(
 scripts/test-prewarm.sh
 )
 
-# --- writable throwaway working copy of the tree (INCLUDING .git; suites need
-# real git history). Excludes virtualenvs (absolute paths break on move) and
-# disposable caches. ---
+# --- writable throwaway working copy of the tree ------------------------------
+# The copy is git's view of the tree: tracked files, untracked files that are
+# not ignored, and .git (suites need real git history). Gitignored bulk --
+# experiment scratch, build output -- stays out, because it can outgrow the
+# temp filesystem the copy lives on. A gitignored path the suite does read
+# (typically what a pre-warm command staged) is declared in
+# test_sandbox.carry_ignored and copied when present. Virtualenvs (absolute
+# paths break on move) and disposable caches are excluded even when git does
+# not ignore them.
+SANDBOX_CARRY_IGNORED=('.rlsbl-test-tools')
+copy_worktree() {
+  local src="$1" dest="$2" path
+  git -C "${src}" ls-files -z --cached --others --exclude-standard \
+    | rsync -a --from0 --files-from=- --ignore-missing-args \
+        --exclude '.venv' \
+        --exclude '__pycache__' \
+        --exclude '.pytest_cache' \
+        --exclude '.mypy_cache' \
+        --exclude '.ruff_cache' \
+        --exclude '.wrangler' \
+        --exclude 'node_modules' \
+        --exclude '.coverage' \
+        "${src}/" "${dest}/"
+  rsync -a "${src}/.git" "${dest}/"
+  for path in "${SANDBOX_CARRY_IGNORED[@]}"; do
+    if [ -e "${src}/${path}" ]; then
+      rsync -a --relative "${src}/./${path}" "${dest}/"
+    fi
+  done
+}
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/test-sandbox-work.XXXXXX")"
 echo $$ >"${WORK}.pid"
 if has_cache uv; then
@@ -357,16 +384,7 @@ trap cleanup EXIT
 if has_cache uv; then
   cp -a --reflink=auto "${UV_CACHE}/." "${UV_CACHE_COPY}/"
 fi
-rsync -a \
-  --exclude '.venv' \
-  --exclude '__pycache__' \
-  --exclude '.pytest_cache' \
-  --exclude '.mypy_cache' \
-  --exclude '.ruff_cache' \
-  --exclude '.wrangler' \
-  --exclude 'node_modules' \
-  --exclude '.coverage' \
-  "${REPO_ROOT}/" "${WORK}/"
+copy_worktree "${REPO_ROOT}" "${WORK}"
 
 BIND_ARGS+=(--bind "${WORK}" "${WORK}")
 

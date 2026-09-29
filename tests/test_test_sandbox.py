@@ -49,6 +49,7 @@ def _section(**overrides):
         "prewarm": ["scripts/test-prewarm.sh"],
         "extra_env": {"LEGACY_SANDBOX": "1"},
         "ci_workflows": [".github/workflows/ci.yml"],
+        "carry_ignored": [".stage-dir"],
     }
     section.update(overrides)
     for key, value in list(section.items()):
@@ -129,6 +130,21 @@ class TestValidation:
         with pytest.raises(ConfigError, match="prewarm"):
             validate_test_sandbox_config(_section(prewarm=[""]))
 
+    def test_carry_ignored_must_be_a_list_of_strings(self):
+        with pytest.raises(ConfigError, match="carry_ignored"):
+            validate_test_sandbox_config(_section(carry_ignored=".stage-dir"))
+        with pytest.raises(ConfigError, match="carry_ignored"):
+            validate_test_sandbox_config(_section(carry_ignored=[""]))
+
+    @pytest.mark.parametrize("bad", ["/abs/stage", "~/stage", "../outside"])
+    def test_carry_ignored_paths_must_stay_in_the_project(self, bad):
+        with pytest.raises(ConfigError, match="carry_ignored"):
+            validate_test_sandbox_config(_section(carry_ignored=[bad]))
+
+    def test_carry_ignored_single_quote_rejected(self):
+        with pytest.raises(ConfigError, match="single quote"):
+            validate_test_sandbox_config(_section(carry_ignored=["it's"]))
+
     def test_ci_workflow_paths_must_be_relative(self):
         with pytest.raises(ConfigError, match="ci_workflows"):
             validate_test_sandbox_config(
@@ -180,6 +196,7 @@ class TestTemplateVars:
         assert v["sandboxCaches"] == "uv go"
         assert v["sandboxPrewarm"] == "scripts/test-prewarm.sh"
         assert v["sandboxExtraEnv"] == "  --setenv LEGACY_SANDBOX 1"
+        assert v["sandboxCarryIgnored"] == "'.stage-dir'"
 
     def test_root_relative_depth(self, sandbox_on):
         assert template_vars(_section(runner_path="test.sh"), sandbox_on)[
@@ -198,6 +215,7 @@ class TestTemplateVars:
         assert v["sandboxPrewarm"] == ""
         assert v["sandboxExtraEnv"] == ""
         assert v["sandboxDefaultArgs"] == ""
+        assert v["sandboxCarryIgnored"] == ""
 
 
 class TestRunnerMapping:
@@ -440,6 +458,99 @@ def test_rlsbl_own_runner_is_a_template_instance():
     )
     assert unreplaced == []
     assert (REPO_ROOT / "scripts" / "test.sh").read_text() == rendered
+
+
+def test_rlsbl_carries_the_prewarm_stage_dir():
+    """The pre-warm stages safegit in a gitignored dir the suite reads.
+
+    The working copy leaves gitignored paths behind, so the stage dir must be
+    declared under ``carry_ignored`` or the staged binary never reaches the
+    sandbox.
+    """
+    from conftest import SAFEGIT_STAGE_DIR
+
+    config = json.loads((REPO_ROOT / ".rlsbl" / "config.json").read_text())
+    assert SAFEGIT_STAGE_DIR in config[CONFIG_KEY]["carry_ignored"]
+
+
+class TestWorkingCopy:
+    """The throwaway copy holds what git sees, not the whole directory.
+
+    Copying the directory wholesale dragged gitignored bulk (gigabytes of
+    experiment scratch) into the temp filesystem and filled it before the suite
+    started.
+    """
+
+    @staticmethod
+    def _copy_function():
+        content = TEMPLATE_PATH.read_text()
+        start = content.index("copy_worktree() {")
+        end = content.index("\n}\n", start) + len("\n}\n")
+        return content[start:end]
+
+    def _copy(self, src, dest, carry):
+        carry_words = " ".join(f"'{c}'" for c in carry)
+        script = (
+            "set -euo pipefail\n"
+            f"SANDBOX_CARRY_IGNORED=({carry_words})\n"
+            f"{self._copy_function()}"
+            'copy_worktree "$1" "$2"\n'
+        )
+        return subprocess.run(
+            ["bash", "-c", script, "copy", str(src), str(dest)],
+            capture_output=True, text=True,
+        )
+
+    def _repo(self, tmp_path):
+        src = tmp_path / "src"
+        src.mkdir()
+        run_git(src, "init", "-q")
+        (src / ".gitignore").write_text("bulk/\n.stage/\n")
+        (src / "tracked.txt").write_text("tracked\n")
+        (src / "gone.txt").write_text("deleted in the worktree\n")
+        (src / "pkg").mkdir()
+        (src / "pkg" / "mod.py").write_text("x = 1\n")
+        run_git(src, "add", "-A")
+        run_git(src, "commit", "-q", "-m", "seed")
+        (src / "gone.txt").unlink()
+        (src / "new_untracked.txt").write_text("in progress\n")
+        (src / "bulk").mkdir()
+        (src / "bulk" / "huge.bin").write_text("scratch\n")
+        (src / ".stage").mkdir()
+        (src / ".stage" / "tool").write_text("staged\n")
+        dest = tmp_path / "dest"
+        dest.mkdir()
+        return src, dest
+
+    def test_copies_the_git_view_and_leaves_ignored_bulk(self, tmp_path):
+        src, dest = self._repo(tmp_path)
+        result = self._copy(src, dest, [])
+        assert result.returncode == 0, result.stderr
+        assert (dest / "tracked.txt").read_text() == "tracked\n"
+        assert (dest / "pkg" / "mod.py").is_file()
+        assert (dest / "new_untracked.txt").is_file()
+        assert (dest / ".gitignore").is_file()
+        assert not (dest / "gone.txt").exists()
+        assert not (dest / "bulk").exists()
+        assert not (dest / ".stage").exists()
+        log = subprocess.run(
+            ["git", "-C", str(dest), "log", "--format=%s"],
+            capture_output=True, text=True, check=True,
+        )
+        assert log.stdout.strip() == "seed"
+
+    def test_declared_ignored_paths_are_carried(self, tmp_path):
+        src, dest = self._repo(tmp_path)
+        result = self._copy(src, dest, [".stage"])
+        assert result.returncode == 0, result.stderr
+        assert (dest / ".stage" / "tool").read_text() == "staged\n"
+        assert not (dest / "bulk").exists()
+
+    def test_a_declared_path_the_prewarm_did_not_create_is_skipped(self, tmp_path):
+        src, dest = self._repo(tmp_path)
+        result = self._copy(src, dest, [".never-staged"])
+        assert result.returncode == 0, result.stderr
+        assert not (dest / ".never-staged").exists()
 
 
 # ---------------------------------------------------------------------------
