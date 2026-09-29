@@ -194,8 +194,60 @@ def _get_config_hooks(hook_name, config):
     return entries
 
 
+def _refuse_hook_dir(project_dir, dir_value, display_name, hook_owners):
+    """Refuse a hook ``dir`` outside the member (or releasable) the hook belongs to.
+
+    ``dir`` resolves inside *project_dir*: a ``..`` segment or an absolute
+    path is refused outright. In a workspace, the directory it names must be
+    owned by the same member as *project_dir* -- or, for a releasable-level
+    hook, by one of the releasable's members (*hook_owners*). A directory a
+    nested member owns is that member's: a command run there belongs in that
+    member's own hooks.
+    """
+    parts = dir_value.replace("\\", "/").split("/")
+    if os.path.isabs(dir_value) or ".." in parts:
+        raise HookError(
+            f"{display_name} hook's dir '{dir_value}' must name a directory "
+            f"inside {project_dir}, with no '..' segment."
+        )
+    from ...ownership import member_for_directory, member_name
+    from ...workspace import find_workspace_root, load_workspace
+
+    ws_root = find_workspace_root(project_dir)
+    if ws_root is None:
+        return
+    projects = load_workspace(ws_root)
+    real_root = os.path.realpath(ws_root)
+
+    def _owner(directory):
+        rel = os.path.relpath(os.path.realpath(directory), real_root)
+        return member_for_directory(
+            "." if rel == os.curdir else rel.replace(os.sep, "/"),
+            projects, include_root=True,
+        )
+
+    base = _owner(project_dir)
+    target = _owner(os.path.join(project_dir, dir_value))
+    if target is None or base is None:
+        return
+    allowed = set(hook_owners or ()) | {member_name(base)}
+    if member_name(target) in allowed:
+        return
+    target_path = target["path"]
+    config_path = (
+        ".rlsbl/config.json" if target_path == "." else f"{target_path}/.rlsbl/config.json"
+    )
+    raise HookError(
+        f"{display_name} hook's dir '{dir_value}' lies inside workspace member "
+        f"'{member_name(target)}' ({target_path}), which owns that directory: a "
+        f"command run there belongs to that member, not to the one declaring "
+        f"the hook. Declare the hook on '{member_name(target)}' instead, in "
+        f"{config_path}."
+    )
+
+
 def run_config_hooks(hook_name, config, project_dir, env, timeout, *,
-                     fatal=True, display_name=None):
+                     fatal=True, display_name=None, hook_owners=None):
     """Run config-driven hooks for a given hook slot.
 
     Reads ``config["hooks"][<hook_config_key>]``, normalizes each entry,
@@ -212,6 +264,10 @@ def run_config_hooks(hook_name, config, project_dir, env, timeout, *,
             If False, logs a warning and continues (for post-release).
         display_name: human-readable name for error messages. If None,
             uses ``hook_name``.
+        hook_owners: for a releasable-level hook, the names of the
+            releasable's members, whose directories its ``dir`` may name.
+            Otherwise a ``dir`` must stay in the member *project_dir* belongs
+            to (:func:`_refuse_hook_dir`).
 
     Returns:
         True if config had entries for this hook (even if empty list),
@@ -240,6 +296,9 @@ def run_config_hooks(hook_name, config, project_dir, env, timeout, *,
         # Compute working directory
         cwd = project_dir
         if "dir" in normalized:
+            _refuse_hook_dir(
+                project_dir, normalized["dir"], display_name, hook_owners,
+            )
             cwd = os.path.join(project_dir, normalized["dir"])
 
         # Merge env: base env + entry-specific env
@@ -308,7 +367,7 @@ def is_hook_customized(config, hook_path):
 
 
 def run_release_hook(hook_name, hook_path, project_dir, env, timeout,
-                     *, config=None):
+                     *, config=None, hook_owners=None):
     """Run a release hook: config-driven if available, else script-based.
 
     When ``config`` is provided and has entries for the hook slot, runs
@@ -340,7 +399,8 @@ def run_release_hook(hook_name, hook_path, project_dir, env, timeout,
                 break
         fatal = "post-release" not in hook_name
         if run_config_hooks(canonical, config, project_dir, env, timeout,
-                            fatal=fatal, display_name=hook_name):
+                            fatal=fatal, display_name=hook_name,
+                            hook_owners=hook_owners):
             return
 
     # Fall back to script-based hooks
@@ -480,6 +540,9 @@ def run_releasable_hooks(hook_name, workspace_root, releasable_name,
             hook_env,
             timeout,
             config=releasable_config,
+            # A releasable-level hook acts for the releasable, so its dir may
+            # name any of the releasable's own members.
+            hook_owners=frozenset(name for name, _dir in sorted_members),
         )
 
     def _releasable_has_hooks():
