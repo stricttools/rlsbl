@@ -394,6 +394,7 @@ def _is_npm_wrapper(npm_dir_path):
 USER_OWNED = {
     "CHANGELOG.md",
     ".npmignore",
+    ".dockerignore",
     ".rlsbl/changes/unreleased.jsonl",
     # Custom workflow files: never created by scaffold, never touched on update.
     # Users put extra jobs here to avoid three-way merge conflicts on ci.yml/publish.yml.
@@ -2126,6 +2127,14 @@ def run_cmd(registry, args, flags, ctx):
         excl_created, excl_skipped, excl_warnings = apply_scratch_test_exclusions(
             {registry: target_path}, dry_run=dry_run,
         )
+        # Keep the private paths out of the Python sdist (a project-owned file
+        # too, so merged the same way).
+        from ..upload_exclusions import apply_upload_exclusions
+        for part, extra in zip(
+            (excl_created, excl_skipped, excl_warnings),
+            apply_upload_exclusions({registry: target_path}, dry_run=dry_run),
+        ):
+            part.extend(extra)
         excl_created.extend(_ensure_ci_inputs({registry: target_path}, dry_run=dry_run))
 
         if dry_run:
@@ -3291,6 +3300,12 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         excl_created, excl_skipped, excl_warnings = apply_scratch_test_exclusions(
             target_paths, dry_run=dry_run,
         )
+        from ..upload_exclusions import apply_upload_exclusions
+        for part, extra in zip(
+            (excl_created, excl_skipped, excl_warnings),
+            apply_upload_exclusions(target_paths, dry_run=dry_run),
+        ):
+            part.extend(extra)
         excl_created.extend(_ensure_ci_inputs(target_paths, dry_run=dry_run))
 
         if dry_run:

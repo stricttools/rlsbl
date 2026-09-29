@@ -26,6 +26,9 @@ description = "How rlsbl scaffold generates CI workflows, git hooks, and the scr
 | `experiments/.gitignore` | Makes `experiments/` a scratch directory git carries but never fills |
 | `screenshots/.gitignore` | Makes `screenshots/` a scratch directory git carries but never fills |
 | `experiments/go.mod`, `screenshots/go.mod` | Go projects only: keeps the go command out of the scratch directories |
+| `.rlsbl/go.mod`, and a `go.mod` in each other private directory at the root that git tracks files in | Go projects only: keeps the private directory out of the module zip (see [Private paths](#private-paths)) |
+| `.npmignore` | npm projects: created once, carrying the private-path entries |
+| `.dockerignore` | Docker projects: created once, carrying `.git` and the private-path entries |
 | `.go-version` | pgdesign target only, beside `pgdesign.toml`: the Go its CI installs. Created from the Go on this machine when missing and never rewritten; change the version by editing the file |
 
 ## Scratch directories
@@ -85,6 +88,21 @@ rlsbl's repository walks -- dead-module detection, circular-dependency detection
 
 The pruning is scoped to the project root, matching where scaffold creates them. A directory named `experiments` or `screenshots` nested deeper inside a project is an ordinary source directory and is walked normally. In a workspace, every member is walked with its own directory as the root, so each member's own scratch directories are pruned.
 
+## Private paths
+
+A registry keeps every upload permanently, so a release refuses an upload that carries a private path: planning notes, release and family metadata, agent instructions, scratch output, or environment files (the list is in the `upload-private-paths` row of [the checks reference](checks.md#project-checks)). Scaffold writes each ecosystem's own exclusion, so a new project passes that refusal without hand edits:
+
+| Ecosystem | What scaffold writes | Where |
+| --- | --- | --- |
+| Python (hatchling) | The private-path entries, merged into `exclude` (existing entries kept); `uv build` builds the wheel from this sdist | `[tool.hatch.build.targets.sdist]` in `pyproject.toml` |
+| npm | The private-path entries, in the file scaffold creates once and never touches again | `.npmignore` |
+| Go | A stub `go.mod` in `.rlsbl/` and in each other private directory at the module root that git tracks files in; Go leaves a directory holding its own `go.mod` out of the module zip | `<directory>/go.mod` |
+| Docker | `.git` and the private-path entries, in the file scaffold creates once and never touches again | `.dockerignore` |
+
+A Python project built with another backend gets a printed warning naming that backend's exclusion instead, since scaffold writes only hatchling's; its CI refuses the upload until the entries are added. `.npmignore` and `.dockerignore` are user-owned, so a project scaffolded before these entries existed adds them by hand when the refusal names them.
+
+Go cannot leave a single file out of a module zip, only a directory holding its own `go.mod`. A private file at the module root therefore moves or stops being committed: `CLAUDE.md` moves to `.claude/CLAUDE.md` (Claude Code reads it there) with a stub `go.mod` in `.claude/`, and an environment or local-only file leaves git.
+
 ## Three-way merge
 
 When scaffold runs on a project that already has scaffolded files, it performs a three-way merge to reconcile template updates with your local modifications. This ensures that upgrading rlsbl never silently overwrites your customizations to CI workflows, hooks, or configuration files, while still applying any template improvements from newer versions.
@@ -125,6 +143,7 @@ These files are created once by scaffold and **never overwritten or merged**, ev
 
 - `CHANGELOG.md`
 - `.npmignore`
+- `.dockerignore`
 - `.rlsbl/hooks/pre-checks.sh`
 - `.rlsbl/changes/unreleased.jsonl`
 - `.github/workflows/ci-custom.yml`

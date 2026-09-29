@@ -151,16 +151,20 @@ class DockerTarget(BaseTarget):
         from .utils import _get_git_author
         author = _get_git_author()
 
+        from ..upload_exclusions import dockerignore_block
+
         return TemplateVars(self.name, {
             "image": image,
             "registry": registry,
             "name": name,
             "author": author,
+            "privatePathIgnore": dockerignore_block(),
         })
 
     def template_mappings(self, ctx):
         return [
             {"template": "ci.yml.tpl", "target": ".github/workflows/ci.yml"},
+            {"template": "dockerignore.tpl", "target": DOCKERIGNORE},
         ]
 
     def offline_upload_listing(self, dir_path):

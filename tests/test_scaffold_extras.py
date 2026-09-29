@@ -250,8 +250,10 @@ def test_npm_scaffold_creates_npmignore(tmp_project):
     assert npmignore_mappings[0]["template"] == "npmignore.tpl"
 
     # Process the template and verify the file is created
+    from rlsbl.upload_exclusions import npmignore_block
+
     created, skipped, warnings, _ = process_mappings(
-        tpl_dir, npmignore_mappings, {},
+        tpl_dir, npmignore_mappings, {"npm.privatePathIgnore": npmignore_block()},
     )
 
     npmignore_path = tmp_project / ".npmignore"
