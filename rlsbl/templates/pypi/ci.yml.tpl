@@ -26,14 +26,24 @@ jobs:
       - run: uv python install ${{ matrix.python-version }}
       - run: uv sync --locked
       - run: uv run python -c "import {{importName}}"{{#if pypi.hasPytest}}
-      - run: uv run pytest --rootdir .{{/if}}{{#if pypi.nestedMembers}}
+      - run: uv run pytest --rootdir .{{/if}}
+      # Listing what the upload carries takes building it, which needs the
+      # network, so the upload is built and checked here, on the candidate
+      # commit a release waits on, rather than before the release starts.
+      - name: Build the upload
+        run: uv build --out-dir "$RUNNER_TEMP/rlsbl-upload"
+      # A registry keeps every upload permanently: planning notes, release
+      # metadata, agent instructions, scratch output, and environment files
+      # are refused. The script is rlsbl's rule itself (rlsbl.private_paths).
+      - name: Check the upload carries no private paths
+        run: |
+          python3 - "$RUNNER_TEMP/rlsbl-upload" <<'PY'
+          {{pypi.privatePathCheck}}
+          PY{{#if pypi.nestedMembers}}
       # Workspace members nested in this one are published on their own; the
-      # upload must not carry their files. Listing an upload's contents takes
-      # building it, which needs the network, so it is checked here, on the
-      # release commit, rather than before the release starts.
+      # upload must not carry their files.
       - name: Check the upload leaves nested members out
         run: |
-          uv build --out-dir "$RUNNER_TEMP/rlsbl-upload"
           python3 - "$RUNNER_TEMP/rlsbl-upload" {{pypi.nestedMembers}} <<'PY'
           import pathlib, sys, tarfile, zipfile
           dist = pathlib.Path(sys.argv[1])

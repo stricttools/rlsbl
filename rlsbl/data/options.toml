@@ -816,6 +816,15 @@ requires = []
 description = "No releasable member has a runtime dependency on an unversioned member."
 
 [[option]]
+name = "upload-private-paths"
+subject = "project"
+values = "error > warn > off"
+default = "error"
+scope = "none"
+requires = []
+description = "No npm package, Go module zip, or Docker build context carries a private path."
+
+[[option]]
 name = "version-consistency"
 subject = "project"
 values = "error > warn > off"

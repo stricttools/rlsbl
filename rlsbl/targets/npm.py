@@ -35,6 +35,23 @@ def _npmrc_has_login(path):
     return False
 
 
+def _npm_npmignore_fix(rel, rule, directory):
+    """Keep a private path out of a package with no ``files`` field."""
+    return f'add "{rule}" to .npmignore'
+
+
+def _npm_files_field_fix(rel, rule, directory):
+    """Keep a private path out of a package whose ``files`` field lists it.
+
+    npm reads the root ``.npmignore`` only for what ``files`` does not name,
+    so the field itself has to stop covering the path.
+    """
+    return (
+        f'narrow the "files" field in package.json so that it no longer '
+        f"covers {directory or rel}"
+    )
+
+
 def _missing_package_json_message(pkg_path, ctx):
     """The refusal for an npm target directory holding no ``package.json``."""
     project_root = getattr(ctx, "project_root", None)
@@ -270,12 +287,17 @@ class NpmTarget(BaseTarget):
                 f"{(result.stderr or result.stdout or '').strip()}"
             )
         listing = json.loads(result.stdout)
+        with open(os.path.join(dir_path, "package.json"), encoding="utf-8") as f:
+            has_files_field = "files" in json.load(f)
         return UploadListing(
             label="`npm pack`",
             files=tuple(entry["path"] for entry in listing[0]["files"]),
             fix=(
                 'List only the member\'s own files in package.json\'s "files" '
                 "field (or exclude the nested member in .npmignore)."
+            ),
+            private_path_fix=(
+                _npm_files_field_fix if has_files_field else _npm_npmignore_fix
             ),
         )
 

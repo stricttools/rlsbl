@@ -190,11 +190,24 @@ def _ci_workflow(member_dir):
     return content
 
 
-def _upload_check_step(workflow):
+_NESTED_STEP = "Check the upload leaves nested members out"
+
+
+def _steps(workflow):
     from ruamel.yaml import YAML
 
-    steps = YAML(typ="safe").load(workflow)["jobs"]["test"]["steps"]
-    return next(s for s in steps if s.get("name", "").startswith("Check the upload"))
+    return YAML(typ="safe").load(workflow)["jobs"]["test"]["steps"]
+
+
+def _named(workflow, name):
+    return next(s for s in _steps(workflow) if s.get("name") == name)
+
+
+def _upload_check_step(workflow):
+    """The build step and the nested-member step, as one script."""
+    build = _named(workflow, "Build the upload")
+    check = _named(workflow, _NESTED_STEP)
+    return {"run": build["run"] + "\n" + check["run"]}
 
 
 def test_a_python_parents_ci_builds_and_checks_its_upload(tmp_path):
@@ -209,7 +222,7 @@ def test_a_python_member_without_nested_members_gets_no_such_step(tmp_path):
     root = tmp_path / "ws"
     make_nested_workspace(root, "python")
     workflow = _ci_workflow(root / "sdk" / "python")
-    assert "Check the upload" not in workflow
+    assert _NESTED_STEP not in workflow
 
 
 def _run_step(step, cwd, tmp_path):

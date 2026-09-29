@@ -21,6 +21,7 @@ from ..targets import (
     targets_with_dep_floors,
     targets_with_import_analysis,
     targets_with_library_lint,
+    targets_listing_uploads_offline,
 )
 
 # Manifest filenames used by workspace-unregistered and workspace-stale-entries
@@ -82,9 +83,14 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # nested-member-runner-exclusion writes into the runners rlsbl can
     # configure: pytest (pypi) and deno.
     "nested-member-runner-exclusion": frozenset({"pypi", "deno"}),
-    # nested-member-upload-contents lists what npm and Go publish offline;
-    # a Python upload is checked in CI (the pypi CI template).
+    # nested-member-upload-contents lists what npm and Go publish offline; a
+    # Docker build context is left out, since a Dockerfile may build from its
+    # nested members on purpose. A Python upload is checked in CI (the pypi CI
+    # template).
     "nested-member-upload-contents": frozenset({"npm", "go"}),
+    # upload-private-paths lists every upload a target can list offline
+    # (offline_upload_listing); a Python upload is checked in CI.
+    "upload-private-paths": targets_listing_uploads_offline(),
     # nested-member-uv-sources reads [tool.uv.sources], which only uv (pypi)
     # projects declare.
     "nested-member-uv-sources": frozenset({"pypi"}),
@@ -494,6 +500,7 @@ def register_checks(app):
     from .strictspec_gate import register_strictspec_gate_checks
     from .go_tags import register_go_tag_checks
     from .nested import register_nested_checks
+    from .upload_private_paths import register_upload_private_path_checks
     from .go_workspace import register_go_workspace_checks
 
     register_project_checks(app)
@@ -505,4 +512,5 @@ def register_checks(app):
     register_strictspec_gate_checks(app)
     register_go_tag_checks(app)
     register_nested_checks(app)
+    register_upload_private_path_checks(app)
     register_go_workspace_checks(app)
