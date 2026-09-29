@@ -52,6 +52,11 @@ PRIVATE_FILES = ("CLAUDE.md", "AGENTS.md")
 #: environment files, and anything named local-only.
 PRIVATE_NAME_PATTERNS = (".env*", "*.local-only")
 
+#: A directory whose contents are test fixtures, never the project's own
+#: state: Go's ``testdata`` convention. A fixture may hold any private name
+#: as the input or expected output of a test.
+FIXTURE_DIR = "testdata"
+
 
 def exclude_entries():
     """Every rule as a gitignore-syntax exclude entry, in declaration order.
@@ -75,10 +80,13 @@ def private_match(rel):
     ``.env*``); *directory* is the private directory holding the path, relative
     to the package directory, or None when the path is a private file itself.
     The outermost private component wins, so a whole private directory is one
-    rule however deep its files sit.
+    rule however deep its files sit. Nothing under a ``testdata`` directory is
+    private.
     """
     parts = [p for p in rel.replace(os.sep, "/").split("/") if p and p != "."]
     last = len(parts) - 1
+    if FIXTURE_DIR in parts[:last]:
+        return None
     for i, part in enumerate(parts):
         is_dir = i < last
         directory = "/".join(parts[: i + 1]) if is_dir else None
