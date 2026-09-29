@@ -23,7 +23,10 @@ def _npm_project(root, subdir):
     proj_dir = os.path.join(str(root), subdir)
     os.makedirs(proj_dir, exist_ok=True)
     with open(os.path.join(proj_dir, "package.json"), "w") as handle:
-        json.dump({"name": subdir, "version": "0.1.0"}, handle)
+        json.dump(
+            {"name": subdir, "version": "0.1.0", "engines": {"node": ">=22"}},
+            handle,
+        )
     return proj_dir
 
 
@@ -91,7 +94,8 @@ class TestBatchReleaseInitFilter:
         rlsbl.app.test(["monorepo", "init", "--root-dev-node"])
         for name in ("pkg-a", "pkg-b"):
             _npm_project(root, name)
-            rlsbl.app.test(["monorepo", "add", name, "--releasable", name])
+            added = rlsbl.app.test(["monorepo", "add", name, "--releasable", name])
+            assert added.exit_code == 0, added.stderr
 
     def test_an_empty_filter_is_refused(self, mock_git_repo):
         self._workspace(mock_git_repo)
@@ -402,7 +406,8 @@ class TestOmittedFlagsStillWork:
         rlsbl.app.test(["monorepo", "init", "--root-dev-node"])
         for name in ("pkg-a", "pkg-b"):
             _npm_project(mock_git_repo, name)
-            rlsbl.app.test(["monorepo", "add", name, "--releasable", name])
+            added = rlsbl.app.test(["monorepo", "add", name, "--releasable", name])
+            assert added.exit_code == 0, added.stderr
 
         result = rlsbl.app.test(["monorepo", "release", "init"])
         assert result.exit_code == 0, result.stderr

@@ -325,6 +325,18 @@ def _cmd_add(args, flags, project_root, dry_run=False):
         print("  Would run: rlsbl monorepo sync (regenerate CI workflows)")
         return
 
+    no_commit = not flags.get("auto-commit", True)
+    ws_file = os.path.join(WORKSPACE_DIR, WORKSPACE_FILE)
+    ws_path = os.path.join(root, ws_file)
+
+    # The registration is written first, because `rlsbl scaffold` in a
+    # directory the workspace does not declare writes a standalone project's
+    # layout instead of a member's. Its bytes before this command are kept so
+    # a failed scaffold or sync restores them: the member is never left
+    # registered without the scaffold and the sync it depends on.
+    with open(ws_path, "r", encoding="utf-8", newline="") as f:
+        workspace_before = f.read()
+
     projects.append(project)
     # ``releasables`` is the full desired list only when this add created one;
     # otherwise it stays None so the existing section is preserved untouched.
@@ -339,20 +351,12 @@ def _cmd_add(args, flags, project_root, dry_run=False):
             f"directory is scaffolded by the `rlsbl monorepo sync` below."
         )
 
-    no_commit = not flags.get("auto-commit", True)
-    ws_file = os.path.join(WORKSPACE_DIR, WORKSPACE_FILE)
-
-    if no_commit:
-        print(f"Skipped commit (--no-auto-commit). Run `safegit commit -- {ws_file}` manually.")
-    else:
-        # Commit workspace.toml
-        commit_files(f"monorepo: add {name}", [ws_file], allow_failure=True, cwd=root)
-
-    # Auto-scaffold if not already scaffolded
-    project_rlsbl = os.path.join(abs_path, ".rlsbl", "config.json")
-    if not os.path.exists(project_rlsbl):
-        print(f"Scaffolding {name}...")
-        try:
+    registered = False
+    try:
+        # Auto-scaffold if not already scaffolded
+        project_rlsbl = os.path.join(abs_path, ".rlsbl", "config.json")
+        if not os.path.exists(project_rlsbl):
+            print(f"Scaffolding {name}...")
             # -P: suppress CWD injection from ``python -m`` run in a foreign dir
             # (a root module shadowing a stdlib/dep name would break rlsbl imports).
             # No confirmation-skip flag: `scaffold` is `mutating` but not
@@ -362,26 +366,43 @@ def _cmd_add(args, flags, project_root, dry_run=False):
                 cmd.extend(["--target", explicit_target])
             if no_commit:
                 cmd.append("--no-auto-commit")
-            effects.run(
-                cmd,
-                cwd=abs_path,
-                check=False,
-            )
-        except Exception as e:
-            print(f"Warning: scaffold failed: {e}", file=sys.stderr)
+            _run_add_child(cmd, abs_path, f"`rlsbl scaffold` in {path}", name)
 
-    # Sync CI workflows
-    try:
+        # Sync CI workflows
         sync_cmd = [sys.executable, "-P", "-m", "rlsbl", "monorepo", "sync"]
         if no_commit:
             sync_cmd.append("--no-auto-commit")
-        effects.run(
-            sync_cmd,
-            cwd=root,
-            check=False,
-        )
-    except Exception:
-        pass
+        _run_add_child(sync_cmd, root, "`rlsbl monorepo sync`", name)
+        registered = True
+    finally:
+        if not registered:
+            effects.atomic_write_text(ws_path, workspace_before, preserve_mode=True)
+
+    if no_commit:
+        print(f"Skipped commit (--no-auto-commit). Run `safegit commit -- {ws_file}` manually.")
+    else:
+        commit_files(f"monorepo: add {name}", [ws_file], allow_failure=True, cwd=root)
+
+
+def _run_add_child(cmd, cwd, what, name):
+    """Run one of `monorepo add`'s child commands; stop the add if it fails.
+
+    The child's own output streams through, so its error is already printed
+    when this refuses. The caller restores workspace.toml.
+    """
+    result = effects.run(cmd, cwd=cwd, check=False)
+    if effects.unsettled(result) or result.returncode == 0:
+        return
+    print(
+        f"Error: {what} failed (exit {result.returncode}; its error is "
+        f"above), so member '{name}' is not added: "
+        f"{os.path.join(WORKSPACE_DIR, WORKSPACE_FILE)} is restored to what it "
+        f"was before this command. Files the scaffold and the sync already "
+        f"wrote stay, and register nothing. Fix what it reports, then re-run "
+        f"this `rlsbl monorepo add`.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 def _cmd_remove(args, flags, project_root):
@@ -399,12 +420,18 @@ def _cmd_remove(args, flags, project_root):
 
     projects = load_workspace(root)
 
-    norm_path = path.rstrip("/")
-    new_projects = [p for p in projects if p["path"].rstrip("/") != norm_path]
+    # A member path has one spelling (the one workspace.toml holds), so the
+    # match is exact: `web/` is not the member at `web`.
+    new_projects = [p for p in projects if p["path"] != path]
 
     if len(new_projects) == len(projects):
-        print(f"Warning: Project at '{path}' not found in workspace.", file=sys.stderr)
-        return
+        known = ", ".join(f"'{p['path']}' ({p['name']})" for p in projects)
+        print(
+            f"Error: no member at '{path}'. The workspace's members, by path: "
+            f"{known or '(none)'}. Pass one of those paths as written.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     save_workspace(root, new_projects)
     print(f"Removed project at {path}")

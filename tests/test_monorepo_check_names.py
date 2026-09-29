@@ -17,7 +17,7 @@ def _make_npm_project(base_path, subdir):
     proj_dir = os.path.join(str(base_path), subdir)
     os.makedirs(proj_dir, exist_ok=True)
     with open(os.path.join(proj_dir, "package.json"), "w") as f:
-        json.dump({"name": "test-" + subdir, "version": "0.1.0"}, f)
+        json.dump({"name": "test-" + subdir, "version": "0.1.0", "engines": {"node": ">=22"}}, f)
     return subdir
 
 

@@ -107,7 +107,7 @@ class TestAddExplicitTarget:
         proj_dir = os.path.join(str(mock_git_repo), "mypkg")
         os.makedirs(proj_dir)
         with open(os.path.join(proj_dir, "package.json"), "w") as f:
-            json.dump({"name": "mypkg", "version": "1.0.0"}, f)
+            json.dump({"name": "mypkg", "version": "1.0.0", "engines": {"node": ">=22"}}, f)
         _cmd_add(["mypkg"], {"releasable": "false", "target": "npm"}, project_root=".")
         projects = declared_members(load_workspace(str(mock_git_repo)))
         assert len(projects) == 1

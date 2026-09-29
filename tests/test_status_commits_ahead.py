@@ -23,7 +23,7 @@ def _make_npm_project(base_path, subdir=".", name="test-pkg", version="0.1.0"):
     proj_dir = os.path.join(str(base_path), subdir) if subdir != "." else str(base_path)
     os.makedirs(proj_dir, exist_ok=True)
     with open(os.path.join(proj_dir, "package.json"), "w") as f:
-        json.dump({"name": name, "version": version}, f)
+        json.dump({"name": name, "version": version, "engines": {"node": ">=22"}}, f)
 
 
 def _commit_file(repo, name, content="x\n", message="change"):
@@ -257,7 +257,7 @@ class TestStatusCommitsAheadMonorepo:
         core_dir = mock_git_repo / "core"
         core_dir.mkdir()
         with open(core_dir / "package.json", "w") as f:
-            json.dump({"name": "core", "version": "1.0.0"}, f)
+            json.dump({"name": "core", "version": "1.0.0", "engines": {"node": ">=22"}}, f)
         _cmd_add(["core"], {"releasable": "false"}, project_root=".")
 
         # Tag core
@@ -283,7 +283,7 @@ class TestStatusCommitsAheadMonorepo:
         proj_dir = mock_git_repo / "alpha"
         proj_dir.mkdir()
         with open(proj_dir / "package.json", "w") as f:
-            json.dump({"name": "alpha", "version": "1.0.0"}, f)
+            json.dump({"name": "alpha", "version": "1.0.0", "engines": {"node": ">=22"}}, f)
         _cmd_add(["alpha"], {"releasable": "false"}, project_root=".")
         _tag(mock_git_repo, "alpha@v1.0.0", project="alpha")
 
@@ -308,13 +308,13 @@ class TestStatusCommitsAheadMonorepo:
         alpha = mock_git_repo / "alpha"
         alpha.mkdir()
         with open(alpha / "package.json", "w") as f:
-            json.dump({"name": "alpha", "version": "1.0.0"}, f)
+            json.dump({"name": "alpha", "version": "1.0.0", "engines": {"node": ">=22"}}, f)
         _cmd_add(["alpha"], {"releasable": "false"}, project_root=".")
 
         beta = mock_git_repo / "beta"
         beta.mkdir()
         with open(beta / "package.json", "w") as f:
-            json.dump({"name": "beta", "version": "1.0.0"}, f)
+            json.dump({"name": "beta", "version": "1.0.0", "engines": {"node": ">=22"}}, f)
         _cmd_add(["beta"], {"releasable": "false"}, project_root=".")
 
         # Tag both at the same commit
@@ -354,13 +354,13 @@ class TestStatusCommitsAheadMonorepo:
         alpha = mock_git_repo / "alpha"
         alpha.mkdir()
         with open(alpha / "package.json", "w") as f:
-            json.dump({"name": "alpha", "version": "1.0.0"}, f)
+            json.dump({"name": "alpha", "version": "1.0.0", "engines": {"node": ">=22"}}, f)
         _cmd_add(["alpha"], {"releasable": "false"}, project_root=".")
 
         beta = mock_git_repo / "beta"
         beta.mkdir()
         with open(beta / "package.json", "w") as f:
-            json.dump({"name": "beta", "version": "1.0.0"}, f)
+            json.dump({"name": "beta", "version": "1.0.0", "engines": {"node": ">=22"}}, f)
         _cmd_add(["beta"], {"releasable": "false"}, project_root=".")
 
         _tag(mock_git_repo, "alpha@v1.0.0", project="alpha")
@@ -396,7 +396,7 @@ class TestStatusCommitsAheadMonorepo:
         alpha = mock_git_repo / "alpha"
         alpha.mkdir()
         with open(alpha / "package.json", "w") as f:
-            json.dump({"name": "alpha", "version": "1.0.0"}, f)
+            json.dump({"name": "alpha", "version": "1.0.0", "engines": {"node": ">=22"}}, f)
         _cmd_add(["alpha"], {"releasable": "false"}, project_root=".")
 
         # Tag alpha now, before more commits
@@ -410,7 +410,7 @@ class TestStatusCommitsAheadMonorepo:
         beta = mock_git_repo / "beta"
         beta.mkdir()
         with open(beta / "package.json", "w") as f:
-            json.dump({"name": "beta", "version": "1.0.0"}, f)
+            json.dump({"name": "beta", "version": "1.0.0", "engines": {"node": ">=22"}}, f)
         _cmd_add(["beta"], {"releasable": "false"}, project_root=".")
         # Tag beta at current HEAD (after all commits)
         _tag(mock_git_repo, "beta@v1.0.0", project="beta")

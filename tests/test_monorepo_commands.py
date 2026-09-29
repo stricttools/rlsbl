@@ -14,7 +14,7 @@ def _make_npm_project(base_path, subdir):
     proj_dir = os.path.join(str(base_path), subdir)
     os.makedirs(proj_dir, exist_ok=True)
     with open(os.path.join(proj_dir, "package.json"), "w") as f:
-        json.dump({"name": "test-" + subdir, "version": "0.1.0"}, f)
+        json.dump({"name": "test-" + subdir, "version": "0.1.0", "engines": {"node": ">=22"}}, f)
     return subdir
 
 
@@ -191,20 +191,25 @@ class TestRemove:
         captured = capsys.readouterr()
         assert "Removed project at pkg-a" in captured.out
 
-    def test_warning_on_missing_project(self, mock_git_repo, capsys):
+    def test_missing_project_is_an_error(self, mock_git_repo, capsys):
         _cmd_init({"root-dev-node": True}, project_root=".")
-        # Should NOT raise SystemExit -- just warn
-        _cmd_remove(["nonexistent"], {}, project_root=".")
+        with pytest.raises(SystemExit) as exc:
+            _cmd_remove(["nonexistent"], {}, project_root=".")
+        assert exc.value.code == 1
         captured = capsys.readouterr()
-        assert "Warning:" in captured.err
+        assert "Error: no member at 'nonexistent'" in captured.err
+        assert "'.' (root)" in captured.err
 
-    def test_normalizes_trailing_slash(self, mock_git_repo, capsys):
+    def test_a_trailing_slash_is_not_the_members_path(self, mock_git_repo, capsys):
+        """A member path has one spelling; `pkg-a/` is refused, naming `pkg-a`."""
         _cmd_init({"root-dev-node": True}, project_root=".")
         _make_npm_project(mock_git_repo, "pkg-a")
         _cmd_add(["pkg-a"], {"releasable": "false"}, project_root=".")
         capsys.readouterr()
-        _cmd_remove(["pkg-a/"], {}, project_root=".")
-        assert _added(mock_git_repo) == []
+        with pytest.raises(SystemExit):
+            _cmd_remove(["pkg-a/"], {}, project_root=".")
+        assert "'pkg-a' (pkg-a)" in capsys.readouterr().err
+        assert [p["path"] for p in _added(mock_git_repo)] == ["pkg-a"]
 
     def test_refuses_no_args(self, mock_git_repo):
         _cmd_init({"root-dev-node": True}, project_root=".")
@@ -215,16 +220,18 @@ class TestRemove:
         with pytest.raises(SystemExit):
             _cmd_remove(["pkg-a"], {}, project_root=".")
 
-    def test_nonexistent_path_warns_without_exit(self, mock_git_repo, capsys):
-        """Removing a path not in the workspace prints a warning, does not sys.exit."""
+    def test_nonexistent_path_names_the_members(self, mock_git_repo, capsys):
+        """Removing a path not in the workspace exits 1 naming every member."""
         _cmd_init({"root-dev-node": True}, project_root=".")
         _make_npm_project(mock_git_repo, "pkg-a")
         _cmd_add(["pkg-a"], {"releasable": "false"}, project_root=".")
         capsys.readouterr()
-        # Should NOT raise SystemExit
-        _cmd_remove(["nonexistent"], {}, project_root=".")
+        with pytest.raises(SystemExit) as exc:
+            _cmd_remove(["nonexistent"], {}, project_root=".")
+        assert exc.value.code == 1
         captured = capsys.readouterr()
-        assert "Warning:" in captured.err
+        assert "'pkg-a' (pkg-a)" in captured.err
+        assert [p["path"] for p in _added(mock_git_repo)] == ["pkg-a"]
 
 
 class TestList:

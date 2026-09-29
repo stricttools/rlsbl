@@ -36,18 +36,37 @@ def _git_log_count(repo):
     return int(result.stdout.strip())
 
 
+def _mark_scaffolded(proj_dir):
+    """Give *proj_dir* the ``.rlsbl/config.json`` a scaffolded npm member has.
+
+    A member carrying its own hand-written ``ci.yml`` is one rlsbl already
+    manages: ``rlsbl scaffold`` refuses to merge into a ``ci.yml`` it has no
+    merge base for, so ``monorepo add`` scaffolds only a member without this
+    file.
+    """
+    rlsbl_dir = os.path.join(str(proj_dir), ".rlsbl")
+    os.makedirs(rlsbl_dir, exist_ok=True)
+    with open(os.path.join(rlsbl_dir, "config.json"), "w") as f:
+        json.dump({
+            "targets": ["npm"],
+            "publish_mode": "ci",
+            "pipelines": {"npm": {"type": "npm", "local": False, "target": "npm"}},
+        }, f)
+
+
 def _make_npm_project(base_path, subdir, with_ci=False):
     """Create a minimal npm project so detect_targets finds it."""
     proj_dir = os.path.join(str(base_path), subdir)
     os.makedirs(proj_dir, exist_ok=True)
     with open(os.path.join(proj_dir, "package.json"), "w") as f:
-        json.dump({"name": "test-" + os.path.basename(subdir), "version": "0.1.0"}, f)
+        json.dump({"name": "test-" + os.path.basename(subdir), "version": "0.1.0", "engines": {"node": ">=22"}}, f)
 
     if with_ci:
         wf_dir = os.path.join(proj_dir, ".github", "workflows")
         os.makedirs(wf_dir, exist_ok=True)
         with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
             f.write(CI_WORKFLOW)
+        _mark_scaffolded(proj_dir)
     return subdir
 
 

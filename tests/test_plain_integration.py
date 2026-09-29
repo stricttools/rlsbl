@@ -58,18 +58,37 @@ jobs:
 """
 
 
+def _mark_scaffolded(proj_dir):
+    """Give *proj_dir* the ``.rlsbl/config.json`` a scaffolded npm member has.
+
+    A member carrying its own hand-written ``ci.yml`` is one rlsbl already
+    manages: ``rlsbl scaffold`` refuses to merge into a ``ci.yml`` it has no
+    merge base for, so ``monorepo add`` scaffolds only a member without this
+    file.
+    """
+    rlsbl_dir = os.path.join(str(proj_dir), ".rlsbl")
+    os.makedirs(rlsbl_dir, exist_ok=True)
+    with open(os.path.join(rlsbl_dir, "config.json"), "w") as f:
+        json.dump({
+            "targets": ["npm"],
+            "publish_mode": "ci",
+            "pipelines": {"npm": {"type": "npm", "local": False, "target": "npm"}},
+        }, f)
+
+
 def _make_npm_project(base_path, subdir, version="0.1.0", ci=True, publish=False):
     """Create a minimal npm project with optional CI and publish workflows."""
     proj_dir = os.path.join(str(base_path), subdir)
     os.makedirs(proj_dir, exist_ok=True)
     with open(os.path.join(proj_dir, "package.json"), "w") as f:
-        json.dump({"name": subdir, "version": version}, f)
+        json.dump({"name": subdir, "version": version, "engines": {"node": ">=22"}}, f)
 
     if ci:
         wf_dir = os.path.join(proj_dir, ".github", "workflows")
         os.makedirs(wf_dir, exist_ok=True)
         with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
             f.write(CI_WORKFLOW)
+        _mark_scaffolded(proj_dir)
 
     if publish:
         wf_dir = os.path.join(proj_dir, ".github", "workflows")
@@ -83,9 +102,9 @@ def _make_npm_project(base_path, subdir, version="0.1.0", ci=True, publish=False
 def _make_plain_project(base_path, subdir, version="0.1.0"):
     """Create a minimal plain project with a VERSION file and no workflows.
 
-    Also creates .rlsbl/config.json with targets: ["plain"] to match what
-    scaffold would produce. In tests the scaffold subprocess fails (no
-    installed rlsbl module), so we set it up manually.
+    Also creates .rlsbl/config.json with targets: ["plain"], which
+    detect_targets needs to find the plain target, and which makes
+    ``monorepo add`` treat the member as already scaffolded.
     """
     proj_dir = os.path.join(str(base_path), subdir)
     os.makedirs(proj_dir, exist_ok=True)
