@@ -85,6 +85,7 @@ Every refusal below is raised during observation, so it costs nothing and fires 
 | Direction | Refusal | Why, and what to do |
 | --------- | ------- | ------------------- |
 | extract | The releasable **owns the root member** (`path = "."`) | A workspace has exactly one root member and it owns every file no other member claims, so extracting it would leave the source with no root. Move the root member into a releasable that stays, or give the repository root a member of its own. |
+| extract | A departing member **encloses a member that stays** (a [nested member](monorepo.md#nested-members) of another releasable, a dev node, or a member outside every releasable) | The departing members' directories are filtered out and deleted whole, so the nested member's files would be carried into the new repository and deleted here. Extract the nested member's releasable first, or move the member into the departing releasable (its `releasable` key); a member outside every releasable moves its directory out instead. |
 | extract | A **remaining member depends on a departing member** | The edge would dangle. Extract never rewrites somebody's manifest as a side effect, so it refuses and names the exact edit -- see [Severing an inbound edge](#severing-an-inbound-edge). |
 | extract | The releasable has **no state directory** | Its version, changelog and release archives are what the conversion moves. `rlsbl monorepo sync` creates the directory; if the releasable has already shipped, put its real version in the version file first. |
 | extract | A member contains a **submodule**, or has **nothing tracked** at its path | A gitlink cannot be named in the source-side commit, so the conversion would delete the member and then fail to record it. An empty path has no tree to verify identity against. |
@@ -234,7 +235,7 @@ Every remedy that applies is printed, because one edge can be declared in more t
 | Ecosystem | The edit, and what performs it |
 | --------- | ------------------------------ |
 | Python | `rlsbl rewrite uv-path-sources` deletes the `[tool.uv.sources]` entry and floors the dependency at the version the lock resolves. It reads the lock beside the manifest, or the uv-workspace lock of the nearest ancestor declaring `[tool.uv.workspace]` whose globs claim the directory; when neither exists it says so and the edit is by hand. See [rlsbl rewrite](cli-rewrite.md). |
-| Go | `rlsbl rewrite go-module-path --from-module <old> --to-module <new>`, run at the repository root **before** extracting, since the module path moves with the code. |
+| Go | `rlsbl rewrite go-module-path --from-module <old> --to-module <new>`, run at the repository root **before** extracting, since the module path moves with the code. It renames that one module: a module nested under it with a `go.mod` of its own keeps its path, and moves with an invocation of its own. |
 | npm | A hand edit: replace the workspace spec with a published range and drop the member from any `workspaces` array. No rewrite command edits the dependency entries of `package.json`. |
 | Declared | Remove the name from `depends_on` in `.rlsbl-monorepo/workspace.toml`. |
 

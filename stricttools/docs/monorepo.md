@@ -89,7 +89,7 @@ Each `[[projects]]` block declares the project's identity, its inter-project rel
 
 | Field | Required | Type | Description |
 | ----- | -------- | ---- | ----------- |
-| `path` | yes | string | Relative path from repo root to the project directory |
+| `path` | yes | string | Relative path from repo root to the project directory, in its one canonical spelling: `/`-separated, with no `.`, `..`, or empty segment, no leading or trailing `/`, and no backslash; the repository root is `.`. A member may sit inside another member's directory (see [Nested members](#nested-members)) |
 | `releasable` | yes | string or `false` | The `[[releasables]]` entry this project is versioned under, or `false` to opt out of versioning entirely |
 | `name` | no | string | Project name (defaults to basename of `path`; the member at `path = "."` must be named `root`) |
 | `depends_on` | no | list of strings | Explicit intra-workspace dependencies (project names) |
@@ -126,7 +126,8 @@ The rows are in the order the loader reports them.
 | --- | --- |
 | A key at the top level that is neither section | Delete it, or fix the spelling of the section header it was meant to be. A workspace has no top-level scalar settings; the sections with a reader are `projects`, `releasables` and `layers`. It is reported first because a misspelled section header is why the sections below look wrong. |
 | No `[[releasables]]` section at all — the retired implicit mode | Add the section and give every releasable member a `releasable` key (a name, or `false`). The error also names the last rlsbl version that reads such a workspace, for a repository that genuinely cannot convert right now. |
-| More than one root member, or two members whose paths normalize to the same territory | Keep one and give the other a path of its own. Two members cannot own one territory. |
+| A member path in any spelling but the canonical one (`draw/cmd/`, `./draw`, `draw//cmd`, `draw\cmd`, `..`, an absolute path) | Write the spelling the error names. A path that names no directory inside the repository has none, and gets a directory of its own. The same spellings are refused by `rlsbl monorepo add` and `rlsbl monorepo absorb`. |
+| More than one root member, or two members declaring the same path | Keep one and give the other a path of its own. Two members cannot own one territory. |
 | No root member | Add one, choosing its kind. The error prints both declarations in full. |
 | A `watch` key on any member | Delete it. Territory is derived from declared paths, never enumerated. A member that genuinely needs to own files outside its own directory declares that directory as a member of its own. |
 | A `subtree_remote` key on any member | Move the line into that member's `[[releasables]]` entry. A mirror's destination belongs to the unit that owns a version, a changelog and a tag scheme. |
@@ -136,6 +137,28 @@ The rows are in the order the loader reports them.
 | A root member named anything but `root` | Set `name = "root"`, or omit `name` entirely. |
 | A non-root member named `root` | Rename it, or give it `path = "."` in place of the root member declared today. Which member owns the repository root is your decision, and rlsbl will not guess it. |
 | A releasable that owns the root member and declares no `tag_format` | Declare it: `v{version}` for bare version tags, `{name}@v{version}` to keep the workspace scheme. The repository's existing tags decide which, and only you can read them. |
+
+### Nested members
+
+A member may sit inside another member's directory: `draw` and `draw/cmd`, or `sdk` with `sdk/python` and `sdk/npm`. Nothing declares the nesting; it follows from the declared paths. The member inside is a **nested member**, and the one around it is its **enclosing member**. The root member is the enclosing member of every other member.
+
+**Every file belongs to the most specific member.** `draw/cmd/main.go` is `draw/cmd`'s, not `draw`'s, and everything rlsbl does with a member's files follows that: changelog coverage and attribution, the lint and ldflags checks, the dependency import scan, CI filters, test runners, published uploads, scaffolding, extraction, and mirroring. What each one does about the members nested in a member:
+
+| Area | What happens |
+| --- | --- |
+| Checks that read a member's sources | `library-lint`, `ruff-lint`, `ldflags-symbol`, and the dependency checks read the member's own files only. A Go import resolves to the longest module path containing it, so importing `M/kernel/vulkan` is a dependency on `kernel/vulkan`, not on `kernel`. |
+| Tags | A tag belongs to a member only when its tag format renders it: `kernel/v*` lists `kernel/vulkan/v0.1.0`, and that tag is still `kernel/vulkan`'s alone. |
+| CI filters | A member's filter excludes its nested members, except one holding a dependency of the member (see [Router paths filters](#router-paths-filters)). |
+| Test runners | `rlsbl scaffold` writes a path-exact `--ignore=<path>` per nested member into the member's pytest `addopts` (and each path into a Deno member's `exclude`), and `nested-member-runner-exclusion` fails while one is missing. pytest resolves `--ignore` against the directory it starts in, so run a member's tests from its own directory, as rlsbl and CI do. npm's test runner is the project's own choice, so rlsbl writes nothing for it. |
+| Published uploads | A member's upload may not carry a nested member's files. `nested-member-upload-contents` lists an npm package and a Go module zip offline; a Python upload is built and checked in the member's CI run (the pypi CI template adds the step for a member with nested members). |
+| uv workspace sources | A `{ workspace = true }` source belongs in the uv workspace root's `pyproject.toml`: uv refuses one declared in a nested member, which `nested-member-uv-sources` reports. |
+| Hooks | A hook's `dir` may not point into a nested member: the hook belongs on the member that owns the directory, in its own config. A releasable-level hook may name any of its releasable's members. |
+| Scaffold | A member's merge bases and a same-releasable nested member's live one inside the other; scaffolding the enclosing member leaves the nested member's alone. |
+| Extract and mirror | `rlsbl monorepo extract` refuses a releasable whose member encloses a member that is not leaving with it, and a mirrored releasable's member may not enclose another member at all. |
+
+**A parent and its nested member may share a releasable.** When they are both Go modules, each gets its own module-proxy tag at every release: a releasable tagged `gfx/v{version}` whose members are `gfx` and `gfx/shader` creates `gfx/v0.2.0` and `gfx/shader/v0.2.0`, each pushed in a push of its own after the primary tag. A path-style `tag_format` must name the path of one of the releasable's own Go members (`path-tag-format-go-member`), and a module path may not end in a major-version suffix such as `/v2` (`go-module-major-suffix`).
+
+**Go modules in one workspace reach each other through a committed `go.work`**, not `replace`: `go install <module>@<version>` rejects a module carrying a `replace`, so `go-workspace-replace` refuses one pointing into the workspace and names the migration (`go work init`, `go work use <module dirs>`, then `go mod edit -dropreplace` in the member). rlsbl does not raise a module's `require` line when a sibling module releases, because the dependent's `go.sum` needs the new version's hash, which exists only once the tag reaches the proxy; `go-workspace-require-current` refuses a require below the sibling's latest release and names the `go get <module>@v<version>` to run.
 
 ### Releasables section
 
@@ -459,9 +482,9 @@ The generated router filters each project's inlined jobs on a `dorny/paths-filte
 - the territory of every workspace project it depends on, transitively and in every dependency scope (`runtime`, `dev`, `peer`, `explicit`): a change to a dev-scoped dependency breaks the dependent's tests, which is what its CI job runs;
 - the workspace-root manifests and lockfiles that are actually present (`pyproject.toml`, `uv.lock`, `package.json`, `go.mod`, and their kin), so a root dependency bump triggers every member;
 - the generated router itself, so a change to it re-runs everything;
-- for the root member, whose territory is the residual, `**` narrowed by a negated exclude of every other member's territory -- minus the territories it depends on, which stay included.
+- a negated exclude of every member nested inside the project's territory, since those members own their files: for the root member, whose territory is the residual, that is `**` narrowed by every other member's territory. A nested member whose territory holds one of the project's dependencies -- the dependency itself, or a member enclosing it -- is never excluded: an exclude is final (see below), so it would silence the dependency even with its territory included.
 
-The step declares `predicate-quantifier: some-with-excludes`. Under the action's default (`some`) a negated pattern matches everything *outside* itself, so the root member's excludes would match exactly the paths they exclude.
+The step declares `predicate-quantifier: some-with-excludes`. Under the action's default (`some`) a negated pattern matches everything *outside* itself, so the excludes would match the very paths they exclude. Under `some-with-excludes` an excluded file cannot be included back by another pattern, which is why a territory holding a dependency stays unexcluded.
 
 A push whose diff matches none of a project's patterns leaves that project's CI job `skipped` on the pushed commit. `rlsbl check --name router-filters-fresh` re-derives the block and fails when the committed router no longer matches the workspace; regenerate with `rlsbl monorepo sync`.
 
