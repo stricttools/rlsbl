@@ -64,9 +64,11 @@ class TestCommitFilesGitFallback:
 
     @patch("rlsbl.utils.run", side_effect=dirty_run_side_effect())
     @patch("shutil.which", return_value=None)
-    def test_calls_git_add_then_commit(self, mock_which, mock_run):
-        # Present on disk (the test runs in its own cwd), so nothing needs the
-        # staged-deletion probe.
+    def test_calls_git_add_then_commit(self, mock_which, mock_run, tmp_path, monkeypatch):
+        # Present on disk, so nothing needs the staged-deletion probe. The files
+        # are written into tmp_path: without the testisolation plugin's autouse
+        # chdir the process cwd is the repo root.
+        monkeypatch.chdir(tmp_path)
         for name in ("a.txt", "b.txt"):
             with open(name, "w") as f:
                 f.write("x\n")
