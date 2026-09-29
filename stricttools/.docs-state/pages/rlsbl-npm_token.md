@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.npm_token"
-description = "The npm token in ``~/.npmrc``, and whether repositories' ``NPM_TOKEN`` secrets carry it."
+description = "Reads the npm token in ~/.npmrc, asks npm whether it is live, and compares it with repositories' NPM_TOKEN secrets, which sync-npm-token rewrites from stdin."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 130
 +++

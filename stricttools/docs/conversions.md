@@ -1,5 +1,5 @@
 +++
-description = "Moving a releasable between repositories: extract's two engines and absorb, tag policy, the refusals (a departing member enclosing one that stays among them), verification, splitting a releasable, renaming a project, and the transition record."
+description = "Moving a releasable between repositories: extract's two engines and absorb, tag policy, the refusals (a departing member enclosing one that stays, a source changed while the target was built), how a failed source step restores the source to its last commit, verification, splitting a releasable, renaming a project, and the transition record."
 +++
 
 # Repository conversions
