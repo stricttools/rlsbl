@@ -153,8 +153,9 @@ def test_npm_and_pypi_project_gets_both_registries_steps(mock_git_repo):
     assert _GO_STEP not in text, text
 
 
-def test_npm_and_go_project_gets_no_pypi_steps(mock_git_repo):
-    steps = _scaffold_multi_project(mock_git_repo, ["go", "npm"])
+@pytest.mark.parametrize("registries", [["go", "npm"], ["npm", "go"]])
+def test_npm_and_go_project_gets_no_pypi_steps(mock_git_repo, registries):
+    steps = _scaffold_multi_project(mock_git_repo, registries)
     _assert_current_release_flow(steps)
     text = "\n".join(steps)
     assert _NPM_STEP in text, text

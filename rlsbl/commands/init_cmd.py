@@ -2952,9 +2952,10 @@ def _npm_provenance_var(config):
 def _overlay_target_vars(merged_vars, target_name):
     """Promote namespaced ``{target_name}.{key}`` entries to bare ``{key}``.
 
-    Scans *merged_vars* for keys starting with ``{target_name}.`` and adds
-    bare versions so templates like ``{{registryUrl}}`` resolve even when
-    the target is not the primary.  Does not overwrite existing bare keys.
+    Scans *merged_vars* for keys starting with ``{target_name}.`` and sets
+    the bare versions so templates like ``{{registryUrl}}`` resolve even when
+    the target is not the primary.  Overwrites existing bare keys: a
+    target's own value wins over the primary's for that target's templates.
     """
     prefix = f"{target_name}."
     for key, value in list(merged_vars.items()):
@@ -3220,6 +3221,11 @@ def run_cmd_multi(registries_list, args, flags, ctx):
             for r in registries_list:
                 target_obj = TARGETS[r]
                 all_mappings = target_obj.template_mappings(ctx)
+                # Every template of this target renders with this target's
+                # namespaced vars overlaid un-namespaced, so {{importName}},
+                # {{goreleaserMain}} etc. resolve whichever target is primary.
+                target_vars = dict(vars_dict)
+                _overlay_target_vars(target_vars, r)
 
                 # Split into CI mappings and non-workflow mappings
                 ci_mappings = []
@@ -3246,17 +3252,12 @@ def run_cmd_multi(registries_list, args, flags, ctx):
                     m["target"] = os.path.join(dirname, new_basename)
 
                 if ci_mappings:
-                    # Build per-target vars: overlay this target's namespaced vars
-                    # un-namespaced so {{importName}} etc. resolve even when this
-                    # target is not the primary.
-                    ci_vars = dict(vars_dict)
-                    _overlay_target_vars(ci_vars, r)
                     # Subdirectory working-directory injection and CI service
                     # containers are part of rendering "theirs", so the stored
                     # merge base and the next run's template come out of the
                     # same pipeline (no phantom base/theirs diff).
                     new_plans = plan_mappings(
-                        target_obj.template_dir(), ci_mappings, ci_vars,
+                        target_obj.template_dir(), ci_mappings, target_vars,
                         transform=make_ci_workflow_transform(
                             ctx.config or {},
                             working_dir=target_paths.get(r, "."),
@@ -3270,7 +3271,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
                     if m["target"] not in seen_targets:
                         seen_targets.add(m["target"])
                         extra_plans.extend(plan_mappings(
-                            target_obj.template_dir(), [m], vars_dict,
+                            target_obj.template_dir(), [m], target_vars,
                         ))
 
         # Plan the merged publish workflow (skip for publish_mode "none" and workspace roots)
