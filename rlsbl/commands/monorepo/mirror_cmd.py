@@ -1297,6 +1297,31 @@ def _apply_tag(plan, remote, root, project_path, *, notes_dir):
     )
 
 
+def nested_member_mirror_problem(project, projects, releasable_name, remote):
+    """Why *project* cannot be mirrored while members sit inside it, or None.
+
+    A mirror is the subtree split of the member's directory, so every member
+    nested in it -- whatever releasable it belongs to -- would ride into the
+    mirror's history and be published there as this releasable's. Shared by
+    ``rlsbl monorepo mirror`` and by the release, which refuses before
+    anything is written.
+    """
+    from ...ownership import nested_member_paths
+
+    nested = nested_member_paths(project, projects)
+    if not nested:
+        return None
+    listed = ", ".join(f"'{path}'" for path in nested)
+    return (
+        f"releasable '{releasable_name}' is mirrored to {remote}, but its member "
+        f"'{project['name']}' ({project['path']}) encloses the workspace "
+        f"member(s) {listed}. The mirror is the subtree split of "
+        f"'{project['path']}', so it would carry their files and publish them "
+        f"as '{releasable_name}''s. Move each nested member's directory out of "
+        f"'{project['path']}', or drop subtree_remote from the releasable."
+    )
+
+
 def _cmd_mirror(flags, project_root):
     """Observe-then-converge reconciler for a project's subtree mirror.
 
@@ -1351,6 +1376,14 @@ def _cmd_mirror(flags, project_root):
             "  subtree_remote = \"<mirror repository URL>\"",
             file=sys.stderr,
         )
+        sys.exit(1)
+
+    releasable_for_nesting = resolve_releasable_for_project(project, releasables)
+    problem = nested_member_mirror_problem(
+        project, projects, releasable_for_nesting.name, subtree_remote,
+    )
+    if problem is not None:
+        print(f"Error: {problem}", file=sys.stderr)
         sys.exit(1)
 
     # SSH host consistency (hard error on mismatch).
