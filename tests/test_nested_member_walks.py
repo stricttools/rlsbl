@@ -251,3 +251,37 @@ class TestGoImportAttribution:
         # draw/cmd's own sub-package is not an import of draw; its real
         # import of draw still is.
         assert names.count("draw") == 1
+
+
+def test_ruff_lint_excludes_nested_members_with_a_one_member_context(
+    tmp_path, monkeypatch,
+):
+    """A release's preflight lists only the member itself in ctx.projects."""
+    from rlsbl import app
+    from rlsbl.check_context import WorkspaceCheckContext
+    from rlsbl.workspace import load_workspace
+
+    root = tmp_path / "ws"
+    make_nested_workspace(root, "python")
+    calls = []
+
+    class _Done:
+        def __init__(self, stdout=""):
+            self.stdout = stdout
+            self.stderr = ""
+            self.returncode = 0
+
+    def fake_run(cmd, *args, **kwargs):
+        calls.append(list(cmd))
+        return _Done("ruff 0.15.20" if cmd[:2] == ["ruff", "--version"] else "[]")
+
+    monkeypatch.setattr("rlsbl.effects.run", fake_run)
+    monkeypatch.setattr("rlsbl.utils.require_tool", lambda *a, **k: True)
+    sdk = next(p for p in load_workspace(str(root)) if p["name"] == "sdk")
+    ctx = WorkspaceCheckContext(
+        project_root=root / "sdk", workspace_root=root,
+        config={"publish_mode": "ci"}, projects=[sdk],
+    )
+    app._check_defs["ruff-lint"].impl(ctx)
+    check = next(c for c in calls if c[:2] == ["ruff", "check"])
+    assert "--extend-exclude" in check

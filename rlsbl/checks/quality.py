@@ -122,16 +122,13 @@ def register_quality_checks(app):
             "ruff", "check", str(ctx.project_root),
             "--output-format=json", "--quiet",
         ]
-        if ctx.workspace_root is not None and ctx.projects:
-            rel = os.path.relpath(
-                os.path.realpath(str(ctx.project_root)),
-                os.path.realpath(str(ctx.workspace_root)),
-            ).replace(os.sep, "/")
-            nested = _sibling_exclude_dirs(
-                str(ctx.workspace_root), rel, ctx.projects,
-            )
-            if nested:
-                command += ["--extend-exclude", ",".join(nested)]
+        # Read from the workspace itself, not ctx.projects: a release's
+        # preflight hands each member a context listing that member alone.
+        from ..workspace import nested_member_dirs
+
+        nested = nested_member_dirs(str(ctx.project_root))
+        if nested:
+            command += ["--extend-exclude", ",".join(nested)]
         try:
             result = effects.run(
                 command,
