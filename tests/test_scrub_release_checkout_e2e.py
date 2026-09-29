@@ -183,3 +183,31 @@ def test_compose_rewrites_maps_each_original_commit_to_its_final_one():
         {"refname": "refs/tags/v2", "old_sha": "c", "new_sha": "c2"},
     ]
     assert saved["new_head"] == "b2"
+
+
+def test_a_scrub_stopped_after_its_commit_is_finished_by_a_rerun(
+    repo, tmp_path, capsys,
+):
+    """The scrub commit moves HEAD past the rewrite's new head. A push that
+    fails after it leaves the saved result behind, and the re-run must
+    recognize that commit as its own and finish, not call the result stale."""
+    hook = tmp_path / "remote" / "hooks" / "pre-receive"
+    hook.write_text("#!/bin/sh\necho 'origin refuses pushes for now' >&2\nexit 1\n")
+    hook.chmod(0o755)
+
+    with pytest.raises(SystemExit) as exc:
+        _scrub(repo)
+    assert exc.value.code == 1
+    capsys.readouterr()
+    saved = json.loads(
+        (repo / ".rlsbl" / "releases" / "scrub-result.json").read_text()
+    )
+    assert "COMMITTED" in saved["completed_steps"]
+    assert "BRANCH_PUSHED" not in saved["completed_steps"]
+
+    hook.unlink()
+    _scrub(repo)
+
+    assert remote_ref(repo, "refs/heads/main") == git(repo, "rev-parse", "HEAD")
+    assert not (repo / ".rlsbl" / "releases" / "scrub-result.json").exists()
+    assert not _secret_reachable(repo)
