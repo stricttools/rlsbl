@@ -33,6 +33,7 @@ from ..workspace import load_workspace
 from .release_reconcile import (
     push_ref_with_lease as _push_ref_with_lease_impl,
     push_rewritten_tags,
+    tag_scheme_index,
     update_github_releases,
     snapshot_remote_refs as _snapshot_remote_refs_impl,
 )
@@ -979,10 +980,10 @@ def run_cmd(flags, *, ctx):
         print(f"{len(rewrites)} commits rewritten, {len(tags)} tags affected.")
         print("Force-pushing rewritten history.")
 
-    # -- Build tag prefix index for monorepo tag-to-project lookup --
-    tag_prefix_index = None
+    # -- Each member's tag scheme, for monorepo tag-to-project lookup --
+    tag_schemes = None
     if workspace_projects is not None:
-        tag_prefix_index = {f"{proj.name}@": proj for proj in workspace_projects}
+        tag_schemes = tag_scheme_index(str(ctx.workspace_root), workspace_projects)
 
     # -- Acquire lock --
     lock_dir = ".rlsbl-monorepo" if ctx.workspace_root else ".rlsbl"
@@ -1220,7 +1221,7 @@ def run_cmd(flags, *, ctx):
             scrub_data["releases_updated"] = update_github_releases(
                 tags, ctx=ctx, project_root=project_root,
                 workspace_projects=workspace_projects,
-                tag_prefix_index=tag_prefix_index,
+                tag_schemes=tag_schemes,
                 gh=run_gh, gh_installed=check_gh_installed,
                 gh_auth=check_gh_auth,
                 extract_entry=extract_changelog_entry,

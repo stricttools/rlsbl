@@ -161,7 +161,7 @@ class TestTheScrubsReleaseRewrite:
         update_github_releases(
             [{"refname": "refs/tags/v1.1.0"}], ctx=_Ctx(str(root)),
             project_root=str(root), workspace_projects=None,
-            tag_prefix_index=None, gh=gh, gh_installed=lambda: True,
+            tag_schemes=None, gh=gh, gh_installed=lambda: True,
             gh_auth=lambda: True, extract_entry=lambda _p, _v: "- A change.\n",
         )
         assert not [a for a in gh.create() if a.startswith("--latest")]

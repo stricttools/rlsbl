@@ -12,7 +12,9 @@ import pytest
 from rlsbl.changelog.schema import ChangelogEntry, parse_jsonl, serialize_entry
 from rlsbl.commands.release_scrub import SAFEGIT_MIN_VERSION, run_cmd
 from rlsbl.context import ProjectContext
-from rlsbl.workspace import WorkspaceProject
+from rlsbl.workspace import WorkspaceProject, load_workspace
+
+from conftest import make_workspace
 
 # ---------------------------------------------------------------------------
 # Module path prefix for patching
@@ -887,6 +889,9 @@ class TestReleasableDirsRemapped:
         mock_load_ws.return_value = [
             WorkspaceProject({"name": "alpha", "path": "packages/alpha"}),
         ]
+        # The tag-scheme index reads the releasables from the real file.
+        make_workspace(ws_root, [{"path": "packages/alpha", "name": "alpha"}])
+        mock_load_ws.return_value = load_workspace(str(ws_root))
 
         safegit_result = _safegit_envelope({
             "rewrites": {"old_hash_1": "new_hash_1", "old_hash_2": "new_hash_2"},
@@ -2391,7 +2396,7 @@ class TestNoMatchValidatesHashes:
 
 
 class TestMonorepoTagCorrectProject:
-    """Two projects (alpha, beta) both at v1.0.0. Tag prefix determines which CHANGELOG is used."""
+    """Two projects (alpha, beta) both at v1.0.0. Each tag's scheme determines which CHANGELOG is used."""
 
     @patch(f"{MOD}.release_lock")
     @patch(f"{MOD}.acquire_lock")
@@ -2440,6 +2445,12 @@ class TestMonorepoTagCorrectProject:
             WorkspaceProject({"name": "beta", "path": "packages/beta"}),
         ]
         mock_load_ws.return_value = workspace_projects
+        # The tag-scheme index reads the releasables from the real file.
+        make_workspace(ws_root, [
+            {"path": "packages/alpha", "name": "alpha"},
+            {"path": "packages/beta", "name": "beta"},
+        ])
+        mock_load_ws.return_value = load_workspace(str(ws_root))
 
         # Track which changelog paths extract_changelog_entry is called with
         extract_calls = []
@@ -2556,6 +2567,9 @@ class TestStandaloneTagNoPrefix:
             WorkspaceProject({"name": "myproj", "path": "packages/myproj"}),
         ]
         mock_load_ws.return_value = workspace_projects
+        # The tag-scheme index reads the releasables from the real file.
+        make_workspace(ws_root, [{"path": "packages/myproj", "name": "myproj"}])
+        mock_load_ws.return_value = load_workspace(str(ws_root))
 
         extract_calls = []
 

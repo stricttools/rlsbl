@@ -101,6 +101,7 @@ from ..preview_apply import (
     VerdictItem,
     reconcile,
 )
+from ..errors import RlsblError
 from ..tag_glob import TagMode, parse_version_tag
 from ..utils import (
     check_gh_auth,
@@ -205,17 +206,59 @@ def push_rewritten_tags(tags, remote_refs, *, push_timeout, git=None):
         )
 
 
+def tag_scheme_index(workspace_root, workspace_projects):
+    """Every workspace member's tag scheme, in declaration order.
+
+    ``[(TagScheme, member), ...]``: a member in a releasable tags under the
+    releasable's ``tag_format``, any other member under its target's monorepo
+    scheme (the workspace scheme ``{name}@v*`` with no target) -- the same
+    resolution every other tag question asks
+    (:func:`rlsbl.tag_glob.resolve_monorepo_tag_glob`). Members of one
+    releasable share one scheme.
+    """
+    from ..tag_glob import TagScheme, resolve_monorepo_tag_glob
+    from ..workspace import load_releasables, resolve_releasable_for_project
+
+    releasables = load_releasables(str(workspace_root), workspace_projects)
+    index = []
+    for proj in workspace_projects or []:
+        rel = resolve_releasable_for_project(proj, releasables)
+        glob = resolve_monorepo_tag_glob(proj, workspace_root, releasable=rel)
+        index.append((TagScheme.from_glob(glob), proj))
+    return index
+
+
+def _tag_owner(tag_name, tag_schemes):
+    """The member whose scheme renders *tag_name*, or None."""
+    for scheme, proj in tag_schemes or ():
+        if scheme.owns(tag_name):
+            return proj
+    return None
+
+
+def _unowned_tag_error(tag_name):
+    return RlsblError(
+        f"tag '{tag_name}' belongs to no releasable or member here: no scheme "
+        f"renders it at its version. rlsbl will not guess whose notes and "
+        f"release commit it carries. If it is not a release tag, declare it "
+        f"with `rlsbl transition record --non-version-tag {tag_name} --reason "
+        f"\"<why>\"`; if it is one, correct the tag_format of the releasable "
+        f"it belongs to."
+    )
+
+
 def _notes_for_tag(tag_name, version, *, ctx, project_root, workspace_projects,
-                   tag_prefix_index, extract_entry=None):
-    """Resolve a tag's release notes from the owning project's CHANGELOG.md."""
+                   tag_schemes, extract_entry=None):
+    """Resolve a tag's release notes from the owning project's CHANGELOG.md.
+
+    In a workspace the owner is the member whose scheme renders the tag
+    (:func:`tag_scheme_index`); a standalone-spelled tag no member owns is the
+    repository root's pre-conversion history. Any other tag is refused: its
+    notes would be a guess.
+    """
     extract_entry = extract_entry or extract_changelog_entry
     if ctx.workspace_root:
-        matched_proj = None
-        if tag_prefix_index:
-            for prefix, proj in tag_prefix_index.items():
-                if tag_name.startswith(prefix):
-                    matched_proj = proj
-                    break
+        matched_proj = _tag_owner(tag_name, tag_schemes)
         if matched_proj is not None:
             proj_path = os.path.join(str(ctx.workspace_root), matched_proj.path)
             changelog_path = os.path.join(proj_path, "CHANGELOG.md")
@@ -233,18 +276,7 @@ def _notes_for_tag(tag_name, version, *, ctx, project_root, workspace_projects,
             if os.path.exists(changelog_path):
                 return extract_entry(changelog_path, version)
             return None
-        print(
-            f"Warning: no prefix match for tag {tag_name}, scanning all projects",
-            file=sys.stderr,
-        )
-        for proj in workspace_projects or []:
-            proj_path = os.path.join(str(ctx.workspace_root), proj.path)
-            changelog_path = os.path.join(proj_path, "CHANGELOG.md")
-            if os.path.exists(changelog_path):
-                entry = extract_entry(changelog_path, version)
-                if entry:
-                    return entry
-        return None
+        raise _unowned_tag_error(tag_name)
 
     changelog_path = os.path.join(str(project_root), "CHANGELOG.md")
     if os.path.exists(changelog_path):
@@ -252,7 +284,7 @@ def _notes_for_tag(tag_name, version, *, ctx, project_root, workspace_projects,
     return None
 
 
-def _release_record_dir_for_tag(tag_name, *, ctx, project_root, tag_prefix_index):
+def _release_record_dir_for_tag(tag_name, *, ctx, project_root, tag_schemes):
     """The release-archive directory whose release record owns *tag_name*'s version.
 
     The same resolution :func:`_notes_for_tag` performs for the CHANGELOG, so
@@ -266,11 +298,7 @@ def _release_record_dir_for_tag(tag_name, *, ctx, project_root, tag_prefix_index
     from .release.release_state import resolve_releasable_dir
 
     ws_root = str(ctx.workspace_root)
-    matched_proj = None
-    for prefix, proj in (tag_prefix_index or {}).items():
-        if tag_name.startswith(prefix):
-            matched_proj = proj
-            break
+    matched_proj = _tag_owner(tag_name, tag_schemes)
     if matched_proj is None:
         parsed = parse_version_tag(tag_name, mode=TagMode.PRERELEASE_INCLUSIVE)
         if parsed and parsed.scheme == "standalone":
@@ -284,8 +312,23 @@ def _release_record_dir_for_tag(tag_name, *, ctx, project_root, tag_prefix_index
     return os.path.join(proj_path, ".rlsbl", "releases")
 
 
+def _declared_non_version_tags(repo_root):
+    """The tags this repository's transition record declares outside the version model."""
+    from ..transition_record import (
+        KIND_NON_VERSION_TAG,
+        read_events,
+        repository_transition_record_path,
+    )
+
+    path = repository_transition_record_path(str(repo_root))
+    return {
+        event.tag
+        for event in read_events(path, kinds=[KIND_NON_VERSION_TAG])
+    }
+
+
 def update_github_releases(tags, *, ctx, project_root, workspace_projects,
-                           tag_prefix_index, gh=None, gh_installed=None,
+                           tag_schemes, gh=None, gh_installed=None,
                            gh_auth=None, extract_entry=None):
     """Rewrite the GitHub Release document for every rewritten tag.
 
@@ -343,6 +386,9 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
     if not (gh_installed() and gh_auth()):
         return 0
 
+    non_version_tags = _declared_non_version_tags(
+        ctx.workspace_root or project_root,
+    )
     written = 0
     for tag_info in tags:
         refname = tag_info.get("refname", "")
@@ -355,6 +401,9 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
             )
             continue
 
+        if tag_name in non_version_tags:
+            # Declared outside the version model: no version, no document.
+            continue
         parsed_tag = parse_version_tag(
             tag_name, mode=TagMode.PRERELEASE_INCLUSIVE,
         )
@@ -378,12 +427,12 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
         notes = _notes_for_tag(
             tag_name, version, ctx=ctx, project_root=project_root,
             workspace_projects=workspace_projects,
-            tag_prefix_index=tag_prefix_index, extract_entry=extract_entry,
+            tag_schemes=tag_schemes, extract_entry=extract_entry,
         ) or ""
 
         release_record_dir = _release_record_dir_for_tag(
             tag_name, ctx=ctx, project_root=project_root,
-            tag_prefix_index=tag_prefix_index,
+            tag_schemes=tag_schemes,
         )
         release_commit = None
         notices = ()

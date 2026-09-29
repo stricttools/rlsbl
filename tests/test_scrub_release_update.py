@@ -85,7 +85,7 @@ def _update(tmp_path, tags, recorder, *, notes="## notes\n\n- A change.\n"):
     (tmp_path / "CHANGELOG.md").write_text("# Changelog\n", encoding="utf-8")
     return update_github_releases(
         tags, ctx=Ctx(str(tmp_path)), project_root=str(tmp_path),
-        workspace_projects=None, tag_prefix_index=None,
+        workspace_projects=None, tag_schemes=None,
         gh=recorder, gh_installed=lambda: True, gh_auth=lambda: True,
         extract_entry=lambda _path, _version: notes,
     )
@@ -166,7 +166,7 @@ class TestNothingIsEverDeleted:
         updated = update_github_releases(
             [{"refname": "refs/tags/v1.0.0"}, {"refname": "refs/tags/v1.1.0"}],
             ctx=Ctx(str(tmp_path)), project_root=str(tmp_path),
-            workspace_projects=None, tag_prefix_index=None,
+            workspace_projects=None, tag_schemes=None,
             gh=flaky, gh_installed=lambda: True, gh_auth=lambda: True,
             extract_entry=lambda _p, _v: "notes",
         )
@@ -302,7 +302,7 @@ class TestTheUpdatedDocument:
         updated = update_github_releases(
             [{"refname": "refs/tags/v1.0.0"}],
             ctx=Ctx(str(tmp_path)), project_root=str(tmp_path),
-            workspace_projects=None, tag_prefix_index=None,
+            workspace_projects=None, tag_schemes=None,
             gh=failing, gh_installed=lambda: True, gh_auth=lambda: True,
             extract_entry=lambda _p, _v: "notes",
         )
