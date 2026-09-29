@@ -103,7 +103,7 @@ from ...transition_record import (
     get_transition_record_path,
 )
 from ...lock import rlsbl_lock
-from ...ownership import ROOT_MEMBER_NAME, normalize_path
+from ...ownership import ROOT_MEMBER_NAME, member_path_problem, normalize_path
 from ...preview_apply import Preview, Reconciler, VerdictItem, reconcile
 from ...release_file import read_release_file, write_release_commit
 from ...saferm import saferm_delete
@@ -783,6 +783,9 @@ def resolve_arrival(workspace_root, source_repo, dest_path, *, name,
     """Resolve and validate one absorption. Reads only; refuses loudly."""
     workspace_root = os.path.abspath(workspace_root)
     source_repo = os.path.abspath(source_repo)
+    problem = member_path_problem(dest_path)
+    if problem is not None:
+        raise AbsorbError(f"the destination {problem}")
     dest_path = normalize_path(dest_path)
 
     if not dest_path:

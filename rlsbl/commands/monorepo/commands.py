@@ -123,6 +123,12 @@ def _cmd_add(args, flags, project_root, dry_run=False):
         sys.exit(1)
 
     path = args[0]
+    from ...ownership import member_path_problem
+
+    problem = member_path_problem(path)
+    if problem is not None:
+        print(f"Error: {problem}", file=sys.stderr)
+        sys.exit(1)
     if not os.path.isdir(path):
         print(f"Error: '{path}' is not a directory.", file=sys.stderr)
         sys.exit(1)

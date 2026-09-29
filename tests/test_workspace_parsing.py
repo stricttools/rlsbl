@@ -309,16 +309,17 @@ class TestLoadWorkspaceValidation:
 
 
 class TestLoadWorkspaceNormalization:
-    """load_workspace() normalizes paths and infers names."""
+    """load_workspace() refuses non-canonical paths and infers names."""
 
-    def test_multiple_trailing_slashes_stripped(self, tmp_project):
+    def test_multiple_trailing_slashes_are_refused(self, tmp_project):
         ws_dir = tmp_project / WORKSPACE_DIR
         ws_dir.mkdir()
         (ws_dir / WORKSPACE_FILE).write_text(
             workspace_toml('[[projects]]\npath = "packages/foo///"\nname = "foo"\n')
         )
-        result = load_workspace(str(tmp_project))
-        assert result[0].path == "packages/foo"
+        with pytest.raises(WorkspaceError) as exc:
+            load_workspace(str(tmp_project))
+        assert "Write it as 'packages/foo'" in str(exc.value)
 
     def test_name_defaults_to_last_component(self, tmp_project):
         ws_dir = tmp_project / WORKSPACE_DIR

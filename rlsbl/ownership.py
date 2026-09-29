@@ -138,6 +138,57 @@ def normalize_path(path) -> str:
     return text.rstrip("/")
 
 
+#: What a canonical member path is, for messages that refuse one.
+CANONICAL_MEMBER_PATH_RULE = (
+    "A member path is repository-relative, '/'-separated, with no '.', '..' "
+    "or empty segment, no leading or trailing '/', no backslash and no "
+    "surrounding whitespace; the repository root is '.'."
+)
+
+
+def canonical_member_path(raw) -> str | None:
+    """The one spelling of member path *raw*, or ``None`` when there is none.
+
+    ``None`` means *raw* names no directory inside the repository: it is
+    absolute, or it climbs out through ``..``. Every other spelling has exactly
+    one canonical form (``draw//cmd/`` is ``draw/cmd``, ``./`` is ``.``).
+    """
+    import posixpath
+
+    text = str(raw).replace("\\", "/").strip()
+    if text.startswith("/"):
+        return None
+    canonical = posixpath.normpath(text) if text else "."
+    if canonical == ".." or canonical.startswith("../"):
+        return None
+    return canonical
+
+
+def member_path_problem(raw) -> str | None:
+    """Why *raw* is not a canonical member path, or ``None`` when it is.
+
+    The answer names the spelling to write when one exists. Member paths are
+    accepted in exactly one spelling and never tidied at load: a tidied path is
+    a guess about what the operator meant, and every tool that reads the file
+    would have to repeat the same guess.
+    """
+    if not isinstance(raw, str):
+        return f"the path {raw!r} is not a string. {CANONICAL_MEMBER_PATH_RULE}"
+    canonical = canonical_member_path(raw)
+    if canonical == raw:
+        return None
+    problem = (
+        f"the path '{raw}' is not a canonical member path. "
+        f"{CANONICAL_MEMBER_PATH_RULE}"
+    )
+    if canonical is None:
+        return (
+            f"{problem} It names no directory inside the repository, so no "
+            f"member can live there: declare a directory inside the repository."
+        )
+    return f"{problem} Write it as '{canonical}'."
+
+
 def is_root_path(path) -> bool:
     """True when *path* is one of the spellings that mean the repository root.
 

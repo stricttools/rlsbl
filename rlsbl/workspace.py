@@ -31,7 +31,12 @@ from .workspace_types import (  # noqa: F401
     project_is_dev_only,
     project_is_releasable,
 )
-from .ownership import ROOT_MEMBER_NAME, ROOT_MEMBER_PATH, normalize_path  # noqa: F401
+from .ownership import (  # noqa: F401
+    ROOT_MEMBER_NAME,
+    ROOT_MEMBER_PATH,
+    member_path_problem,
+    normalize_path,
+)
 from . import effects
 
 
@@ -238,13 +243,28 @@ def _declared_paths(data, projects):
     return spellings
 
 
+def _refuse_non_canonical_member_paths(data, projects):
+    """Refuse a member path declared in any spelling but the canonical one.
+
+    Checked against the paths as the operator wrote them, before any other
+    rule about paths: the duplicate and root-member rules below compare
+    spellings, and they can only do that once each territory has one.
+    """
+    for i, declared in enumerate(_declared_paths(data, projects)):
+        problem = member_path_problem(declared)
+        if problem is not None:
+            raise WorkspaceError(
+                f"projects[{i}] ('{projects[i]['name']}'): {problem}"
+            )
+
+
 def _validate_member_paths(data, projects):
     """Refuse a member list that does not give each path exactly one member.
 
     Two members claiming one territory make ownership depend on declaration
-    order, so both spellings of the collision are refused at load: identical
-    paths, and paths that differ only in spelling (``a`` and ``./a`` are the
-    same directory, and normalize to the same member path).
+    order, so the collision is refused at load. Paths reach this rule already
+    in their one canonical spelling (:func:`_refuse_non_canonical_member_paths`),
+    so one territory is always one string here.
     """
     declared = _declared_paths(data, projects)
 
@@ -269,16 +289,10 @@ def _validate_member_paths(data, projects):
         path = proj["path"]
         if path in seen:
             first = seen[path]
-            spellings = ""
-            if declared[first] != declared[i]:
-                spellings = (
-                    f" (spelled '{declared[first]}' and '{declared[i]}' -- the "
-                    f"same directory)"
-                )
             raise WorkspaceError(
                 f"projects[{first}] ('{projects[first]['name']}') and "
                 f"projects[{i}] ('{proj['name']}') both declare the path "
-                f"'{path}'{spellings}. Every file has exactly one owner, which "
+                f"'{path}'. Every file has exactly one owner, which "
                 f"requires exactly one member per path: with two, the owner "
                 f"would be whichever member workspace.toml happens to declare "
                 f"first. Merge the two entries into one, or give one of them a "
@@ -297,22 +311,23 @@ def validate_workspace_model(data, projects):
        misspelled section header is why the sections below look wrong;
     2. an implicit-mode workspace (no ``[[releasables]]``) -- because
        every other remedy below is written for an explicit-mode workspace;
-    3. more than one root member;
-    4. two members whose paths normalize to the same territory;
-    5. no root member;
-    6. a ``watch`` key on any member;
-    7. a ``subtree_remote`` key on any member;
-    8. a ``dev_node`` key on any member;
-    9. any other unknown key on a member table;
-    10. an unknown key on a ``[[releasables]]`` table;
-    11. a root member named anything but ``root``;
-    12. a non-root member named ``root``;
-    13. a releasable owning the root member with no explicit ``tag_format``.
+    3. a member path in any spelling but the canonical one;
+    4. more than one root member;
+    5. two members declaring the same path;
+    6. no root member;
+    7. a ``watch`` key on any member;
+    8. a ``subtree_remote`` key on any member;
+    9. a ``dev_node`` key on any member;
+    10. any other unknown key on a member table;
+    11. an unknown key on a ``[[releasables]]`` table;
+    12. a root member named anything but ``root``;
+    13. a non-root member named ``root``;
+    14. a releasable owning the root member with no explicit ``tag_format``.
 
-    Structural facts about the member list (3-5) precede per-member key
-    errors (6-9): a remedy for a stray key presumes the member list itself
-    is sound. The retired keys (6-8) precede the generic unknown-key refusal
-    (9) so each keeps its own remedy.
+    Structural facts about the member list (3-6) precede per-member key
+    errors (7-10): a remedy for a stray key presumes the member list itself
+    is sound. The retired keys (7-9) precede the generic unknown-key refusal
+    (10) so each keeps its own remedy.
 
     *data* is the raw parsed document (needed for the releasables section and
     for the paths as the operator spelled them), *projects* the already-built
@@ -338,6 +353,9 @@ def validate_workspace_model(data, projects):
             "reads an implicit-mode workspace, and file a todo in this "
             "repository to convert it."
         )
+
+    # -- one spelling per member path ----------------------------------------
+    _refuse_non_canonical_member_paths(data, projects)
 
     # -- (g)/(h) one member per path, one root member ------------------------
     _validate_member_paths(data, projects)
@@ -835,6 +853,12 @@ def _member_to_write(proj):
     """
     data = proj.to_dict() if isinstance(proj, WorkspaceProject) else dict(proj)
     data = {k: v for k, v in data.items() if not is_runtime_member_key(k)}
+    problem = member_path_problem(data.get("path"))
+    if problem is not None:
+        raise WorkspaceError(
+            f"{WORKSPACE_FILE}: the member '{data.get('name')}' being written: "
+            f"{problem}"
+        )
     _refuse_unknown_keys(
         data, MEMBER_KEYS,
         surface=f"the member '{data.get('name')}' being written",
