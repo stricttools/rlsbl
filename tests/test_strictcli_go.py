@@ -18,6 +18,16 @@ from rlsbl.commands.release.validate import (
 )
 
 
+# A help document as `<app> help --json` prints it, in strictcli's canonical
+# encoding.
+_HELP_DOCUMENT = """\
+{
+  "schema_version": 2,
+  "version": "1.0.0",
+  "commands": []
+}
+"""
+
 # -- Go source snippets for test fixtures --
 
 _GO_MOD_WITH_STRICTCLI = """\
@@ -297,14 +307,14 @@ class TestSchemaDumpBranching:
     """Tests for schema dump command construction and invocation."""
 
     def test_go_schema_dump_command(self):
-        """Go projects use 'go run' for schema dump."""
+        """Go projects print the help document with 'go run <main> help --json'."""
         cmd = _schema_dump_command("./cmd/myapp/", "go")
-        assert cmd == ["go", "run", "./cmd/myapp/", "--dump-schema"]
+        assert cmd == ["go", "run", "./cmd/myapp/", "help", "--json"]
 
     def test_python_schema_dump_command(self):
-        """Python projects use 'uv run' for schema dump (no regression)."""
+        """Python projects print the help document with 'uv run <script> help --json'."""
         cmd = _schema_dump_command("myapp", "python")
-        assert cmd == ["uv", "run", "myapp", "--dump-schema"]
+        assert cmd == ["uv", "run", "myapp", "help", "--json"]
 
     def test_schema_dump_invokes_go_run(self, tmp_path, monkeypatch):
         """Schema dump calls 'go run' subprocess for Go projects."""
@@ -315,7 +325,9 @@ class TestSchemaDumpBranching:
 
         def fake_subprocess_run(cmd, **kwargs):
             captured_cmds.append(cmd)
-            return subprocess.CompletedProcess(args=cmd, returncode=0)
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout=_HELP_DOCUMENT, stderr="",
+            )
 
         monkeypatch.setattr(
             "rlsbl.commands.release.validate.detect_strictcli",
@@ -331,7 +343,8 @@ class TestSchemaDumpBranching:
         _run_strictcli_schema_dump(flags, log, project_dir=str(tmp_path))
 
         assert len(captured_cmds) == 1
-        assert captured_cmds[0] == ["go", "run", ".", "--dump-schema"]
+        assert captured_cmds[0] == ["go", "run", ".", "help", "--json"]
+        assert (tmp_path / ".strictcli" / "schema.json").read_text() == _HELP_DOCUMENT
 
     def test_schema_dump_invokes_uv_run(self, tmp_path, monkeypatch):
         """Schema dump calls 'uv run' subprocess for Python projects (no regression)."""
@@ -339,7 +352,9 @@ class TestSchemaDumpBranching:
 
         def fake_subprocess_run(cmd, **kwargs):
             captured_cmds.append(cmd)
-            return subprocess.CompletedProcess(args=cmd, returncode=0)
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout=_HELP_DOCUMENT, stderr="",
+            )
 
         monkeypatch.setattr(
             "rlsbl.commands.release.validate.detect_strictcli",
@@ -355,10 +370,10 @@ class TestSchemaDumpBranching:
         _run_strictcli_schema_dump(flags, log, project_dir=str(tmp_path))
 
         assert len(captured_cmds) == 1
-        assert captured_cmds[0] == ["uv", "run", "myapp", "--dump-schema"]
+        assert captured_cmds[0] == ["uv", "run", "myapp", "help", "--json"]
 
     def test_dry_run_records_the_go_command(self, tmp_path, monkeypatch):
-        """A preview records `go run ... --dump-schema`, it does not describe it.
+        """A preview records `go run ... help --json`, it does not describe it.
 
         The hand-rolled ``Would run: ...`` line this used to assert on
         restated the argv in a second place. The dump is an ``effects.run``,
@@ -371,13 +386,14 @@ class TestSchemaDumpBranching:
         )
 
         fake_effects = MagicMock()
+        fake_effects.unsettled.return_value = True
         with patch("rlsbl.commands.release.effects", fake_effects):
             _run_strictcli_schema_dump(
                 {"dry-run": True}, lambda m: None, project_dir=str(tmp_path),
             )
 
         assert fake_effects.run.call_args[0][0] == [
-            "go", "run", "./cmd/myapp/", "--dump-schema",
+            "go", "run", "./cmd/myapp/", "help", "--json",
         ]
 
     def test_detection_failure_is_release_validation_error(self, tmp_path, monkeypatch):
@@ -407,7 +423,7 @@ class TestSchemaDumpBranching:
 
 
 class TestTypescriptDetection:
-    """TypeScript/npm strictcli apps: package.json -> node <bin> --dump-schema.
+    """TypeScript/npm strictcli apps: package.json -> node <bin> help --json.
 
     Until this branch existed, `rlsbl release run` in a TS strictcli project
     silently dumped nothing: detection knew Python and Go only, so the release
@@ -419,7 +435,7 @@ class TestTypescriptDetection:
 
     def test_typescript_schema_dump_command(self):
         cmd = _schema_dump_command("dist/cli.js", "typescript")
-        assert cmd == ["node", "dist/cli.js", "--dump-schema"]
+        assert cmd == ["node", "dist/cli.js", "help", "--json"]
 
     def test_string_bin_is_the_entry_point(self, tmp_path):
         self._write_package_json(tmp_path, {

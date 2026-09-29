@@ -26,7 +26,7 @@ rlsbl includes several utility commands alongside its core release, changelog, s
 }
 ```
 
-A consumer reads `.payload` and nothing else changes about the data it finds there. `writes` names the write set of an update command and is `null` on every rlsbl command, none of which is one. Human output is suppressed in machine mode, so a parser never has to strip anything, and `--quiet` cannot reach the envelope. The commands that produce a payload are `status`, `unreleased`, `check-name`, `check`, `monorepo graph` and `monorepo impact`; each one declares its payload's JSON Schema, which `rlsbl --dump-schema` publishes verbatim.
+A consumer reads `.payload` and nothing else changes about the data it finds there. `writes` names the write set of an update command and is `null` on every rlsbl command, none of which is one. Human output is suppressed in machine mode, so a parser never has to strip anything, and `--quiet` cannot reach the envelope. The commands that produce a payload are `status`, `unreleased`, `check-name`, `check`, `monorepo graph` and `monorepo impact`; each one declares its payload's JSON Schema, which `rlsbl help --json` publishes verbatim.
 
 ## `rlsbl commit`
 

@@ -200,7 +200,7 @@ Steps 15 and 16 are the **candidate push and the CI gate**: everything above the
 | 3 | Validate JSONL changelog (every structural check) | Yes |
 | 4 | Generate CHANGELOG.md from all JSONL files | Yes |
 | 5 | Run `pre-checks.sh` hook | Yes |
-| 6 | Run strictcli schema dump (`--dump-schema`) if project uses strictcli | Yes |
+| 6 | Run strictcli schema dump (`<app> help --json`, written to `.strictcli/schema.json`) if project uses strictcli | Yes |
 | 7 | Run `selfdoc gen --no-auto-commit` if project uses selfdoc | Yes |
 | 8 | Run selfdoc check (verify generated files are up-to-date) if project uses selfdoc | Yes |
 | 9 | Run built-in tests (`uv run pytest` / `go test` / `npm test`) | Yes |
@@ -224,6 +224,8 @@ Steps 15 and 16 are the **candidate push and the CI gate**: everything above the
 | 27 | Confirm, with `--watch` and `--no-watch` alike, that every workflow at the tagged commit a published Release starts shows a run for the tag within five minutes (GitHub reports no error when one does not start); then watch CI, or print `Watch CI: rlsbl watch <sha>` | Yes (exit 1 naming what was found; the tag and the Release stay) |
 
 The tag at step 19 is placed on the commit CI verified at step 16, **not** on HEAD: the finalization commits from steps 17-18 sit on top of it and are pushed alongside it at step 20. This is what makes "the tag points at a CI-green tree" true rather than approximately true.
+
+At step 6 the release runs the project's entry point with `help --json` (`uv run <script>`, `go run <main package>`, or `node <bin>`), writes the help document it prints on stdout to `.strictcli/schema.json` byte for byte, and sets the document's top-level `version` to the version being released. A program on a strictcli that has no `help` command (Python strictcli 0.43.0, Go strictcli v0.36.0, TypeScript strictcli 0.42.0, and every release before them, all of which have only `--dump-schema`) stops the release before anything is changed, with a refusal naming the upgrade for that language. rlsbl never runs `--dump-schema`, and never picks between the two commands.
 
 ### The release commit
 

@@ -107,7 +107,7 @@ LEGACY_BASELINE: dict[str, dict[tuple[str, tuple[str, ...]], int]] = {
     },
     "rlsbl/commands/release/validate.py": {
         # Spelling collision: the strictcli implementation LANGUAGE taxonomy
-        # (python / go / typescript) picking the --dump-schema argv.
+        # (python / go / typescript) picking the launcher of `help --json`.
         ("compare", ('go',)): 1,
         # Spelling collision: an npm PIPELINE type declaring ``provenance``.
         ("compare", ('npm',)): 1,
