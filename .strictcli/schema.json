@@ -3724,7 +3724,7 @@
       "pure": true,
       "needs_network": false,
       "depends_on": [],
-      "description": "When the workspace root has a conftest.py, every member with a tests/ directory pins its own pytest rootdir.",
+      "description": "When an enclosing member or the workspace root has a conftest.py, every member with a tests/ directory under it pins its own pytest rootdir.",
       "subject": "tests",
       "scope": "workspace:non_dev_node"
     },

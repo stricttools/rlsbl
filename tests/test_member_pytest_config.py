@@ -137,3 +137,36 @@ class TestMemberPytestConfigCheck:
     def test_severity_is_error(self):
         """The check is a hard error (no bypass)."""
         assert app._check_defs["member-pytest-config"].severity == "error"
+
+
+class TestEnclosingMemberConftest:
+    """Any enclosing member's conftest.py is the same hazard as the root's."""
+
+    def _nested(self, root, *, child_config=False):
+        parent = _member(root, "sdk", tests=True, pytest_config=True)
+        (root / "sdk" / "conftest.py").write_text("")
+        child = _member(root, "sdk/python", tests=True, pytest_config=child_config)
+        child["name"] = "sdkpython"
+        return [{"path": ".", "name": "root"}, parent, child]
+
+    def test_a_nested_member_under_an_enclosing_conftest_fails(self, mock_git_repo):
+        projects = self._nested(mock_git_repo)
+        result = app._check_defs["member-pytest-config"].impl(
+            _ctx(mock_git_repo, projects)
+        )
+        assert result.status == "fail"
+        text = " ".join(p.text for p in result.problems)
+        assert "sdk/python/pyproject.toml" in text
+        assert "sdk/conftest.py" in text
+
+    def test_adding_the_named_table_clears_it(self, mock_git_repo):
+        projects = self._nested(mock_git_repo)
+        assert app._check_defs["member-pytest-config"].impl(
+            _ctx(mock_git_repo, projects)
+        ).status == "fail"
+        # Apply the printed fix to the file it names.
+        with open(mock_git_repo / "sdk" / "python" / "pyproject.toml", "a") as f:
+            f.write('\n[tool.pytest.ini_options]\ntestpaths = ["tests"]\n')
+        assert app._check_defs["member-pytest-config"].impl(
+            _ctx(mock_git_repo, projects)
+        ).status == "pass"

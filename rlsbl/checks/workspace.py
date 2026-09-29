@@ -1452,22 +1452,40 @@ def register_workspace_checks(app):
 
     @app.error_check("member-pytest-config")
     def check_member_pytest_config(ctx, reporter):
-        """Members with tests must pin their own pytest rootdir when the root
-        has a conftest.py."""
+        """Members with tests must pin their own pytest rootdir when an
+        enclosing member (the root member included) has a conftest.py."""
         import tomllib
 
+        from ..ownership import member_path, member_prefix
+
         root = str(ctx.workspace_root)
-        if not os.path.isfile(os.path.join(root, "conftest.py")):
+        # The repository root encloses every member, declared as the root
+        # member or not.
+        conftest_dirs = sorted({
+            member_path(proj) for proj in ctx.projects
+            if os.path.isfile(os.path.join(root, proj["path"], "conftest.py"))
+        } | ({""} if os.path.isfile(os.path.join(root, "conftest.py")) else set()))
+        if not conftest_dirs:
             return reporter.skipped(
-                "workspace root has no conftest.py; no pytest rootdir-escape hazard"
+                "no workspace member has a conftest.py; no pytest rootdir-escape hazard"
             )
 
         findings = []
         for proj in ctx.projects:
-            abs_pkg = os.path.join(root, proj["path"])
-            if os.path.realpath(abs_pkg) == os.path.realpath(root):
+            own = member_path(proj)
+            if not own:
+                continue
+            # Every enclosing member's conftest.py, nearest first: the root
+            # member's ("") encloses everyone.
+            enclosing = sorted(
+                (d for d in conftest_dirs
+                 if d != own and own.startswith(member_prefix({"path": d or "."}))),
+                key=len, reverse=True,
+            )
+            if not enclosing:
                 continue
 
+            abs_pkg = os.path.join(root, proj["path"])
             pyproject = os.path.join(abs_pkg, "pyproject.toml")
             if not os.path.isfile(pyproject):
                 continue
@@ -1479,25 +1497,28 @@ def register_workspace_checks(app):
                 with open(pyproject, "rb") as f:
                     data = tomllib.load(f)
             except (OSError, tomllib.TOMLDecodeError):
-                findings.append(proj["name"])
+                findings.append((proj, enclosing[0]))
                 continue
 
             has_config = "ini_options" in data.get("tool", {}).get("pytest", {})
             if not has_config:
-                findings.append(proj["name"])
+                findings.append((proj, enclosing[0]))
 
         if findings:
-            for name in findings:
+            for proj, conftest_dir in findings:
+                conftest = f"{conftest_dir}/conftest.py" if conftest_dir else "conftest.py"
                 reporter.error(
-                    f"{name}: add a [tool.pytest.ini_options] table to "
-                    f'{name}/pyproject.toml (e.g. testpaths = ["tests"]) to '
-                    "pin pytest's rootdir to the member"
+                    f"{proj['name']}: add a [tool.pytest.ini_options] table to "
+                    f'{proj["path"]}/pyproject.toml (e.g. testpaths = ["tests"]) '
+                    f"to pin pytest's rootdir to the member; without it the "
+                    f"rootdir escapes past it and {conftest} is loaded into "
+                    f"its test run"
                 )
             return reporter.found(
                 f"{len(findings)} member(s) with tests but no own "
-                "[tool.pytest.ini_options] while the workspace root has a "
-                "conftest.py -- pytest's rootdir escapes to the workspace "
-                "root, silently loading the root conftest and its config"
+                "[tool.pytest.ini_options] under an enclosing member's "
+                "conftest.py -- pytest's rootdir escapes to the enclosing "
+                "member, silently loading its conftest and its config"
             )
         return reporter.passed("all members with tests pin their own pytest config")
 
