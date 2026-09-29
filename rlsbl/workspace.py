@@ -148,9 +148,11 @@ def load_workspace(root):
         if "path" not in proj or not isinstance(proj["path"], str):
             raise WorkspaceError(f"projects[{i}] missing required 'path' string")
         entry = dict(proj)
-        # One normalization, the resolver's own (rlsbl.ownership): a member
-        # path is stored exactly as attribution will read it, so `a`, `./a`
-        # and `a/` are one territory here as well as there.
+        # The resolver's own normalization (rlsbl.ownership), so the path is
+        # stored as attribution reads it. Any spelling it would change is
+        # refused below (_refuse_non_canonical_member_paths) against the path
+        # as declared, so for a workspace that loads this is the identity,
+        # except that the root's "." is held here as "" and restored.
         entry["path"] = normalize_path(entry["path"])
         if is_root_path(entry["path"]):
             # The repository root has one canonical spelling and one legal
