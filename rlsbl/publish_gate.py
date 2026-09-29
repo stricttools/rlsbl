@@ -398,7 +398,18 @@ def build_router_gate_job(prefix_regex_pairs: list[tuple[str, str]]) -> dict:
     CI as reusable workflows, so check runs are named
     ``<router job key> / <ci job name>``). Longer prefixes are matched
     first so overlapping project names resolve to the right project.
+
+    Pairs are grouped by prefix: every member of a releasable carries the
+    releasable's prefix, and a shell ``case`` takes its first matching branch,
+    so one branch per member would check the first member's CI and never the
+    rest. Each distinct prefix gets one branch whose regex alternates over
+    every member's.
     """
+    grouped: dict[str, list[str]] = {}
+    for prefix, regex in prefix_regex_pairs:
+        regexes = grouped.setdefault(prefix, [])
+        if regex not in regexes:
+            regexes.append(regex)
     lines = [
         "set -euo pipefail",
         "",
@@ -413,13 +424,15 @@ def build_router_gate_job(prefix_regex_pairs: list[tuple[str, str]]) -> dict:
         'tag_ref="${TAG_INPUT:-$GITHUB_REF_NAME}"',
         'case "$tag_ref" in',
     ]
-    for prefix, regex in sorted(
-        prefix_regex_pairs, key=lambda pair: len(pair[0]), reverse=True
-    ):
+    for prefix in sorted(grouped, key=len, reverse=True):
+        regexes = grouped[prefix]
+        # Each alternative keeps its own anchors, so the union matches
+        # exactly what any one member's regex matched.
+        regex = regexes[0] if len(regexes) == 1 else "(" + "|".join(regexes) + ")"
         lines.append(f'  "{prefix}"*)')
         lines.append(f"    regex='{regex}'")
         lines.append("    ;;")
-    known = ", ".join(prefix for prefix, _ in prefix_regex_pairs)
+    known = ", ".join(grouped)
     lines.extend(
         [
             "  *)",
