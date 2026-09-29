@@ -1291,8 +1291,14 @@ def register_workspace_checks(app):
         has_monorepo = os.path.isdir(os.path.join(root, ".rlsbl-monorepo"))
         if has_rlsbl and has_monorepo:
             from ..config import PROJECT_CONFIG_LABEL, config_file_label
+            from ..errors import WorkspaceError
 
-            where = config_file_label(root)
+            try:
+                where = config_file_label(root)
+            except WorkspaceError:
+                # The workspace does not load (other checks report why), so
+                # the root member's releasable is not known by name.
+                where = ".rlsbl-monorepo/releasables/<root releasable>/config.json"
             if where == PROJECT_CONFIG_LABEL:
                 fix = (
                     "the root member belongs to no releasable, so it carries "
