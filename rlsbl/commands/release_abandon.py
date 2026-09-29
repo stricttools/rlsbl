@@ -36,7 +36,6 @@ if the earlier run had not committed it, and the state file is deleted. It refus
 Every probe that cannot answer is a hard error, never read as "absent".
 """
 
-import os
 import subprocess
 import sys
 

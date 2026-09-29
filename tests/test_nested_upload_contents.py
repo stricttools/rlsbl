@@ -12,9 +12,7 @@ member's CI run on the release commit.
 
 import json
 import os
-import shlex
 import subprocess
-import sys
 
 import pytest
 
