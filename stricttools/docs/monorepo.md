@@ -358,6 +358,8 @@ The resolved base version, target version and tag of every item are written to a
 
 If a releasable's release fails mid-batch, there is no automatic resume of the batch itself. The command prints what succeeded, then re-raises the error. To recover, fix the issue and re-run: items the plan proves are already released are skipped.
 
+A re-run that finds every item of the plan released archives the plan. When the batch file is unchanged since the plan was resolved from it, it is the file that batch ran, and the re-run archives it too, which finishes a batch whose closing archive commit failed; a batch file written or edited since is the next batch's, and is left in place.
+
 ## Snapshot
 
 `rlsbl monorepo snapshot` generates a committed JSON artifact at `.rlsbl-monorepo/snapshot.json` that captures the entire workspace state, including package metadata, dependency edges, and the computed topological order. This artifact is useful for CI verification and external tooling that needs to inspect workspace structure without parsing TOML.

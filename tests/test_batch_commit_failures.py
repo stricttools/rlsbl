@@ -84,12 +84,15 @@ def test_a_failed_finalize_commit_restores_the_batch_file(tmp_project, capsys):
     assert _archived_batch_file(tmp_project) == []
     assert git(tmp_project, "status", "--porcelain", "--", ".rlsbl-monorepo/releases") == ""
 
-    # The named re-run: it meets the completed plan and archives it.
-    with pytest.raises(SystemExit):
+    # The named re-run: it meets the completed plan of the batch that file
+    # ran, and finishes the archive the failed commit did not record.
+    with pytest.raises(SystemExit) as done:
         _batch(tmp_project)
-    err = capsys.readouterr().err
-    assert "is a completed plan" in err
+    assert done.value.code == 0
+    assert "Finished the archive" in capsys.readouterr().out
+    assert not (_releases(tmp_project) / "unreleased.toml").exists()
     assert not (_releases(tmp_project) / PLAN_FILENAME).exists()
+    assert len(_archived_batch_file(tmp_project)) == 1
     assert any(
         f.endswith(".plan.json") for f in os.listdir(_releases(tmp_project))
     )
@@ -102,6 +105,11 @@ def test_a_failed_completed_plan_archive_restores_the_plan(tmp_project, capsys):
         _batch(tmp_project, _failing_commit_for("chore: finalize batch release file"))
     capsys.readouterr()
 
+    # A batch file edited after the batch ran is the next batch's: the re-run
+    # archives only the completed plan, and its commit fails here.
+    batch_file = _releases(tmp_project) / "unreleased.toml"
+    batch_file.write_text(batch_file.read_text() + "# the next batch\n")
+    git(tmp_project, "commit", "-q", "-am", "next batch")
     with pytest.raises(SystemExit):
         _batch(tmp_project, _failing_commit_for("chore: archive completed batch plan"))
     err = capsys.readouterr().err
@@ -114,3 +122,5 @@ def test_a_failed_completed_plan_archive_restores_the_plan(tmp_project, capsys):
         _batch(tmp_project)
     assert "is a completed plan" in capsys.readouterr().err
     assert not plan.exists()
+    assert batch_file.exists()
+    assert _archived_batch_file(tmp_project) == []
