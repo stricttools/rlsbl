@@ -1916,6 +1916,51 @@ def lockfile_sync_failure(cmd, cwd, lockfile, *, exc, rerun):
     return head + f"Fix the error {cmd[0]} printed, then {rerun}."
 
 
+#: What puts a missing lockfile wrapper script in place, by the ``./`` command
+#: a lockfile spec runs.
+_WRAPPER_INSTALL = {
+    "./gradlew": "Add the Gradle wrapper (`gradle wrapper`)",
+}
+
+
+class LockfileToolMissingError(Exception):
+    """A lockfile the release owes a re-lock has no tool to re-lock it.
+
+    Skipping the re-lock would put a stale lockfile in the release commit, so
+    the release refuses before anything is pushed. The caller supplies how the
+    release continues (:meth:`message`), because only it knows whether the
+    release was resumed.
+    """
+
+    def __init__(self, *, sync_cmd, tool_name, lockfile, cwd):
+        self.sync_cmd = list(sync_cmd)
+        self.tool_name = tool_name
+        self.lockfile = lockfile
+        self.cwd = cwd
+        super().__init__(self.message("re-run the release"))
+
+    def message(self, rerun):
+        from ...release_checkout import live_path
+
+        where = live_path(self.cwd)
+        command = " ".join(self.sync_cmd)
+        consequence = (
+            f"so the release cannot re-lock {self.lockfile} after the version "
+            f"bump (`{command}` in {where}), and the release commit would "
+            f"carry it stale"
+        )
+        if self.sync_cmd[0].startswith("./"):
+            return (
+                f"`{self.sync_cmd[0]}` is not in {where}, {consequence}. "
+                f"{_WRAPPER_INSTALL[self.sync_cmd[0]]} in {where} and commit "
+                f"it, then {rerun}."
+            )
+        return (
+            f"`{self.tool_name}` is not on PATH, {consequence}. Install "
+            f"{self.tool_name} (or put it on PATH), then {rerun}."
+        )
+
+
 def _target_lockfile_syncs(target_paths, log, specs=None):
     """Which lockfile syncs a release owes, and what each one runs.
 
@@ -1931,6 +1976,10 @@ def _target_lockfile_syncs(target_paths, log, specs=None):
     :data:`_LOCKFILE_SPECS`).  The dev_node refresh passes the uv spec alone:
     such a project is not a release target, and the only lockfile the bump can
     stale there is the one recording the bumped sibling.
+
+    A lockfile whose tool is missing from PATH (or whose wrapper script is
+    missing from the project) raises :class:`LockfileToolMissingError`: the
+    release cannot ship that lockfile fresh.
 
     Returns a list of dicts the plan carries verbatim::
 
@@ -1950,13 +1999,14 @@ def _target_lockfile_syncs(target_paths, log, specs=None):
             if not os.path.exists(lockfile_path):
                 continue
             if sync_cmd[0].startswith("./"):
-                wrapper_path = os.path.join(t_path, sync_cmd[0][2:])
-                if not os.path.exists(wrapper_path):
-                    log(f"Warning: {sync_cmd[0]} not found in {t_path}, skipping {lockfile} sync")
-                    continue
-            elif shutil.which(tool_name) is None:
-                log(f"Warning: {tool_name} not found on PATH, skipping {lockfile} sync")
-                continue
+                tool_found = os.path.exists(os.path.join(t_path, sync_cmd[0][2:]))
+            else:
+                tool_found = shutil.which(tool_name) is not None
+            if not tool_found:
+                raise LockfileToolMissingError(
+                    sync_cmd=sync_cmd, tool_name=tool_name, lockfile=lockfile,
+                    cwd=t_path,
+                )
             norm_path = os.path.normpath(lockfile_path)
             ignored = False
             try:

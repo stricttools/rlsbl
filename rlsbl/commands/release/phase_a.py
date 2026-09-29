@@ -346,6 +346,8 @@ def build_phase_a_plan(inp: BuildInputs) -> PhaseAPlan:
     """
     from . import TARGETS, should_tag
     from .execute import (
+        LockfileToolMissingError,
+        ReleaseAbortError,
         _bump_selfdoc_version_content,
         _rel_to_git_root,
         _sync_member_package_versions_plan,
@@ -524,27 +526,34 @@ def build_phase_a_plan(inp: BuildInputs) -> PhaseAPlan:
         releasable_cfg_dir=inp.releasable_cfg_dir,
     )
 
+    # A lockfile whose tool is missing would ship stale: refuse, naming the
+    # tool, before anything is written.
+    rerun = ("run `rlsbl release resume`" if state.resuming
+             else "re-run `rlsbl release run`")
     owed_syncs = []
-    for paths in lock_targets:
-        owed_syncs.extend(_target_lockfile_syncs(paths, log))
+    try:
+        for paths in lock_targets:
+            owed_syncs.extend(_target_lockfile_syncs(paths, log))
 
-    # A workspace project the release never bumps can still lock one that it
-    # does, through an editable uv path source. Its uv.lock goes stale on THIS
-    # write and nothing else will refresh it before CI reads it, so the refresh
-    # belongs in this commit (see :func:`_devnode_lock_syncs`).
-    if inp.monorepo_root:
-        from .execute import _devnode_lock_syncs
+        # A workspace project the release never bumps can still lock one that
+        # it does, through an editable uv path source. Its uv.lock goes stale
+        # on THIS write and nothing else will refresh it before CI reads it, so
+        # the refresh belongs in this commit (see :func:`_devnode_lock_syncs`).
+        if inp.monorepo_root:
+            from .execute import _devnode_lock_syncs
 
-        bumped_dirs = {project_dir}
-        for mp_path in (state.member_package_paths or ()):
-            bumped_dirs.add(os.path.join(str(inp.monorepo_root), mp_path))
-        if state.monorepo_project_path:
-            bumped_dirs.add(
-                os.path.join(str(inp.monorepo_root), state.monorepo_project_path)
+            bumped_dirs = {project_dir}
+            for mp_path in (state.member_package_paths or ()):
+                bumped_dirs.add(os.path.join(str(inp.monorepo_root), mp_path))
+            if state.monorepo_project_path:
+                bumped_dirs.add(os.path.join(
+                    str(inp.monorepo_root), state.monorepo_project_path
+                ))
+            owed_syncs.extend(
+                _devnode_lock_syncs(inp.monorepo_root, bumped_dirs, log)
             )
-        owed_syncs.extend(
-            _devnode_lock_syncs(inp.monorepo_root, bumped_dirs, log)
-        )
+    except LockfileToolMissingError as exc:
+        raise ReleaseAbortError(exc.message(rerun)) from exc
 
     for sync in owed_syncs:
         steps.append(PlanStep(
