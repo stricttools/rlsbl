@@ -1191,17 +1191,25 @@ class _Executor:
         return None
 
     def _do_sync_lockfile(self, step):
+        # A lockfile the re-lock could not refresh would go into the release
+        # commit stale, so a failed re-lock stops the release before its
+        # candidate is pushed, naming the fix and the command that continues.
         from . import subprocess as _subprocess
+        from .execute import ReleaseAbortError, lockfile_sync_failure
 
         p = step.payload
         try:
             effects.run(
                 p["cmd"], cwd=p["cwd"], timeout=p["timeout"],
-                check=True, capture_output=True,
+                check=True, capture_output=True, text=True,
             )
         except (_subprocess.CalledProcessError, _subprocess.TimeoutExpired,
                 OSError) as e:
-            self._log(f"Warning: {p['lockfile']} sync failed: {e}")
+            raise ReleaseAbortError(lockfile_sync_failure(
+                p["cmd"], p["cwd"], p["lockfile"], exc=e,
+                rerun=("run `rlsbl release resume`" if self._inp.state.resuming
+                       else "re-run `rlsbl release run`"),
+            )) from e
         return None
 
     def _do_write_marker(self, step):

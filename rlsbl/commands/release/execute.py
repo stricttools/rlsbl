@@ -1826,6 +1826,96 @@ _LOCKFILE_SPECS = [
 _LOCKFILE_SYNC_TIMEOUT = 30
 
 
+
+#: npm's and uv's words for a registry they could not reach.
+_REGISTRY_NETWORK_MARKERS = (
+    "ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "ETIMEDOUT", "ECONNRESET",
+    "ENETUNREACH", "Failed to fetch", "error sending request",
+    "tcp connect error", "dns error",
+)
+#: npm's and uv's words for a registry that answered without the version.
+_REGISTRY_UNPUBLISHED_RES = (
+    re.compile(r"No matching version found for (?P<name>\S+)@(?P<version>[^\s@]+?)\.?(?:\s|$)"),
+    re.compile(r"'(?P<name>\S+)@(?P<version>[^\s@']+)' is not in this registry"),
+    re.compile(r"there is no version of (?P<name>[^\s=]+)==(?P<version>\S+?)[,.]?\s"),
+)
+_UV_NOT_FOUND_RE = re.compile(
+    r"Because (?P<name>\S+) was not found in the (?:package registry|provided "
+    r"package locations)"
+)
+
+
+def _unpublished_requirement(detail):
+    """``(name, version)`` of a required version the registry lacks, or None."""
+    flat = " ".join(detail.split()) + " "
+    for pattern in _REGISTRY_UNPUBLISHED_RES:
+        m = pattern.search(flat)
+        if m:
+            return m.group("name"), m.group("version")
+    m = _UV_NOT_FOUND_RE.search(flat)
+    if m:
+        name = m.group("name")
+        pinned = re.search(rf"depends on {re.escape(name)}==(\S+?)[,.]?\s", flat)
+        return name, pinned.group(1) if pinned else "(any version)"
+    return None
+
+
+def lockfile_sync_failure(cmd, cwd, lockfile, *, exc, rerun):
+    """The refusal for a release lockfile re-lock that could not run or failed.
+
+    The release re-locks each lockfile after the version bump so the release
+    commit carries a lockfile that matches it; a failed re-lock would put a
+    stale lockfile in the release. Names the command, where it ran (in the
+    working tree), and the fix for the cause the tool's own output shows: an
+    unreachable registry, or a required version the registry never published.
+    Any other failure names what the tool printed. *rerun* is how the release
+    continues once the fix is in.
+    """
+    from ...release_checkout import live_path
+
+    where = live_path(cwd)
+    command = " ".join(cmd)
+    what = f"re-locking {lockfile} after the version bump"
+    network = (
+        "Restore this machine's network access to the registry it is "
+        "configured for (`npm config get registry` prints npm's; uv's is the "
+        "index pyproject.toml or UV_DEFAULT_INDEX names)"
+    )
+    if isinstance(exc, subprocess.TimeoutExpired):
+        return (
+            f"`{command}` did not finish within {exc.timeout}s in {where} "
+            f"({what}): the registry is unreachable or answering too slowly. "
+            f"{network}, then {rerun}."
+        )
+    if isinstance(exc, subprocess.CalledProcessError):
+        detail = (exc.stderr or exc.stdout or "")
+        if isinstance(detail, bytes):
+            detail = detail.decode(errors="replace")
+        detail = detail.strip()
+        head = (
+            f"`{command}` failed in {where} ({what}, exit {exc.returncode}):"
+            f"\n{detail}\n"
+        )
+    else:
+        detail = str(exc)
+        head = f"`{command}` could not run in {where} ({what}): {detail}\n"
+    unpublished = _unpublished_requirement(detail)
+    if unpublished:
+        name, version = unpublished
+        return head + (
+            f"{name} {version} is required but the registry does not have it: "
+            f"that version was never published. When {name} is a sibling "
+            f"package, release it first (its release publishes {version}), "
+            f"then {rerun}."
+        )
+    if any(m in detail for m in _REGISTRY_NETWORK_MARKERS):
+        return head + (
+            f"The package registry could not be reached. {network}, then "
+            f"{rerun}."
+        )
+    return head + f"Fix the error {cmd[0]} printed, then {rerun}."
+
+
 def _target_lockfile_syncs(target_paths, log, specs=None):
     """Which lockfile syncs a release owes, and what each one runs.
 
