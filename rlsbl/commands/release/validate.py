@@ -1773,6 +1773,11 @@ def _go_strictcli_upgrade(project_dir, upgrade):
     return "; ".join(steps)
 
 
+#: The upgrades that depend on which strictcli the project requires, by
+#: strictcli implementation language.
+_STRICTCLI_UPGRADE_BY_REQUIREMENT = {"go": _go_strictcli_upgrade}
+
+
 #: What every strictcli without a ``help`` command answers ``help --json``
 #: with, on stderr, alongside exit 1. Read off real Go, Python, and TypeScript
 #: programs on the releases named above.
@@ -1841,8 +1846,9 @@ def _run_strictcli_schema_dump(flags, log, project_dir=".", version=None):
     if completed.returncode != 0:
         if _NO_HELP_COMMAND in stderr:
             last, upgrade = _PRE_HELP_JSON_STRICTCLI[lang]
-            if lang == "go":
-                upgrade = _go_strictcli_upgrade(project_dir, upgrade)
+            refine = _STRICTCLI_UPGRADE_BY_REQUIREMENT.get(lang)
+            if refine is not None:
+                upgrade = refine(project_dir, upgrade)
             raise ReleaseValidationError(
                 f"`{' '.join(cmd)}` exited {completed.returncode}: {stderr}\n"
                 f"This program's strictcli predates `help --json`, the command "
