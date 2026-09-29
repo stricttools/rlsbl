@@ -353,3 +353,27 @@ def test_a_stub_module_is_not_an_unregistered_workspace_member(tmp_path, monkeyp
     result = capture_all_checks()["workspace-unregistered"](ctx)
     assert result.status == "pass", [p.text for p in result.problems]
 
+
+def test_rlsbl_own_sdist_excludes_every_private_path():
+    """rlsbl's own next release passes the refusal its CI applies."""
+    from rlsbl.private_paths import exclude_entries
+
+    repo = os.path.join(os.path.dirname(__file__), "..")
+    assert set(exclude_entries()) <= set(_sdist_exclude(os.path.join(repo, "pyproject.toml")))
+
+
+def test_rlsbl_own_ci_runs_the_current_rule():
+    """rlsbl's own CI checks its upload with the rule as it stands."""
+    from ruamel.yaml import YAML
+
+    import rlsbl.private_paths as module
+
+    repo = os.path.join(os.path.dirname(__file__), "..")
+    with open(os.path.join(repo, ".github", "workflows", "ci-pypi.yml")) as f:
+        steps = YAML(typ="safe").load(f)["jobs"]["test"]["steps"]
+    names = [s.get("name") for s in steps]
+    assert names.index("Build the upload") + 1 == names.index(
+        "Check the upload carries no private paths")
+    check = steps[names.index("Check the upload carries no private paths")]
+    with open(module.__file__) as f:
+        assert f.read() in check["run"]

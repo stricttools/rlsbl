@@ -115,3 +115,22 @@ select = ["F401", "F841"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/todo/",
+    "/experiments/",
+    "/screenshots/",
+    "/stricttools/",
+    ".rlsbl/",
+    ".rlsbl-monorepo/",
+    ".strictmetadata/",
+    ".stricttools/",
+    ".claude/",
+    ".selfdoc/",
+    ".strictcli/",
+    "CLAUDE.md",
+    "AGENTS.md",
+    ".env*",
+    "*.local-only",
+]
