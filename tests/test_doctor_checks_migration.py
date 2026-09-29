@@ -787,8 +787,13 @@ class TestWorkspaceStaleEntriesCheck:
 class TestWorkspaceUnregisteredCheck:
     """The workspace-unregistered check detects dirs with manifests not in workspace.toml."""
 
-    def test_private_package_json_not_flagged(self, mock_git_repo):
-        """Directory with private package.json is NOT flagged as unregistered."""
+    def test_private_package_json_is_flagged(self, mock_git_repo):
+        """A private package.json is still a project nobody declared.
+
+        ``private: true`` stops npm from publishing it; it does not make the
+        directory anyone's, and skipping it could hide a real unregistered
+        package.
+        """
         # Create a private npm workspace root (e.g., pnpm workspace root)
         web_dir = mock_git_repo / "web"
         web_dir.mkdir()
@@ -805,7 +810,8 @@ class TestWorkspaceUnregisteredCheck:
             graph=None,
         )
         result = app._check_defs["workspace-unregistered"].impl(ctx)
-        assert result.status == "pass"
+        assert result.status == "fail"
+        assert any("web" in p.text for p in result.problems)
 
     def test_non_private_package_json_flagged(self, mock_git_repo):
         """Directory with non-private package.json IS flagged as unregistered."""
@@ -826,8 +832,10 @@ class TestWorkspaceUnregisteredCheck:
         assert result.status == "fail"
         assert any("mylib" in p.text for p in result.problems)
 
-    def test_parent_of_registered_path_not_flagged(self, mock_git_repo):
-        """Directory that is a parent of a registered project path is NOT flagged."""
+    def test_parent_of_registered_path_is_flagged(self, mock_git_repo):
+        """An undeclared directory with a manifest is flagged even when a
+        declared member sits inside it: its own files fall to whichever member
+        encloses it."""
         # Create web/ with a package.json (would normally be flagged)
         web_dir = mock_git_repo / "web"
         web_dir.mkdir()
@@ -850,7 +858,10 @@ class TestWorkspaceUnregisteredCheck:
             graph=None,
         )
         result = app._check_defs["workspace-unregistered"].impl(ctx)
-        assert result.status == "pass"
+        assert result.status == "fail"
+        assert [p.text for p in result.problems] == [
+            "web: has manifest but not in workspace.toml",
+        ]
 
     def test_non_parent_dir_still_flagged(self, mock_git_repo):
         """Directory that is NOT a parent of any registered path IS flagged."""
