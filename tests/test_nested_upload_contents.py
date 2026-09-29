@@ -121,6 +121,55 @@ def test_a_go_mod_at_the_nested_members_root_clears_the_go_refusal(go_ws):
     assert _check(go_ws).status == "pass", _texts(_check(go_ws))
 
 
+def _dev_node_root_ws(tmp_path, root_config=None):
+    """A root dev node carrying a private workspace package.json, over an npm member."""
+    root = tmp_path / "ws"
+    (root / "web").mkdir(parents=True)
+    (root / "package.json").write_text(json.dumps(
+        {"name": "tooling-workspace", "private": True, "engines": {"node": ">=22"}},
+    ))
+    (root / "web" / "package.json").write_text(json.dumps(
+        {"name": "webpkg", "version": "0.1.0", "engines": {"node": ">=22"}},
+    ))
+    (root / "web" / "index.js").write_text("module.exports = 1;\n")
+    if root_config is not None:
+        (root / ".rlsbl").mkdir()
+        (root / ".rlsbl" / "config.json").write_text(json.dumps(root_config))
+    return root
+
+
+def test_a_member_outside_every_releasable_uploads_nothing(tmp_path):
+    root = _dev_node_root_ws(tmp_path)
+    make_workspace(root, [
+        {"path": ".", "name": "root", "dev_only": True, "releasable": False},
+        {"path": "web", "name": "web"},
+    ])
+    run_git(root, "init", "-q", "-b", "main")
+    _commit(root)
+    assert _check(root).status == "pass", _texts(_check(root))
+
+
+def test_a_member_whose_publishing_is_suppressed_uploads_nothing(tmp_path):
+    root = tmp_path / "ws"
+    (root / "svc" / "py").mkdir(parents=True)
+    (root / "svc" / "go.mod").write_text("module github.com/example/nested/svc\n\ngo 1.22\n")
+    (root / "svc" / "svc.go").write_text("package svc\n")
+    (root / "svc" / ".rlsbl").mkdir()
+    (root / "svc" / ".rlsbl" / "config.json").write_text(json.dumps(
+        {"publish_mode": "none", "targets": ["go"]},
+    ))
+    (root / "svc" / "py" / "pyproject.toml").write_text(
+        '[project]\nname = "svcpy"\nversion = "0.1.0"\n'
+    )
+    make_workspace(root, [
+        {"path": "svc", "name": "svc"},
+        {"path": "svc/py", "name": "svcpy"},
+    ])
+    run_git(root, "init", "-q", "-b", "main")
+    _commit(root)
+    assert _check(root).status == "pass", _texts(_check(root))
+
+
 def test_nested_go_modules_are_already_left_out(tmp_path):
     root = tmp_path / "ws"
     make_nested_workspace(root, "go")

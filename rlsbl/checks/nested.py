@@ -84,6 +84,30 @@ def register_nested_checks(app):
 # ---------------------------------------------------------------------------
 
 
+def _uploads(proj, root):
+    """Does *proj* publish an upload at all?
+
+    A member outside every releasable is never released, and one whose
+    effective config sets ``publish_mode: "none"`` is released without
+    publishing, so neither has an upload to carry anyone's files. A config
+    whose ``publish_mode`` cannot be read is treated as publishing: the
+    ``publish-mode`` check refuses it on its own.
+    """
+    from ..config import ConfigError, read_project_config, suppresses_publish
+    from ..targets import resolve_releasable_config_dir
+
+    if not isinstance(proj.get("releasable"), str):
+        return False
+    config = read_project_config(
+        os.path.join(root, proj["path"]),
+        releasable_config_dir=resolve_releasable_config_dir(proj, root),
+    )
+    try:
+        return not suppresses_publish(config)
+    except ConfigError:
+        return True
+
+
 def upload_content_problems(workspace_root):
     """One finding per file a member's upload would take from a nested member.
 
@@ -101,7 +125,7 @@ def upload_content_problems(workspace_root):
     problems = []
     for proj in projects:
         proj_dir = os.path.join(root, proj["path"])
-        if not nested_member_dirs(proj_dir):
+        if not nested_member_dirs(proj_dir) or not _uploads(proj, root):
             continue
         entries = detect_targets(
             proj_dir, releasable_config_dir=resolve_releasable_config_dir(proj, root),
