@@ -48,13 +48,41 @@ def runner_exclusion_problems(workspace_root):
             problems.append(
                 f"{proj['name']}: its {entry.name} test runner would collect "
                 f"the members nested inside it; {config_rel} must exclude "
-                f"{', '.join(missing)}. Run `rlsbl scaffold` in {proj['path']} "
-                f"to write them (a file rlsbl cannot write into, such as a "
-                f"pytest.ini or a deno.jsonc, takes them by hand). pytest "
-                f"resolves --ignore against the directory it starts in: run it "
-                f"from {proj['path']}, as rlsbl and CI do."
+                f"{', '.join(missing)}. "
+                + _runner_exclusion_fix(proj, target, config_rel, missing)
+                + f" pytest resolves --ignore against the directory it starts "
+                f"in: run it from {proj['path']}, as rlsbl and CI do."
             )
     return problems
+
+
+def _runner_exclusion_fix(proj, target, config_rel, missing):
+    """How to write *missing* into *config_rel*, as the operator can do it.
+
+    ``rlsbl scaffold`` writes them for a member, but it does not run at the
+    workspace root, so the root member's entries are written by hand.
+    """
+    from ..ownership import is_root_path
+    from ..scratch_dirs import DENO_CONFIG_EXCLUDE, PYTEST_NORECURSEDIRS
+
+    if not is_root_path(proj["path"]):
+        return (
+            f"Run `rlsbl scaffold` in {proj['path']} to write them (a file "
+            f"rlsbl cannot write into, such as a pytest.ini or a deno.jsonc, "
+            f"takes them by hand)."
+        )
+    if target.scratch_test_exclusion == PYTEST_NORECURSEDIRS:
+        where = "addopts under [tool.pytest.ini_options]"
+        if not config_rel.endswith("pyproject.toml"):
+            where = "addopts under [pytest]"
+    elif target.scratch_test_exclusion == DENO_CONFIG_EXCLUDE:
+        where = "the top-level exclude list"
+    else:
+        where = "the runner's exclusions"
+    return (
+        f"`rlsbl scaffold` does not run at the workspace root, so write them "
+        f"by hand: add {' '.join(missing)} to {where} in {config_rel}."
+    )
 
 
 def register_nested_checks(app):
