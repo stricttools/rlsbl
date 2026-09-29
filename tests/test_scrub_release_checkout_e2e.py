@@ -211,3 +211,34 @@ def test_a_scrub_stopped_after_its_commit_is_finished_by_a_rerun(
     assert remote_ref(repo, "refs/heads/main") == git(repo, "rev-parse", "HEAD")
     assert not (repo / ".rlsbl" / "releases" / "scrub-result.json").exists()
     assert not _secret_reachable(repo)
+
+
+def test_a_rerun_with_different_arguments_does_not_finish_a_stopped_scrub(
+    repo, tmp_path, capsys,
+):
+    """A scrub stopped at its push is finished only by the same scrub: a
+    re-run asking for another pattern must not push the saved rewrite and
+    report its own scrub complete."""
+    hook = tmp_path / "remote" / "hooks" / "pre-receive"
+    hook.write_text("#!/bin/sh\necho 'origin refuses pushes for now' >&2\nexit 1\n")
+    hook.chmod(0o755)
+    with pytest.raises(SystemExit):
+        _scrub(repo)
+    capsys.readouterr()
+    hook.unlink()
+    origin_before = remote_ref(repo, "refs/heads/main")
+
+    ctx = ProjectContext(project_root=repo, workspace_root=None, config={})
+    other = dict(_flags(), pattern="app")
+    with pytest.raises(SystemExit) as exc:
+        with patch(f"{MOD}.check_gh_installed", return_value=False):
+            run_cmd(other, ctx=ctx)
+    assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert "--pattern SECRETTOKEN123" in err
+    assert remote_ref(repo, "refs/heads/main") == origin_before
+
+    # The fix the refusal names: the same command finishes the saved scrub.
+    _scrub(repo)
+    assert remote_ref(repo, "refs/heads/main") == git(repo, "rev-parse", "HEAD")
+    assert not (repo / ".rlsbl" / "releases" / "scrub-result.json").exists()

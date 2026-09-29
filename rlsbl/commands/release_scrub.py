@@ -173,10 +173,15 @@ def _remove_release_checkout(ctx):
 
     The lock is not held across the safegit run itself: its file is untracked
     in the working tree while held, and safegit refuses a dirty tree.
+
+    A release that was running when the scrub started held the lock, so it
+    may have stopped while the scrub waited for it: the stopped-release
+    refusal is asked again once the lock is held.
     """
     lock_dir, lock_root = _lock_home(ctx)
     acquire_lock(lock_dir=lock_dir, project_root=lock_root)
     try:
+        _refuse_in_flight_releases(ctx)
         return release_checkout.remove_checkout(str(ctx.project_root))
     finally:
         release_lock()
@@ -260,6 +265,32 @@ def compose_rewrites(saved, again):
     saved["new_head"] = again["new_head"]
 
 
+def _require_same_scrub(scrub_data, flags, mode, scrub_result_path, *,
+                        project_root, ctx, workspace_projects):
+    """This run's safegit arguments, refused unless the saved scrub ran them.
+
+    A saved result is finished only by the scrub that made it: a re-run
+    asking for another pattern or mode would otherwise push the saved
+    rewrite and report its own scrub complete. A result saved without its
+    arguments is accepted as it is.
+    """
+    remap_globs = changelog_remap_globs(
+        str(project_root), ctx.workspace_root,
+        workspace_projects=workspace_projects,
+    )
+    safegit_args = _build_safegit_args(flags, mode, remap_globs)
+    saved_args = scrub_data.get("safegit_args")
+    if saved_args is not None and safegit_args != saved_args:
+        _fail(
+            f"{scrub_result_path} holds a rewrite made by `safegit "
+            f"{' '.join(saved_args)}`, and this run would run "
+            f"`safegit {' '.join(safegit_args)}`. Re-run `rlsbl release "
+            f"scrub` with the arguments the saved scrub was started with, so "
+            f"it finishes that scrub."
+        )
+    return safegit_args
+
+
 def _verify_saved_rewrite(scrub_data, flags, mode, scrub_result_path, *,
                           project_root, ctx, workspace_projects):
     """Re-run the saved scrub's safegit before finishing its rewrite.
@@ -269,20 +300,11 @@ def _verify_saved_rewrite(scrub_data, flags, mode, scrub_result_path, *,
     again keeps the saved result and exits 1 with safegit's report; one that
     rewrites further is folded into the saved rewrite.
     """
-    remap_globs = changelog_remap_globs(
-        str(project_root), ctx.workspace_root,
+    safegit_args = _require_same_scrub(
+        scrub_data, flags, mode, scrub_result_path,
+        project_root=project_root, ctx=ctx,
         workspace_projects=workspace_projects,
     )
-    safegit_args = _build_safegit_args(flags, mode, remap_globs)
-    saved_args = scrub_data.get("safegit_args") or []
-    if safegit_args != saved_args:
-        _fail(
-            f"{scrub_result_path} holds a rewrite made by `safegit "
-            f"{' '.join(saved_args)}`, which then failed; this run would run "
-            f"`safegit {' '.join(safegit_args)}`. Re-run `rlsbl release "
-            f"scrub` with the arguments the saved scrub was started with, so "
-            f"it confirms that scrub and finishes it."
-        )
     try:
         output = run("safegit", safegit_args, timeout=600)
     except subprocess.CalledProcessError as e:
@@ -1084,6 +1106,12 @@ def run_cmd(flags, *, ctx):
             project_root=project_root, ctx=ctx,
             workspace_projects=workspace_projects,
         )
+    elif resuming:
+        _require_same_scrub(
+            scrub_data, flags, mode, scrub_result_path,
+            project_root=project_root, ctx=ctx,
+            workspace_projects=workspace_projects,
+        )
 
     # -- If not resuming, build and run safegit command --
     if not resuming:
@@ -1201,6 +1229,7 @@ def run_cmd(flags, *, ctx):
         # Save scrub-result.json for resume support
         scrub_data["completed_steps"] = []
         scrub_data["remote_refs"] = remote_refs or {}
+        scrub_data["safegit_args"] = list(safegit_args)
         effects.makedirs(os.path.dirname(scrub_result_path), exist_ok=True)
         effects.atomic_write_text(scrub_result_path, json.dumps(scrub_data, indent=2))
 
