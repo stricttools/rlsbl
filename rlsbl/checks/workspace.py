@@ -8,7 +8,6 @@ deps-runtime-test-only, deps-dev-in-lib, deps-stale, root-rlsbl-conflict,
 test-suite-workspace.
 """
 
-import json
 import os
 import subprocess
 
@@ -493,6 +492,10 @@ def register_workspace_checks(app):
             msg += f", {rel_count} releasable(s) verified"
         return reporter.passed(msg)
 
+    #: Folders whose manifests are test inputs, not projects (Go ignores
+    #: testdata/ by the same convention).
+    _TEST_INPUT_DIRS = frozenset({"tests", "testdata", "fixtures"})
+
     @app.error_check("workspace-unregistered")
     def check_workspace_unregistered(ctx, reporter):
         """No project directories on disk should be missing from workspace.toml."""
@@ -519,59 +522,47 @@ def register_workspace_checks(app):
                     os.path.relpath(entry.path, root).rstrip("/")
                 )
 
-        gitignored = set()
-        try:
-            result = effects.run(
-                ["git", "ls-files", "--others", "--ignored", "--exclude-standard", "--directory"],
-                cwd=root,
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-            for line in result.stdout.splitlines():
-                gitignored.add(line.rstrip("/"))
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            pass
+        # Every manifest git lists (tracked, plus untracked files that are not
+        # ignored), at any depth: an undeclared project anywhere falls to the
+        # member enclosing it, so no depth is safe to leave unread.
+        from ..lint.utils import SourceWalkError, git_listed_files
+        from ..ownership import is_tool_owned_path, member_path, owner_of
 
+        try:
+            listed = git_listed_files(root)
+        except SourceWalkError as exc:
+            reporter.error(str(exc))
+            return reporter.found("the workspace's files could not be listed")
+
+        manifest_names = set(PROJECT_MANIFESTS)
+        rlsbl_config = RLSBL_CONFIG.replace(os.sep, "/")
         found_project_dirs = set()
-        try:
-            entries = os.listdir(root)
-        except OSError:
-            entries = []
-
-        for entry in sorted(entries):
-            if entry.startswith("."):
+        for rel in listed:
+            if is_tool_owned_path(rel):
                 continue
-            if entry in gitignored:
+            if rel == rlsbl_config or rel.endswith("/" + rlsbl_config):
+                directory = rel[: -len(rlsbl_config)].rstrip("/")
+            elif rel.rsplit("/", 1)[-1] in manifest_names:
+                directory = rel.rsplit("/", 1)[0] if "/" in rel else ""
+            else:
                 continue
-            # A scratch directory is not gitignored as a whole (it carries a
-            # committed .gitignore), so the listing above does not cover it --
-            # but a produced repository inside one is not a workspace member.
-            if is_scratch_dir_name(entry):
+            if not directory:
                 continue
-            dir_path = os.path.join(root, entry)
-            if not os.path.isdir(dir_path):
+            parts = directory.split("/")
+            # Hidden directories are tool and editor state, never a project.
+            if any(part.startswith(".") for part in parts):
                 continue
-            if os.path.isfile(os.path.join(dir_path, RLSBL_CONFIG)):
-                found_project_dirs.add(entry)
+            # Test inputs: a fixture project is not a project.
+            if any(part in _TEST_INPUT_DIRS for part in parts):
                 continue
-            for manifest in PROJECT_MANIFESTS:
-                if os.path.isfile(os.path.join(dir_path, manifest)):
-                    if manifest == "package.json":
-                        try:
-                            with open(os.path.join(dir_path, manifest)) as f:
-                                pkg = json.load(f)
-                            if pkg.get("private") is True:
-                                continue
-                        except (json.JSONDecodeError, OSError):
-                            pass
-                    found_project_dirs.add(entry)
-                    break
-
-        found_project_dirs -= {
-            d for d in found_project_dirs
-            if any(rp.startswith(d + "/") for rp in registered_paths)
-        }
+            # A scratch directory at a member's root holds throwaway probes
+            # and produced repositories, never members.
+            owner = owner_of(directory + "/x", ctx.projects)
+            base = member_path(owner) if owner is not None else ""
+            owned = directory[len(base):].lstrip("/")
+            if owned and is_scratch_dir_name(owned.split("/", 1)[0]):
+                continue
+            found_project_dirs.add(directory)
 
         unregistered = sorted(
             found_project_dirs - registered_paths - declared_target_paths

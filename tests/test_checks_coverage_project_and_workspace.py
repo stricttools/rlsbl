@@ -2324,8 +2324,9 @@ class TestWorkspaceUnregistered:
         result = app._check_defs["workspace-unregistered"].impl(ctx)
         assert result.status == "pass"
 
-    def test_private_npm_workspace_skipped(self, tmp_path, monkeypatch):
-        """Lines 131-135: private npm workspace roots are skipped."""
+    def test_private_npm_workspace_is_flagged(self, tmp_path, monkeypatch):
+        """A private npm workspace root nobody declared is flagged like any
+        other manifest: ``private: true`` could hide a real package."""
         repo = tmp_path / "repo"
         repo.mkdir()
         monkeypatch.chdir(repo)
@@ -2350,8 +2351,8 @@ class TestWorkspaceUnregistered:
 
         ctx = _make_ws_ctx(repo, projects)
         result = app._check_defs["workspace-unregistered"].impl(ctx)
-        # "packages" dir should be skipped because its package.json has private:true
-        assert result.status == "pass"
+        assert result.status == "fail"
+        assert any("packages" in p.text for p in result.problems)
 
     def test_rlsbl_config_detected(self, tmp_path, monkeypatch):
         """Lines 124-126: directory with .rlsbl/config.json is detected."""
