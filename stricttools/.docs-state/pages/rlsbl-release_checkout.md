@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.release_checkout"
-description = "The release checkout a release runs in: preparing and reusing it, the compare-and-swap branch advance and its undo, and the uncommitted changes that block a release."
+description = "The release checkout a release runs in: preparing, reusing, and removing it, the compare-and-swap branch advance and its undo, and the uncommitted changes that block a release."
 generated = true
 nav_group = "API Reference"
 nav_order = 158
