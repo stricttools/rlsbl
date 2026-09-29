@@ -3740,6 +3740,11 @@
         },
         {
           "level": 3,
+          "text": "`_abort_on_untidy_go_modules`",
+          "anchor": "_abort_on_untidy_go_modules"
+        },
+        {
+          "level": 3,
           "text": "`_resolve_git_root`",
           "anchor": "_resolve_git_root"
         },
@@ -7053,6 +7058,11 @@
         },
         {
           "level": 3,
+          "text": "`_add_step_failed`",
+          "anchor": "_add_step_failed"
+        },
+        {
+          "level": 3,
           "text": "`_listed_releasable`",
           "anchor": "_listed_releasable"
         },
@@ -7492,6 +7502,21 @@
         },
         {
           "level": 3,
+          "text": "`_write_source_edit`",
+          "anchor": "_write_source_edit"
+        },
+        {
+          "level": 3,
+          "text": "`_delete_departed`",
+          "anchor": "_delete_departed"
+        },
+        {
+          "level": 3,
+          "text": "`_restore_source`",
+          "anchor": "_restore_source"
+        },
+        {
+          "level": 3,
           "text": "`_floor_config_paths`",
           "anchor": "_floor_config_paths"
         },
@@ -7780,6 +7805,11 @@
           "level": 3,
           "text": "`_rewrite_identity`",
           "anchor": "_rewrite_identity"
+        },
+        {
+          "level": 3,
+          "text": "`_seed_member_bases`",
+          "anchor": "_seed_member_bases"
         },
         {
           "level": 3,
@@ -8502,6 +8532,21 @@
           "level": 3,
           "text": "`_target_lockfile_syncs`",
           "anchor": "_target_lockfile_syncs"
+        },
+        {
+          "level": 3,
+          "text": "`release_lock_targets`",
+          "anchor": "release_lock_targets"
+        },
+        {
+          "level": 3,
+          "text": "`UntidyGoModuleError`",
+          "anchor": "untidygomoduleerror"
+        },
+        {
+          "level": 3,
+          "text": "`refuse_untidy_go_modules`",
+          "anchor": "refuse_untidy_go_modules"
         },
         {
           "level": 3,
@@ -9443,6 +9488,11 @@
         },
         {
           "level": 3,
+          "text": "`_abort_on_untidy_go_modules`",
+          "anchor": "_abort_on_untidy_go_modules"
+        },
+        {
+          "level": 3,
           "text": "`_resolve_git_root`",
           "anchor": "_resolve_git_root"
         },
@@ -9877,6 +9927,41 @@
           "level": 3,
           "text": "`_save_step`",
           "anchor": "_save_step"
+        },
+        {
+          "level": 3,
+          "text": "`_lock_home`",
+          "anchor": "_lock_home"
+        },
+        {
+          "level": 3,
+          "text": "`_remove_release_checkout`",
+          "anchor": "_remove_release_checkout"
+        },
+        {
+          "level": 3,
+          "text": "`_failure_detail`",
+          "anchor": "_failure_detail"
+        },
+        {
+          "level": 3,
+          "text": "`_rewrite_payload`",
+          "anchor": "_rewrite_payload"
+        },
+        {
+          "level": 3,
+          "text": "`_save_failed_rewrite_and_exit`",
+          "anchor": "_save_failed_rewrite_and_exit"
+        },
+        {
+          "level": 3,
+          "text": "`compose_rewrites`",
+          "anchor": "compose_rewrites"
+        },
+        {
+          "level": 3,
+          "text": "`_verify_saved_rewrite`",
+          "anchor": "_verify_saved_rewrite"
         },
         {
           "level": 3,
@@ -15904,6 +15989,11 @@
         },
         {
           "level": 3,
+          "text": "`remove_checkout`",
+          "anchor": "remove_checkout"
+        },
+        {
+          "level": 3,
           "text": "`_write_back`",
           "anchor": "_write_back"
         },
@@ -19772,6 +19862,11 @@
         },
         {
           "level": 3,
+          "text": "`missing_version_file`",
+          "anchor": "missing_version_file"
+        },
+        {
+          "level": 3,
           "text": "`detect_python_package_root`",
           "anchor": "detect_python_package_root"
         },
@@ -23494,7 +23589,7 @@
       ]
     }
   ],
-  "last_gen": "2026-09-29T02:55:55.329770+00:00",
+  "last_gen": "2026-09-29T03:58:13.448502+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
