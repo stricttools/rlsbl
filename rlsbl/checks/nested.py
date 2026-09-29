@@ -1,6 +1,7 @@
 """Nested-member checks (tags: workspace, preflight): a member's tools leave the members inside it alone.
 
-Checks: nested-member-runner-exclusion, nested-member-upload-contents.
+Checks: nested-member-runner-exclusion, nested-member-upload-contents,
+nested-member-uv-sources.
 """
 
 import os
@@ -59,6 +60,7 @@ def runner_exclusion_problems(workspace_root):
 def register_nested_checks(app):
     """Register the nested-member checks on *app*."""
     _register_upload_contents(app)
+    _register_uv_sources(app)
 
     @app.error_check("nested-member-runner-exclusion")
     def check_nested_member_runner_exclusion(ctx, reporter):
@@ -141,4 +143,80 @@ def _register_upload_contents(app):
             reporter.error(problem)
         return reporter.found(
             f"{len(problems)} file(s) a member's upload would take from a nested member"
+        )
+
+
+# ---------------------------------------------------------------------------
+# uv workspace sources
+# ---------------------------------------------------------------------------
+
+
+def _workspace_sources(pyproject):
+    """Names declared ``{ workspace = true }`` in *pyproject*'s [tool.uv.sources]."""
+    import tomllib
+
+    try:
+        with open(pyproject, "rb") as f:
+            data = tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError):
+        return []
+    sources = data.get("tool", {}).get("uv", {}).get("sources", {})
+    if not isinstance(sources, dict):
+        return []
+    return sorted(
+        name for name, spec in sources.items()
+        if isinstance(spec, dict) and spec.get("workspace") is True
+    )
+
+
+def uv_sources_problems(workspace_root):
+    """One finding per nested member declaring a uv workspace source itself."""
+    from ..ownership import member_path, nested_member_paths
+    from ..uv_workspace import find_uv_workspace_root
+    from ..workspace import load_workspace
+
+    root = str(workspace_root)
+    projects = load_workspace(root)
+    nested = {
+        path
+        for proj in projects if member_path(proj)
+        for path in nested_member_paths(proj, projects)
+    }
+    problems = []
+    for proj in projects:
+        if member_path(proj) not in nested:
+            continue
+        pyproject = os.path.join(root, proj["path"], "pyproject.toml")
+        names = _workspace_sources(pyproject)
+        if not names:
+            continue
+        uv_root = find_uv_workspace_root(os.path.join(root, proj["path"])) or root
+        root_pyproject = os.path.join(uv_root, "pyproject.toml")
+        problems.append(
+            f"{proj['name']}: {proj['path']}/pyproject.toml declares "
+            f"{', '.join(names)} as `{{ workspace = true }}` in "
+            f"[tool.uv.sources], but uv refuses a workspace source declared in "
+            f"a member nested inside another member (\"references a workspace "
+            f"in `tool.uv.sources` ... but is not a workspace member\"). Move "
+            f"the entries to [tool.uv.sources] in {root_pyproject}, where uv "
+            f"resolves them for every member."
+        )
+    return problems
+
+
+def _register_uv_sources(app):
+    @app.error_check("nested-member-uv-sources")
+    def check_nested_member_uv_sources(ctx, reporter):
+        """A nested member declares no uv workspace source of its own."""
+        if not isinstance(ctx, WorkspaceCheckContext) or ctx.workspace_root is None:
+            return reporter.skipped("not a workspace")
+        problems = uv_sources_problems(ctx.workspace_root)
+        if not problems:
+            return reporter.passed(
+                "no nested member declares a uv workspace source of its own"
+            )
+        for problem in problems:
+            reporter.error(problem)
+        return reporter.found(
+            f"{len(problems)} nested member(s) declaring uv workspace sources"
         )

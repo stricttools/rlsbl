@@ -492,6 +492,15 @@ requires = []
 description = "A member's npm package and Go module zip carry no nested member's files."
 
 [[option]]
+name = "nested-member-uv-sources"
+subject = "project"
+values = "error > warn > off"
+default = "error"
+scope = "none"
+requires = []
+description = "No member nested inside another member declares its own uv workspace sources."
+
+[[option]]
 name = "npm-private-mismatch"
 subject = "project"
 values = "error > warn > off"

@@ -1124,6 +1124,22 @@ needs_network = false
 depends_on = []
 scope = "workspace"
 
+# nested-member-uv-sources: uv refuses a `{ workspace = true }` source declared
+# in a member nested inside another member (probed with uv 0.9.17), while the
+# same entry in the uv workspace root's pyproject.toml resolves. Pure (reads
+# pyproject.toml files). In "preflight" so the refusal names the file to move
+# the entry to, rather than uv's own message surfacing mid-release.
+[checks.nested-member-uv-sources]
+description = "No member nested inside another member declares its own uv workspace sources."
+subject = "project"
+tags = ["workspace", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
 # go-toolchain-declared: setup-go installs the Go named by go.mod's `toolchain`
 # line and falls back to the `go` directive -- the consumers' floor -- without
 # one, so CI would test on an older Go than the project is developed with.
