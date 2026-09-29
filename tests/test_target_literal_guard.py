@@ -135,10 +135,6 @@ LEGACY_BASELINE: dict[str, dict[tuple[str, tuple[str, ...]], int]] = {
     "rlsbl/release_file.py": {
         ("compare", ('flutter',)): 2,
     },
-    "rlsbl/tagging.py": {
-        ("compare", ('npm',)): 1,
-        ("compare", ('pypi',)): 1,
-    },
 }
 
 
