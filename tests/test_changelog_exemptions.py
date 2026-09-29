@@ -374,6 +374,7 @@ class TestExemptionsAnswerTheNamedRepository:
         uncovered = uncovered_commits(
             [auto, changelog, normal],
             changes_dir=str(named / ".rlsbl" / "changes"),
+            scope=None,
             cwd=str(named),
         )
 
