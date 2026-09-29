@@ -377,3 +377,88 @@ def test_rlsbl_own_ci_runs_the_current_rule():
     check = steps[names.index("Check the upload carries no private paths")]
     with open(module.__file__) as f:
         assert f.read() in check["run"]
+
+
+# ---------------------------------------------------------------------------
+# The whole scaffold command, end to end
+# ---------------------------------------------------------------------------
+
+
+def _upload_script(workflow_path):
+    from ruamel.yaml import YAML
+
+    with open(workflow_path) as f:
+        steps = YAML(typ="safe").load(f)["jobs"]["test"]["steps"]
+    return "\n".join(
+        s["run"] for s in steps
+        if s.get("name") in ("Build the upload", "Check the upload carries no private paths")
+    )
+
+
+def _run_upload_steps(root, tmp_path):
+    runner = tmp_path / "runner"
+    runner.mkdir(exist_ok=True)
+    env = dict(os.environ, RUNNER_TEMP=str(runner), UV_OFFLINE="1")
+    shutil.rmtree(runner / "rlsbl-upload", ignore_errors=True)
+    return subprocess.run(
+        ["bash", "-euo", "pipefail", "-c",
+         _upload_script(root / ".github" / "workflows" / "ci.yml")],
+        cwd=root, env=env, capture_output=True, text=True,
+    )
+
+
+@pytest.fixture
+def scaffolded_python(tmp_path, monkeypatch):
+    """A hatchling project carrying private paths, through `rlsbl scaffold`."""
+    import rlsbl
+
+    root = tmp_path / "planted"
+    (root / "planted").mkdir(parents=True)
+    (root / "pyproject.toml").write_text(
+        '[project]\nname = "planted"\nversion = "0.1.0"\nrequires-python = ">=3.11"\n\n'
+        '[build-system]\nrequires = ["hatchling"]\nbuild-backend = "hatchling.build"\n'
+    )
+    (root / "planted" / "__init__.py").write_text("")
+    for rel in ("todo/plan.md", "CLAUDE.md", ".env"):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        (root / rel).write_text("private\n")
+    run_git(root, "init", "-q", "-b", "main")
+    run_git(root, "remote", "add", "origin", "git@github.com:example/planted.git")
+    run_git(root, "add", "-A")
+    run_git(root, "commit", "-q", "-m", "fixture")
+    monkeypatch.chdir(root)
+    result = rlsbl.app.test(["scaffold", "--publish-mode", "ci", "--no-auto-commit", "--no-auto-tag"])
+    assert result.exit_code == 0, result.stdout + result.stderr
+    return root
+
+
+def test_a_newly_scaffolded_python_project_passes_its_ci_upload_check(
+    scaffolded_python, tmp_path,
+):
+    result = _run_upload_steps(scaffolded_python, tmp_path)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "the upload carries no private paths" in result.stdout
+
+
+def test_rescaffolding_adds_the_ci_step_to_an_older_workflow(scaffolded_python, tmp_path):
+    """The changelog's instruction: re-run `rlsbl scaffold` to add the CI step."""
+    import rlsbl
+
+    root = scaffolded_python
+    ci = root / ".github" / "workflows" / "ci.yml"
+    base = root / ".rlsbl" / "bases" / ".github" / "workflows" / "ci.yml"
+    assert base.exists()
+    # The workflow an earlier rlsbl wrote: no upload steps, on disk and as the
+    # stored merge base alike.
+    text = ci.read_text()
+    start = text.index("      # Listing what the upload carries")
+    end = text.index("          PY\n", start) + len("          PY\n")
+    older = text[:start] + text[end:]
+    ci.write_text(older)
+    base.write_text(older)
+    assert "Check the upload carries no private paths" not in ci.read_text()
+
+    result = rlsbl.app.test(["scaffold", "--no-auto-commit", "--no-auto-tag"])
+    assert result.exit_code == 0, result.stdout + result.stderr
+    assert "Check the upload carries no private paths" in ci.read_text()
+    assert _run_upload_steps(root, tmp_path).returncode == 0
