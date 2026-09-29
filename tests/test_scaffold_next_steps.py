@@ -115,6 +115,16 @@ def test_single_registry_next_steps_name_the_current_release_flow(
     _assert_current_release_flow(_scaffold_single(registry))
 
 
+def test_npm_lockfile_step_says_commit_before_releasing(mock_git_repo):
+    """Releases are the only push, so the lockfile step names the release."""
+    _write_npm(mock_git_repo)
+    steps = _scaffold_single("npm")
+    assert steps[0] == (
+        'Run "npm install" and commit package-lock.json before releasing'
+    ), steps
+    assert not any("before pushing" in s for s in steps), steps
+
+
 def _scaffold_multi_project(root: Path, registries: list[str]) -> list[str]:
     for registry in registries:
         _WRITERS[registry](root)
