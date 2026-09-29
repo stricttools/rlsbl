@@ -625,6 +625,12 @@
         "go"
       ]
     },
+    "go-module-major-suffix": {
+      "kind": "targets",
+      "targets": [
+        "go"
+      ]
+    },
     "go-toolchain-declared": {
       "kind": "targets",
       "targets": [
@@ -797,6 +803,12 @@
         "pgdesign",
         "plain",
         "spec"
+      ]
+    },
+    "path-tag-format-go-member": {
+      "kind": "targets",
+      "targets": [
+        "go"
       ]
     },
     "prepush-changelog-coverage": {
@@ -1646,6 +1658,18 @@
           "no"
         ],
         [
+          "go-module-major-suffix",
+          "no",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
           "go-toolchain-declared",
           "no",
           "yes",
@@ -1734,6 +1758,18 @@
           "no",
           "no",
           "yes",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "path-tag-format-go-member",
+          "no",
+          "yes",
+          "no",
           "no",
           "no",
           "no",

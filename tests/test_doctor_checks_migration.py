@@ -116,6 +116,10 @@ EXPECTED_CHECKS = [
     "go-module-identity",
     # every go.mod declares the Go it is developed with (a toolchain line)
     "go-toolchain-declared",
+    # a path-style tag_format names one of its releasable's own Go members
+    "path-tag-format-go-member",
+    # no go.mod module path carries a major-version suffix
+    "go-module-major-suffix",
     # every -X linker flag names a symbol the Go source actually declares
     "ldflags-symbol",
     # the declared strictspec floor reaches every generated validator

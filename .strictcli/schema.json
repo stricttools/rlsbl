@@ -3575,6 +3575,19 @@
       "description": "Every go.mod's module path equals the repository's origin identity plus the module's subdirectory.",
       "subject": "project"
     },
+    "go-module-major-suffix": {
+      "tags": [
+        "project",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "description": "No go.mod module path ends in a major-version suffix (/v2 and above).",
+      "subject": "project"
+    },
     "go-toolchain-declared": {
       "tags": [
         "project",
@@ -3776,6 +3789,20 @@
       "depends_on": [],
       "description": "Every repository this one absorbed is archived on GitHub (requires network).",
       "subject": "release"
+    },
+    "path-tag-format-go-member": {
+      "tags": [
+        "workspace",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "description": "A releasable's path-style tag_format names the path of one of its own Go members.",
+      "subject": "workspace",
+      "scope": "workspace"
     },
     "prepush-changelog-coverage": {
       "tags": [

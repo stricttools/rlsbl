@@ -339,6 +339,15 @@ requires = []
 description = "Every go.mod's module path equals the repository's origin identity plus the module's subdirectory."
 
 [[option]]
+name = "go-module-major-suffix"
+subject = "project"
+values = "error > warn > off"
+default = "error"
+scope = "none"
+requires = []
+description = "No go.mod module path ends in a major-version suffix (/v2 and above)."
+
+[[option]]
 name = "go-toolchain-declared"
 subject = "project"
 values = "error > warn > off"
@@ -490,6 +499,15 @@ default = "error"
 scope = "none"
 requires = []
 description = "Every repository this one absorbed is archived on GitHub (requires network)."
+
+[[option]]
+name = "path-tag-format-go-member"
+subject = "workspace"
+values = "error > warn > off"
+default = "error"
+scope = "none"
+requires = []
+description = "A releasable's path-style tag_format names the path of one of its own Go members."
 
 [[option]]
 name = "prepush-changelog-coverage"

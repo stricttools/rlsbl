@@ -1058,6 +1058,36 @@ pure = true
 needs_network = false
 depends_on = []
 
+# path-tag-format-go-member: a releasable whose tag_format is a Go path tag
+# (`<path>/v{version}`) publishes the module at that path, permanently, so the
+# path must be one of the releasable's own Go members. Pure (reads the
+# workspace and each member's manifests). In "preflight" so a tag naming
+# another module, or none, is never created.
+[checks.path-tag-format-go-member]
+description = "A releasable's path-style tag_format names the path of one of its own Go members."
+subject = "workspace"
+tags = ["workspace", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+# go-module-major-suffix: a module path ending in /v2, /v3, ... marks a major
+# version of 2 or higher, which Go resolves only as v2.x.y and later. Refused
+# before anything is tagged, because a Go tag is permanent. Pure (reads
+# go.mod). In "preflight" so no such module is ever published.
+[checks.go-module-major-suffix]
+description = "No go.mod module path ends in a major-version suffix (/v2 and above)."
+subject = "project"
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
 # go-toolchain-declared: setup-go installs the Go named by go.mod's `toolchain`
 # line and falls back to the `go` directive -- the consumers' floor -- without
 # one, so CI would test on an older Go than the project is developed with.
