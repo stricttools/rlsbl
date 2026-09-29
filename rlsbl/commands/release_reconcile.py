@@ -327,6 +327,36 @@ def _declared_non_version_tags(repo_root):
     }
 
 
+def _is_companion_tag(tag_name, version, *, ctx, workspace_projects, tag_schemes):
+    """Is *tag_name* a workspace releasable's ecosystem companion at *version*?
+
+    Asked only of a tag no member's scheme renders: a primary tag is never a
+    companion. The companions a released version owns are ``expected_refs``'
+    answer, the single authority the release, the checks, and reconcile read.
+    """
+    if not ctx.workspace_root or _tag_owner(tag_name, tag_schemes) is not None:
+        return False
+    from ..targets.base import BaseTarget
+    from ..targets.refs import ref_context
+    from ..workspace import get_releasable_dir, load_releasables, members_of
+
+    root = str(ctx.workspace_root)
+    for rel in load_releasables(root, workspace_projects):
+        members = members_of(rel.name, workspace_projects)
+        if not members:
+            continue
+        context = ref_context(
+            repo_root=root,
+            primary_tag_format=rel.effective_tag_format,
+            releasable_name=rel.name,
+            member_package_paths=[p["path"] for p in members],
+            releasable_config_dir=get_releasable_dir(root, rel.name),
+        )
+        if tag_name in BaseTarget().expected_refs(version, context).companions:
+            return True
+    return False
+
+
 def update_github_releases(tags, *, ctx, project_root, workspace_projects,
                            tag_schemes, gh=None, gh_installed=None,
                            gh_auth=None, extract_entry=None):
@@ -417,6 +447,14 @@ def update_github_releases(tags, *, ctx, project_root, workspace_projects,
             )
             continue
         version = parsed_tag.version
+        if _is_companion_tag(
+            tag_name, version, ctx=ctx, workspace_projects=workspace_projects,
+            tag_schemes=tag_schemes,
+        ):
+            # An ecosystem companion (a nested Go module's own tag): the
+            # release creates no GitHub Release for it, so there is no
+            # document to write. Its re-pointing was the tag step's.
+            continue
 
         try:
             gh(view_body_args(tag_name), config=ctx.config)
