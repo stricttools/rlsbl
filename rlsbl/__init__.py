@@ -2248,7 +2248,7 @@ class RootReleasable:
     value: str = strictcli.member_value(help="name of the releasable the root member belongs to; it is created in [[releasables]]")
     tag_format: str = strictcli.sub_flag(presence="required", help="tag format for that releasable, e.g. \"v{version}\" for bare version tags or \"{name}@v{version}\" for the workspace scheme; a root releasable never inherits a default")
     publish_mode: str = strictcli.sub_flag(presence="required", help="the root member's publish mode, \"ci\" or \"none\", with no default; it is written to the releasable's .rlsbl-monorepo/releasables/<name>/config.json, where a root member's config lives")
-    publish_gate_check_regex: str = strictcli.sub_flag(presence="optional", help="regex matching the check-run names of the root's hand-authored CI, which the publish gate waits for on the release commit; required with --publish-mode ci when a release target is detected at the root")
+    publish_gate_check_regex: str = strictcli.sub_flag(presence="optional", help="regex matching the check-run names of the root's hand-authored CI, which publishing waits for on the release commit; required with --publish-mode ci when a release target is detected at the root")
 
 
 @mono.command(

@@ -333,7 +333,7 @@ from ...ci_router import _router_ci_check_regex  # noqa: E402
 from ... import effects
 
 
-#: The example regex the root publisher's gate-regex errors show.
+#: The example regex the root publisher's check-regex errors show.
 ROOT_GATE_REGEX_EXAMPLE = "^(test|lint)( \\(.*\\))?$"
 
 
