@@ -259,12 +259,35 @@ def _refuse_non_canonical_member_paths(data, projects):
     rule about paths: the duplicate and root-member rules below compare
     spellings, and they can only do that once each territory has one.
     """
+    import json
+
+    from .ownership import canonical_member_path
+
+    ws_file = f"{WORKSPACE_DIR}/{WORKSPACE_FILE}"
+    found = []
     for i, declared in enumerate(_declared_paths(data, projects)):
         problem = member_path_problem(declared)
-        if problem is not None:
-            raise WorkspaceError(
-                f"projects[{i}] ('{projects[i]['name']}'): {problem}"
+        if problem is None:
+            continue
+        line = f"projects[{i}] ('{projects[i]['name']}'): {problem}"
+        canonical = (
+            canonical_member_path(declared) if isinstance(declared, str) else None
+        )
+        if canonical is not None:
+            # The one-line edit, spelled as the TOML basic string it is
+            # written as, so it can be applied to the file as printed.
+            line += (
+                f" In {ws_file}, change path = {json.dumps(declared)} to "
+                f"path = {json.dumps(canonical)}."
             )
+        found.append(line)
+    if len(found) == 1:
+        raise WorkspaceError(found[0])
+    if found:
+        raise WorkspaceError(
+            f"{ws_file} declares member paths that are not canonical; fix "
+            f"every one of them:\n" + "\n".join(f"  {line}" for line in found)
+        )
 
 
 def _validate_member_paths(data, projects):

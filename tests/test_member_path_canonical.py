@@ -162,3 +162,30 @@ def test_monorepo_absorb_refuses_a_non_canonical_destination(tmp_path):
             tag_format=None, delete_with_rm=False,
         )
     assert "Write it as 'vendor/widget'" in str(exc.value)
+
+
+def test_every_non_canonical_path_is_refused_at_once_naming_the_file(tmp_path):
+    """A workspace written with trailing slashes is fixed in one pass, not one
+    load per member: the refusal names the file and every line to change."""
+    import re
+
+    body = "".join(
+        f'[[projects]]\npath = "{p}/"\nname = "{p}"\nreleasable = false\n\n'
+        for p in ("python", "go", "typescript")
+    )
+    write_raw(tmp_path, workspace_toml(body))
+    with pytest.raises(WorkspaceError) as exc:
+        load_workspace(str(tmp_path))
+    message = str(exc.value)
+    assert f"{WORKSPACE_DIR}/{WORKSPACE_FILE}" in message
+    edits = re.findall(r"change (path = \"[^\"]*\") to (path = \"[^\"]*\")", message)
+    assert len(edits) == 3, message
+    # Apply the printed edits, line for line, and nothing else.
+    ws_file = tmp_path / WORKSPACE_DIR / WORKSPACE_FILE
+    text = ws_file.read_text()
+    for old, new in edits:
+        assert text.count(old) == 1
+        text = text.replace(old, new)
+    ws_file.write_text(text)
+    paths = sorted(p["path"] for p in load_workspace(str(tmp_path)))
+    assert paths == [".", "go", "python", "typescript"]
