@@ -2387,12 +2387,24 @@ def _apply_source(dep, item, run):
     Every write the remaining workspace can refuse -- the transition record,
     the dependency floors, workspace.toml, the CI router sync, and the
     snapshot -- happens before anything is deleted, and the deletions come
-    last before the commit. The source's tree was clean when the extract
-    started (:func:`resolve_departure` refuses otherwise), so every change it
-    reports is this step's own: a failure anywhere before the commit puts each
+    last before the commit. The source's tree is clean when this step starts
+    (it refuses otherwise, below), so every change it reports is this step's
+    own: a failure anywhere before the commit puts each
     of those paths back as the last commit holds it, and the error names what
     failed.
+
+    That check runs under the lock the filter step took: building the extracted repository takes time, and an edit another
+    session made meanwhile is neither this step's to commit nor its to undo.
     """
+    dirty = _dirty_paths(dep.workspace_root)
+    if dirty:
+        raise ExtractError(
+            f"the source working tree changed while the extracted repository "
+            f"was built ({', '.join(dirty)}); nothing was written in the "
+            f"source. The extracted repository at {dep.target_path} is "
+            f"complete, but the extract did not finish. Commit or set aside "
+            f"those changes, delete {dep.target_path}, and re-run this extract."
+        )
     try:
         _write_source_edit(dep)
         _delete_departed(dep)

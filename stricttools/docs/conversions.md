@@ -97,7 +97,7 @@ Every refusal below is raised during observation, so it costs nothing and fires 
 | absorb | The source declares targets spanning **both tag schemes** | A releasable has exactly one tag format, and picking whichever target was detected first would tag the unit under a scheme nobody chose. State it with `--tag-format`. |
 | absorb | The source's version cannot be determined | A releasable's version file is state the release flow bumps from, so it is never invented. Set the version in the source's manifest, or tag its current release. |
 | absorb | A **tag name or a version collides** with the destination's | See [Collisions](#collisions). |
-| both | The working tree is dirty, a release is in flight, or `saferm` is absent without `--delete-with-rm` | A history rewrite captures only committed state, so uncommitted work would be silently dropped. The tree is re-checked under rlsbl's advisory lock immediately before the first write. |
+| both | The working tree is dirty, a release is in flight, or `saferm` is absent without `--delete-with-rm` | A history rewrite captures only committed state, so uncommitted work would be silently dropped. The tree is re-checked under rlsbl's advisory lock immediately before the first write, and an extract checks the source again before it edits it, after the extracted repository is built: a change made meanwhile is refused, never committed with the extract or undone by its rollback. |
 | extract | `git-filter-repo` is missing | Only for an **unmirrored** releasable, which is the only one whose history is filtered. A [promotion](#two-engines-filter-or-promote-the-mirror) filters nothing, so it never asks for the tool. |
 
 ## What rlsbl deliberately does not do
