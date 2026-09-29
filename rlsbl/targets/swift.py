@@ -6,6 +6,7 @@ import re
 from .base import PACKAGE_RENAME_UNSUPPORTED
 from .base import BaseTarget, TemplateVars
 from .. import effects
+from .utils import missing_version_file
 
 VERSION_FILE = "VERSION"
 
@@ -46,8 +47,8 @@ class SwiftTarget(BaseTarget):
         """Read version from the VERSION file."""
         version_path = os.path.join(dir_path, VERSION_FILE)
         if not os.path.exists(version_path):
-            raise FileNotFoundError(
-                f"No {VERSION_FILE} file found. Run 'rlsbl scaffold' first."
+            raise missing_version_file(
+                dir_path, f"{VERSION_FILE} file", create=VERSION_FILE,
             )
         with open(version_path, "r", encoding="utf-8") as f:
             return f.read().strip()

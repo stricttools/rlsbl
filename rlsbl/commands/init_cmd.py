@@ -114,6 +114,14 @@ def refuse_unreachable_hooks_dir():
     )
 
 
+#: What scaffold prints at a workspace root, which it does not scaffold.
+WORKSPACE_ROOT_SKIP = (
+    "Skipping: `rlsbl scaffold` does not scaffold the workspace root. The "
+    "root member's CI comes from `rlsbl monorepo sync`, and its other files "
+    "are written by hand."
+)
+
+
 def _is_workspace_root(project_root):
     """Check if project_root is a monorepo workspace root.
 
@@ -1899,7 +1907,7 @@ def run_cmd(registry, args, flags, ctx):
 
     # Workspace roots are not packages -- skip all per-package scaffold
     if _is_workspace_root(project_root):
-        print("Skipping scaffold at workspace root (use rlsbl monorepo sync instead)")
+        print(WORKSPACE_ROOT_SKIP)
         return
 
     reg = TARGETS[registry]
@@ -3040,7 +3048,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
 
     # Workspace roots are not packages -- skip all per-package scaffold
     if _is_workspace_root(project_root):
-        print("Skipping scaffold at workspace root (use rlsbl monorepo sync instead)")
+        print(WORKSPACE_ROOT_SKIP)
         return
 
     primary = registries_list[0]

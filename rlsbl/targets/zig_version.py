@@ -4,6 +4,7 @@ import os
 import re
 import sys
 from .. import effects
+from .utils import missing_version_file
 
 VERSION_FILE = "VERSION"
 ZON_FILE = "build.zig.zon"
@@ -40,9 +41,9 @@ def read_zig_version(dir_path):
     if version is not None:
         return version
 
-    raise FileNotFoundError(
-        f"No {VERSION_FILE} or {ZON_FILE} with .version field found. "
-        "Run 'rlsbl scaffold' first."
+    raise missing_version_file(
+        dir_path, f"{VERSION_FILE} or {ZON_FILE} with .version field",
+        create=VERSION_FILE,
     )
 
 

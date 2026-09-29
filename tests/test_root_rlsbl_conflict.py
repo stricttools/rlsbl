@@ -115,7 +115,7 @@ class TestScaffoldWorkspaceRootGuard:
         run_cmd("npm", {}, {}, ctx)
 
         captured = capsys.readouterr()
-        assert "Skipping scaffold at workspace root" in captured.out
+        assert "does not scaffold the workspace root" in captured.out
         # .rlsbl/ should NOT be created
         assert not (mock_git_repo / ".rlsbl").exists()
 
@@ -138,6 +138,6 @@ class TestScaffoldWorkspaceRootGuard:
         run_cmd_multi(["npm", "pypi"], {}, {}, ctx)
 
         captured = capsys.readouterr()
-        assert "Skipping scaffold at workspace root" in captured.out
+        assert "does not scaffold the workspace root" in captured.out
         # .rlsbl/ should NOT be created
         assert not (mock_git_repo / ".rlsbl").exists()
