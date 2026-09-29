@@ -69,6 +69,7 @@ class _State:
     hook_generated = ()
     pre_existing_dirty = None
     flags: dict = {}
+    resuming = False
 
 
 def _workspace(root, *, lock_target="../python", pinned="0.40.0",

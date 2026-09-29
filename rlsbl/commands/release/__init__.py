@@ -127,15 +127,18 @@ from .release_state import (
 
 
 def _abort_on_untidy_go_modules(target_paths, *, member_package_paths,
-                                monorepo_root, releasable_cfg_dir):
+                                monorepo_root, releasable_cfg_dir, rerun):
     """Refuse, before anything mutates, a Go module the release's tidy changes.
 
     The owed syncs are the ones the mutating phase plans
     (:func:`~.execute.release_lock_targets` and
     :func:`~.execute._target_lockfile_syncs`), so the guard judges the
-    modules that phase tidies.
+    modules that phase tidies. Asking which syncs are owed also refuses a
+    lockfile whose tool is missing; *rerun* is how the release continues once
+    that tool is installed.
     """
     from .execute import (
+        LockfileToolMissingError,
         UntidyGoModuleError,
         _target_lockfile_syncs,
         refuse_go_work_sync_changes,
@@ -148,7 +151,10 @@ def _abort_on_untidy_go_modules(target_paths, *, member_package_paths,
         target_paths, member_package_paths=member_package_paths,
         monorepo_root=monorepo_root, releasable_cfg_dir=releasable_cfg_dir,
     ):
-        owed.extend(_target_lockfile_syncs(paths, lambda _msg: None))
+        try:
+            owed.extend(_target_lockfile_syncs(paths, lambda _msg: None))
+        except LockfileToolMissingError as exc:
+            raise ReleaseValidationError(exc.message(rerun)) from exc
     try:
         refuse_untidy_go_modules(owed)
         refuse_go_work_sync_changes(owed)
@@ -494,6 +500,7 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
         target_paths,
         member_package_paths=member_package_paths if releasable_name else None,
         monorepo_root=monorepo_root, releasable_cfg_dir=_rel_cfg_dir,
+        rerun="run `rlsbl release resume`",
     )
 
     # Resolve changes_dir
@@ -959,6 +966,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         target_paths,
         member_package_paths=member_package_paths if releasable_name else None,
         monorepo_root=monorepo_root, releasable_cfg_dir=_rel_cfg_dir,
+        rerun="re-run `rlsbl release run`",
     )
 
     # Resolve the canonical (target, pipeline) pairs for the release flow.
