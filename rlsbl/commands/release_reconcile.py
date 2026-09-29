@@ -170,10 +170,22 @@ def push_ref_with_lease(refname, expected_sha, target_sha, *, timeout, git=None)
             out = git("git", ["ls-remote", "origin", refname], timeout=120)
             current = out.split()[0] if out.split() else ""
         except Exception:
-            current = ""
+            current = None  # origin could not be read
         if target_sha and current == target_sha:
             print(f"{refname} already up to date on origin.")
             return
+        detail = (getattr(push_exc, "stderr", None) or "").strip() or str(push_exc)
+        if current is not None and current == (expected_sha or ""):
+            # The lease held: nobody moved the ref, origin refused the push.
+            print(
+                f"Error: origin refused the push of {refname}: {detail}\n"
+                f"origin still holds {expected_sha or '<absent>'}, the value "
+                f"the lease expects, so nothing moved it. Fix what refused "
+                f"the push, then re-run this same command: it resumes from "
+                f"the push.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
         print(
             f"Error: failed to push {refname}: {push_exc}\n"
             f"  expected remote value: {expected_sha or '<absent>'}\n"
