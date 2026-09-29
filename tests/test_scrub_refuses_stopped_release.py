@@ -94,3 +94,60 @@ def test_a_workspace_names_the_member_to_run_the_fix_from(tmp_path):
 
     ctx = ProjectContext(project_root=tmp_path / "pkg", workspace_root=tmp_path, config={})
     assert _in_flight_releases(ctx) == [(str(tmp_path / "pkg"), state)]
+
+
+def test_a_release_that_stops_while_the_scrub_waits_for_the_lock_is_refused(
+    safegit_bin, tmp_path, monkeypatch, capsys,
+):
+    """A release still running when the scrub starts holds the lock and has
+    no state file yet. The scrub waits for the lock; when the release stops
+    and lets go, its state file is there, and the scrub refuses before it
+    removes the release checkout or rewrites anything."""
+    import fcntl
+    import threading
+
+    from rlsbl.commands.release.release_state import get_state_path
+
+    monkeypatch.setenv(
+        "PATH", str(safegit_bin.parent) + os.pathsep + os.environ.get("PATH", ""),
+    )
+    repo = build(tmp_path, files="0.29.4")
+    commit_file(repo, "config.env", f"token={SECRET}\n", "add config")
+    commit_file(repo, ".gitignore", ".rlsbl/releases/scrub-result.json\n"
+                ".rlsbl/releases/in-progress.json\n.rlsbl/lock\n",
+                "ignore run state")
+    generate_changelog(str(repo))
+    git(repo, "add", "CHANGELOG.md")
+    git(repo, "commit", "-q", "-m", "generate changelog")
+    head = git(repo, "rev-parse", "HEAD")
+    checkout = release_checkout.prepare_checkout(str(repo), head)
+    monkeypatch.chdir(repo)
+
+    # The running release: holds the lock, then stops, leaving its state.
+    lock_path = repo / ".rlsbl" / "lock"
+    lock_path.parent.mkdir(exist_ok=True)
+    holder = open(lock_path, "w")
+    fcntl.flock(holder, fcntl.LOCK_EX)
+    state = get_state_path(str(repo))
+
+    def stop_release():
+        import time
+        time.sleep(1.0)
+        os.makedirs(os.path.dirname(state), exist_ok=True)
+        with open(state, "w") as f:
+            json.dump({"new_version": "0.29.5", "completed_steps": []}, f)
+        fcntl.flock(holder, fcntl.LOCK_UN)
+        holder.close()
+
+    releaser = threading.Thread(target=stop_release)
+    releaser.start()
+    try:
+        with pytest.raises(SystemExit) as exc:
+            _scrub(repo)
+    finally:
+        releaser.join()
+    assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert "stopped mid-flight" in err and state in err
+    assert os.path.isdir(checkout), "the release checkout was removed"
+    assert git(repo, "rev-parse", "HEAD") == head
