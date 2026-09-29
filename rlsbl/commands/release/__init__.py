@@ -524,9 +524,11 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
     # -- regenerated from those very entries a few lines below -- says nothing
     # about. The refusal names one remedy, and it runs as written.
     if _adopted:
+        from ...context import resolve_release_scope
         require_adopted_commits_covered(
-            _adopted, changes_dir=changes_dir, version=new_version,
-            cwd=project_dir,
+            _adopted, changes_dir=changes_dir,
+            scope=resolve_release_scope(project_dir)[3],
+            version=new_version, cwd=project_dir,
         )
 
     # Adopting past the CI gate breaks the seal. The recorded verdict belongs
