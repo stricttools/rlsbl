@@ -999,6 +999,80 @@ class TestApplyMultiMember:
 
 
 @skip_no_filter_repo
+class TestSourceStepFailure:
+    """A failure in the source step leaves the source as its last commit holds
+    it, and the fix the error names -- fix what failed, delete the extracted
+    repository, re-run -- completes the extract."""
+
+    def _fail_in(self, monkeypatch, module, name):
+        def boom(*_a, **_k):
+            raise RuntimeError(f"{name} failed on purpose")
+        monkeypatch.setattr(module, name, boom)
+
+    def _assert_source_intact(self, ns, head):
+        assert gitout(ns.root, "rev-parse", "HEAD") == head
+        assert gitout(ns.root, "status", "--porcelain") == ""
+        assert (ns.root / "pkgA" / "main.py").exists()
+        assert (ns.root / "pkgB" / "main.py").exists()
+        assert os.path.isdir(get_releasable_dir(str(ns.root), "core"))
+        assert "core" in [r.name for r in load_releasables(
+            str(ns.root), load_workspace(str(ns.root)))]
+
+    def _rerun_after_the_fix(self, ns, target, monkeypatch, module, name, real):
+        monkeypatch.setattr(module, name, real)
+        shutil.rmtree(target)
+        cmd_extract(str(ns.root), "core", str(target))
+        assert not (ns.root / "pkgA").exists()
+        assert {p.name for p in load_workspace(str(ns.root))} == {"root", "pkgC"}
+        assert gitout(ns.root, "status", "--porcelain") == ""
+        assert gitout(ns.root, "log", "-1", "--format=%s") == (
+            "monorepo: extract releasable core"
+        )
+
+    def test_a_failed_sync_leaves_the_source_intact(self, tmp_path, monkeypatch):
+        from rlsbl.commands.monorepo import sync
+
+        ns = make_source(tmp_path)
+        target = tmp_path / "core_out"
+        head = gitout(ns.root, "rev-parse", "HEAD")
+        real = sync._cmd_sync
+        self._fail_in(monkeypatch, sync, "_cmd_sync")
+
+        with pytest.raises(ExtractError) as exc:
+            cmd_extract(str(ns.root), "core", str(target))
+        message = str(exc.value)
+        assert "_cmd_sync failed on purpose" in message
+        assert f"delete {target}" in message
+        self._assert_source_intact(ns, head)
+
+        self._rerun_after_the_fix(ns, target, monkeypatch, sync, "_cmd_sync", real)
+
+    def test_a_failed_commit_after_the_deletions_restores_them(
+        self, tmp_path, monkeypatch,
+    ):
+        from rlsbl.commands.monorepo import extract_cmd
+
+        ns = make_source(tmp_path)
+        target = tmp_path / "core_out"
+        head = gitout(ns.root, "rev-parse", "HEAD")
+        real = extract_cmd.commit_files
+
+        def commit_fails_in_the_source(message, paths, *, cwd):
+            if os.path.realpath(cwd) == os.path.realpath(ns.root):
+                raise RuntimeError("commit_files failed on purpose")
+            return real(message, paths, cwd=cwd)
+
+        monkeypatch.setattr(extract_cmd, "commit_files", commit_fails_in_the_source)
+
+        with pytest.raises(ExtractError):
+            cmd_extract(str(ns.root), "core", str(target))
+        self._assert_source_intact(ns, head)
+
+        self._rerun_after_the_fix(
+            ns, target, monkeypatch, extract_cmd, "commit_files", real,
+        )
+
+
 class TestApplySingleMember:
     def test_destination_is_a_flat_repository_that_identifies_itself(
         self, tmp_path,

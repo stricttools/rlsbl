@@ -2382,7 +2382,57 @@ def _apply_transition_record(dep, item, run):
 
 
 def _apply_source(dep, item, run):
-    """Remove the departed members from the source and commit the whole edit."""
+    """Remove the departed members from the source and commit the whole edit.
+
+    Every write the remaining workspace can refuse -- the transition record,
+    the dependency floors, workspace.toml, the CI router sync, and the
+    snapshot -- happens before anything is deleted, and the deletions come
+    last before the commit. The source's tree was clean when the extract
+    started (:func:`resolve_departure` refuses otherwise), so every change it
+    reports is this step's own: a failure anywhere before the commit puts each
+    of those paths back as the last commit holds it, and the error names what
+    failed.
+    """
+    try:
+        _write_source_edit(dep)
+        _delete_departed(dep)
+        commit_files(
+            f"monorepo: extract releasable {dep.releasable.name}",
+            _dirty_paths(dep.workspace_root),
+            cwd=dep.workspace_root,
+        )
+    except Exception as exc:
+        _restore_source(dep)
+        raise ExtractError(
+            f"the source step failed: {exc}\n"
+            f"The source repository at {dep.workspace_root} is restored to its "
+            f"last commit: the departing members, the releasable, and its state "
+            f"are all still there, and nothing was committed. The extracted "
+            f"repository at {dep.target_path} is complete, but the extract did "
+            f"not finish. Fix what failed, delete {dep.target_path}, and re-run "
+            f"this extract."
+        ) from exc
+    leftover = _dirty_paths(dep.workspace_root)
+    if leftover:
+        raise ExtractError(
+            f"the source repository still has uncommitted changes after the "
+            f"extract commit: {', '.join(leftover)}. The extracted repository "
+            f"at {dep.target_path} is complete; commit or revert the leftovers "
+            f"in the source by hand."
+        )
+    print(
+        f"  source: removed {', '.join(dep.member_names)} and releasable "
+        f"'{dep.releasable.name}'; {SNAPSHOT_FILE} regenerated."
+    )
+
+
+def _write_source_edit(dep):
+    """The source's file edits for the departure, with nothing deleted yet.
+
+    Neither the sync nor the snapshot reads a directory the workspace no
+    longer lists, so both see the remaining workspace while the departing
+    members' directories are still on disk.
+    """
     transition_record_path = _source_transition_record_path(dep)
     append_events(transition_record_path, [DepartedGlobsEvent(
         globs=list(dep.departed_globs),
@@ -2395,6 +2445,25 @@ def _apply_source(dep, item, run):
 
     _declare_dep_floors(dep)
 
+    remaining = [p for p in dep.projects if p.name not in set(dep.member_names)]
+    remaining_releasables = [
+        r for r in dep.releasables if r.name != dep.releasable.name
+    ]
+    save_workspace(dep.workspace_root, remaining, releasables=remaining_releasables)
+
+    from .sync import _cmd_sync
+
+    _cmd_sync({"auto-commit": False}, project_root=dep.workspace_root)
+
+    projects = load_workspace(dep.workspace_root)
+    graph = WorkspaceGraph(dep.workspace_root, projects)
+    write_snapshot(
+        dep.workspace_root, generate_snapshot(dep.workspace_root, projects, graph),
+    )
+
+
+def _delete_departed(dep):
+    """Delete the departed members' directories and the releasable's state."""
     for member in dep.members:
         _delete_path(
             os.path.join(dep.workspace_root, member.path),
@@ -2413,39 +2482,42 @@ def _apply_source(dep, item, run):
         delete_with_rm=dep.delete_with_rm,
     )
 
-    remaining = [p for p in dep.projects if p.name not in set(dep.member_names)]
-    remaining_releasables = [
-        r for r in dep.releasables if r.name != dep.releasable.name
-    ]
-    save_workspace(dep.workspace_root, remaining, releasables=remaining_releasables)
 
-    from .sync import _cmd_sync
+def _restore_source(dep):
+    """Put every path the failed source step changed back as HEAD holds it.
 
-    _cmd_sync({"auto-commit": False}, project_root=dep.workspace_root)
-
-    projects = load_workspace(dep.workspace_root)
-    graph = WorkspaceGraph(dep.workspace_root, projects)
-    write_snapshot(
-        dep.workspace_root, generate_snapshot(dep.workspace_root, projects, graph),
-    )
-
-    commit_files(
-        f"monorepo: extract releasable {dep.releasable.name}",
-        _dirty_paths(dep.workspace_root),
-        cwd=dep.workspace_root,
-    )
-    leftover = _dirty_paths(dep.workspace_root)
-    if leftover:
-        raise ExtractError(
-            f"the source repository still has uncommitted changes after the "
-            f"extract commit: {', '.join(leftover)}. The extracted repository "
-            f"at {dep.target_path} is complete; commit or revert the leftovers "
-            f"in the source by hand."
+    A path HEAD tracks is restored in the index and the working tree; a path
+    HEAD does not track was created by the step and is deleted.
+    """
+    root = dep.workspace_root
+    changed = _dirty_paths(root)
+    if not changed:
+        return
+    listed = effects.run(
+        ["git", "ls-tree", "-r", "-z", "--name-only", "HEAD", "--", *changed],
+        cwd=root, capture_output=True, text=True, check=True,
+    ).stdout
+    in_head = {p for p in listed.split("\0") if p}
+    tracked = [p for p in changed if p.rstrip("/") in in_head
+               or any(h.startswith(p.rstrip("/") + "/") for h in in_head)]
+    if tracked:
+        effects.run(
+            ["git", "restore", "--source=HEAD", "--staged", "--worktree",
+             "--", *tracked],
+            cwd=root, capture_output=True, text=True, check=True,
+            env={**os.environ, "GIT_LITERAL_PATHSPECS": "1"},
         )
-    print(
-        f"  source: removed {', '.join(dep.member_names)} and releasable "
-        f"'{dep.releasable.name}'; {SNAPSHOT_FILE} regenerated."
-    )
+    for path in changed:
+        if path in tracked:
+            continue
+        _delete_path(
+            os.path.join(root, path),
+            description=(
+                "Written by an extract whose source step failed (rlsbl "
+                "monorepo extract)"
+            ),
+            delete_with_rm=dep.delete_with_rm,
+        )
 
 
 def _floor_config_paths(dep):
