@@ -381,26 +381,19 @@ def _resolve_all_changelog_contexts(ctx):
 
 
 def _sibling_exclude_dirs(root, project_path, all_projects):
-    """Compute sibling project directories to exclude from a scan.
+    """The absolute directories of the members nested inside *project_path*.
 
-    For a project at ``project_path``, returns a list of other
-    workspace project directories that are subdirectories of this
-    project's path.  This prevents walk_source_files from descending
-    into sibling projects when the current project is at a parent
-    path (e.g. ``path = "."``).
+    The walk over one member's sources leaves these out: their files belong to
+    the nested members (:func:`rlsbl.ownership.nested_member_paths`, the one
+    authority; for the root member, that is every other member).
     """
-    project_abs = os.path.realpath(os.path.join(root, project_path))
-    exclude = []
-    for other in all_projects:
-        other_path = other["path"]
-        if other_path == project_path:
-            continue
-        other_abs = os.path.realpath(os.path.join(root, other_path))
-        # Only exclude if the other project is strictly inside this
-        # project's directory tree.
-        if other_abs.startswith(project_abs + os.sep):
-            exclude.append(other_abs)
-    return exclude
+    from ..ownership import nested_member_paths
+
+    real_root = os.path.realpath(root)
+    return [
+        os.path.join(real_root, *path.split("/"))
+        for path in nested_member_paths({"path": project_path}, all_projects)
+    ]
 
 
 def _build_dep_import_cache(ctx):

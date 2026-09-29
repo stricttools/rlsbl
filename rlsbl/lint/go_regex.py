@@ -121,7 +121,10 @@ class GoRegexLinter:
         """Run forbidden-import, stdout, and entry-point checks on Go files via regex."""
         results = []
 
-        for filepath in walk_source_files(project_path, (".go",), config.exclude_patterns):
+        for filepath in walk_source_files(
+            project_path, (".go",), config.exclude_patterns,
+            exclude_dirs=config.exclude_dirs,
+        ):
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     source = f.read()

@@ -321,6 +321,27 @@ def member_for_directory(dirpath, members, *, include_root):
     return _most_specific_claim(normalized, candidates)
 
 
+def nested_member_paths(member, members) -> list:
+    """The declared paths of the members lying inside *member*'s territory, sorted.
+
+    A member's own files are the ones under its path that no more specific
+    member claims, so these are exactly the directories a walk over *member*'s
+    own files must leave out. For the root member that is every other member.
+    Computed from the declared paths alone -- no filesystem, no git -- so every
+    walker asks the same question and gets the same answer.
+    """
+    prefix = member_prefix(member)
+    own = member_path(member)
+    nested = []
+    for other in members:
+        path = member_path(other)
+        if not path or path == own:
+            continue
+        if path.startswith(prefix):
+            nested.append(path)
+    return sorted(nested)
+
+
 def _most_specific_claim(normalized, members):
     """The most specific member path claiming *normalized*; root is the residual."""
     best = None

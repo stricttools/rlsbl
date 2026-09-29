@@ -422,7 +422,10 @@ class PythonAstLinter:
 
         # Source file checks
         parser = _make_parser()
-        for filepath in walk_source_files(project_path, (".py",), config.exclude_patterns):
+        for filepath in walk_source_files(
+            project_path, (".py",), config.exclude_patterns,
+            exclude_dirs=config.exclude_dirs,
+        ):
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     source = f.read()

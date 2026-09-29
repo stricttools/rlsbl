@@ -69,6 +69,9 @@ def lint_library(
     Returns a list of LintResult namedtuples.
     """
     project_path = os.path.abspath(project_path)
+    from ..workspace import nested_member_dirs
+
+    nested = nested_member_dirs(project_path)
     parser_type = load_parser_setting(project_path)
     languages = _detect_languages(project_path)
 
@@ -91,6 +94,9 @@ def lint_library(
         defaults = list(get_language(language).default_excludes)
         merged = list(dict.fromkeys(defaults + config.exclude_patterns))
         config.exclude_patterns = merged
+        # A nested workspace member's files are that member's: they are linted
+        # when it is, never as part of the member enclosing it.
+        config.exclude_dirs = list(nested)
         # _create_linter raises for an unknown language; a detected language
         # always has one, so there is no branch here that can silently lint
         # nothing.

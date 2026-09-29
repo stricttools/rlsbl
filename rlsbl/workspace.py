@@ -985,6 +985,32 @@ def save_workspace(root, projects, releasables=None):
     effects.atomic_write_text(target, tomlkit.dumps(doc))
 
 
+def nested_member_dirs(directory) -> list:
+    """Absolute directories of the workspace members nested inside *directory*.
+
+    The directories a walk over *directory*'s own files leaves out: every
+    declared member whose path lies strictly inside it (for the repository root,
+    every member but the root member). Outside any workspace there are none.
+    The member list is read from the enclosing workspace, and a workspace that
+    fails to load is an error here as everywhere: a walk cannot know which
+    files are its own without it.
+    """
+    from .ownership import nested_member_paths
+
+    root = find_workspace_root(directory)
+    if root is None:
+        return []
+    projects = load_workspace(root)
+    rel = os.path.relpath(os.path.realpath(directory), os.path.realpath(root))
+    rel = rel.replace(os.sep, "/")
+    if rel == ".":
+        rel = ROOT_MEMBER_PATH
+    return [
+        os.path.join(os.path.realpath(root), *path.split("/"))
+        for path in nested_member_paths({"path": rel}, projects)
+    ]
+
+
 def resolve_project(root, cwd="."):
     """Determine which project cwd is inside, returning a WorkspaceProject or None.
 

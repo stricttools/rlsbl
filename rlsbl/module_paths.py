@@ -49,6 +49,23 @@ def under_module_prefix(path: str, prefix: str, *, sep: str) -> bool:
     return path == prefix or path.startswith(prefix + sep)
 
 
+def owning_module(path: str, modules, *, sep: str):
+    """The module in *modules* that *path* belongs to, or ``None``.
+
+    The longest containing module path wins: with modules ``M/draw`` and
+    ``M/draw/cmd``, the import ``M/draw/cmd/sub`` belongs to ``M/draw/cmd``
+    alone. Nested modules are how one repository holds several, and the
+    enclosing module's path is a prefix of every nested one's, so first-match
+    containment attributes a nested module's imports to its parent.
+    """
+    best = None
+    for module in modules:
+        if under_module_prefix(path, module, sep=sep):
+            if best is None or len(module) > len(best):
+                best = module
+    return best
+
+
 def go_import_under_module(import_path: str, module_path: str) -> bool:
     """True when a Go *import_path* belongs to the module at *module_path*."""
     return under_module_prefix(import_path, module_path, sep=GO_SEP)
