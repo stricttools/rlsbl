@@ -159,3 +159,4 @@
 {"format_version":1,"id":"18d9debacf70a46506f904f3f0bb4a55b61bc3850ff86651","commits":["5499da8e6e19ce3c948b1e73c0e31d766258b1df"],"user_facing":true,"description":"**rlsbl's own source distribution no longer ships its planning notes, release metadata, and agent instructions.** The sdist carried `todo/`, `.rlsbl/`, `stricttools/`, `CLAUDE.md`, and other private paths; they are now excluded, and rlsbl's CI refuses the upload on the release commit if one returns.","type":"fix"}
 {"format_version":1,"id":"18d9dee3e0a101b2efdc8cb5080e42bb9eedc4cb11889d5b","commits":["5440b48d8f3b0823b5801a9f7c2c1e47723282b2"],"user_facing":false}
 {"format_version":1,"id":"18d9df19062fd38f9f3b36952db44e49badaaa2d471676ef","commits":["ab68bb45f6440473970195a93ce344945390b072"],"user_facing":false}
+{"format_version":1,"id":"18d9df31fd568196c880bc93678b4b9ea09f4a06cecf6fea","commits":["b97e0f0cfafd40986fc1d8dde80793d197134770"],"user_facing":false}
