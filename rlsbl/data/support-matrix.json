@@ -819,6 +819,12 @@
         "npm"
       ]
     },
+    "npm-token-synced": {
+      "kind": "targets",
+      "targets": [
+        "npm"
+      ]
+    },
     "old-repo-archived": {
       "kind": "universal",
       "targets": [
@@ -1923,6 +1929,20 @@
         ],
         [
           "npm-private-mismatch",
+          "no",
+          "no",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "npm-token-synced",
           "no",
           "no",
           "yes",

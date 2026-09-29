@@ -528,6 +528,15 @@ requires = []
 description = "A package.json with private: true does not contradict publish_mode ci."
 
 [[option]]
+name = "npm-token-synced"
+subject = "release"
+values = "error > warn > off"
+default = "error"
+scope = "none"
+requires = []
+description = "The npm token in ~/.npmrc is accepted by npm, and the repository's NPM_TOKEN secret was set no earlier than that token was created (requires network)."
+
+[[option]]
 name = "observe-allowlist-breadth"
 subject = "code"
 values = "warn > off"

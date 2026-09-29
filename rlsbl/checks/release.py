@@ -1,6 +1,6 @@
 """Release checks (tag: release): the refs and the Releases hanging off them, the branch, the CI credentials, what a private repository must not publish, and the follow-ups a recorded conversion still owes the outside world.
 
-Checks: unpublished-refs, branch-sync, ci-publish-secrets,
+Checks: unpublished-refs, branch-sync, ci-publish-secrets, npm-token-synced,
 private-repo-publishing, old-repo-archived, go-deprecation-published.
 
 Every check in this module reads something OUTSIDE the working tree -- the
@@ -419,6 +419,31 @@ def register_networked_release_checks(app):
         for problem in verdict.problems:
             reporter.error(problem)
         return reporter.found(f"{len(verdict.problems)} missing CI secret(s)")
+
+    @app.error_check("npm-token-synced")
+    def check_npm_token_synced(ctx, reporter):
+        """The npm token is live, and the repository's NPM_TOKEN carries it.
+
+        npm must accept the token in ``~/.npmrc``, and the repository's
+        ``NPM_TOKEN`` secret must have been set no earlier than that token was
+        created (its creation time from ``npm token list --json``); otherwise
+        CI publishes with an older token and fails after the release has
+        tagged. A time that cannot be determined is an error, never a pass.
+        See :mod:`rlsbl.npm_token`.
+        """
+        from ..npm_token import evaluate_npm_token_sync
+        from ..utils import get_github_repo
+
+        verdict = evaluate_npm_token_sync(
+            ctx.config, get_github_repo(ctx.config),
+        )
+        if verdict.skip_reason is not None:
+            return reporter.skipped(verdict.skip_reason)
+        if verdict.ok:
+            return reporter.passed("; ".join(verdict.notes))
+        for problem in verdict.problems:
+            reporter.error(problem)
+        return reporter.found(f"{len(verdict.problems)} npm token finding(s)")
 
     @app.error_check("private-repo-publishing")
     def check_private_repo_publishing(ctx, reporter):

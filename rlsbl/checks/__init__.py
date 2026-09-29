@@ -117,6 +117,9 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # and hex (HEX_API_KEY). A pypi pipeline publishes through OIDC trusted
     # publishing and declares none, so the check can find nothing there.
     "ci-publish-secrets": frozenset({"npm", "maven", "hex"}),
+    # npm-token-synced compares the npm token in ~/.npmrc with the NPM_TOKEN
+    # secret an npm CI publish authenticates with.
+    "npm-token-synced": frozenset({"npm"}),
     # private-repo-publishing names the publishing that needs a public
     # repository: npm build provenance, PyPI attestations, and the Go module
     # proxy.
