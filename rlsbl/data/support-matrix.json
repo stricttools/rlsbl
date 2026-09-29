@@ -641,6 +641,18 @@
         "go"
       ]
     },
+    "go-workspace-replace": {
+      "kind": "targets",
+      "targets": [
+        "go"
+      ]
+    },
+    "go-workspace-require-current": {
+      "kind": "targets",
+      "targets": [
+        "go"
+      ]
+    },
     "layers-violations": {
       "kind": "workspace",
       "targets": []
@@ -1717,6 +1729,32 @@
         ],
         [
           "go-toolchain-declared",
+          "no",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "go-workspace-replace",
+          "no",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "go-workspace-require-current",
           "no",
           "yes",
           "no",

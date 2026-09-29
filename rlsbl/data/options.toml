@@ -357,6 +357,24 @@ requires = []
 description = "Every Go module's go.mod carries a toolchain line."
 
 [[option]]
+name = "go-workspace-replace"
+subject = "project"
+values = "error > warn > off"
+default = "error"
+scope = "none"
+requires = []
+description = "No releasable Go member replaces a module with a directory in the workspace."
+
+[[option]]
+name = "go-workspace-require-current"
+subject = "project"
+values = "error > warn > off"
+default = "error"
+scope = "none"
+requires = []
+description = "No Go member requires a sibling workspace module below that module's latest release."
+
+[[option]]
 name = "layers-violations"
 subject = "code"
 values = "error > warn > off"
