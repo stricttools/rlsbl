@@ -10,7 +10,7 @@
     "source_docstring": "4fff13535641ef3e9f7c8663fb4854a94edccb3e370b2f4d2721a69393f06594"
   },
   "en/checks.md": {
-    "content": "f876a2cc57698526e091f79700dc17d623914f8b318d60791ffb21808b7029ea",
+    "content": "d06a46bb4c0702992836128399f972449734199bae824bac997b55a615a04046",
     "description": "41d8cae1088027cfba7f0b0ba883bf276d8019f0e4a10a90fe7f2e7b5445aea8"
   },
   "en/ci-customization.md": {
@@ -300,19 +300,16 @@
   "en/rlsbl-checks-go_tags.md": {
     "content": "702acfe18e2005f52d5ab49835b1026b024eb7b6bdbebf59ae9dea2497db9573",
     "description": "2fe5aaf6ca7270e4ef72df6dffcff153d1557306620cfadf50c0777b3fdccce7",
-    "seed_hash": "104ca6d54a2f234ef335a7bd1dd384171650fa894fe3f83e6494c607ccd21c96",
     "source_docstring": "b9187ca8f7b9f8ac8fe026c1a10e8ac8ce17ba71fe27e3bea34a2b5a6d2171a0"
   },
   "en/rlsbl-checks-go_workspace.md": {
     "content": "8ef5049a477b02a5f2827398286adce592d163dd4602847d432d05e7b1a5ad00",
     "description": "0dd084236e3b2496b64fc194b75ced2406e305be977ca3788f503fd3a9b5b0ca",
-    "seed_hash": "151ffe4c3fe082a82c1b842922cb6a5a59cb16074b26cc349cad71f810583927",
     "source_docstring": "611a8aa0b9e0e4b2a9e9ac6a37d5c26b34a6c8571b03778e94233db0eb15fa49"
   },
   "en/rlsbl-checks-nested.md": {
     "content": "7f7ec7fe803e2a868fb7add8338ca7d327e033f122d678c24b4e349fffcd80e0",
     "description": "fb5509782773e679f0d8dd3489f9ff2de17b4b46f17a36ce98fb73559b7214c8",
-    "seed_hash": "de22abeca378a60e74b2eeee42dd9302b8294a024226d3d8c12429015e507afc",
     "source_docstring": "f33149aebaf091db920809252c70b2761aa1dfa5b3b24e83b5ef69f68ed9c56c"
   },
   "en/rlsbl-checks-prepush.md": {
@@ -752,7 +749,6 @@
   "en/rlsbl-go_mod.md": {
     "content": "025ba060e2d68c8f4ed153becb2f76fc3e75e9ba561f8cfc1c7fcaa5dbdfc863",
     "description": "b561114429c109937cc60fab44fa0c129212a4b03b4f4e855c83bbe662624c9c",
-    "seed_hash": "5547f0ab1e8d16f2deb867c5841c4c88f2bec9457077d1b9c59188906d199ae5",
     "source_docstring": "22183f426fad452a6d833f94cfd1a7ee9766efbeb79bd251533e86a33d8124a5"
   },
   "en/rlsbl-go_package_name.md": {
@@ -898,7 +894,6 @@
   "en/rlsbl-nested_exclusions.md": {
     "content": "4dad2c98537c7fca878a64f8a347ed2db67f1066fa96acebbbd6a4dee8496e60",
     "description": "fcb7a20e7dbe74dc9baeacb156f3eb75cff0d329045fc22d9540f917b13b6d75",
-    "seed_hash": "b2957b9b84d0df3dcf02f186d3433a0ee2045164345ca20af713a123d9dd5e66",
     "source_docstring": "be483d60d1a0397d5be632e2b2b1498dc159422f82d4a95fc3d81a67a1735e8c"
   },
   "en/rlsbl-node_matrix.md": {
