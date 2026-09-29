@@ -75,6 +75,10 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # go-module-identity compares a go.mod module path against the repository's
     # own origin identity, which only Go has.
     "go-module-identity": frozenset({"go"}),
+    # path-tag-format-go-member compares a releasable's path-style tag_format
+    # with its Go members' paths; go-module-major-suffix reads go.mod.
+    "path-tag-format-go-member": frozenset({"go"}),
+    "go-module-major-suffix": frozenset({"go"}),
     # go-toolchain-declared asks whether go.mod carries a `toolchain` line,
     # which is Go's.
     "go-toolchain-declared": frozenset({"go"}),
@@ -476,6 +480,7 @@ def register_checks(app):
     from .quality import register_quality_checks
     from .prepush import register_prepush_checks
     from .strictspec_gate import register_strictspec_gate_checks
+    from .go_tags import register_go_tag_checks
 
     register_project_checks(app)
     register_release_checks(app)
@@ -484,3 +489,4 @@ def register_checks(app):
     register_quality_checks(app)
     register_prepush_checks(app)
     register_strictspec_gate_checks(app)
+    register_go_tag_checks(app)
