@@ -9706,6 +9706,11 @@
         },
         {
           "level": 3,
+          "text": "`_is_companion_tag`",
+          "anchor": "_is_companion_tag"
+        },
+        {
+          "level": 3,
           "text": "`update_github_releases`",
           "anchor": "update_github_releases"
         },
@@ -9927,6 +9932,11 @@
           "level": 3,
           "text": "`_save_step`",
           "anchor": "_save_step"
+        },
+        {
+          "level": 3,
+          "text": "`_is_scrub_commit_on`",
+          "anchor": "_is_scrub_commit_on"
         },
         {
           "level": 3,
@@ -23589,7 +23599,7 @@
       ]
     }
   ],
-  "last_gen": "2026-09-29T03:58:13.448502+00:00",
+  "last_gen": "2026-09-29T04:10:12.751967+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
