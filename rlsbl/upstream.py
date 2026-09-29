@@ -496,10 +496,18 @@ def render(plan: AdoptPlan, out) -> None:
 def apply(plan: AdoptPlan, *, push_timeout=120) -> None:
     """Perform *plan*'s moves. Call only on a plan :func:`refusal` accepts.
 
+    Every push carries one ref. GitHub fires no events for a push deleting
+    four or more tags, so one push carrying every creation and deletion
+    would silently skip every workflow and webhook the deletions should
+    start.
+
     Order is what makes a crash re-runnable: the kept refs are written here
-    first; then ONE atomic push creates them on origin and deletes origin's
-    inherited ``refs/tags`` (each guarded by a lease on the object observed);
-    only then are the local tags deleted, each guarded by its object too.
+    first; then, tag by tag, its kept ref is pushed to origin, its
+    ``refs/tags`` entry is deleted from origin, and it is deleted here -- the
+    two pushes each guarded by a lease on the object observed, the local
+    deletion by its object too. A tag is never deleted anywhere before its
+    kept ref is on origin, and a run that stops part-way leaves every earlier
+    tag finished, which the next run's observation sees.
     """
     up = plan.upstream
     root = plan.repo_root
@@ -510,22 +518,23 @@ def apply(plan: AdoptPlan, *, push_timeout=120) -> None:
                           root)
             _require_ok(result, f"write {up.kept_ref(t.tag)}")
 
-    leases, refspecs = [], []
     for t in work:
         if t.push_kept:
-            leases.append(f"--force-with-lease={up.kept_ref(t.tag)}:")
-            refspecs.append(f"{up.kept_ref(t.tag)}:{up.kept_ref(t.tag)}")
+            kept = up.kept_ref(t.tag)
+            result = _git(
+                ["push", "--no-verify", REMOTE,
+                 f"--force-with-lease={kept}:", f"{kept}:{kept}"],
+                root, timeout=push_timeout,
+            )
+            _require_ok(result, f"push {kept} to {REMOTE}")
         if t.delete_origin:
-            leases.append(f"--force-with-lease={_TAGS}{t.tag}:{t.origin}")
-            refspecs.append(f":{_TAGS}{t.tag}")
-    if refspecs:
-        result = _git(
-            ["push", "--atomic", "--no-verify", REMOTE, *leases, *refspecs],
-            root, timeout=push_timeout,
-        )
-        _require_ok(result, f"push to {REMOTE}")
-
-    for t in work:
+            result = _git(
+                ["push", "--no-verify", REMOTE,
+                 f"--force-with-lease={_TAGS}{t.tag}:{t.origin}",
+                 f":{_TAGS}{t.tag}"],
+                root, timeout=push_timeout,
+            )
+            _require_ok(result, f"delete {_TAGS}{t.tag} on {REMOTE}")
         if t.delete_local:
             result = _git(["update-ref", "-d", f"{_TAGS}{t.tag}", t.local], root)
             _require_ok(result, f"delete refs/tags/{t.tag}")

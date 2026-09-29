@@ -209,8 +209,11 @@ A fork's inherited tags are upstream's releases, not its own, and they must leav
 A tag is inherited when upstream (`https://<host>/<owner>/<repo>`, read with `git ls-remote`, never a package registry) has a tag of the same name at the same object. `rlsbl upstream adopt-tags` moves each one, keeping its object (an annotated tag keeps its tag object):
 
 1. writes `refs/tags-of/<host>/<owner>/<repo>/<tag>` here;
-2. in one atomic push to `origin`, creates that ref there and deletes `refs/tags/<tag>`, each guarded by a lease on the object it observed;
-3. deletes `refs/tags/<tag>` here, guarded by its object too.
+2. pushes that ref to `origin`, guarded by a lease on its absence there;
+3. deletes `refs/tags/<tag>` from `origin` in a push of its own, guarded by a lease on the object it observed;
+4. deletes `refs/tags/<tag>` here, guarded by its object too.
+
+The kept refs are all written here first, then each tag takes the remaining steps before the next one starts. Every push carries one ref: GitHub fires no events for a push deleting four or more tags, so one push carrying every deletion would start none of the workflows and webhooks they should. A push that fails stops the run with every earlier tag finished and no tag deleted anywhere before its kept ref is on `origin`.
 
 Tags upstream does not have are left alone. A tag carrying an inherited tag's name at a different object -- here, on `origin`, or against a kept ref -- refuses the whole run, named, before anything is written: rlsbl does not guess which object the name should carry. An inherited tag that exists only on `origin`, with its object missing here, is refused naming the `git fetch origin tag <tag>` that brings it. The command is consequential, `--dry-run` prints the plan and writes nothing, and a re-run finishes an interrupted run or has nothing to do.
 

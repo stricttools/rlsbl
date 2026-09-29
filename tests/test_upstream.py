@@ -266,6 +266,115 @@ class TestAdoptTags:
         }
 
 
+# The origin's pre-receive hook runs once per push and reads that push's ref
+# updates on stdin, one "<old> <new> <ref>" line each. It appends one JSON
+# line per push to the log, and refuses the push when the refuse file names a
+# ref the push updates -- standing in for a push that fails part-way through.
+_PUSH_LOG_HOOK = """\
+#!/usr/bin/env python3
+import json, os, sys
+lines = [l.split() for l in sys.stdin.read().splitlines() if l.strip()]
+refs = [[old, new, ref] for old, new, ref in lines]
+with open({log!r}, "a") as f:
+    f.write(json.dumps(refs) + "\\n")
+refuse = {refuse!r}
+if os.path.exists(refuse):
+    names = open(refuse).read().split()
+    if any(ref in names for _, _, ref in refs):
+        sys.stderr.write("refused by the test's origin\\n")
+        sys.exit(1)
+"""
+
+_ZERO = "0" * 40
+
+
+def _log_pushes(fork, tmp_path):
+    """Install the push-logging hook on origin; return (log, refuse) paths."""
+    log, refuse = tmp_path / "pushes.jsonl", tmp_path / "refuse"
+    hook = _origin(fork) / "hooks" / "pre-receive"
+    hook.write_text(_PUSH_LOG_HOOK.format(log=str(log), refuse=str(refuse)))
+    hook.chmod(0o755)
+    return log, refuse
+
+
+def _pushes(log):
+    if not log.exists():
+        return []
+    return [json.loads(line) for line in log.read_text().splitlines()]
+
+
+def _add_upstream_tags(fork, count):
+    """Give upstream more tags and bring them into the fork and its origin."""
+    upstream = fork.parent / "upstream"
+    names = []
+    for i in range(count):
+        commit_file(upstream, f"extra{i}.txt", f"{i}\n", f"upstream: extra {i}")
+        name = f"v0.4.{i}"
+        git(upstream, "tag", name)
+        names.append(name)
+    git(fork, "fetch", "-q", "--tags", UPSTREAM_URL)
+    git(fork, "push", "-q", "origin", *[f"refs/tags/{n}" for n in names])
+    return names
+
+
+class TestAdoptTagsOneTagPerPush:
+    """GitHub fires no events for a push deleting four or more tags, so every
+    push the adoption makes carries one ref: each kept ref is pushed alone,
+    then its tag deleted from origin alone."""
+
+    def test_every_push_carries_one_ref(self, fork, tmp_path):
+        extra = _add_upstream_tags(fork, 3)
+        log, _ = _log_pushes(fork, tmp_path)
+        inherited = ["v0.1.0", "v0.2.0", "v0.3.0", *extra]
+
+        result = _adopt("--approve-consequential")
+        assert result.exit_code == 0, result.stderr
+
+        pushes = _pushes(log)
+        assert all(len(p) == 1 for p in pushes), pushes
+        created = [p[0][2] for p in pushes if p[0][0] == _ZERO]
+        deleted = [p[0][2] for p in pushes if p[0][1] == _ZERO]
+        assert sorted(created) == sorted(KEPT + t for t in inherited)
+        assert sorted(deleted) == sorted(f"refs/tags/{t}" for t in inherited)
+        assert len(pushes) == 2 * len(inherited)
+        # A tag is deleted from origin only after its kept ref is there.
+        order = [p[0][2] for p in pushes]
+        for t in inherited:
+            assert order.index(KEPT + t) < order.index(f"refs/tags/{t}")
+        assert set(_refs(_origin(fork), "refs/tags/")) == {"refs/tags/nightly"}
+
+    def test_a_failed_push_stops_the_run_and_a_re_run_finishes_it(
+        self, fork, tmp_path,
+    ):
+        log, refuse = _log_pushes(fork, tmp_path)
+        refuse.write_text("refs/tags/v0.2.0\n")
+
+        result = _adopt("--approve-consequential")
+        assert result.exit_code == 1, result.stdout
+        assert "re-run `rlsbl upstream adopt-tags` to finish" in result.stderr
+        # The tag before the failure moved completely; the failing one kept
+        # its tag on origin and here, with its kept ref already pushed; the
+        # one after it was not pushed at all.
+        origin_tags = set(_refs(_origin(fork), "refs/tags/"))
+        assert "refs/tags/v0.1.0" not in origin_tags
+        assert "refs/tags/v0.2.0" in origin_tags
+        assert "refs/tags/v0.3.0" in origin_tags
+        assert KEPT + "v0.2.0" in _refs(_origin(fork), KEPT)
+        assert KEPT + "v0.3.0" not in _refs(_origin(fork), KEPT)
+        assert "refs/tags/v0.2.0" in _refs(fork, "refs/tags/")
+
+        refuse.unlink()
+        pushes_before = len(_pushes(log))
+        result = _adopt("--approve-consequential")
+        assert result.exit_code == 0, result.stderr
+        assert set(_refs(_origin(fork), "refs/tags/")) == {"refs/tags/nightly"}
+        assert set(_refs(fork, "refs/tags/")) == {"refs/tags/nightly"}
+        assert set(_refs(_origin(fork), KEPT)) == {
+            KEPT + t for t in ("v0.1.0", "v0.2.0", "v0.3.0")
+        }
+        assert all(len(p) == 1 for p in _pushes(log)[pushes_before:])
+
+
 # ---------------------------------------------------------------------------
 # Changelog coverage in a fork
 # ---------------------------------------------------------------------------
