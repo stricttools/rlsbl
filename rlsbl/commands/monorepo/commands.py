@@ -439,6 +439,15 @@ def _cmd_add(args, flags, project_root, dry_run=False):
     if registry_name:
         project["registry_name"] = registry_name
 
+    # The sync this add runs refuses a root publisher that names no check
+    # regex; refuse before anything is written, with the same fix.
+    from .publish_inline import root_publisher_check_regex_problem
+
+    problem = root_publisher_check_regex_problem(root)
+    if problem is not None:
+        print(f"Error: {problem}", file=sys.stderr)
+        sys.exit(1)
+
     # Honest plan boundary: validation above has fully run. In dry-run we report
     # exactly what would happen and make ZERO mutations -- no workspace write, no
     # scaffold, no sync. Anything below this point mutates state.

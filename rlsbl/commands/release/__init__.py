@@ -904,6 +904,17 @@ def _run_cmd_inner(release_config, flags, *, ctx):
         validate_pipeline_config(config)
         _provenance_scan_configs.append(config)
 
+    # A releasable owning the workspace root: its root publisher must name the
+    # CI check runs publishing waits for, or the next `monorepo sync` refuses
+    # it after this release shipped. Refused here, before any mutation.
+    if member_package_paths is not None and monorepo_root:
+        from ...ownership import ROOT_MEMBER_PATH
+        if ROOT_MEMBER_PATH in member_package_paths:
+            from ..monorepo.publish_inline import root_publisher_check_regex_problem
+            _root_problem = root_publisher_check_regex_problem(str(monorepo_root))
+            if _root_problem is not None:
+                raise ReleaseValidationError(_root_problem)
+
     project_dir = str(project_root)
 
     # Scaffold conflict guard

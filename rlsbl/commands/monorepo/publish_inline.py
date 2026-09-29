@@ -381,6 +381,32 @@ def _require_root_publish_gate_regex(project: dict, root: str) -> str:
     return regex
 
 
+def root_publisher_check_regex_problem(root: str) -> str | None:
+    """Why the workspace's root publisher cannot publish yet, or None.
+
+    A root member that publishes (see ``_root_is_publisher``) must declare
+    ``publish_gate_check_regex`` before anything relies on it: the next
+    ``monorepo sync`` refuses the root publisher without it. Asking here lets
+    ``monorepo add`` and the root releasable's release refuse up front, with
+    the same message naming the file and key, instead of the sync that
+    follows them.
+    """
+    from ...ownership import ROOT_MEMBER_PATH
+    from ...workspace import load_workspace
+    from .sync import _root_is_publisher
+
+    root_project = next(
+        (p for p in load_workspace(root) if p["path"] == ROOT_MEMBER_PATH), None,
+    )
+    if root_project is None or not _root_is_publisher(root_project, root):
+        return None
+    try:
+        _require_root_publish_gate_regex(root_project, root)
+    except ConfigError as exc:
+        return str(exc)
+    return None
+
+
 def _render_root_publisher_jobs(
     project: dict, root: str, tag_prefix: str
 ) -> dict:

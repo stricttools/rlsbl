@@ -158,8 +158,12 @@ def _setup_releasable_workspace(root, member_path="packages/core",
     with open(os.path.join(changes_dir, "unreleased.jsonl"), "w") as f:
         f.write("")
     rel_dir = get_releasable_dir(str(root), releasable_name)
+    rel_config = {}
+    if member_path == ".":
+        # A publishing root member names the CI check runs publishing waits for.
+        rel_config["publish_gate_check_regex"] = "^test$"
     with open(os.path.join(rel_dir, "config.json"), "w") as f:
-        f.write("{}\n")
+        f.write(json.dumps(rel_config) + "\n")
     # Canonical CHANGELOG.md at the releasable level
     with open(os.path.join(rel_dir, "CHANGELOG.md"), "w") as f:
         f.write(
