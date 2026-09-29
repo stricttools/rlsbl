@@ -61,11 +61,34 @@ def require_tool(name, purpose=None, fatal=True):
 
 
 
+def is_git_repository_root(directory) -> bool:
+    """Is *directory* the root of a git work tree?
+
+    Answered the way git's own discovery answers it, on disk and with no git
+    call (the walks that ask run before anything else, on every command): a
+    ``.git`` directory holding ``HEAD``, or a ``.git`` file naming its git
+    directory (``gitdir: ...``, as a linked worktree or a submodule has). A
+    ``.git`` entry that is neither is not a repository, and git walks past it.
+    """
+    marker = os.path.join(directory, ".git")
+    if os.path.isdir(marker):
+        return os.path.isfile(os.path.join(marker, "HEAD"))
+    if os.path.isfile(marker):
+        try:
+            with open(marker, encoding="utf-8") as f:
+                return f.readline().startswith("gitdir:")
+        except (OSError, UnicodeDecodeError):
+            return False
+    return False
+
+
 def find_project_root(start=None):
     """Walk up from start (default: cwd) to find .rlsbl/ or .rlsbl-monorepo/.
 
     Returns the directory path containing the marker, or None if not found.
-    Prefers the nearest ancestor with either marker.
+    Prefers the nearest ancestor with either marker. The walk stops at the
+    enclosing git repository's root: a repository nested inside another is its
+    own world, and the outer repository's project is never its project.
     """
     current = os.path.realpath(start or ".")
     while True:
@@ -73,6 +96,8 @@ def find_project_root(start=None):
             return current
         if os.path.isdir(os.path.join(current, ".rlsbl-monorepo")):
             return current
+        if is_git_repository_root(current):
+            return None
         parent = os.path.dirname(current)
         if parent == current:
             return None
