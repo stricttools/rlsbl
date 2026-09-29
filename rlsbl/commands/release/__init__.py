@@ -813,7 +813,7 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     # Target validation is deferred until after releasable context is resolved
     # so that member_dirs can be passed for releasable target union.
     validate_ota_mode(release_config, project_root, config)
-    validate_config_integrity(config)
+    validate_config_integrity(config, project_dir=str(project_root))
 
     # Pipeline config validation is deferred until after releasable context
     # is resolved, so per-member pipeline validation can run in releasable

@@ -60,8 +60,17 @@ class TestMonorepoCommands:
         result = rlsbl.app.test([
             "monorepo", "init",
             "--root-releasable", "", "--tag-format", "v{version}",
+            "--publish-mode", "none",
         ])
         _assert_refused(result, "root-releasable")
+
+    def test_init_refuses_an_empty_publish_gate_check_regex(self, mock_git_repo):
+        result = rlsbl.app.test([
+            "monorepo", "init",
+            "--root-releasable", "core", "--tag-format", "v{version}",
+            "--publish-mode", "ci", "--publish-gate-check-regex", "",
+        ])
+        _assert_refused(result, "publish-gate-check-regex")
 
     def test_graph_refuses_an_empty_root(self, mock_git_repo):
         rlsbl.app.test(["monorepo", "init", "--root-dev-node"])

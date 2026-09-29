@@ -209,26 +209,64 @@ def old_private_key_message():
     )
 
 
-def get_publish_mode(config):
+PROJECT_CONFIG_LABEL = ".rlsbl/config.json"
+
+
+def is_workspace_root_dir(project_dir):
+    """True when *project_dir* is a monorepo workspace root.
+
+    The root member of a workspace has no ``.rlsbl/`` of its own (the
+    ``root-rlsbl-conflict`` check refuses one beside ``.rlsbl-monorepo/``), so
+    its config lives in its releasable's directory instead.
+    """
+    from .workspace import WORKSPACE_DIR, WORKSPACE_FILE
+
+    return os.path.isfile(
+        os.path.join(str(project_dir), WORKSPACE_DIR, WORKSPACE_FILE)
+    )
+
+
+def config_file_label(project_dir=None):
+    """The config file a project declares its own keys in, relative to it.
+
+    ``.rlsbl/config.json`` for a standalone project or a workspace member
+    below the root. For a workspace's root member it is its releasable's
+    ``.rlsbl-monorepo/releasables/<name>/config.json``, because a root
+    ``.rlsbl/`` is refused beside ``.rlsbl-monorepo/``. A root member that belongs to no
+    releasable (a dev node) is never released, and keeps the default label.
+    """
+    if project_dir is None or not is_workspace_root_dir(project_dir):
+        return PROJECT_CONFIG_LABEL
+    from .context import resolve_releasable_config_dir
+
+    root = str(project_dir)
+    rel_dir = resolve_releasable_config_dir(root, root)
+    if rel_dir is None:
+        return PROJECT_CONFIG_LABEL
+    return os.path.join(os.path.relpath(rel_dir, root), "config.json")
+
+
+def get_publish_mode(config, where=PROJECT_CONFIG_LABEL):
     """Return the ``publish_mode`` enum value (one of :data:`PUBLISH_MODES`).
 
     Single source of truth for reading the publish mode. Raises
     :class:`ConfigError` when the deprecated ``private`` key is present, when
     ``publish_mode`` is absent (it is required, no default), or when its value
-    is not one of the valid modes.
+    is not one of the valid modes. *where* is the config file the error tells
+    the operator to edit (see :func:`config_file_label`).
     """
     if "private" in config:
         raise ConfigError(old_private_key_message())
     if "publish_mode" not in config:
         raise ConfigError(
-            'missing required "publish_mode" key in .rlsbl/config.json — set '
+            f'missing required "publish_mode" key in {where} — set '
             '"publish_mode": "ci" to publish via CI, or "publish_mode": "none" '
             'to suppress publishing.'
         )
     mode = config["publish_mode"]
     if mode not in PUBLISH_MODES:
         raise ConfigError(
-            f'invalid "publish_mode" value {mode!r} in .rlsbl/config.json — '
+            f'invalid "publish_mode" value {mode!r} in {where} — '
             f'must be one of {sorted(PUBLISH_MODES)}.'
         )
     return mode
@@ -335,7 +373,7 @@ def validate_config_schema(config, *, project_dir=None):
         ConfigError on any violation.
     """
     # 1. Require publish_mode (and ban the deprecated private key)
-    get_publish_mode(config)
+    get_publish_mode(config, where=config_file_label(project_dir))
 
     # 2. Ban targets: []
     targets = config.get("targets")

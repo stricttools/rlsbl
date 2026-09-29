@@ -193,17 +193,27 @@ def validate_ota_mode(release_config, project_root, config):
             )
 
 
-def validate_config_integrity(config):
+def validate_config_integrity(config, project_dir=None):
     """Validate ``publish_mode`` and that suppressed repos have no local pipelines.
+
+    *project_dir* names the project the config belongs to, so the error points
+    at the file its keys live in: a workspace's root member has no
+    ``.rlsbl/config.json`` and is not scaffolded, so its fix is an edit of its
+    releasable's ``config.json``.
 
     Raises ReleaseValidationError on failure.
     """
-    from ...config import get_publish_mode, ConfigError
+    from ...config import (
+        PROJECT_CONFIG_LABEL, ConfigError, config_file_label, get_publish_mode,
+    )
 
+    where = config_file_label(project_dir)
     try:
-        mode = get_publish_mode(config)
+        mode = get_publish_mode(config, where=where)
     except ConfigError as e:
-        raise ReleaseValidationError(f"{e}\nQuick fix: rlsbl scaffold")
+        if where == PROJECT_CONFIG_LABEL:
+            raise ReleaseValidationError(f"{e}\nQuick fix: rlsbl scaffold")
+        raise ReleaseValidationError(str(e))
 
     if mode == "none":
         pipelines_cfg = config.get("pipelines", {})

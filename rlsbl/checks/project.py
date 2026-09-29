@@ -1106,9 +1106,11 @@ def register_project_checks(app):
         if skip_reason is not None:
             return reporter.skipped(skip_reason)
 
-        from ..config import get_publish_mode
+        from ..config import config_file_label, get_publish_mode
         try:
-            mode = get_publish_mode(ctx.config)
+            mode = get_publish_mode(
+                ctx.config, where=config_file_label(ctx.project_root),
+            )
         except ConfigError as e:
             text = exception_text(e)
             reporter.error(text)
@@ -1158,9 +1160,11 @@ def register_project_checks(app):
             return reporter.skipped("cannot read package.json")
 
         npm_private = pkg.get("private", False)
-        from ..config import get_publish_mode
+        from ..config import config_file_label, get_publish_mode
         try:
-            mode = get_publish_mode(ctx.config)
+            mode = get_publish_mode(
+                ctx.config, where=config_file_label(ctx.project_root),
+            )
         except ConfigError as e:
             text = exception_text(e)
             reporter.error(text)

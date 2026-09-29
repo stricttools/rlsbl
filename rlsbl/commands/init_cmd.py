@@ -1842,26 +1842,36 @@ def _ensure_pipeline_config(registries, ctx):
                 )
                 sys.exit(1)
             seen_types[target_name] = True
-            entry = {
-                "type": target_name,
-                "local": False,
-                # The target link is mandatory (validate_pipeline_target_links)
-                # and is what publish-template resolution matches on -- a
-                # generated entry without it fails rlsbl's own config-schema
-                # check AND silently falls back to the target-name default
-                # template, ignoring pipeline config such as Go's `artifact`.
-                # The caller registers the targets before calling this, so the
-                # reference always resolves.
-                "target": target_name,
-            }
-            if target_name == "go":
-                entry["artifact"] = _detect_go_artifact_kind(
-                    _target_dir(target_name, ctx)
-                )
-            pipelines[target_name] = entry
+            pipelines[target_name] = default_pipeline_entry(
+                target_name, lambda: _target_dir(target_name, ctx),
+            )
 
     if pipelines:
         ctx.config = write_project_config("pipelines", pipelines, ctx.project_root)
+
+
+def default_pipeline_entry(target_name, target_dir):
+    """The pipeline entry scaffold generates for *target_name*.
+
+    *target_dir* is a callable returning the target's own directory; it is
+    asked only for a Go target, whose ``artifact`` kind is detected from the
+    package layout there.
+    """
+    entry = {
+        "type": target_name,
+        "local": False,
+        # The target link is mandatory (validate_pipeline_target_links)
+        # and is what publish-template resolution matches on -- a
+        # generated entry without it fails rlsbl's own config-schema
+        # check AND silently falls back to the target-name default
+        # template, ignoring pipeline config such as Go's `artifact`.
+        # The caller registers the targets before calling this, so the
+        # reference always resolves.
+        "target": target_name,
+    }
+    if target_name == "go":
+        entry["artifact"] = _detect_go_artifact_kind(target_dir())
+    return entry
 
 
 def _trigger_monorepo_sync(auto_commit=True):
