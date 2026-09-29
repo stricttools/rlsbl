@@ -82,6 +82,9 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # nested-member-runner-exclusion writes into the runners rlsbl can
     # configure: pytest (pypi) and deno.
     "nested-member-runner-exclusion": frozenset({"pypi", "deno"}),
+    # nested-member-upload-contents lists what npm and Go publish offline;
+    # a Python upload is checked in CI (the pypi CI template).
+    "nested-member-upload-contents": frozenset({"npm", "go"}),
     # go-toolchain-declared asks whether go.mod carries a `toolchain` line,
     # which is Go's.
     "go-toolchain-declared": frozenset({"go"}),

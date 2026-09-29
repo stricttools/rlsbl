@@ -784,6 +784,13 @@
         "pypi"
       ]
     },
+    "nested-member-upload-contents": {
+      "kind": "targets",
+      "targets": [
+        "go",
+        "npm"
+      ]
+    },
     "npm-private-mismatch": {
       "kind": "targets",
       "targets": [
@@ -1792,6 +1799,19 @@
           "no",
           "no",
           "yes",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "nested-member-upload-contents",
+          "no",
+          "yes",
+          "yes",
+          "no",
+          "no",
           "no",
           "no",
           "no",

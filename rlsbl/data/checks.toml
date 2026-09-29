@@ -1105,6 +1105,25 @@ needs_network = false
 depends_on = []
 scope = "workspace"
 
+# nested-member-upload-contents: a member's published upload carries only its
+# own files, never a nested member's. npm's tarball is listed by `npm pack
+# --dry-run --ignore-scripts --offline` (with a throwaway npm cache) and the Go
+# module zip is derived from the tracked files by Go's own rule; both offline.
+# A Python upload can only be listed by building it, which needs the network,
+# so the pypi CI template builds and checks it on the release commit instead.
+# Impure (starts npm). In "preflight" so a parent never publishes a nested
+# member's files.
+[checks.nested-member-upload-contents]
+description = "A member's npm package and Go module zip carry no nested member's files."
+subject = "project"
+tags = ["workspace", "preflight"]
+severity = "error"
+fast = false
+pure = false
+needs_network = false
+depends_on = []
+scope = "workspace"
+
 # go-toolchain-declared: setup-go installs the Go named by go.mod's `toolchain`
 # line and falls back to the `go` directive -- the consumers' floor -- without
 # one, so CI would test on an older Go than the project is developed with.

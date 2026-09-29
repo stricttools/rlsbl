@@ -476,6 +476,16 @@ class PypiTarget(BaseTarget):
         if _probe_pytest_location(dir_path) is not None:
             result["hasPytest"] = "true"
 
+        # Members nested inside this one: CI builds the upload and checks it
+        # carries none of their files (building needs the network, so this is
+        # CI's job, not a preflight check's).
+        from ..nested_exclusions import nested_paths_inside
+        from ..workspace import nested_member_dirs
+
+        nested = nested_paths_inside(dir_path, nested_member_dirs(dir_path))
+        if nested:
+            result["nestedMembers"] = " ".join(nested)
+
         return TemplateVars(self.name, result)
 
     def template_mappings(self, ctx):

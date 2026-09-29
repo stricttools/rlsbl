@@ -483,6 +483,15 @@ requires = []
 description = "Every member's test runner excludes the members nested inside it."
 
 [[option]]
+name = "nested-member-upload-contents"
+subject = "project"
+values = "error > warn > off"
+default = "error"
+scope = "none"
+requires = []
+description = "A member's npm package and Go module zip carry no nested member's files."
+
+[[option]]
 name = "npm-private-mismatch"
 subject = "project"
 values = "error > warn > off"

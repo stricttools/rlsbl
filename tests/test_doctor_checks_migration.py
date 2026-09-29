@@ -122,6 +122,8 @@ EXPECTED_CHECKS = [
     "go-module-major-suffix",
     # a member's test runner excludes the members nested inside it
     "nested-member-runner-exclusion",
+    # a member's npm package and Go module zip carry no nested member's files
+    "nested-member-upload-contents",
     # every -X linker flag names a symbol the Go source actually declares
     "ldflags-symbol",
     # the declared strictspec floor reaches every generated validator
