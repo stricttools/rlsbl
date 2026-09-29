@@ -1336,11 +1336,11 @@ def register_workspace_checks(app):
 
             # Which refs a released version owns is ``expected_refs``' answer,
             # never a second derivation here. This used to ask each member's
-            # target for ``companion_tags`` directly, which knows neither of
-            # the two rules the release flow applies: a primary tag that is
-            # already Go-compatible suppresses companions entirely, and a
-            # publish-suppressed member contributes none. The first one made
-            # this check demand a tag the release deliberately never creates.
+            # target for ``companion_tags`` directly, which knows none of the
+            # rules the release flow applies: a publish-suppressed member
+            # contributes none, a companion equal to the primary is the
+            # primary, and a released version owes only the members its
+            # release record lists.
             # The receiver is a BaseTarget because it contributes nothing to
             # the answer: the releasable's own tag_format names the primary,
             # each member's own target names its companions, and

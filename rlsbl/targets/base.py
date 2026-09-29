@@ -555,13 +555,20 @@ class BaseTarget:
         ``member_package_paths`` being None -- rather than empty -- means "no
         companions", exactly as the release flow's own guard did.
 
-        Two rules, both inherited from the collector this replaced:
+        The rules:
 
-        * A primary tag that is ALREADY Go-compatible (it contains ``/v``)
-          suppresses companions entirely, so a release already tagged that way
-          does not duplicate its own tag.
+        * Every member's ecosystem contributes its own tags, whatever the
+          primary's spelling: a releasable tagged ``gfx/v{version}`` whose
+          members are the Go modules ``gfx`` and ``gfx/shader`` owes
+          ``gfx/shader/v<version>`` as well. A companion equal to the primary
+          is the primary, and is not repeated.
         * A publish-suppressed member (``publish_mode: "none"``) contributes
           nothing -- there is no proxy to satisfy for something never published.
+        * A version the release record already archives owes the tags of the
+          members its record lists (the paths it recorded tree hashes for) and
+          no others, so a member added after that release is never owed a tag
+          at a commit that predates it. A version with no archive yet -- the
+          release being made -- owes every member's.
 
         A member whose config cannot be resolved is a HARD ERROR, matching the
         version-sync plan: the two must agree on the member set, and silently
@@ -569,15 +576,19 @@ class BaseTarget:
         """
         if context.member_package_paths is None:
             return ()
-        if "/v" in primary:
-            return ()
 
         from . import TARGETS
         from ..member_context import resolve_member_context
+        from .refs import recorded_release_paths
+
+        member_paths = context.member_package_paths
+        recorded = recorded_release_paths(context, version)
+        if recorded is not None:
+            member_paths = tuple(p for p in member_paths if p in recorded)
 
         seen: set[str] = set()
         found: list[str] = []
-        for pkg_path in context.member_package_paths:
+        for pkg_path in member_paths:
             abs_pkg = os.path.join(context.repo_root, pkg_path)
             if not os.path.isdir(abs_pkg):
                 continue

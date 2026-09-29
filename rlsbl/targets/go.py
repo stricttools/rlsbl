@@ -348,9 +348,9 @@ class GoTarget(BaseTarget):
         When ``path`` is set (monorepo member), the Go module proxy
         needs a tag of the form ``{path}/v{version}`` to resolve the
         module.  This tag is identical to the Go target's primary
-        ``monorepo_tag_format`` output, so it is only useful as a
-        *companion* when a different target (e.g. npm) is the primary
-        release target and produces a non-Go-compatible primary tag.
+        ``monorepo_tag_format`` output: for the member whose path the
+        releasable's primary tag names it IS the primary, and for every other
+        Go member of the releasable it is a companion the release also creates.
 
         The repository ROOT contributes none: a root module's proxy tag is
         ``v{version}`` itself, which is the primary the release already
