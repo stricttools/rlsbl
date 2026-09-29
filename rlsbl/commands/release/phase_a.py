@@ -350,6 +350,7 @@ def build_phase_a_plan(inp: BuildInputs) -> PhaseAPlan:
         _rel_to_git_root,
         _sync_member_package_versions_plan,
         _target_lockfile_syncs,
+        release_lock_targets,
     )
     state = inp.state
     log = inp.log
@@ -514,23 +515,14 @@ def build_phase_a_plan(inp: BuildInputs) -> PhaseAPlan:
                 files_to_commit.append(manifest_rel)
 
     # ---- Lockfile syncs ---------------------------------------------------
-    lock_targets = [dict(target_paths)]
-    if state.releasable_name and state.member_package_paths and inp.monorepo_root:
-        from ...member_context import resolve_member_context as _rmc_lock
-
-        for mp_path in state.member_package_paths:
-            mp_abs = os.path.join(str(inp.monorepo_root), mp_path)
-            if not os.path.isdir(mp_abs):
-                continue
-            member = _rmc_lock(
-                mp_abs, releasable_config_dir=inp.releasable_cfg_dir,
-            )
-            if member.publish_mode == "none":
-                continue
-            if member.target_paths:
-                lock_targets.append(dict(member.target_paths))
-    if inp.monorepo_root:
-        lock_targets.append({"workspace_root": str(inp.monorepo_root)})
+    lock_targets = release_lock_targets(
+        target_paths,
+        member_package_paths=(
+            state.member_package_paths if state.releasable_name else None
+        ),
+        monorepo_root=inp.monorepo_root,
+        releasable_cfg_dir=inp.releasable_cfg_dir,
+    )
 
     owed_syncs = []
     for paths in lock_targets:
