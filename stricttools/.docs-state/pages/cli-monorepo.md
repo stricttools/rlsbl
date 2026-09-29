@@ -32,7 +32,7 @@ Create a new monorepo workspace by generating the .rlsbl-monorepo directory and 
 
 ## monorepo add
 
-Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optional settings cover display name, target registry, inter-project dependencies, releasable membership, registry identity, and flags marking the project as a shared library or a dev-only leaf. A --releasable naming a group [[releasables]] does not declare yet creates it, as absorb creates one for an arriving member: a singleton entry whose tag_format is written out explicitly, derived from the member's primary target scheme unless --tag-format states it. The mirror destination is not among them: it is a releasable-level key, declared in workspace.toml beside the releasable it binds. What CI reacts to is not among them: the router's paths filters are derived from the workspace, never declared per project.
+Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optional settings cover display name, target registry, inter-project dependencies, releasable membership, registry identity, and flags marking the project as a shared library or a dev-only leaf. A --releasable naming a group [[releasables]] does not declare yet creates it, as absorb creates one for an arriving member: a singleton entry whose tag_format is written out explicitly, derived from the member's primary target scheme unless --tag-format states it. The mirror destination is not among them: it is a releasable-level key, declared in workspace.toml beside the releasable it binds. What CI reacts to is not among them: the router's paths filters are derived from the workspace, never declared per project. After writing the entry the command scaffolds the member (unless it already has a .rlsbl/config.json) and runs monorepo sync; if either fails, the command exits 1 with workspace.toml restored to what it was before, and the entry is committed only after both succeed.
 
 **Effect:** mutating
 
@@ -58,7 +58,7 @@ Register a project directory in the monorepo workspace.toml configuration. The p
 
 ## monorepo remove
 
-Unregister a project from the monorepo workspace.toml by its path. This removes the project entry from the workspace configuration file but does not delete any files, directories, or git history on disk. The project's code remains intact and can be re-added later with the add subcommand if needed.
+Unregister a project from the monorepo workspace.toml by its path. This removes the project entry from the workspace configuration file but does not delete any files, directories, or git history on disk. The project's code remains intact and can be re-added later with the add subcommand if needed. The path must be a member's path as workspace.toml writes it; any other path is refused, naming every member's path.
 
 **Effect:** mutating
 
