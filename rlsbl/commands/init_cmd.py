@@ -1504,8 +1504,24 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
     # template removed).  The first pass above handles bases for orphaned managed
     # files; this second pass catches bases that linger after the managed file
     # was removed outside the orphan loop (e.g., manually deleted or renamed).
+    #
+    # A releasable member's bases directory sits at its own path under the
+    # releasable's state directory, so a nested member of the same releasable
+    # keeps ITS bases inside this one (bases/gfx/shader inside bases/gfx).
+    # Those are the nested member's, never this project's orphans.
     if os.path.isdir(bases_dir):
-        for dirpath, _dirnames, filenames in os.walk(bases_dir):
+        from ..workspace import nested_member_dirs
+
+        cwd_real = os.path.realpath(os.getcwd())
+        nested_rel = {
+            os.path.relpath(d, cwd_real) for d in nested_member_dirs(cwd_real)
+        }
+        for dirpath, dirnames, filenames in os.walk(bases_dir):
+            rel_dir = os.path.relpath(dirpath, bases_dir)
+            dirnames[:] = [
+                d for d in dirnames
+                if os.path.normpath(os.path.join(rel_dir, d)) not in nested_rel
+            ]
             for fname in filenames:
                 base_abs = os.path.join(dirpath, fname)
                 managed_rel = os.path.relpath(base_abs, bases_dir)
