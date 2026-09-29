@@ -1237,16 +1237,9 @@ def register_workspace_checks(app):
     @app.warn_check("scaffold-gitignore-stale")
     def check_scaffold_gitignore_stale(ctx, reporter):
         """Workspace project .gitignore files must contain rlsbl-managed entries."""
-        from importlib.resources import files as pkg_files
+        from ..utils import rlsbl_gitignore_entries
 
-        template_text = (
-            pkg_files("rlsbl") / "templates" / "shared" / "gitignore.tpl"
-        ).read_text()
-        rlsbl_entries = [
-            line.strip()
-            for line in template_text.splitlines()
-            if ".rlsbl" in line and line.strip() and not line.strip().startswith("#")
-        ]
+        rlsbl_entries = rlsbl_gitignore_entries()
 
         if not rlsbl_entries:
             return reporter.passed("no rlsbl-specific gitignore entries in template")

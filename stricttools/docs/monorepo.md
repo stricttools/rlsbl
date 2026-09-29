@@ -469,6 +469,8 @@ After a promotion the mirror is no longer a derived artifact: nothing regenerate
 
 `rlsbl monorepo sync` folds every project's CI jobs into a single generated router at the repository root's shared `.github/workflows/` directory, performing template variable resolution along the way. This is required because GitHub Actions only reads workflows from the repository root, not from individual project subdirectories.
 
+The sync also adds rlsbl's run-state entries (its locks, in-progress release state, and scrub results) to the repository root's `.gitignore` when they are missing, keeping the lines already there, and commits the file with the routers: `rlsbl scaffold` writes them into each member's `.gitignore` but does not run at the workspace root.
+
 The sync process:
 
 1. For each project in the workspace, reads its scaffolded CI workflow

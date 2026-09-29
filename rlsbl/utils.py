@@ -1489,3 +1489,51 @@ def read_go_module_path(project_dir: str) -> str | None:
     except (OSError, UnicodeDecodeError):
         pass
     return None
+
+
+def rlsbl_gitignore_entries() -> list[str]:
+    """The rlsbl-owned lines of the scaffolded ``.gitignore`` template.
+
+    Every line of ``templates/shared/gitignore.tpl`` that names an rlsbl
+    directory: the run-state files (locks, in-progress release state, scrub
+    results) a project's git must never track. The ``scaffold-gitignore-stale``
+    check asks every workspace member's ``.gitignore`` for them, and
+    ``monorepo sync`` writes them into the workspace root's, which scaffold
+    does not touch.
+    """
+    from importlib.resources import files as pkg_files
+
+    template_text = (
+        pkg_files("rlsbl") / "templates" / "shared" / "gitignore.tpl"
+    ).read_text()
+    return [
+        line.strip()
+        for line in template_text.splitlines()
+        if ".rlsbl" in line and line.strip() and not line.strip().startswith("#")
+    ]
+
+
+def ensure_gitignore_entries(directory: str, entries: list[str]) -> str | None:
+    """Append the *entries* missing from ``<directory>/.gitignore``.
+
+    Additive: existing lines are kept as they are, in their order. Creates the
+    file when absent. Returns the file's path when it changed, else None.
+    """
+    from . import effects
+
+    path = os.path.join(directory, ".gitignore")
+    existing = ""
+    if os.path.isfile(path):
+        with open(path, encoding="utf-8") as f:
+            existing = f.read()
+    present = {line.strip() for line in existing.splitlines()}
+    missing = [e for e in entries if e not in present]
+    if not missing:
+        return None
+    text = existing
+    if text and not text.endswith("\n"):
+        text += "\n"
+    text += "\n".join(missing) + "\n"
+    effects.atomic_write_text(path, text, preserve_mode=True)
+    return path
+
