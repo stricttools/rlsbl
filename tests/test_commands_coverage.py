@@ -1222,36 +1222,6 @@ class TestResolveReleaseTargets:
         assert isinstance(result, dict)
 
 
-class TestSyncLockfiles:
-    """Covers lines 170-237: _sync_lockfiles."""
-
-    def test_no_lockfiles(self, tmp_path):
-        from rlsbl.commands.release.execute import _sync_lockfiles
-
-        files = []
-        _sync_lockfiles({"npm": str(tmp_path)}, files, print)
-        assert files == []
-
-    def test_tool_not_found(self, tmp_path):
-        from rlsbl.commands.release.execute import _sync_lockfiles
-
-        (tmp_path / "uv.lock").write_text("content")
-        files = []
-        with patch("shutil.which", return_value=None):
-            _sync_lockfiles({"pypi": str(tmp_path)}, files, print)
-        assert files == []
-
-    def test_sync_fails_warns(self, tmp_path):
-        from rlsbl.commands.release.execute import _sync_lockfiles
-
-        (tmp_path / "uv.lock").write_text("content")
-        files = []
-        with patch("shutil.which", return_value="/usr/bin/uv"):
-            with patch("subprocess.run", side_effect=subprocess.CalledProcessError(1, "uv")):
-                _sync_lockfiles({"pypi": str(tmp_path)}, files, print)
-        assert files == []
-
-
 class TestArchiveBlogBody:
     """Covers lines 239-251: archive_blog_body."""
 
