@@ -216,7 +216,9 @@ class TestObserveAndApply:
             "\n"
             f'import "{OLD}/internal/deep"\n'
         ))
-        _write(repo, "dist/go.mod", f"module {OLD}/dist\n")
+        # A module of its own under dist/ that requires the renamed one: its
+        # reference is swept (its own path, a nested module's, is not).
+        _write(repo, "dist/go.mod", f"module example.com/dist\n\nrequire {OLD} v0.1.0\n")
 
         preview = observe(repo, OLD, NEW)
         for rel in (

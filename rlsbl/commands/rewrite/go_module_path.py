@@ -1,11 +1,11 @@
 """Rename a Go module path across a repository.
 
-``rlsbl rewrite go-module-path --from-module <old> --to-module <new>`` moves a
-module and everything under it onto a new path:
+``rlsbl rewrite go-module-path --from-module <old> --to-module <new>`` moves
+ONE module onto a new path:
 
 * every ``go.mod`` in the repository has its module-path TOKENS rewritten --
   the ``module`` directive itself, and any ``require`` / ``replace`` /
-  ``exclude`` / ``retract`` reference to the old path from a nested module;
+  ``exclude`` / ``retract`` reference to the old path from another module;
 * every Go import site under the old path is rewritten, located by the
   tree-sitter import scanner (:func:`rlsbl.lint.go_ast.scan_imports`) and
   rewritten **line-scoped** -- only on the exact line the parser reported an
@@ -15,6 +15,14 @@ Containment is never a bare ``startswith``.  Both halves ask
 :mod:`rlsbl.module_paths`, so a neighbouring module whose path merely begins
 with the same letters (``github.com/o/foobar`` beside ``github.com/o/foo``) is
 left alone.
+
+**A nested module is another module.**  A path under the old one that a go.mod
+in the repository declares as its own module (``<old>/cmd`` with a go.mod of
+its own) is not renamed, and neither are its packages' imports: the longest
+declared module path owns every token and import
+(:func:`rlsbl.module_paths.owning_module`).  Its references to the renamed
+module ARE rewritten, like any other module's.  Renaming it is an invocation
+of its own.
 
 What is deliberately NOT rewritten
 ----------------------------------
@@ -61,7 +69,12 @@ from ... import effects
 from ...lint.go_ast import scan_imports
 from ...lint.tree_walk import SourceParseError
 from ...lint.utils import SourceWalkError, walk_source_files
-from ...module_paths import GO_SEP, go_import_under_module, rewrite_module_prefix
+from ...module_paths import (
+    GO_SEP,
+    go_import_under_module,
+    owning_module,
+    rewrite_module_prefix,
+)
 from ...preview_apply import Preview, Reconciler, VerdictItem, reconcile
 from .abort import already_written
 
@@ -117,6 +130,7 @@ class FileRewrite:
     kind: str          # "go.mod", "go source" or "strictcli schema dump"
     occurrences: int
     sites: tuple[str, ...]   # human-readable per-occurrence lines
+    nested: tuple[str, ...] = ()   # declared modules under the old path
 
 
 # ---------------------------------------------------------------------------
@@ -152,6 +166,23 @@ def _token_pattern(old):
     return re.compile(_TOKEN_BEFORE + re.escape(old) + _TOKEN_AFTER)
 
 
+def belongs_to(path, old, nested):
+    """Is module path or import *path* the module *old*'s own?
+
+    It is under *old* and no nested module (a longer declared module path)
+    owns it instead.
+    """
+    return owning_module(path, (old, *nested), sep=GO_SEP) == old
+
+
+def nested_modules(declared, old):
+    """The declared module paths strictly under *old*, sorted."""
+    return tuple(sorted(
+        m for m in set(declared.values())
+        if m != old and go_import_under_module(m, old)
+    ))
+
+
 def _excluded(path, root):
     """True when *path* sits under an excluded path component."""
     rel = os.path.relpath(path, str(root))
@@ -169,11 +200,12 @@ def find_go_mod_files(root):
     )
 
 
-def rewrite_go_mod_text(text, old, new):
+def rewrite_go_mod_text(text, old, new, nested=()):
     """Rewrite module-path tokens in ``go.mod`` *text*.
 
     Returns ``(new_text, occurrences, sites)``.  Only the code portion of each
     line is touched: anything after ``//`` is a comment and is left verbatim.
+    A token a *nested* module owns is left alone.
     """
     pattern = _token_pattern(old)
     out = []
@@ -186,7 +218,10 @@ def rewrite_go_mod_text(text, old, new):
         code = stripped if comment_at < 0 else stripped[:comment_at]
         comment = "" if comment_at < 0 else stripped[comment_at:]
 
-        hits = list(pattern.finditer(code))
+        hits = [
+            hit for hit in pattern.finditer(code)
+            if belongs_to(_token_at(code, hit.start()), old, nested)
+        ]
         if hits:
             occurrences += len(hits)
             for hit in hits:
@@ -195,7 +230,10 @@ def rewrite_go_mod_text(text, old, new):
                     f"line {lineno}: {token} -> "
                     f"{rewrite_module_prefix(token, old, new, sep=GO_SEP)}"
                 )
-            code = pattern.sub(lambda _m: new, code)
+            starts = {hit.start() for hit in hits}
+            code = pattern.sub(
+                lambda m: new if m.start() in starts else m.group(0), code,
+            )
         out.append(code + comment + eol)
     return "".join(out), occurrences, tuple(sites)
 
@@ -249,7 +287,7 @@ def find_schema_dumps(root):
     )
 
 
-def rewrite_schema_project_id(text, old, new):
+def rewrite_schema_project_id(text, old, new, nested=()):
     """Rewrite a strictcli schema dump's ``project_id``, line-scoped.
 
     Returns ``(new_text, occurrences, sites)`` -- one occurrence at most, since
@@ -271,7 +309,7 @@ def rewrite_schema_project_id(text, old, new):
         current = json.loads(f'"{match.group(1)}"')
     except ValueError:
         return text, 0, ()
-    if not go_import_under_module(current, old):
+    if not go_import_under_module(current, old) or not belongs_to(current, old, nested):
         return text, 0, ()
 
     renamed = rewrite_module_prefix(current, old, new, sep=GO_SEP)
@@ -353,12 +391,13 @@ def rewrite_go_source_text(text, sites, old, new):
     return "".join(lines), occurrences, tuple(descriptions)
 
 
-def scan_go_source(path, old):
-    """Import sites in *path* that are under module *old*."""
+def scan_go_source(path, old, nested=()):
+    """Import sites in *path* that belong to module *old* itself."""
     return [
         (import_path, lineno)
         for import_path, _fp, lineno in scan_imports(path)
         if go_import_under_module(import_path, old)
+        and belongs_to(import_path, old, nested)
     ]
 
 
@@ -380,7 +419,7 @@ def _is_schema_dump(path):
     )
 
 
-def observe_file(path, root, old, new):
+def observe_file(path, root, old, new, nested=()):
     """Observe one file, returning a :class:`FileRewrite` or None."""
     rel = os.path.relpath(path, str(root))
     try:
@@ -389,13 +428,13 @@ def observe_file(path, root, old, new):
         return None
 
     if os.path.basename(path) == "go.mod":
-        _new_text, count, sites = rewrite_go_mod_text(text, old, new)
+        _new_text, count, sites = rewrite_go_mod_text(text, old, new, nested)
         kind = "go.mod"
     elif _is_schema_dump(path):
-        _new_text, count, sites = rewrite_schema_project_id(text, old, new)
+        _new_text, count, sites = rewrite_schema_project_id(text, old, new, nested)
         kind = SCHEMA_DUMP_KIND
     else:
-        found = scan_go_source(path, old)
+        found = scan_go_source(path, old, nested)
         if not found:
             return None
         _new_text, count, sites = rewrite_go_source_text(text, found, old, new)
@@ -405,19 +444,21 @@ def observe_file(path, root, old, new):
         return None
     return FileRewrite(
         path=path, rel=rel, kind=kind, occurrences=count, sites=sites,
+        nested=tuple(nested),
     )
 
 
 def recompute(rewrite, old, new):
     """Re-derive a file's rewrite from disk.  Returns ``(new_text, count)``."""
     text = _read(rewrite.path)
+    nested = rewrite.nested
     if rewrite.kind == "go.mod":
-        new_text, count, _ = rewrite_go_mod_text(text, old, new)
+        new_text, count, _ = rewrite_go_mod_text(text, old, new, nested)
     elif rewrite.kind == SCHEMA_DUMP_KIND:
-        new_text, count, _ = rewrite_schema_project_id(text, old, new)
+        new_text, count, _ = rewrite_schema_project_id(text, old, new, nested)
     else:
         new_text, count, _ = rewrite_go_source_text(
-            text, scan_go_source(rewrite.path, old), old, new
+            text, scan_go_source(rewrite.path, old, nested), old, new
         )
     return new_text, count
 
@@ -438,6 +479,7 @@ def observe(root, old, new):
     go_mods = find_go_mod_files(root)
     declared = declared_modules(go_mods)
     owns = old in set(declared.values())
+    nested = nested_modules(declared, old)
 
     sources = sorted(
         p for p in walk_source_files(
@@ -450,7 +492,7 @@ def observe(root, old, new):
 
     items = []
     for path in [*go_mods, *sources, *schema_dumps]:
-        found = observe_file(path, root, old, new)
+        found = observe_file(path, root, old, new, nested)
         if found is None:
             continue
         items.append(
@@ -489,6 +531,11 @@ def observe(root, old, new):
         summary_facts = (
             f"no go.mod here declares '{old}': this repository CONSUMES the "
             f"module rather than owning it, so only references are rewritten.",
+        )
+    if nested:
+        summary_facts += (
+            f"left alone, as modules of their own: {', '.join(nested)} "
+            f"(rename each with its own invocation).",
         )
     return Preview((
         *items,
