@@ -1808,6 +1808,8 @@ def resolve_release_targets(primary, flags, project_dir=".", *, config,
 #: what it would change without changing anything.
 GO_TIDY = ["go", "mod", "tidy"]
 GO_TIDY_DIFF = GO_TIDY + ["-diff"]
+#: The sync a release owes a Go workspace's go.work.sum.
+GO_WORK_SYNC = ["go", "work", "sync"]
 
 # Lockfile specs: (lockfile, tool_name, sync_cmd, guard_file)
 # guard_file: if set, the spec only applies when this file exists in the same directory.
@@ -1816,7 +1818,7 @@ _LOCKFILE_SPECS = [
     ("uv.lock", "uv", ["uv", "lock"], None),
     ("package-lock.json", "npm", ["npm", "install", "--package-lock-only"], None),
     ("go.sum", "go", GO_TIDY, None),
-    ("go.work.sum", "go", ["go", "work", "sync"], "go.work"),
+    ("go.work.sum", "go", GO_WORK_SYNC, "go.work"),
     ("gradle.lockfile", "gradle", ["./gradlew", "dependencies", "--write-locks"], None),
 ]
 
@@ -1924,6 +1926,116 @@ def release_lock_targets(target_paths, *, member_package_paths, monorepo_root,
 
 class UntidyGoModuleError(Exception):
     """A Go module the release would tidy is not tidy in the commit."""
+
+
+def _go_json(argv, cwd, timeout, what):
+    """Run a read-only go command printing JSON; return the decoded values.
+
+    ``go list -m -json`` prints a stream of objects, the ``edit -json`` forms
+    one; either way the result is a list. Raises :class:`UntidyGoModuleError`
+    when the command cannot run or fails, naming *what* it was asked for.
+    """
+    import json
+
+    try:
+        probe = effects.run(
+            argv, cwd=cwd, capture_output=True, text=True, timeout=timeout,
+        )
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        raise UntidyGoModuleError(
+            f"`{' '.join(argv)}` could not run in {cwd} ({what}): {exc}."
+        ) from exc
+    if effects.unsettled(probe):
+        return None
+    if probe.returncode != 0:
+        raise UntidyGoModuleError(
+            f"`{' '.join(argv)}` failed in {cwd} ({what}, exit "
+            f"{probe.returncode}): {(probe.stderr or '').strip()}"
+        )
+    decoder = json.JSONDecoder()
+    text, values, i = probe.stdout, [], 0
+    while True:
+        while i < len(text) and text[i].isspace():
+            i += 1
+        if i >= len(text):
+            return values
+        value, i = decoder.raw_decode(text, i)
+        values.append(value)
+
+
+def go_work_sync_changes(root, timeout):
+    """The member go.mod requirements ``go work sync`` at *root* would raise.
+
+    ``go work sync`` writes the workspace's build list back into every module
+    the workspace uses: a module requiring a dependency below the version the
+    build list selects (another module requires a higher one) gets that
+    version written into its go.mod. The build list (``go list -m -json
+    all``) and each module's requirements (``go mod edit -json``) are read
+    without writing anything but the module cache. Returns
+    ``(module dir, dependency, required, selected)`` tuples, or None when the
+    answer is unavailable (a preview past its first recorded mutation).
+    """
+    what = "the release's go work sync guard"
+    work = _go_json(["go", "work", "edit", "-json"], root, timeout, what)
+    build = _go_json(["go", "list", "-m", "-json", "all"], root, timeout, what)
+    if work is None or build is None:
+        return None
+    main_paths = {m["Path"] for m in build if m.get("Main")}
+    selected = {
+        m["Path"]: (m.get("Replace") or {}).get("Version") or m.get("Version")
+        for m in build if not m.get("Main")
+    }
+    changes = []
+    for use in (work[0].get("Use") or []) if work else []:
+        module_dir = os.path.normpath(os.path.join(root, use["DiskPath"]))
+        mod = _go_json(["go", "mod", "edit", "-json"], module_dir, timeout, what)
+        if mod is None:
+            return None
+        for req in (mod[0].get("Require") or []) if mod else []:
+            dep, required = req["Path"], req["Version"]
+            if dep in main_paths:
+                continue
+            chosen = selected.get(dep)
+            if chosen and chosen != required:
+                changes.append((module_dir, dep, required, chosen))
+    return changes
+
+
+def refuse_go_work_sync_changes(syncs):
+    """Refuse when the release's ``go work sync`` would edit a module's go.mod.
+
+    The release runs ``go work sync`` to refresh go.work.sum. When the
+    workspace's modules require one dependency at different versions, it also
+    raises the lower requirements in their go.mod files: requirement changes
+    nobody committed or reviewed, which the release then stops on as
+    unexpected modified files. Refused before the release mutates anything,
+    naming the sync and the commit that fix it.
+
+    Raises :class:`UntidyGoModuleError`.
+    """
+    from ...release_checkout import live_path
+
+    for sync in syncs:
+        if sync["cmd"] != GO_WORK_SYNC:
+            continue
+        cwd = sync["cwd"]
+        changes = go_work_sync_changes(cwd, sync["timeout"])
+        if not changes:
+            continue
+        where = live_path(cwd)
+        lines = "\n".join(
+            f"  {live_path(d)}/go.mod: {dep} {required} -> {chosen}"
+            for d, dep, required, chosen in changes
+        )
+        raise UntidyGoModuleError(
+            f"The Go workspace at {where} is not in sync with its modules. "
+            f"The release runs `go work sync` there to refresh go.work.sum, "
+            f"and it would raise these requirements to the versions the "
+            f"workspace selects, changing what the release commits beyond "
+            f"the release's own edits:\n{lines}\nRun `go work sync` in "
+            f"{where}, commit the go.mod and go.sum files it changes, and "
+            f"re-run the release."
+        )
 
 
 def refuse_untidy_go_modules(syncs):

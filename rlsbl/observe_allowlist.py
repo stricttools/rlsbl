@@ -301,6 +301,16 @@ OBSERVE_ALLOWLIST = (
         "module cache",
     ),
     ObserveEntry(
+        ("go", "mod", "edit", "-json"), "local-read",
+        "prints a module's go.mod as JSON; -json prints the result instead of "
+        "writing go.mod (the release's go work sync guard)",
+    ),
+    ObserveEntry(
+        ("go", "work", "edit", "-json"), "local-read",
+        "prints go.work as JSON; -json prints the result instead of writing "
+        "go.work (the release's go work sync guard)",
+    ),
+    ObserveEntry(
         ("go", "env", "GOVERSION"), "self-report",
         "prints the installed Go's version (the pgdesign scaffold seeds "
         ".go-version from it)",
