@@ -1,5 +1,5 @@
 +++
-description = "Every check rlsbl runs, grouped by tag, with its severity, its option and how an options entry sets it, check and failing-checks, the hooks checks.toml declares, the targets each applies to, how a workspace run is scoped, the nested-member and Go workspace checks, and which tags and Releases unpublished-refs demands."
+description = "Every check rlsbl runs, grouped by tag, with its severity, its option and how an options entry sets it, check and failing-checks, the hooks checks.toml declares, the targets each applies to, how a workspace run is scoped, the nested-member and Go workspace checks, the private-path upload refusal, the npm token check that also blocks in preflight, and which tags and Releases unpublished-refs demands."
 +++
 
 # Check system

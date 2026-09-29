@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.private_paths"
-description = "The paths a published upload must never carry, and the Python upload's check."
+description = "The paths a published upload must never carry (planning notes, release metadata, agent files, secrets) and the stdlib-only check CI runs on a built Python upload."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 153
 +++

@@ -1,5 +1,5 @@
 +++
-description = "How rlsbl scaffold generates CI workflows, git hooks, and the scratch directories, plus the per-ecosystem settings that keep a project's test runner out of them and out of its nested members."
+description = "How rlsbl scaffold generates CI workflows, git hooks, the scratch directories and each ecosystem's private-path exclusions, the settings that keep a project's test runner out of its nested members, and why the workspace root is never scaffolded."
 +++
 
 # Scaffold system

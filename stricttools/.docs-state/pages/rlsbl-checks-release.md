@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.checks.release"
-description = "The checks that read outside the working tree: the remote's refs, the branch, the CI publish credentials, and the follow-ups a conversion still owes."
+description = "The checks that read outside the working tree: the remote's refs, the branch, the CI publish credentials and whether NPM_TOKEN holds the current npm token, and conversion follow-ups."
 generated = true
 nav_group = "API Reference"
 nav_order = 22

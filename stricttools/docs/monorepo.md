@@ -1,5 +1,5 @@
 +++
-description = "rlsbl monorepo workspaces: workspace.toml, the canonical member path, the root member and loader refusals, nested members, the graph, batch releases, mirrors and their tag verdicts, the CI router."
+description = "rlsbl monorepo workspaces: workspace.toml, the canonical member path, monorepo add's single commit and required publish mode, the root member (configured under its releasable, never scaffolded) and loader refusals, nested members, the graph, batch releases and finishing a batch's archive, mirrors and their tag verdicts, the CI router and the root .gitignore entries sync writes."
 +++
 
 # Monorepo guide
