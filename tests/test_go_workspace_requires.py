@@ -140,6 +140,42 @@ def test_a_replace_into_the_workspace_is_refused(tmp_path):
     assert f"go mod edit -dropreplace={M}/draw" in text
 
 
+def test_the_refusal_names_the_module_that_carries_the_replace(tmp_path):
+    root = tmp_path / "ws"
+    make_nested_workspace(root, "go")
+    _with_replace(root)
+    text = _text(_check(root, "go-workspace-replace"))
+    assert f"`go install {M}/draw/cmd@<version>`" in text
+    assert f"`go install {M}/draw@<version>`" not in text
+
+
+def _apply_printed_migration(root, text, env):
+    for command in re.findall(r"`([^`]+)`", text):
+        if not command.startswith(("go work", "go mod edit")):
+            continue
+        cwd = root
+        if "dropreplace" in command:
+            cwd = root / "draw" / "cmd"
+        ran = subprocess.run(
+            shlex.split(command), cwd=cwd, env=env, capture_output=True, text=True,
+        )
+        assert ran.returncode == 0, (command, ran.stderr)
+
+
+def test_the_migration_applies_where_a_go_work_is_already_committed(tmp_path):
+    root = tmp_path / "ws"
+    make_nested_workspace(root, "go")
+    (root / "go.work").write_text("go 1.22\n\nuse ./draw\n")
+    _with_replace(root)
+    text = _text(_check(root, "go-workspace-replace"))
+    env = _go_env(tmp_path, tmp_path / "no-proxy")
+    env["GOPROXY"] = "off"
+    _apply_printed_migration(root, text, env)
+    assert "replace" not in (root / "draw" / "cmd" / "go.mod").read_text()
+    assert "./draw/cmd" in (root / "go.work").read_text()
+    assert _check(root, "go-workspace-replace").status == "pass"
+
+
 def test_a_replace_outside_the_workspace_is_not_this_checks_business(tmp_path):
     root = tmp_path / "ws"
     make_nested_workspace(root, "go")
