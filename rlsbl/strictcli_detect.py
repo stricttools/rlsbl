@@ -10,7 +10,14 @@ from .errors import RlsblError
 from .module_paths import go_import_under_module
 
 
-_STRICTCLI_GO_MODULE = "github.com/smm-h/strictcli"
+#: Every module path strictcli's Go implementation has been published under.
+#: It moved from github.com/smm-h/strictcli/go to
+#: github.com/stricttools/strictcli/go at Go strictcli v0.36.0, and consumers
+#: pinned on either side of the move are strictcli projects.
+_STRICTCLI_GO_MODULES = (
+    "github.com/smm-h/strictcli",
+    "github.com/stricttools/strictcli",
+)
 
 
 class StrictcliDetectError(RlsblError):
@@ -132,9 +139,12 @@ def _detect_ts_strictcli(project_dir: str) -> tuple[str, str] | None:
 
 def _is_strictcli_module_path(path: str) -> bool:
     """Return True if a Go module path is strictcli or a sub-path of it
-    (e.g. github.com/smm-h/strictcli/go), not a mere string prefix
-    (e.g. github.com/smm-h/strictcli-extras)."""
-    return go_import_under_module(path, _STRICTCLI_GO_MODULE)
+    (e.g. github.com/stricttools/strictcli/go), under either the current or
+    the former module path, and not a mere string prefix
+    (e.g. github.com/stricttools/strictcli-extras)."""
+    return any(
+        go_import_under_module(path, module) for module in _STRICTCLI_GO_MODULES
+    )
 
 
 def _go_mod_has_strictcli(project_dir: str) -> bool:

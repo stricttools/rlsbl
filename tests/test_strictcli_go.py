@@ -241,6 +241,36 @@ class TestGoModHasStrictcli:
         )
         assert _go_mod_has_strictcli(str(tmp_path)) is True
 
+    def test_current_strictcli_module_path_detected(self, tmp_path):
+        """strictcli's Go module now lives at github.com/stricttools/strictcli/go.
+
+        A consumer requiring it (as consumers on Go strictcli v0.36.0 do) is a
+        strictcli project, so its release must regenerate the schema rather
+        than silently skip it.
+        """
+        _write_go_mod(
+            tmp_path,
+            "module github.com/example/myapp\n\ngo 1.21\n\n"
+            "require github.com/stricttools/strictcli/go v0.36.0\n",
+        )
+        assert _go_mod_has_strictcli(str(tmp_path)) is True
+
+    def test_current_path_prefix_lookalike_not_detected(self, tmp_path):
+        _write_go_mod(
+            tmp_path,
+            "module github.com/example/myapp\n\ngo 1.21\n\n"
+            "require github.com/stricttools/strictcli-extras v1.0.0\n",
+        )
+        assert _go_mod_has_strictcli(str(tmp_path)) is False
+
+    def test_current_strictcli_library_itself_is_not_a_consumer(self, tmp_path):
+        _write_go_mod(
+            tmp_path,
+            "module github.com/stricttools/strictcli/go\n\ngo 1.21\n\n"
+            "require golang.org/x/text v0.14.0\n",
+        )
+        assert _go_mod_has_strictcli(str(tmp_path)) is False
+
     def test_prefix_lookalike_module_not_detected(self, tmp_path):
         """A module whose path merely starts with the strictcli path as a
         string prefix (not a path segment) does not match."""
