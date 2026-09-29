@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.checks.go_tags"
-description = "Go tag rules (tags: workspace/project, preflight): what a Go tag may name."
+description = "The Go tag checks run before tagging: a path-style tag_format must name one of its releasable's Go members, and no go.mod module path may carry a /v2 suffix."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 16
 +++

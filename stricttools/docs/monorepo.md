@@ -1,5 +1,5 @@
 +++
-description = "rlsbl monorepo workspaces: workspace.toml, the root member and loader refusals, the graph, batch releases, mirrors and their tag verdicts, the CI router."
+description = "rlsbl monorepo workspaces: workspace.toml, the canonical member path, the root member and loader refusals, nested members, the graph, batch releases, mirrors and their tag verdicts, the CI router."
 +++
 
 # Monorepo guide
@@ -484,7 +484,7 @@ The generated router filters each project's inlined jobs on a `dorny/paths-filte
 - the generated router itself, so a change to it re-runs everything;
 - a negated exclude of every member nested inside the project's territory, since those members own their files: for the root member, whose territory is the residual, that is `**` narrowed by every other member's territory. A nested member whose territory holds one of the project's dependencies -- the dependency itself, or a member enclosing it -- is never excluded: an exclude is final (see below), so it would silence the dependency even with its territory included.
 
-The step declares `predicate-quantifier: some-with-excludes`. Under the action's default (`some`) a negated pattern matches everything *outside* itself, so the excludes would match the very paths they exclude. Under `some-with-excludes` an excluded file cannot be included back by another pattern, which is why a territory holding a dependency stays unexcluded.
+The step declares `predicate-quantifier: some-with-excludes`. Under the action's default (`some`) a negated pattern matches everything *outside* itself, so the excludes would match the very paths they exclude. Under `some-with-excludes` an excluded file cannot be included back by another pattern, which is why a territory holding a dependency is never excluded.
 
 A push whose diff matches none of a project's patterns leaves that project's CI job `skipped` on the pushed commit. `rlsbl check --name router-filters-fresh` re-derives the block and fails when the committed router no longer matches the workspace; regenerate with `rlsbl monorepo sync`.
 
