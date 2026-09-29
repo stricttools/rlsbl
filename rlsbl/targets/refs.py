@@ -14,10 +14,10 @@ The three sources, and why each is where it is:
   and a standalone repository gets the target's ``tag_format``. The context
   states which of the three applies; the target renders it.
 * **Companion tags** are an ecosystem requirement. Go's module proxy resolves
-  ``{path}/v{version}``, so a releasable whose primary tag is *not* in that form
-  needs one companion per publishing Go member. Both rules the collector
-  carried -- skip when the primary tag is already Go-compatible, skip
-  publish-suppressed members -- live in :meth:`BaseTarget._companion_refs`.
+  ``{path}/v{version}``, so a releasable owes one tag per publishing Go
+  member, less the one its primary tag already is. The rules -- skip
+  publish-suppressed members, and owe a released version only the members its
+  release record lists -- live in :meth:`BaseTarget._companion_refs`.
 * **Recorded aliases** are a repository FACT, read rather than recomputed, from
   TWO sources that say the same kind of thing. A rename creates ``new@v1.2.3``
   beside the existing ``old@v1.2.3``; a conversion does the same at its
@@ -286,6 +286,31 @@ def _shipped_as(context: RefContext, version: str) -> list[tuple[str, str]]:
             if tagged_version == version:
                 found.append((tag, archived_release_path(releases_dir, version)))
     return found
+
+
+def recorded_release_paths(context: RefContext, version: str) -> frozenset | None:
+    """The paths *version*'s archive recorded tree hashes for, or None.
+
+    None when no archive for the version records any: a version not released
+    yet, or one whose archive holds no release commit. Read tolerantly, as
+    :func:`_shipped_as` reads its field: this is a lookup over a field of a
+    record written by the release flow, not a validation pass.
+    """
+    import tomllib
+
+    from ..release_file import archived_release_path
+
+    for releases_dir in context.releases_dirs:
+        path = archived_release_path(releases_dir, version)
+        try:
+            with open(path, "rb") as f:
+                data = tomllib.load(f)
+        except (OSError, tomllib.TOMLDecodeError):
+            continue
+        trees = data.get("tree_hashes")
+        if isinstance(trees, dict) and trees:
+            return frozenset(trees)
+    return None
 
 
 def shipped_tag(context: RefContext, version: str) -> str | None:

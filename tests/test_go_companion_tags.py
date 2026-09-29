@@ -149,12 +149,21 @@ class TestExpectedRefsCompanions:
     a check looks for come from one derivation.
     """
 
-    def test_skips_when_primary_tag_is_go_compatible(self):
-        """If the primary tag already contains /v, no companion tags are needed."""
-        assert _companions(
-            ["packages/mylib"], "/some/workspace", "1.0.0",
-            "packages/mylib/v1.0.0",
-        ) == []
+    def test_a_companion_equal_to_the_primary_is_not_repeated(self, tmp_path):
+        """A path-tagged primary IS its own member's proxy tag."""
+        pkg_dir = tmp_path / "packages" / "mylib"
+        pkg_dir.mkdir(parents=True)
+
+        go_entry = MagicMock()
+        go_entry.name = "go"
+
+        with patch("rlsbl.config.read_project_config", return_value={"publish_mode": "ci"}), \
+             patch("rlsbl.targets.detect_targets", return_value=[go_entry]), \
+             patch("rlsbl.targets.TARGETS", {"go": GoTarget()}):
+            assert _companions(
+                ["packages/mylib"], str(tmp_path), "1.0.0",
+                "packages/mylib/v1.0.0",
+            ) == []
 
     def test_not_a_releasable_release_has_no_companions(self, tmp_path):
         """``member_package_paths=None`` -- not empty -- means no companions.
