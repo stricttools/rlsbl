@@ -237,3 +237,28 @@ class TestInitCreatesTheRootConfig:
         monkeypatch.chdir(tmp_path)
         _init(tmp_path, **{"root-publish-mode": "none"})
         assert ROOT_CONFIG in _tracked(tmp_path)
+
+    def test_a_failed_commit_puts_back_a_file_that_was_there_before(
+        self, tmp_path, monkeypatch, capsys,
+    ):
+        """The rollback takes back what the init wrote, not what it found:
+        a config.json already at the path it writes keeps its bytes."""
+        from rlsbl.commands.monorepo import commands
+
+        _fresh_repo(tmp_path)
+        monkeypatch.chdir(tmp_path)
+        found = tmp_path / ROOT_CONFIG
+        found.parent.mkdir(parents=True)
+        found.write_text('{"mine": true}\n')
+        (tmp_path / WORKSPACE_DIR / "notes.txt").write_text("notes\n")
+
+        def _fail(*_a, **_k):
+            raise subprocess.CalledProcessError(1, "safegit", stderr="index.lock exists")
+
+        monkeypatch.setattr(commands, "commit_files", _fail)
+        with pytest.raises(SystemExit):
+            _init(tmp_path, **{"root-publish-mode": "none"})
+        capsys.readouterr()
+        assert found.read_text() == '{"mine": true}\n'
+        assert (tmp_path / WORKSPACE_DIR / "notes.txt").read_text() == "notes\n"
+        assert not (tmp_path / WORKSPACE_DIR / "workspace.toml").exists()
