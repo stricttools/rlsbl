@@ -1,6 +1,6 @@
 # strictspec generated validator. DO NOT EDIT.
 #
-# strictspec generator: 0.4.0
+# strictspec generator: 0.5.0
 # schema:              rlsbl-release-file (format_version 1)
 # regenerate:          strictspec gen --manifest strictspec.toml
 #
@@ -18,7 +18,7 @@ from strictspec import Diagnostic, Value
 # INFORMATIONAL: pairing is on GENERATED_CODE_FORMAT below, so a later release
 # of the runtime reads this file unchanged, and no tool may derive a dependency
 # floor from this string.
-GENERATED_BY = "0.4.0"
+GENERATED_BY = "0.5.0"
 # GENERATED_CODE_FORMAT is the shape of generated code this file was written to.
 # The runtime pairing guard hard-errors unless this format is one the linked
 # runtime reads; the remedy is regeneration.
