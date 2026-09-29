@@ -5,7 +5,7 @@
     "description": "e12ab232536f997823fbdc939a054707d8ee1954dda6935b84053fe71f6be0b1"
   },
   "en/changelog.md": {
-    "content": "588c77d63020ed88beee81cd310c6566e858d1c2ba59280cbb610c50b7f6d5b8",
+    "content": "1d2393fe3772eba0d2e3a91850738fa4c7c0d0d25cfe9a7a8d8b375102303f56",
     "description": "a6dd91226e9a3a12c40b1f816fd196914b344da47f97ec41b99ec62985d990ce",
     "source_docstring": "4fff13535641ef3e9f7c8663fb4854a94edccb3e370b2f4d2721a69393f06594"
   },
@@ -210,7 +210,7 @@
     "description": "a1f0cfcb22389d01c5dab80b9b6be0783a0b97223ffc56dd9c0d8d3be71646b3"
   },
   "en/monorepo.md": {
-    "content": "06c6bb25ae57ad2415f2adaab35bdc09f724a8c30a8e8a4f5a967d526502299f",
+    "content": "a220a7514edd5a59c5304afc9e51e4641647657dccd66cc96dae10c9820e1378",
     "description": "ffbb7b7e1c4eb8cc08f2dbe0ba9020852d94fa12a47b8f36d9103bd7e6cbaa13",
     "source_docstring": "02b6fd46cd97711b77f82491b52bedc0ef190654867b753b5daebf51751f82e3"
   },
@@ -223,7 +223,7 @@
     "description": "727c3d26e4914bb2c004338b669b08be349a97c6c8038645e6f9b598a50f3094"
   },
   "en/release-workflow.md": {
-    "content": "608ac022610be7c1e46537367a8ceece32471914f340a071d1b4487c7bbddaac",
+    "content": "3dd83ff78712b6d3b0714086dac71c398dec6fc58bfd0fbbb68be7ccacf511ff",
     "description": "2ed021d717371f9ea2d320ab0e19852d4be5c899451b679a63d8629cbd1b472d",
     "source_docstring": "0998f186e8a9850589e938859db694b132aaeacda3864775a912477466446a4b"
   },
@@ -605,7 +605,7 @@
   "en/rlsbl-commands-rewrite-go_module_path.md": {
     "content": "930d66dd4ad1ad8e1348427ec6429f2e9f7c6c25c944ea268144d175edc82550",
     "description": "a5843730aac1c5f29c5a2ec38242503b646f8f99263e608b3959ab801abf3d25",
-    "source_docstring": "4f297c473424387ab089351c7292d67bf7372012ef1e6c51a27270f3bf866114"
+    "source_docstring": "842d59e9557af0ea71d2bc6b92543939baf736fbadf7c29cc144ff4eb59879e2"
   },
   "en/rlsbl-commands-rewrite-project_name.md": {
     "content": "1a4e24e85e69c70cd3ec1e57b0525d922a1e80aecbba59aaeac0af1d47d96a6b",
@@ -1356,7 +1356,7 @@
     "source_docstring": "c56d3fd8faeccc73911eabfe28f4f825c8b563105a8f969351411cbc6784f2fc"
   },
   "en/utilities.md": {
-    "content": "d1f76736330c49b282066f004cfb61cd62f33cb29b91b0c83adc5f39bf06b41a",
+    "content": "c9a466621a6e6af2c56880f5cba7d457170715bab1f4570f78cbd86ecc4a3431",
     "description": "77d7d72f728c747e758be31802911248cb9650a0ee8db87bd4e306f5e3eb9f01"
   }
 }
