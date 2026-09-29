@@ -92,8 +92,15 @@ def replace_problems(ctx):
         os.path.relpath(os.path.dirname(os.path.realpath(g)), root).replace(os.sep, "/")
         for _p, _m, g in members
     })
+    use = " ".join(dirs)
+    # `go work init` refuses to overwrite a go.work, and `go work use` adds to
+    # one that exists, so the migration starts from whichever this repo needs.
+    if os.path.isfile(os.path.join(root, "go.work")):
+        work = f"run `go work use {use}` at the repository root"
+    else:
+        work = f"run `go work init` and `go work use {use}` at the repository root"
     problems = []
-    for proj, _module, go_mod in members:
+    for proj, module, go_mod in members:
         if not isinstance(proj.get("releasable"), str):
             continue
         _requires, replaces = parse_directives(_read(go_mod))
@@ -104,15 +111,13 @@ def replace_problems(ctx):
             target = os.path.realpath(os.path.join(module_dir, rep.new_path))
             if not (target == root or target.startswith(root + os.sep)):
                 continue
-            use = " ".join(d if d != "." else "." for d in dirs)
             problems.append(
                 f"{proj['name']}: {proj['path']}/go.mod replaces {rep.old_path} "
                 f"with {rep.new_path} (line {rep.line}), a directory in this "
-                f"workspace. `go install {rep.old_path}@<version>` rejects a "
+                f"workspace. `go install {module}@<version>` rejects a "
                 f"module carrying a replace, and its consumers never see one. "
                 f"Develop across the workspace's modules with a committed "
-                f"go.work instead: run `go work init` and `go work use {use}` at "
-                f"the repository root and commit go.work, then run "
+                f"go.work instead: {work} and commit go.work, then run "
                 f"`go mod edit -dropreplace={rep.old_path}` in {proj['path']}."
             )
     return problems
