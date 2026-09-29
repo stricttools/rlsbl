@@ -4,6 +4,7 @@ import dataclasses
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -1928,12 +1929,99 @@ class UntidyGoModuleError(Exception):
     """A Go module the release would tidy is not tidy in the commit."""
 
 
+#: go's words for a module proxy it could not reach.
+_GO_NETWORK_MARKERS = (
+    "dial tcp", "no such host", "network is unreachable",
+    "connection refused", "i/o timeout", "TLS handshake timeout",
+    "proxyconnect",
+)
+#: go's words for a proxy that answered, but not with the version: the version
+#: was never published there.
+_GO_UNPUBLISHED_RE = re.compile(
+    r"(?P<module>[^\s:]+)@(?P<version>v[^\s:]+): (?:reading \S+: "
+    r"(?:404 Not Found|410 Gone|no such file or directory)"
+    r"|invalid version: unknown revision)"
+)
+#: A proxy's not-found for a module it cannot fetch at all (a private
+#: repository) carries git's refusal; that is no unpublished version.
+_GO_PRIVATE_MARKERS = (
+    "could not read Username", "terminal prompts disabled",
+    "Repository not found",
+)
+
+
+def go_preflight_failure(argv, cwd, what, *, exc=None, timeout=None,
+                         returncode=None, stderr=None):
+    """The refusal for a Go preflight command that could not run or failed.
+
+    Names the command, where it ran (in the working tree, where the fix is
+    made), *what* it was asked for, and the fix for the cause go's own output
+    shows: a cold module cache GOPROXY=off forbids filling, an unreachable
+    module proxy, a required version the proxy never published, a timeout, an
+    unparseable GOFLAGS, a ``go`` that cannot be started. Any other failure
+    names the command to reproduce it.
+    """
+    from ...release_checkout import live_path
+
+    where = live_path(cwd)
+    cmd = " ".join(argv)
+    rerun = "then re-run the release"
+    warm = f"`go mod download all` in {where}"
+    if isinstance(exc, subprocess.TimeoutExpired):
+        return (
+            f"`{cmd}` did not finish within {timeout}s in {where} ({what}). "
+            f"A cold module cache downloading over a slow network is what "
+            f"takes this long: warm the cache with {warm}, {rerun}."
+        )
+    if exc is not None:
+        return (
+            f"`{cmd}` could not run in {where} ({what}): {exc}. Put a working "
+            f"Go toolchain first on PATH (`go version` must run), {rerun}."
+        )
+    detail = (stderr or "").strip()
+    head = f"`{cmd}` failed in {where} ({what}, exit {returncode}):\n{detail}\n"
+    if "parsing $GOFLAGS" in detail:
+        return head + (
+            f"GOFLAGS holds a flag go does not accept: correct or unset "
+            f"GOFLAGS (`go env GOFLAGS` prints it), {rerun}."
+        )
+    if "module lookup disabled by GOPROXY=off" in detail:
+        return head + (
+            f"GOPROXY=off forbids downloads and the module cache lacks a "
+            f"module this needs. Warm the cache with {warm} under a GOPROXY "
+            f"this machine reaches (for example `GOPROXY=https://proxy.golang.org "
+            f"go mod download all`), or re-run the release with GOPROXY naming "
+            f"such a proxy; {rerun}."
+        )
+    unpublished = _GO_UNPUBLISHED_RE.search(detail)
+    if unpublished and not any(m in detail for m in _GO_PRIVATE_MARKERS):
+        module, version = unpublished.group("module"), unpublished.group("version")
+        return head + (
+            f"{module} {version} is required but the module proxy does not "
+            f"have it: that version was never published. When {module} is a "
+            f"sibling module, release it first (its release publishes "
+            f"{version}), {rerun}."
+        )
+    if any(m in detail for m in _GO_NETWORK_MARKERS):
+        return head + (
+            f"The module proxy (GOPROXY) could not be reached and the module "
+            f"cache lacks a module this needs. Warm the cache with {warm} "
+            f"while the proxy is reachable, or set GOPROXY to a proxy this "
+            f"machine reaches (for example a `file://` module mirror), {rerun}."
+        )
+    return head + (
+        f"Run `{cmd}` in {where} to reproduce it, fix the error it prints, "
+        f"{rerun}."
+    )
+
+
 def _go_json(argv, cwd, timeout, what):
     """Run a read-only go command printing JSON; return the decoded values.
 
     ``go list -m -json`` prints a stream of objects, the ``edit -json`` forms
     one; either way the result is a list. Raises :class:`UntidyGoModuleError`
-    when the command cannot run or fails, naming *what* it was asked for.
+    when the command cannot run or fails, naming *what* it was asked for and
+    the fix for the cause (:func:`go_preflight_failure`).
     """
     import json
 
@@ -1943,15 +2031,14 @@ def _go_json(argv, cwd, timeout, what):
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
         raise UntidyGoModuleError(
-            f"`{' '.join(argv)}` could not run in {cwd} ({what}): {exc}."
+            go_preflight_failure(argv, cwd, what, exc=exc, timeout=timeout)
         ) from exc
     if effects.unsettled(probe):
         return None
     if probe.returncode != 0:
-        raise UntidyGoModuleError(
-            f"`{' '.join(argv)}` failed in {cwd} ({what}, exit "
-            f"{probe.returncode}): {(probe.stderr or '').strip()}"
-        )
+        raise UntidyGoModuleError(go_preflight_failure(
+            argv, cwd, what, returncode=probe.returncode, stderr=probe.stderr,
+        ))
     decoder = json.JSONDecoder()
     text, values, i = probe.stdout, [], 0
     while True:
@@ -2038,6 +2125,10 @@ def refuse_go_work_sync_changes(syncs):
         )
 
 
+#: What the release's ``go mod tidy -diff`` preflight is asked for.
+_TIDY_GUARD = "the release's go mod tidy guard"
+
+
 def refuse_untidy_go_modules(syncs):
     """Refuse when the release's ``go mod tidy`` would change a module.
 
@@ -2065,11 +2156,9 @@ def refuse_untidy_go_modules(syncs):
                 timeout=sync["timeout"],
             )
         except (subprocess.TimeoutExpired, OSError) as exc:
-            raise UntidyGoModuleError(
-                f"`go mod tidy -diff` could not run in {where}: {exc}. The "
-                f"release runs `go mod tidy` there and must first know it "
-                f"changes nothing."
-            ) from exc
+            raise UntidyGoModuleError(go_preflight_failure(
+                GO_TIDY_DIFF, cwd, _TIDY_GUARD, exc=exc, timeout=sync["timeout"],
+            )) from exc
         if effects.unsettled(probe) or probe.returncode == 0:
             continue
         if probe.stdout.strip():
@@ -2081,11 +2170,10 @@ def refuse_untidy_go_modules(syncs):
                 f"tidy` in {where}, commit go.mod and go.sum, and re-run the "
                 f"release."
             )
-        raise UntidyGoModuleError(
-            f"`go mod tidy -diff` failed in {where} (exit {probe.returncode}): "
-            f"{(probe.stderr or '').strip()}. The release runs `go mod tidy` "
-            f"there and must first know it changes nothing."
-        )
+        raise UntidyGoModuleError(go_preflight_failure(
+            GO_TIDY_DIFF, cwd, _TIDY_GUARD, returncode=probe.returncode,
+            stderr=probe.stderr,
+        ))
 
 
 # The uv entry of :data:`_LOCKFILE_SPECS`, by name rather than by index, so a
