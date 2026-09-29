@@ -1928,6 +1928,26 @@ class UntidyGoModuleError(Exception):
     """A Go module the release would tidy is not tidy in the commit."""
 
 
+class GoProbeError(UntidyGoModuleError):
+    """A read-only go command a guard asks could not answer."""
+
+
+def _warn_unanswered(message):
+    """Report a guard go could not answer, without refusing the release.
+
+    The release's own ``go mod tidy`` and ``go work sync`` fail the same way
+    in the same environment (a module only the workspace resolves, a module
+    lookup disabled offline, a toolchain go.mod asks for and GOTOOLCHAIN
+    forbids), and their failure is a warning. A guard asked to prove they
+    change nothing refuses only on a change it can see.
+    """
+    print(
+        f"Warning: {message} The release goes on; its own sync there fails "
+        f"the same way and only warns.",
+        file=sys.stderr,
+    )
+
+
 def _go_json(argv, cwd, timeout, what):
     """Run a read-only go command printing JSON; return the decoded values.
 
@@ -1942,13 +1962,13 @@ def _go_json(argv, cwd, timeout, what):
             argv, cwd=cwd, capture_output=True, text=True, timeout=timeout,
         )
     except (subprocess.TimeoutExpired, OSError) as exc:
-        raise UntidyGoModuleError(
+        raise GoProbeError(
             f"`{' '.join(argv)}` could not run in {cwd} ({what}): {exc}."
         ) from exc
     if effects.unsettled(probe):
         return None
     if probe.returncode != 0:
-        raise UntidyGoModuleError(
+        raise GoProbeError(
             f"`{' '.join(argv)}` failed in {cwd} ({what}, exit "
             f"{probe.returncode}): {(probe.stderr or '').strip()}"
         )
@@ -2009,7 +2029,8 @@ def refuse_go_work_sync_changes(syncs):
     raises the lower requirements in their go.mod files: requirement changes
     nobody committed or reviewed, which the release then stops on as
     unexpected modified files. Refused before the release mutates anything,
-    naming the sync and the commit that fix it.
+    naming the sync and the commit that fix it. A build list go cannot
+    compute warns instead (:func:`_warn_unanswered`).
 
     Raises :class:`UntidyGoModuleError`.
     """
@@ -2019,7 +2040,11 @@ def refuse_go_work_sync_changes(syncs):
         if sync["cmd"] != GO_WORK_SYNC:
             continue
         cwd = sync["cwd"]
-        changes = go_work_sync_changes(cwd, sync["timeout"])
+        try:
+            changes = go_work_sync_changes(cwd, sync["timeout"])
+        except GoProbeError as exc:
+            _warn_unanswered(str(exc))
+            continue
         if not changes:
             continue
         where = live_path(cwd)
@@ -2049,6 +2074,8 @@ def refuse_untidy_go_modules(syncs):
     commit that fix it. ``go mod tidy -diff`` reports the change and writes
     nothing but the module cache.
 
+    A module go cannot tidy at all warns instead (:func:`_warn_unanswered`).
+
     Raises :class:`UntidyGoModuleError`.
     """
     from ...release_checkout import live_path
@@ -2065,11 +2092,8 @@ def refuse_untidy_go_modules(syncs):
                 timeout=sync["timeout"],
             )
         except (subprocess.TimeoutExpired, OSError) as exc:
-            raise UntidyGoModuleError(
-                f"`go mod tidy -diff` could not run in {where}: {exc}. The "
-                f"release runs `go mod tidy` there and must first know it "
-                f"changes nothing."
-            ) from exc
+            _warn_unanswered(f"`go mod tidy -diff` could not run in {where}: {exc}.")
+            continue
         if effects.unsettled(probe) or probe.returncode == 0:
             continue
         if probe.stdout.strip():
@@ -2081,10 +2105,9 @@ def refuse_untidy_go_modules(syncs):
                 f"tidy` in {where}, commit go.mod and go.sum, and re-run the "
                 f"release."
             )
-        raise UntidyGoModuleError(
+        _warn_unanswered(
             f"`go mod tidy -diff` failed in {where} (exit {probe.returncode}): "
-            f"{(probe.stderr or '').strip()}. The release runs `go mod tidy` "
-            f"there and must first know it changes nothing."
+            f"{(probe.stderr or '').strip()}."
         )
 
 
