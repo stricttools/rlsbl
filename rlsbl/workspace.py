@@ -101,12 +101,19 @@ def find_workspace_root(start_path="."):
     """Walk up from start_path looking for a .rlsbl-monorepo/workspace.toml.
 
     Returns the directory containing .rlsbl-monorepo/, or None if not found.
+    The walk stops at the enclosing git repository's root, as
+    :func:`rlsbl.utils.find_project_root` does: an outer repository's
+    workspace is never a nested repository's workspace.
     """
+    from .utils import is_git_repository_root
+
     current = os.path.realpath(start_path)
     while True:
         candidate = os.path.join(current, WORKSPACE_DIR, WORKSPACE_FILE)
         if os.path.isfile(candidate):
             return current
+        if is_git_repository_root(current):
+            return None
         parent = os.path.dirname(current)
         if parent == current:
             return None
