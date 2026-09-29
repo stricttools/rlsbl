@@ -1072,6 +1072,69 @@ class TestSourceStepFailure:
             ns, target, monkeypatch, extract_cmd, "commit_files", real,
         )
 
+    #: A tracked file of the member that stays.
+    EDITED = "pkgC/README.md"
+
+    def _edit_source_while_the_target_is_built(self, ns, monkeypatch):
+        """Another session edits the source after the extract checked it clean:
+        a tracked file changed and a new untracked one."""
+        from rlsbl.commands.monorepo import extract_cmd
+
+        _commit(ns.root, {self.EDITED: "# pkgC\n"}, "docs: pkgC readme")
+        steps = dict(extract_cmd._APPLY_STEPS)
+        real = steps[extract_cmd.ITEM_TRANSITION_RECORD]
+
+        def edit_then_write(dep, item, run):
+            (ns.root / self.EDITED).write_text("# another session's edit\n")
+            (ns.root / "notes.txt").write_text("another session's notes\n")
+            return real(dep, item, run)
+
+        steps[extract_cmd.ITEM_TRANSITION_RECORD] = edit_then_write
+        monkeypatch.setattr(extract_cmd, "_APPLY_STEPS", steps)
+
+    def test_a_failed_source_step_leaves_another_sessions_edits_alone(
+        self, tmp_path, monkeypatch,
+    ):
+        from rlsbl.commands.monorepo import sync
+
+        ns = make_source(tmp_path)
+        target = tmp_path / "core_out"
+        self._edit_source_while_the_target_is_built(ns, monkeypatch)
+        head = gitout(ns.root, "rev-parse", "HEAD")
+        self._fail_in(monkeypatch, sync, "_cmd_sync")
+
+        with pytest.raises(ExtractError):
+            cmd_extract(str(ns.root), "core", str(target))
+        assert gitout(ns.root, "rev-parse", "HEAD") == head
+        assert (ns.root / self.EDITED).read_text() == "# another session's edit\n"
+        assert (ns.root / "notes.txt").read_text() == "another session's notes\n"
+
+    def test_the_source_commit_never_takes_another_sessions_edits(
+        self, tmp_path, monkeypatch,
+    ):
+        ns = make_source(tmp_path)
+        target = tmp_path / "core_out"
+        self._edit_source_while_the_target_is_built(ns, monkeypatch)
+        head = gitout(ns.root, "rev-parse", "HEAD")
+
+        with pytest.raises(ExtractError) as exc:
+            cmd_extract(str(ns.root), "core", str(target))
+        message = str(exc.value)
+        assert self.EDITED in message and "notes.txt" in message
+        assert gitout(ns.root, "rev-parse", "HEAD") == head
+        assert (ns.root / "notes.txt").exists()
+
+        # The fix it names: set the changes aside, delete the target, re-run.
+        (ns.root / "notes.txt").unlink()
+        run_git(ns.root, "checkout", "--", self.EDITED)
+        monkeypatch.undo()
+        shutil.rmtree(target)
+        cmd_extract(str(ns.root), "core", str(target))
+        assert gitout(ns.root, "status", "--porcelain") == ""
+        assert gitout(ns.root, "log", "-1", "--format=%s") == (
+            "monorepo: extract releasable core"
+        )
+
 
 class TestApplySingleMember:
     def test_destination_is_a_flat_repository_that_identifies_itself(
