@@ -113,6 +113,61 @@ def _lock_home(ctx):
     return ".rlsbl", str(ctx.project_root)
 
 
+def _in_flight_releases(ctx):
+    """``(where to run the fix, state file)`` for each release stopped mid-flight.
+
+    A standalone project has one state file; a workspace has one per
+    releasable, found from the releasable's state directory, and the fix is
+    run from the member the stopped release was started for.
+    """
+    from .release.release_state import (
+        find_releasable_state_files, get_state_path, load_release_state,
+    )
+
+    if not ctx.workspace_root:
+        path = get_state_path(str(ctx.project_root))
+        return [(str(ctx.project_root), path)] if os.path.isfile(path) else []
+
+    from ..workspace import load_workspace, members_of
+
+    ws_root = str(ctx.workspace_root)
+    projects = load_workspace(ws_root)
+    found = []
+    for rel_name, state_path in find_releasable_state_files(ws_root):
+        saved = load_release_state(state_path) or {}
+        rep = next(
+            (p for p in projects if p["name"] == saved.get("monorepo_name")), None,
+        )
+        if rep is None:
+            members = members_of(rel_name, projects)
+            rep = members[0] if members else {"path": "."}
+        found.append((os.path.normpath(os.path.join(ws_root, rep["path"])), state_path))
+    return found
+
+
+def _refuse_in_flight_releases(ctx):
+    """Refuse the scrub while a release is stopped mid-flight.
+
+    A stopped release's state records commits of the history the scrub is
+    about to rewrite, and its release checkout, which the scrub removes, is
+    where it resumes. The release is finished or given up first.
+    """
+    stopped = _in_flight_releases(ctx)
+    if not stopped:
+        return
+    lines = "\n".join(f"  {state} (run the fix from {where})" for where, state in stopped)
+    print(
+        f"Error: a release is stopped mid-flight:\n{lines}\n"
+        f"The scrub rewrites the history that release's state records and "
+        f"removes the release checkout it resumes in. Finish the release with "
+        f"`rlsbl release resume --watch` (or --no-watch), or give it up with "
+        f"`rlsbl release abandon`, from the directory named, then re-run this "
+        f"scrub.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
 def _remove_release_checkout(ctx):
     """Remove the release checkout under the lock a running release holds.
 
@@ -1032,6 +1087,8 @@ def run_cmd(flags, *, ctx):
 
     # -- If not resuming, build and run safegit command --
     if not resuming:
+        _refuse_in_flight_releases(ctx)
+
         # Snapshot remote refs BEFORE rewriting: these are the lease
         # expectations for the force-pushes later. Only needed when the
         # rewrite will actually happen.

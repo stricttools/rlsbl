@@ -577,6 +577,8 @@ rlsbl release scrub --pattern "secret_token_.*" --replace "REDACTED" --reason "R
 rlsbl release scrub --file config/secrets.yml --reason "Remove secrets file" --from-commit a1b2c3d
 ```
 
+The command refuses to start while a release is stopped mid-flight (an `in-progress.json` state file, in a workspace under any releasable): the rewrite would change the commits that release's state records, and the release checkout it would resume in is removed. The refusal names each state file and the directory to fix it from: finish the release with `rlsbl release resume`, or give it up with `rlsbl release abandon`, then re-run the scrub.
+
 The command:
 1. Removes the release checkout (`.git/rlsbl/release-checkout`) and its worktree registration, under the lock a running release holds. Its detached HEAD is a ref git counts as reachable, so it would keep the pre-rewrite history, and the content being scrubbed, reachable; the next release creates it afresh.
 2. Runs safegit scrub (match, file, or recipe mode) with repeatable `--remap-shas-in` globs covering every changelog directory (`.rlsbl/changes/*.jsonl` per project, plus `.rlsbl-monorepo/releasables/*/changes/*.jsonl` in monorepos). safegit remaps the full commit hashes INSIDE the JSONL files at every commit of the rewritten history, so all historical versions of the changelogs — including HEAD — stay self-consistent after the rewrite. The glob list is derived from the same enumeration the validation step uses, so remap coverage and validation coverage cannot diverge. Committed scrub archives (`.rlsbl/scrubs/*.json`) are deliberately excluded: they are records of what WAS, their old-side SHAs dangle by design, and validation never reads them.
