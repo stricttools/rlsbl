@@ -4,9 +4,10 @@ import difflib
 import json
 import os
 import re
+import subprocess
 import sys
 
-from .. import effects
+from .. import effects, release_checkout
 from ..release_commit_remap import ON_CONTENT_CHANGE_RECORD, repair_release_commits
 from ..changelog.files import (
     can_remap_hash,
@@ -81,6 +82,155 @@ def _save_step(path, data, step_name):
 def _fail(msg):
     print(f"Error: {msg}", file=sys.stderr)
     sys.exit(1)
+
+
+#: Marks a saved scrub result whose safegit run rewrote the local history and
+#: then failed. A re-run runs safegit again to confirm before finishing.
+UNVERIFIED_KEY = "safegit_failed_after_rewrite"
+
+#: The cleanup safegit names when content remains in unreachable objects.
+PRUNE_COMMAND = "git reflog expire --expire=now --all && git gc --prune=now"
+
+
+def _lock_home(ctx):
+    """The state home whose advisory lock the scrub takes, and its root."""
+    if ctx.workspace_root:
+        return ".rlsbl-monorepo", str(ctx.workspace_root)
+    return ".rlsbl", str(ctx.project_root)
+
+
+def _remove_release_checkout(ctx):
+    """Remove the release checkout under the lock a running release holds.
+
+    The lock is not held across the safegit run itself: its file is untracked
+    in the working tree while held, and safegit refuses a dirty tree.
+    """
+    lock_dir, lock_root = _lock_home(ctx)
+    acquire_lock(lock_dir=lock_dir, project_root=lock_root)
+    try:
+        return release_checkout.remove_checkout(str(ctx.project_root))
+    finally:
+        release_lock()
+
+
+def _failure_detail(exc):
+    """safegit's own report of why it failed: its stderr, trimmed."""
+    detail = (getattr(exc, "stderr", None) or "").strip()
+    return detail or str(exc)
+
+
+def _rewrite_payload(stdout):
+    """The payload of safegit --json output that reports a rewrite, else None."""
+    try:
+        document = _parse_safegit_envelope(stdout or "")
+    except ValueError:
+        return None
+    payload = document.get("payload") or {}
+    return payload if payload.get("rewrites") else None
+
+
+def _unverified_error(exc, scrub_result_path):
+    return (
+        f"safegit rewrote the local history, then failed "
+        f"(exit {exc.returncode}):\n{_failure_detail(exc)}\n"
+        f"The rewrite is saved in {scrub_result_path}, and nothing was "
+        f"pushed: origin, its tags, and the release record still hold the "
+        f"old history. Remove what still holds the old history (safegit "
+        f"names the objects above; a git worktree checked out at an old "
+        f"commit is one such holder), run `{PRUNE_COMMAND}`, and re-run this "
+        f"same command: it runs safegit again to confirm the content is "
+        f"gone, then finishes the scrub."
+    )
+
+
+def _save_failed_rewrite_and_exit(exc, safegit_args, remote_refs, scrub_result_path):
+    """Exit 1 on a failed safegit run, saving the rewrite if it made one.
+
+    safegit reports its rewrite in its --json output even when a later stage (its
+    post-rewrite verification or cleanup) fails. Without the saved rewrite a
+    re-run would find nothing left to rewrite and never push, stranding the
+    local history rewritten and origin not.
+    """
+    payload = _rewrite_payload(getattr(exc, "stdout", None))
+    head = run("git", ["rev-parse", "HEAD"])
+    if payload is None or payload.get("new_head") != head:
+        _fail(f"safegit scrub failed (exit {exc.returncode}):\n{_failure_detail(exc)}")
+    payload["completed_steps"] = []
+    payload["remote_refs"] = remote_refs or {}
+    payload["safegit_args"] = list(safegit_args)
+    payload[UNVERIFIED_KEY] = True
+    effects.makedirs(os.path.dirname(scrub_result_path), exist_ok=True)
+    effects.atomic_write_text(scrub_result_path, json.dumps(payload, indent=2))
+    _fail(_unverified_error(exc, scrub_result_path))
+
+
+def compose_rewrites(saved, again):
+    """Fold a second safegit rewrite (*again*) into the saved one, in place.
+
+    The saved result maps each original commit to the one the first run wrote;
+    a second run maps those onward. The composition maps each original commit
+    to where it ends up, keeps a tag's original ``old_sha`` with its final
+    ``new_sha``, and takes the second run's ``new_head``.
+    """
+    second = again.get("rewrites") or {}
+    if not second:
+        return
+    first = saved.get("rewrites") or {}
+    composed = {old: second.get(mid, mid) for old, mid in first.items()}
+    written = set(first.values())
+    for old, new in second.items():
+        if old not in written:
+            composed[old] = new
+    saved["rewrites"] = composed
+    by_ref = {t["refname"]: t for t in saved.get("tags") or []}
+    for tag in again.get("tags") or []:
+        if tag["refname"] in by_ref:
+            by_ref[tag["refname"]]["new_sha"] = tag["new_sha"]
+        else:
+            saved.setdefault("tags", []).append(dict(tag))
+    saved["new_head"] = again["new_head"]
+
+
+def _verify_saved_rewrite(scrub_data, flags, mode, scrub_result_path, *,
+                          project_root, ctx, workspace_projects):
+    """Re-run the saved scrub's safegit before finishing its rewrite.
+
+    The same arguments are required: the saved rewrite belongs to one scrub,
+    and a different pattern would confirm something else. A run that fails
+    again keeps the saved result and exits 1 with safegit's report; one that
+    rewrites further is folded into the saved rewrite.
+    """
+    remap_globs = changelog_remap_globs(
+        str(project_root), ctx.workspace_root,
+        workspace_projects=workspace_projects,
+    )
+    safegit_args = _build_safegit_args(flags, mode, remap_globs)
+    saved_args = scrub_data.get("safegit_args") or []
+    if safegit_args != saved_args:
+        _fail(
+            f"{scrub_result_path} holds a rewrite made by `safegit "
+            f"{' '.join(saved_args)}`, which then failed; this run would run "
+            f"`safegit {' '.join(safegit_args)}`. Re-run `rlsbl release "
+            f"scrub` with the arguments the saved scrub was started with, so "
+            f"it confirms that scrub and finishes it."
+        )
+    try:
+        output = run("safegit", safegit_args, timeout=600)
+    except subprocess.CalledProcessError as e:
+        again = _rewrite_payload(getattr(e, "stdout", None))
+        if again is not None:
+            compose_rewrites(scrub_data, again)
+            effects.atomic_write_text(
+                scrub_result_path, json.dumps(scrub_data, indent=2),
+            )
+        _fail(_unverified_error(e, scrub_result_path))
+    again = _parse_safegit_envelope(output).get("payload") or {}
+    compose_rewrites(scrub_data, again)
+    if "cleanup_ok" in again:
+        scrub_data["cleanup_ok"] = again["cleanup_ok"]
+    del scrub_data[UNVERIFIED_KEY]
+    effects.atomic_write_text(scrub_result_path, json.dumps(scrub_data, indent=2))
+    print("safegit confirmed the saved rewrite; finishing the scrub.")
 
 
 def _select_and_validate_mode(flags):
@@ -851,6 +1001,14 @@ def run_cmd(flags, *, ctx):
     # -- Cache workspace projects (also needed for the remap globs) --
     workspace_projects = load_workspace(str(ctx.workspace_root)) if ctx.workspace_root else None
 
+    # -- A saved rewrite safegit failed after: confirm before finishing it --
+    if resuming and scrub_data.get(UNVERIFIED_KEY):
+        _verify_saved_rewrite(
+            scrub_data, flags, mode, scrub_result_path,
+            project_root=project_root, ctx=ctx,
+            workspace_projects=workspace_projects,
+        )
+
     # -- If not resuming, build and run safegit command --
     if not resuming:
         # Snapshot remote refs BEFORE rewriting: these are the lease
@@ -875,8 +1033,21 @@ def run_cmd(flags, *, ctx):
         )
         safegit_args = _build_safegit_args(flags, mode, remap_globs)
 
+        if not flags.get("dry-run"):
+            removed = _remove_release_checkout(ctx)
+            if removed:
+                print(
+                    f"Removed the release checkout at {removed}: it pins the "
+                    f"history as it was before the rewrite. The next release "
+                    f"creates it afresh."
+                )
+
         try:
             output = run("safegit", safegit_args, timeout=600)
+        except subprocess.CalledProcessError as e:
+            _save_failed_rewrite_and_exit(
+                e, safegit_args, remote_refs, scrub_result_path,
+            )
         except Exception as e:
             print(f"Error: safegit scrub failed: {e}", file=sys.stderr)
             sys.exit(1)
@@ -986,8 +1157,7 @@ def run_cmd(flags, *, ctx):
         tag_schemes = tag_scheme_index(str(ctx.workspace_root), workspace_projects)
 
     # -- Acquire lock --
-    lock_dir = ".rlsbl-monorepo" if ctx.workspace_root else ".rlsbl"
-    lock_root = str(ctx.workspace_root) if ctx.workspace_root else str(project_root)
+    lock_dir, lock_root = _lock_home(ctx)
     acquire_lock(lock_dir=lock_dir, project_root=lock_root)
 
     # Every changelog dir with hash-bearing JSONL files: per-project

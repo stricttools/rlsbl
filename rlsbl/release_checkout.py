@@ -12,7 +12,9 @@ under the repository's git common directory::
 It is one ``git worktree`` of the repository, detached, and it is REUSED from
 release to release: each release resets it to the commit it starts from and
 removes its untracked files (``git clean -ffd``), leaving ignored files in
-place, so dependency environments and build caches stay warm. Submodules are
+place, so dependency environments and build caches stay warm. A history
+rewrite (``release scrub``) removes it first, since its HEAD keeps the old
+history reachable; the next release creates it afresh. Submodules are
 initialized when the commit declares any. The checkout's commits reach the
 release branch through one door, :func:`advance_live_branch`:
 
@@ -353,6 +355,31 @@ def prepare_checkout(live_root, sha) -> str:
             f"to {sha[:12]}:\n{_render(leftover)}\nDelete {path} and re-run; "
             f"the next release creates it afresh."
         )
+    return path
+
+
+def remove_checkout(live_root) -> str | None:
+    """Remove the release checkout and its worktree registration.
+
+    Returns the removed checkout's path, or None when the repository has no
+    release checkout registered. The checkout's detached HEAD is a ref git
+    counts as reachable, so it pins the history it was reset to; a history
+    rewrite removes it first, and the next release creates it afresh. A
+    registration whose directory is already gone is removed too. A directory at
+    the checkout's path that git does not list as a worktree holds no ref and
+    is left alone, as :func:`prepare_checkout` leaves it.
+    """
+    path = checkout_dir(live_root)
+    listing = _out(["worktree", "list", "--porcelain"], cwd=live_root)
+    registered = {
+        os.path.realpath(line[len("worktree "):])
+        for line in listing.splitlines() if line.startswith("worktree ")
+    }
+    if os.path.realpath(path) not in registered:
+        return None
+    # --force twice: a checkout with untracked or ignored files (the warm
+    # caches) or a locked registration is removed all the same.
+    _git(["worktree", "remove", "--force", "--force", path], cwd=live_root)
     return path
 
 
