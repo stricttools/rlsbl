@@ -466,23 +466,27 @@ def _ensure_target_in_config(registry_name, ctx):
     ctx.config = read_project_config(ctx.project_root)
 
 
+# Per-registry setup steps. The release step is shared by every registry and
+# printed once after them (RELEASE_STEP); there is no push step because the
+# release pushes main itself.
 NEXT_STEPS = {
     "npm": [
         "Add an NPM_TOKEN secret to your GitHub repo (Settings > Secrets > Actions)",
-        "Push to GitHub to activate the CI workflow",
-        "Run rlsbl release [patch|minor|major]",
     ],
     "pypi": [
-        "Push to GitHub",
         "Configure Trusted Publishing on pypi.org",
-        "Run rlsbl release [patch|minor|major]",
     ],
     "go": [
         "GoReleaser runs in CI via GitHub Actions (no local install needed)",
-        "Push to GitHub to activate the CI workflow",
-        "Run rlsbl release [patch|minor|major]",
     ],
 }
+
+RELEASE_STEP = (
+    "Run `rlsbl release init`, set the bump type in "
+    "`.rlsbl/releases/unreleased.toml`, then run `rlsbl release run --watch`"
+)
+
+NPM_LOCKFILE_STEP = 'Run "npm install" and commit package-lock.json before pushing'
 
 # A Go library's publish workflow does not run goreleaser at all -- it verifies
 # module availability on the proxy. Telling its author about goreleaser is
@@ -512,6 +516,26 @@ def _next_steps_for(registry, config):
     if registry == "go" and _go_artifact_kind(config) == "library":
         steps[0] = GO_LIBRARY_FIRST_STEP
     return steps
+
+
+def _print_next_steps(registries, config, npm_lockfile_missing):
+    """Print the "Next steps" block for the project's *registries*.
+
+    Each registry with an entry in NEXT_STEPS contributes its own setup steps,
+    in *registries* order; the shared release step follows once. Nothing is
+    printed when no registry has steps.
+    """
+    steps = []
+    for registry in registries:
+        steps.extend(_next_steps_for(registry, config) or [])
+    if not steps:
+        return
+    if npm_lockfile_missing:
+        steps.insert(0, NPM_LOCKFILE_STEP)
+    steps.append(RELEASE_STEP)
+    print("\nNext steps:")
+    for i, step in enumerate(steps, 1):
+        print(f"  {i}. {step}")
 
 
 _ESCAPE_SENTINEL = "__RLSBL_ESCAPE_OPEN__"
@@ -1614,13 +1638,7 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
 
     # Next steps
     if registry:
-        steps = _next_steps_for(registry, config)
-        if steps:
-            if npm_lockfile_missing:
-                steps.insert(0, 'Run "npm install" and commit package-lock.json before pushing')
-            print("\nNext steps:")
-            for i, step in enumerate(steps, 1):
-                print(f"  {i}. {step}")
+        _print_next_steps([registry], config, npm_lockfile_missing)
 
     # Auto-commit scaffold changes unless --no-auto-commit is set
     if not flags.get("auto-commit", True):
@@ -3351,18 +3369,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
         if private:
             _print_private_summary()
         else:
-            # Show combined next steps for dual-registry
-            steps = [
-                "Add an NPM_TOKEN secret to your GitHub repo (Settings > Secrets > Actions)",
-                "Configure Trusted Publishing on pypi.org",
-                "Push to GitHub to activate the CI workflow",
-                "Run rlsbl release [patch|minor|major]",
-            ]
-            if npm_lockfile_missing:
-                steps.insert(0, 'Run "npm install" and commit package-lock.json before pushing')
-            print("\nNext steps:")
-            for i, step in enumerate(steps, 1):
-                print(f"  {i}. {step}")
+            _print_next_steps(registries_list, ctx.config, npm_lockfile_missing)
 
         # If inside a monorepo, sync root CI workflows
         _trigger_monorepo_sync(auto_commit=flags.get("auto-commit", True))
