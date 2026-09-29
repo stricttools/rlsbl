@@ -3766,6 +3766,20 @@
       "description": "Every detected target reports the same package name.",
       "subject": "project"
     },
+    "nested-member-runner-exclusion": {
+      "tags": [
+        "workspace",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "description": "Every member's test runner excludes the members nested inside it.",
+      "subject": "tests",
+      "scope": "workspace"
+    },
     "npm-private-mismatch": {
       "tags": [
         "project"

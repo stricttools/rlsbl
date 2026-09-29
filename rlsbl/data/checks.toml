@@ -1088,6 +1088,23 @@ pure = true
 needs_network = false
 depends_on = []
 
+# nested-member-runner-exclusion: a member's test runner must not collect the
+# members nested inside it. Scaffold writes one path-exact exclusion per nested
+# member (pytest addopts --ignore, deno exclude); this refuses one that is
+# missing. Pure (reads the workspace and the runners' config files). In
+# "preflight" so a parent never releases on a suite that ran a nested member's
+# tests, or skipped its own.
+[checks.nested-member-runner-exclusion]
+description = "Every member's test runner excludes the members nested inside it."
+subject = "tests"
+tags = ["workspace", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
 # go-toolchain-declared: setup-go installs the Go named by go.mod's `toolchain`
 # line and falls back to the `go` directive -- the consumers' floor -- without
 # one, so CI would test on an older Go than the project is developed with.
