@@ -61,6 +61,7 @@ CONSEQUENTIAL = {
     "transition record":          "declares what this repository's history IS, silencing a reader that would otherwise keep reporting the divergence",
     "rewrite project-name":       "renames the project's published identity and records it, after which reconcile refuses to recreate an earlier version's refs under the new identity",
     "upstream adopt-tags":        "declares tags this repository carries to be upstream's releases, and deletes them from refs/tags here and on origin",
+    "secrets sync-npm-token":     "replaces the npm credential CI publishes with, on this repository or on every repository the account can see",
 }
 
 # Everyday commands that must NEVER prompt. These are the ones the old

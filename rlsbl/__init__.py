@@ -3066,6 +3066,44 @@ def cmd_upstream_adopt_tags(ctx):
 
 
 # ---------------------------------------------------------------------------
+# secrets group
+# ---------------------------------------------------------------------------
+
+secrets_group = app.group("secrets", help="Keep the Actions secrets CI publishes with in step with the credentials on this machine. No secret value is ever printed or passed as an argument.")
+
+
+@secrets_group.command(
+    name="sync-npm-token",
+    effect="mutating",
+    # Consequential because only a human may decide to replace the credential
+    # CI publishes with -- across every repository the account can see, with
+    # --all.
+    consequential=True,
+    grants=[strictcli.Grant(
+        "set-secret",
+        "replaces the NPM_TOKEN Actions secret a repository's CI publishes to npm with",
+        strictcli.PROC_MUTATE,
+    )],
+    help="Copy the npm token in ~/.npmrc (the //registry.npmjs.org/:_authToken= line) into the NPM_TOKEN Actions secret of repositories that already have one. Refuses when ~/.npmrc holds no token, and when npm does not accept it (asked with GET https://registry.npmjs.org/-/whoami); otherwise prints the npm user it authenticates. Without --all the target is the current repository, named by its origin remote, and a repository without an NPM_TOKEN secret is refused: the secret is never created. With --all the targets are every repository the authenticated gh account can see (its own and those of every organization it belongs to) that has an NPM_TOKEN secret; archived repositories are named and skipped, since GitHub refuses writes to them. Each target is set with `gh secret set NPM_TOKEN --repo <owner/repo>`, the token piped on stdin, and printed with its outcome. Exits 1 when any target could not be read or set. The token is never printed.",
+)
+@strictcli.flag(name="all", type=bool, presence="optional", help="Target every repository the authenticated gh account can see that has an NPM_TOKEN secret, instead of the current repository (the handler targets the current repository when --all is not passed)")
+@effects.handler
+def cmd_secrets_sync_npm_token(ctx, all):
+    """Set NPM_TOKEN from ~/.npmrc on repositories that carry it."""
+    from .npm_token import sync_npm_token
+    from .utils import get_origin_repo
+
+    all = _opt_default(all, False)
+    code = sync_npm_token(
+        all_repositories=all,
+        origin_repo=None if all else get_origin_repo(),
+        out=sys.stdout, err=sys.stderr,
+    )
+    if code:
+        sys.exit(code)
+
+
+# ---------------------------------------------------------------------------
 # options group
 # ---------------------------------------------------------------------------
 

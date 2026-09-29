@@ -107,6 +107,10 @@ EXPECTED_EFFECTS = {
     # and deleting the tags on origin. Mutating, previewable, and
     # consequential -- whether a tag is upstream's is a human's call.
     "upstream.adopt-tags": "mutating",
+    # Replaces the NPM_TOKEN Actions secret on GitHub with the token in
+    # ~/.npmrc. Mutating, previewable, and consequential -- replacing the
+    # credential CI publishes with is a human's call.
+    "secrets.sync-npm-token": "mutating",
     "options.registry": "read_only",
     "options.set": "mutating",
 }
