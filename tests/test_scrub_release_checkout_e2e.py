@@ -27,6 +27,7 @@ from githarness import (
     add_remote,
     commit_file,
     git,
+    ignore_rlsbl_lock,
     init_repo,
     remote_ref,
 )
@@ -43,6 +44,7 @@ def repo(safegit_bin, monkeypatch, tmp_path):
     )
     repo = tmp_path / "repo"
     init_repo(repo, email="e2e@test.local", name="E2E")
+    ignore_rlsbl_lock(repo)
     # What scaffold's .gitignore holds for the scrub's resume state.
     commit_file(repo, ".gitignore", ".rlsbl/releases/scrub-result.json\n",
                 "ignore run state")

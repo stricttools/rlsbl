@@ -46,6 +46,7 @@ from githarness import (
     add_remote as _add_remote,
     commit_file as _commit_file,
     git as _git,
+    ignore_rlsbl_lock,
     init_repo,
     remote_ref as _remote_ref,
 )
@@ -79,6 +80,7 @@ def _setup_managed_repo(env):
     a rewrite will move."""
     repo = env / "repo"
     init_repo(repo, email="e2e@test.local", name="E2E")
+    ignore_rlsbl_lock(repo)
 
     c1 = _commit_file(repo, "config.env", f"token={SECRET}\n", "add config")
     changes = repo / ".rlsbl" / "changes"

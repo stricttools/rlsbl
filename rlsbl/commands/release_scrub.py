@@ -168,23 +168,56 @@ def _refuse_in_flight_releases(ctx):
     sys.exit(1)
 
 
-def _remove_release_checkout(ctx):
-    """Remove the release checkout under the lock a running release holds.
+def _refuse_unignored_lock(lock_dir, lock_root):
+    """Refuse when git does not ignore the lock file the scrub holds.
 
-    The lock is not held across the safegit run itself: its file is untracked
-    in the working tree while held, and safegit refuses a dirty tree.
+    The scrub holds the lock through the safegit rewrite, and the lock is a
+    file in the working tree while held; safegit refuses a dirty tree, so git
+    must ignore that file (the scaffolded .gitignore does).
+    """
+    rel = f"{lock_dir}/lock"
+    probe = effects.run(
+        ["git", "check-ignore", "-q", "--", rel],
+        cwd=lock_root, capture_output=True, text=True,
+    )
+    if effects.unsettled(probe) or probe.returncode == 0:
+        return
+    if probe.returncode != 1:
+        print(
+            f"Error: `git check-ignore -q -- {rel}` failed in {lock_root} "
+            f"(exit {probe.returncode}): {(probe.stderr or '').strip()}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    print(
+        f"Error: git does not ignore {rel}, the lock file the scrub holds "
+        f"while safegit rewrites history, and safegit refuses to rewrite a "
+        f"working tree that file makes dirty. Add `{rel}` to .gitignore at "
+        f"{lock_root} (the .gitignore `rlsbl scaffold` writes carries that "
+        f"line), commit it, and re-run this scrub.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
+def _lock_and_remove_release_checkout(ctx, held):
+    """Take the lock a running release holds and remove the release checkout.
+
+    The lock stays held, recorded in *held*, through the safegit rewrite and
+    the rest of the scrub: a release that starts once the checkout is gone
+    waits for the rewrite rather than re-creating the checkout on the history
+    the rewrite replaces.
 
     A release that was running when the scrub started held the lock, so it
     may have stopped while the scrub waited for it: the stopped-release
     refusal is asked again once the lock is held.
     """
     lock_dir, lock_root = _lock_home(ctx)
+    _refuse_unignored_lock(lock_dir, lock_root)
     acquire_lock(lock_dir=lock_dir, project_root=lock_root)
-    try:
-        _refuse_in_flight_releases(ctx)
-        return release_checkout.remove_checkout(str(ctx.project_root))
-    finally:
-        release_lock()
+    held.append(True)
+    _refuse_in_flight_releases(ctx)
+    return release_checkout.remove_checkout(str(ctx.project_root))
 
 
 def _failure_detail(exc):
@@ -1035,6 +1068,17 @@ def _regenerate_and_assert_unchanged(proj_path, scrub_result_path):
 
 
 def run_cmd(flags, *, ctx):
+    # The lock the rewrite takes (see _lock_and_remove_release_checkout) is
+    # held until the scrub returns or exits.
+    held = []
+    try:
+        _run_scrub(flags, ctx=ctx, held=held)
+    finally:
+        if held:
+            release_lock()
+
+
+def _run_scrub(flags, *, ctx, held):
     # -- Validate inputs --
     mode = _select_and_validate_mode(flags)
 
@@ -1140,7 +1184,7 @@ def run_cmd(flags, *, ctx):
         safegit_args = _build_safegit_args(flags, mode, remap_globs)
 
         if not flags.get("dry-run"):
-            removed = _remove_release_checkout(ctx)
+            removed = _lock_and_remove_release_checkout(ctx, held)
             if removed:
                 print(
                     f"Removed the release checkout at {removed}: it pins the "

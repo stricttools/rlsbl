@@ -172,7 +172,7 @@ class TestScrubPreviewRecordsTheChild:
         # predicate rather than trying to parse a recorded run's result.
         import inspect
 
-        src = inspect.getsource(release_scrub.run_cmd)
+        src = inspect.getsource(release_scrub._run_scrub)
         idx_guard = src.index("effects.unsettled(output)")
         idx_parse = src.index("_parse_safegit_envelope(output)")
         assert idx_guard < idx_parse, (

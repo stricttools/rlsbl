@@ -29,6 +29,7 @@ from githarness import (
     add_remote as _add_remote,
     commit_file as _commit_file,
     git as _git,
+    ignore_rlsbl_lock,
     init_repo,
 )
 
@@ -70,6 +71,7 @@ def _setup_released_repo(env):
     """
     repo = env / "repo"
     init_repo(repo, email="e2e@test.local", name="E2E")
+    ignore_rlsbl_lock(repo)
 
     c1 = _commit_file(repo, "app.py", "print('hi')\n", f"add app ({SECRET})")
     changes = repo / ".rlsbl" / "changes"
