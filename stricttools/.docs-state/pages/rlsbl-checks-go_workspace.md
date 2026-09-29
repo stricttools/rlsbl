@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.checks.go_workspace"
-description = "Go modules that depend on each other inside one workspace (tags: workspace, preflight)."
+description = "Checks for Go modules that depend on each other in one workspace: a sibling require at or above its latest release, and no replace into the workspace."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 17
 +++

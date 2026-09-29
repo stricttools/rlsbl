@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.go_mod"
-description = "The require and replace directives of a go.mod, read without the go command."
+description = "Reads the require and replace directives of a go.mod, in their one-line and block forms and with comments ignored, without running the go command."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 101
 +++

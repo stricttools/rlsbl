@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.checks.nested"
-description = "Nested-member checks (tags: workspace, preflight): a member's tools leave the members inside it alone."
+description = "Checks that a member's test runner, published upload, and uv sources leave out the members nested inside it, each naming the file or command that fixes it."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 18
 +++

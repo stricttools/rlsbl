@@ -1,8 +1,7 @@
 +++
 title = "rlsbl.nested_exclusions"
-description = "Telling a member's own test runner to skip the members nested inside it."
+description = "Writes one path-exact exclusion per nested member into a member's pytest addopts or Deno exclude, and reports which exclusions a member is still missing."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 127
 +++
