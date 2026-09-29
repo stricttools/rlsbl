@@ -125,8 +125,8 @@ def _root_releasable_config(root_dir, publish_mode, gate_regex):
     lives in its releasable's ``config.json`` and this init writes it. The
     publish mode has no default, as everywhere else. A root that publishes
     (publish mode "ci" and a detected release target) gets its targets and
-    their default pipelines, and must name the check runs its publish gate
-    waits for: its CI is hand-authored, so rlsbl cannot infer them.
+    their default pipelines, and must name the check runs publishing waits
+    for: its CI is hand-authored, so rlsbl cannot infer them.
     """
     import re
 
@@ -175,7 +175,7 @@ def _root_releasable_config(root_dir, publish_mode, gate_regex):
                     "Error: --publish-gate-check-regex is required with "
                     "--root-releasable and --publish-mode ci when the root "
                     f"publishes (release targets detected at the root: "
-                    f"{', '.join(names)}). The publish gate waits for the root "
+                    f"{', '.join(names)}). Publishing waits for the root "
                     "package's CI check runs on the release commit, and that "
                     "CI is hand-authored, so rlsbl cannot infer their names. "
                     "Pass the regex that matches them, e.g. "
