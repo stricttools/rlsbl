@@ -42,6 +42,7 @@ def run(
     capture_output=False,
     text=False,
     shell=False,
+    input=None,
 ):
     """Run a command and return the :class:`subprocess.CompletedProcess`.
 
@@ -61,6 +62,7 @@ def run(
         capture_output: capture stdout/stderr instead of inheriting them.
         text: decode captured streams as text.
         shell: run *argv* through the system shell.
+        input: data written to the child's stdin (text when *text* is true).
     """
     kwargs = {}
     if cwd is not None:
@@ -77,6 +79,8 @@ def run(
         kwargs["text"] = True
     if shell:
         kwargs["shell"] = True
+    if input is not None:
+        kwargs["input"] = input
     return subprocess.run(argv, **kwargs)
 
 

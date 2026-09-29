@@ -196,6 +196,7 @@ def run(
     resource=None,
     skip_if_current=None,
     grant=None,
+    input=None,
 ):
     """Run a command and return the :class:`subprocess.CompletedProcess`.
 
@@ -218,6 +219,10 @@ def run(
             out that the handler skips this step when the resource is current.
         grant: name of a grant declared on the running command, whose reason
             is rendered beside the step in the preview.
+        input: data written to the child's stdin -- the way a secret reaches
+            a child without appearing in its argv. A preview never renders
+            it, and refuses it on an observe: the framework runs an observe
+            without stdin, so the preview would run a different command.
     """
     h = _handle()
     if h is None:
@@ -230,11 +235,18 @@ def run(
             capture_output=capture_output,
             text=text,
             shell=shell,
+            input=input,
         )
 
     # ``shell=True`` is exactly ``/bin/sh -c <string>``; the contract's method
     # set takes argv lists only, so the shell is spelled out.
     listed = ["/bin/sh", "-c", argv] if shell else list(argv)
+    if input is not None and _is_observe(listed):
+        raise ValueError(
+            f"effects.run: stdin input cannot reach an allowlisted observe "
+            f"under --dry-run ({listed[:3]}): the preview would run it "
+            f"without the input"
+        )
     result = h.run(
         listed,
         cwd=cwd,
@@ -259,6 +271,15 @@ def run(
     if check and result.exit_code != 0:
         raise subprocess.CalledProcessError(result.exit_code, listed, stdout, stderr)
     return subprocess.CompletedProcess(listed, result.exit_code, stdout, stderr)
+
+
+def _is_observe(argv):
+    """Does *argv* match an observe-allowlist prefix (element-wise)?"""
+    from .observe_allowlist import prefixes
+
+    return any(
+        tuple(argv[:len(prefix)]) == tuple(prefix) for prefix in prefixes()
+    )
 
 
 def spawn(argv, *, cwd=None, env=None):
@@ -288,12 +309,15 @@ def gh(
     check=False,
     capture_output=False,
     text=False,
+    input=None,
+    grant=None,
 ):
     """Invoke the ``gh`` CLI.
 
     When *repo* is given, ``GH_REPO`` is injected into a per-call environment
     copy so ``gh`` targets that repository.  ``os.environ`` is never mutated
-    (critical for thread-safety in watch.py's ThreadPoolExecutor).
+    (critical for thread-safety in watch.py's ThreadPoolExecutor).  *input*
+    and *grant* are :func:`run`'s.
     """
     if repo is not None:
         # ``is not None``, not truthiness: an explicitly empty *env* means an
@@ -308,6 +332,8 @@ def gh(
         check=check,
         capture_output=capture_output,
         text=text,
+        input=input,
+        grant=grant,
     )
 
 
