@@ -58,6 +58,20 @@ SAFEGIT_SRC="${RLSBL_SAFEGIT_SRC:-$(dirname "${REPO_ROOT}")/safegit}"
 
 mkdir -p "${GO_DOWNLOAD_CACHE}"
 
+# The pypi CI template's upload check builds the package with hatchling, and
+# its tests run that step offline inside the sandbox, which serves a copy of
+# the real uv cache. Build a throwaway package once here, online, so the
+# hatchling build backend sits in that cache.
+HATCH_PROBE="$(mktemp -d)"
+printf '[project]\nname = "rlsbl-prewarm-probe"\nversion = "0.0.0"\n\n[build-system]\nrequires = ["hatchling"]\nbuild-backend = "hatchling.build"\n' \
+  > "${HATCH_PROBE}/pyproject.toml"
+mkdir -p "${HATCH_PROBE}/rlsbl_prewarm_probe"
+: > "${HATCH_PROBE}/rlsbl_prewarm_probe/__init__.py"
+if ! ( cd "${HATCH_PROBE}" && uv build --out-dir dist >/dev/null 2>&1 ); then
+  echo "[prewarm] WARNING: could not put the hatchling build backend in the uv cache" >&2
+fi
+rm -rf "${HATCH_PROBE}"
+
 # A module-cache entry is usable only when ALL THREE files an offline
 # `go install` needs are present and non-empty. An interrupted fetch leaves
 # the `.info` behind without the `.mod`/`.zip`, so gating on the `.info` alone

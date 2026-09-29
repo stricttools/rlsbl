@@ -3780,6 +3780,20 @@
       "subject": "tests",
       "scope": "workspace"
     },
+    "nested-member-upload-contents": {
+      "tags": [
+        "workspace",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": false,
+      "pure": false,
+      "needs_network": false,
+      "depends_on": [],
+      "description": "A member's npm package and Go module zip carry no nested member's files.",
+      "subject": "project",
+      "scope": "workspace"
+    },
     "npm-private-mismatch": {
       "tags": [
         "project"
