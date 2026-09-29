@@ -53,6 +53,17 @@ from rlsbl.workspace import (
 )
 
 
+def _archive(rel_dir, version):
+    """Record *version* as released, shipping ``packages/golib``."""
+    from rlsbl.release_file import write_archived_release_file
+
+    write_archived_release_file(
+        os.path.join(rel_dir, "releases"), version, bump="patch", include=[],
+        description=f"release {version}", candidate_sha="a" * 40,
+        tree_hashes={"packages/golib": "b" * 40},
+    )
+
+
 def _make_go_member_monorepo(tmp_path, member_config, releasable_config):
     """Create a git monorepo with one Go member and a releasable config dir.
 
@@ -79,6 +90,9 @@ def _make_go_member_monorepo(tmp_path, member_config, releasable_config):
     (ws_dir / "workspace.toml").write_text(workspace_toml(""))
     write_releasable_version(str(repo), "myrel", "1.0.0")
     rel_dir = get_releasable_dir(str(repo), "myrel")
+    # go-companion-tags asks about the latest RELEASED version, which the
+    # release record holds, with the member paths that release shipped.
+    _archive(rel_dir, "1.0.0")
     with open(os.path.join(rel_dir, "config.json"), "w", encoding="utf-8") as f:
         json.dump(releasable_config, f)
 
@@ -294,6 +308,7 @@ class TestMemberSetAgreement:
 
         # 3. The go-companion-tags check agrees (member is checked, tag missing)
         write_releasable_version(str(repo), "myrel", "2.0.0")
+        _archive(rel_dir, "2.0.0")
         check_fn = _get_check("go-companion-tags")
         proj = WorkspaceProject({
             "name": "golib",
