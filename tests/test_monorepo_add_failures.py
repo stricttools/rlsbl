@@ -174,7 +174,7 @@ class TestAddStopsOnAFailedRegistrationCommit:
         result = rlsbl.app.test(["monorepo", "add", "api", "--releasable", "api"])
 
         assert result.exit_code == 1, result.stdout
-        assert "committing .rlsbl-monorepo/workspace.toml failed" in result.stderr
+        assert "committing what the add wrote failed" in result.stderr
         assert "member 'api' is not added" in result.stderr
         assert "re-run this `rlsbl monorepo add`" in result.stderr
         assert _workspace_bytes(ws) == before
@@ -224,3 +224,100 @@ class TestRemoveOfAnUnknownPath:
         assert result.exit_code == 1, result.stdout
         assert "'web' (web)" in result.stderr
         assert "web" in _member_paths(ws)
+
+
+def _tree_state(root):
+    """HEAD, the status with every untracked and ignored file, and each
+    file's bytes outside .git: what a failed add must leave as it found."""
+    files = {
+        str(p.relative_to(root)): p.read_bytes()
+        for p in sorted(root.rglob("*"))
+        if p.is_file() and ".git" not in p.relative_to(root).parts[:1]
+    }
+    dirs = sorted(
+        str(p.relative_to(root)) for p in root.rglob("*")
+        if p.is_dir() and ".git" not in p.relative_to(root).parts[:1]
+    )
+    status = _git(root, "status", "--porcelain", "--untracked-files=all", "--ignored")
+    return _git(root, "rev-parse", "HEAD"), status, files, dirs
+
+
+class TestAFailedAddLeavesTheTreeAsItWas:
+    """A member the add scaffolds: the scaffold and the sync write files,
+    and a failure after them must take every one back and commit nothing."""
+
+    def _registered_member_with_a_broken_manifest(self, root):
+        _npm_member(root, "api")
+        _commit_all(root, "api")
+        assert rlsbl.app.test(
+            ["monorepo", "add", "api", "--releasable", "api"],
+        ).exit_code == 0
+        (root / "api" / "package.json").write_text('{"name": broken')
+        _commit_all(root, "break the api manifest")
+
+    def test_a_failed_sync_after_the_scaffold(self, ws):
+        self._registered_member_with_a_broken_manifest(ws)
+        _npm_member(ws, "web")
+        _commit_all(ws, "web")
+        (ws / "notes.txt").write_text("another session's notes\n")
+        before = _tree_state(ws)
+
+        result = rlsbl.app.test(["monorepo", "add", "web", "--releasable", "web"])
+
+        assert result.exit_code == 1, result.stdout
+        assert "`rlsbl monorepo sync` failed" in result.stderr
+        assert _tree_state(ws) == before
+
+        # The fix it names: what the sync reported, then the re-run.
+        (ws / "api" / "package.json").write_text(json.dumps(
+            {"name": "api", "version": "0.1.0", "engines": {"node": ">=22"}}))
+        (ws / "notes.txt").unlink()
+        _commit_all(ws, "api: fix the manifest")
+        result = rlsbl.app.test(["monorepo", "add", "web", "--releasable", "web"])
+        assert result.exit_code == 0, result.stderr
+        assert "web" in _member_paths(ws)
+        assert _git(ws, "status", "--short", "--untracked-files=all") == ""
+
+    def test_a_failed_registration_commit_after_the_scaffold_and_sync(self, ws):
+        _npm_member(ws, "web")
+        _commit_all(ws, "web")
+        hook = ws / ".git" / "hooks" / "pre-commit"
+        hook.write_text(TestAddStopsOnAFailedRegistrationCommit._HOOK)
+        hook.chmod(0o755)
+        before = _tree_state(ws)
+
+        result = rlsbl.app.test(["monorepo", "add", "web", "--releasable", "web"])
+
+        assert result.exit_code == 1, result.stdout
+        assert "member 'web' is not added" in result.stderr
+        assert _tree_state(ws) == before
+
+        hook.unlink()
+        result = rlsbl.app.test(["monorepo", "add", "web", "--releasable", "web"])
+        assert result.exit_code == 0, result.stderr
+        assert "web" in _member_paths(ws)
+        assert _git(ws, "status", "--short", "--untracked-files=all") == ""
+
+
+@pytest.mark.skipif(
+    __import__("shutil").which("safegit") is None, reason="needs safegit on PATH",
+)
+def test_without_auto_commit_the_printed_commit_takes_what_the_add_wrote(ws):
+    import shlex
+
+    _npm_member(ws, "web")
+    _commit_all(ws, "web")
+
+    result = rlsbl.app.test(
+        ["monorepo", "add", "web", "--releasable", "web", "--no-auto-commit"],
+    )
+
+    assert result.exit_code == 0, result.stderr
+    line = next(
+        ln for ln in result.stdout.splitlines() if ln.startswith("Skipped commit")
+    )
+    command = line.split("`")[1]
+    done = subprocess.run(shlex.split(command), cwd=ws, capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr
+    assert _git(ws, "status", "--short", "--untracked-files=all") == ""
+    assert _git(ws, "log", "-1", "--format=%s").strip() == "monorepo: add web"
