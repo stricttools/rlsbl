@@ -115,3 +115,40 @@ def test_deno_gets_the_nested_member_in_its_exclude(tmp_path, monkeypatch):
     assert warnings == []
     assert json.loads((app / "deno.json").read_text())["exclude"] == ["sub"]
     assert missing_exclusions(DENO_CONFIG_EXCLUDE, str(app), ["sub"]) is None
+
+
+def _root_python_ws(tmp_path):
+    from conftest import make_workspace
+
+    root = tmp_path / "ws"
+    (root / "svc" / "tests").mkdir(parents=True)
+    (root / "pyproject.toml").write_text('[project]\nname = "rootpkg"\nversion = "0.1.0"\n')
+    (root / "svc" / "pyproject.toml").write_text('[project]\nname = "svc"\nversion = "0.1.0"\n')
+    make_workspace(root, [
+        {"path": ".", "name": "root", "releasable": "root"},
+        {"path": "svc", "name": "svc"},
+    ], releasables=[{"name": "root", "tag_format": "v{version}"},
+                    {"name": "svc", "tag_format": "{name}@v{version}"}])
+    return root
+
+
+def test_the_root_members_finding_names_a_fix_that_applies_at_the_root(
+    tmp_path, monkeypatch,
+):
+    """scaffold does not run at the workspace root, so the root member's
+    finding names the edit to make by hand, and making it clears the check."""
+    import re
+
+    import tomlkit
+
+    root = _root_python_ws(tmp_path)
+    text = " ".join(p.text for p in _check(root).problems)
+    assert "--ignore=svc" in text
+    assert "Run `rlsbl scaffold` in ." not in text
+    option = re.search(r"add (--ignore=\S+?) to addopts", text)
+    assert option, text
+    doc = tomlkit.parse((root / "pyproject.toml").read_text())
+    doc.setdefault("tool", {}).setdefault("pytest", {}).setdefault(
+        "ini_options", {})["addopts"] = [option.group(1)]
+    (root / "pyproject.toml").write_text(tomlkit.dumps(doc))
+    assert _check(root).status == "pass", [p.text for p in _check(root).problems]
