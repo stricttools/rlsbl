@@ -147,8 +147,13 @@ def _is_strictcli_module_path(path: str) -> bool:
     )
 
 
-def _go_mod_has_strictcli(project_dir: str) -> bool:
-    """Return True if go.mod has a require directive for a strictcli module.
+#: strictcli's former Go module path, and the path it moved to.
+STRICTCLI_GO_FORMER = "github.com/smm-h/strictcli"
+STRICTCLI_GO_CURRENT = "github.com/stricttools/strictcli"
+
+
+def go_strictcli_requirements(project_dir: str) -> list[str]:
+    """The strictcli module paths go.mod's require directives name, in order.
 
     Only require directives count -- both the single-line form
     (`require path version`) and the block form (`require ( ... )`).
@@ -159,10 +164,11 @@ def _go_mod_has_strictcli(project_dir: str) -> bool:
     """
     go_mod_path = os.path.join(project_dir, "go.mod")
     if not os.path.exists(go_mod_path):
-        return False
+        return []
     with open(go_mod_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
 
+    found = []
     in_require_block = False
     for raw_line in lines:
         line = raw_line.split("//", 1)[0].strip()
@@ -174,7 +180,7 @@ def _go_mod_has_strictcli(project_dir: str) -> bool:
                 continue
             module_path = line.split()[0]
             if _is_strictcli_module_path(module_path):
-                return True
+                found.append(module_path)
             continue
         if line == "require (":
             in_require_block = True
@@ -186,8 +192,13 @@ def _go_mod_has_strictcli(project_dir: str) -> bool:
                 continue
             module_path = rest.split()[0]
             if _is_strictcli_module_path(module_path):
-                return True
-    return False
+                found.append(module_path)
+    return found
+
+
+def _go_mod_has_strictcli(project_dir: str) -> bool:
+    """Return True if go.mod has a require directive for a strictcli module."""
+    return bool(go_strictcli_requirements(project_dir))
 
 
 def _go_file_imports_strictcli(filepath: str) -> bool:
