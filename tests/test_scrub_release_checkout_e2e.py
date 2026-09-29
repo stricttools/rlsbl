@@ -198,7 +198,11 @@ def test_a_scrub_stopped_after_its_commit_is_finished_by_a_rerun(
     with pytest.raises(SystemExit) as exc:
         _scrub(repo)
     assert exc.value.code == 1
-    capsys.readouterr()
+    err = capsys.readouterr().err
+    # The lease held: origin refused the push itself, and nobody moved it.
+    assert "origin refuses pushes for now" in err
+    assert "The remote changed" not in err
+    assert "re-run this same command" in err
     saved = json.loads(
         (repo / ".rlsbl" / "releases" / "scrub-result.json").read_text()
     )
