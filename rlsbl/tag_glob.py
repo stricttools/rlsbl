@@ -93,6 +93,72 @@ def parse_version_tag(tag: str, *, mode: "TagMode") -> "TagVersion | None":
     return None
 
 
+@dataclass(frozen=True)
+class TagScheme:
+    """One project's tag namespace, and the one rule deciding what is in it.
+
+    ``pattern`` is the tag format with the name filled in and the version left
+    as ``{version}`` (``kernel/v{version}``, ``www@v{version}``,
+    ``v{version}``). A tag belongs to the scheme exactly when it is the
+    pattern rendered at the version it carries: ``kernel/v*`` also LISTS
+    ``kernel/vulkan/v0.1.0``, but no version renders ``kernel/v{version}`` as
+    that tag, so it is not ``kernel``'s. A glob is only ever the listing aid
+    (:meth:`list_glob`); ownership is always :meth:`owns`.
+    """
+
+    pattern: str
+
+    def __post_init__(self):
+        if self.pattern.count("{version}") != 1:
+            raise ValueError(
+                f"a tag scheme has exactly one {{version}} slot; "
+                f"{self.pattern!r} has {self.pattern.count('{version}')}"
+            )
+
+    @classmethod
+    def from_format(cls, tag_format: str, name: str) -> "TagScheme":
+        """The scheme a ``tag_format`` declares for the project or releasable *name*."""
+        return cls(tag_format.replace("{name}", name))
+
+    @classmethod
+    def from_glob(cls, glob: str) -> "TagScheme":
+        """The scheme a listing glob was derived from.
+
+        Every glob rlsbl builds is its format with ``{version}`` replaced by
+        ``*`` (:func:`releasable_tag_glob`, the targets' ``monorepo_tag_glob``),
+        so a glob with exactly one ``*`` names exactly one scheme. Anything
+        else is refused rather than read as a guess.
+        """
+        if glob.count("*") != 1 or any(ch in glob for ch in "?["):
+            raise ValueError(
+                f"tag glob {glob!r} does not name one tag scheme: it must hold "
+                f"exactly one '*' (the version) and no other glob character"
+            )
+        return cls(glob.replace("*", "{version}"))
+
+    def render(self, version: str) -> str:
+        """The tag this scheme gives *version*."""
+        return self.pattern.replace("{version}", version)
+
+    def list_glob(self) -> str:
+        """A ``git tag -l`` pattern listing a superset of this scheme's tags."""
+        return self.pattern.replace("{version}", "*")
+
+    def version_of(self, tag: str, *, mode: "TagMode") -> "str | None":
+        """The version *tag* carries under this scheme, or ``None`` when it is not the scheme's."""
+        prefix, suffix = self.pattern.split("{version}")
+        if not (tag.startswith(prefix) and tag.endswith(suffix)):
+            return None
+        middle = tag[len(prefix):len(tag) - len(suffix)]
+        if re.fullmatch(_version_group(mode), middle) is None:
+            return None
+        return middle
+
+    def owns(self, tag: str, *, mode: "TagMode" = TagMode.PRERELEASE_INCLUSIVE) -> bool:
+        """Is *tag* this scheme's rendering of some version?"""
+        return self.version_of(tag, mode=mode) is not None
+
+
 def releasable_tag_glob(tag_format: str, releasable_name: str) -> str:
     """Derive a glob from a releasable's ``tag_format``.
 

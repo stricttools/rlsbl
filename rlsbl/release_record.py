@@ -117,7 +117,7 @@ from .release_file import (
     list_archived_versions,
     read_release_file,
 )
-from .tag_glob import TagMode, parse_version_tag
+from .tag_glob import TagMode, TagScheme
 
 
 # A git object name as the release commit records it: 7 to 40 hex characters.
@@ -319,11 +319,13 @@ def _scheme_tags(tag_glob: str | None, cwd: str | None, *,
                  timeout: int = 10) -> list[str]:
     """Local tags matching this project's version-tag scheme, highest first.
 
-    Two filters, because neither alone is the scheme: the glob selects the
-    project's own namespace (``v*``, ``lib@v*``, ``pkg/dir/v*``), and
-    :func:`~rlsbl.tag_glob.parse_version_tag` keeps only what really parses as
-    a version under one of the three schemes -- so ``vNext`` and ``lib@vlatest``
-    match the glob and are still not version tags.
+    The glob only lists candidates (``v*``, ``lib@v*``, ``pkg/dir/v*``);
+    ownership is the scheme's exact rule
+    (:meth:`~rlsbl.tag_glob.TagScheme.owns`): a tag is this project's when the
+    scheme renders it at the version it carries. So ``vNext`` and
+    ``lib@vlatest`` are listed and are still not version tags, and
+    ``kernel/vulkan/v0.1.0`` -- a nested member's tag -- is listed by
+    ``kernel/v*`` and is still not ``kernel``'s.
 
     An unanswerable listing (no git, a timeout, a preview past its first
     recorded mutation) yields the empty list, the same reading
@@ -332,6 +334,7 @@ def _scheme_tags(tag_glob: str | None, cwd: str | None, *,
     read.
     """
     glob = tag_glob or "v*"
+    scheme = TagScheme.from_glob(glob)
     try:
         result = effects.run(
             ["git", "tag", "-l", glob, "--sort=-v:refname"],
@@ -347,8 +350,7 @@ def _scheme_tags(tag_glob: str | None, cwd: str | None, *,
     return [
         tag
         for tag in ((line.strip() for line in (result.stdout or "").split("\n")))
-        if tag
-        and parse_version_tag(tag, mode=TagMode.PRERELEASE_INCLUSIVE) is not None
+        if tag and scheme.owns(tag, mode=TagMode.PRERELEASE_INCLUSIVE)
     ]
 
 

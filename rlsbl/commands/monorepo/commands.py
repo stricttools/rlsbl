@@ -685,6 +685,7 @@ def _cmd_status(flags, project_root):
     graph = WorkspaceGraph(root, projects)
 
     # Releasable membership, for the column display
+    from ...tag_glob import resolve_monorepo_tag_glob
     from ...workspace import (
         load_releasables,
         mirror_remote_for,
@@ -733,10 +734,9 @@ def _cmd_status(flags, project_root):
         # The tag glob names this package's tag scheme; the release itself
         # comes from its RELEASE RECORD. Releasable members read the releasable's
         # changes dir -- and therefore its archives -- not the package's.
-        if first_target_name and first_target_name in TARGETS:
-            tag_glob = TARGETS[first_target_name].monorepo_tag_glob(name, path=path)
-        else:
-            tag_glob = f"{name}@v*"
+        tag_glob = resolve_monorepo_tag_glob(
+            proj, root, releasable=resolve_releasable_for_project(proj, releasables),
+        )
 
         from ...changelog.files import get_changes_dir
         _cl_changes_dir = None

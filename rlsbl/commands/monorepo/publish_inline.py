@@ -148,6 +148,25 @@ def inject_job_metadata(jobs: dict, tag_prefix: str, working_dir: str) -> dict:
     return result
 
 
+def exclude_longer_prefixes(jobs: dict, prefixes) -> dict:
+    """Make every job's ``if:`` false for tags under any of *prefixes*.
+
+    Each job's condition is a ``startsWith`` on its own project's tag prefix;
+    a longer prefix beginning with it belongs to another project, whose
+    release tags the bare test would also accept.
+    """
+    if not prefixes:
+        return jobs
+    jobs = copy.deepcopy(jobs)
+    exclusions = " && ".join(
+        f"!startsWith(inputs.tag || github.ref_name, '{prefix}')"
+        for prefix in prefixes
+    )
+    for job in jobs.values():
+        job["if"] = f"{job['if']} && {exclusions}"
+    return jobs
+
+
 _SETUP_VERSION_FILE_KEYS = {
     "actions/setup-go": "go-version-file",
     "actions/setup-python": "python-version-file",
@@ -466,8 +485,14 @@ def generate_inline_publish_router(projects_with_publish: list, root: str, relea
     }
 
     prefix_regex_pairs: list = []
+    prefixes = {
+        project["name"]: _get_monorepo_tag_prefix(
+            project, root, releasables=releasables,
+        )
+        for project in projects_with_publish
+    }
     for project in projects_with_publish:
-        tag_prefix = _get_monorepo_tag_prefix(project, root, releasables=releasables)
+        tag_prefix = prefixes[project["name"]]
         if project.get("_root_publisher"):
             # Root publisher: source==destination, so generate jobs from config
             # templates and take the gate check-regex from a mandatory config
@@ -487,6 +512,13 @@ def generate_inline_publish_router(projects_with_publish: list, root: str, relea
                 tag_prefix,
                 workflow_path,
             )
+        # A prefix is a startsWith test, so `kernel/v` also matches the tags
+        # of `kernel/vulkan/v`: a nested member's (or a longer-named
+        # sibling's) release would run this project's publish jobs too.
+        longer = sorted(
+            {p for p in prefixes.values() if p != tag_prefix and p.startswith(tag_prefix)}
+        )
+        jobs = exclude_longer_prefixes(jobs, longer)
         all_jobs.update(jobs)
 
     all_jobs = {

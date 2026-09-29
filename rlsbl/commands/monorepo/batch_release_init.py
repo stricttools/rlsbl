@@ -7,7 +7,7 @@ import sys
 import tomlkit
 
 from ...release_file import get_batch_release_file_path, is_pristine_batch_release_file
-from ...targets import collect_releasable_targets, detect_targets, resolve_releasable_config_dir, TARGETS
+from ...targets import collect_releasable_targets
 from ...utils import commit_scaffold_file
 from ...workspace import find_workspace_root, load_workspace
 from ... import effects
@@ -58,17 +58,20 @@ def _get_unreleased_commit_count(proj, workspace_root, all_projects):
     from ...ownership import OwnershipScope
     from ...workspace import get_releasable_changes_dir
 
-    name = proj["name"]
     path = proj["path"]
 
-    # Determine tag glob for this project
+    # This project's tag scheme: its releasable's, else its target's
+    # monorepo scheme, else the workspace scheme -- the one resolution.
+    from ...tag_glob import resolve_monorepo_tag_glob
+    from ...workspace import load_releasables, resolve_releasable_for_project
+
     project_dir = os.path.join(workspace_root, path)
-    rel_dir = resolve_releasable_config_dir(proj, workspace_root)
-    target_entries = detect_targets(project_dir, releasable_config_dir=rel_dir)
-    if target_entries and target_entries[0].name in TARGETS:
-        tag_glob = TARGETS[target_entries[0].name].monorepo_tag_glob(name, path=path)
-    else:
-        tag_glob = f"{name}@v*"
+    tag_glob = resolve_monorepo_tag_glob(
+        proj, workspace_root,
+        releasable=resolve_releasable_for_project(
+            proj, load_releasables(workspace_root, all_projects),
+        ),
+    )
 
     # The project's own release record: a releasable member's archives live under the
     # releasable, everyone else's under the package.
