@@ -373,15 +373,21 @@ def _cmd_add(args, flags, project_root, dry_run=False):
         if no_commit:
             sync_cmd.append("--no-auto-commit")
         _run_add_child(sync_cmd, root, "`rlsbl monorepo sync`", name)
+
+        if no_commit:
+            print(f"Skipped commit (--no-auto-commit). Run `safegit commit -- {ws_file}` manually.")
+        else:
+            try:
+                commit_files(f"monorepo: add {name}", [ws_file], cwd=root)
+            except Exception as exc:  # noqa: BLE001 -- every failure stops the add
+                detail = (getattr(exc, "stderr", None) or "").strip()
+                _add_step_failed(
+                    f"committing {ws_file} failed ({detail or exc})", name,
+                )
         registered = True
     finally:
         if not registered:
             effects.atomic_write_text(ws_path, workspace_before, preserve_mode=True)
-
-    if no_commit:
-        print(f"Skipped commit (--no-auto-commit). Run `safegit commit -- {ws_file}` manually.")
-    else:
-        commit_files(f"monorepo: add {name}", [ws_file], allow_failure=True, cwd=root)
 
 
 def _run_add_child(cmd, cwd, what, name):
@@ -393,9 +399,15 @@ def _run_add_child(cmd, cwd, what, name):
     result = effects.run(cmd, cwd=cwd, check=False)
     if effects.unsettled(result) or result.returncode == 0:
         return
+    _add_step_failed(
+        f"{what} failed (exit {result.returncode}; its error is above)", name,
+    )
+
+
+def _add_step_failed(failure, name):
+    """Stop `monorepo add` after a failed step; the caller restores workspace.toml."""
     print(
-        f"Error: {what} failed (exit {result.returncode}; its error is "
-        f"above), so member '{name}' is not added: "
+        f"Error: {failure}, so member '{name}' is not added: "
         f"{os.path.join(WORKSPACE_DIR, WORKSPACE_FILE)} is restored to what it "
         f"was before this command. Files the scaffold and the sync already "
         f"wrote stay, and register nothing. Fix what it reports, then re-run "

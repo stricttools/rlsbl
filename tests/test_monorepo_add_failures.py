@@ -150,6 +150,46 @@ class TestAddStopsOnAFailedSync:
         assert _workspace_bytes(ws) == before
 
 
+class TestAddStopsOnAFailedRegistrationCommit:
+    """The registration commit is the add's last step. A commit that fails
+    stops the add like a failed scaffold or sync: exit 1, workspace.toml
+    restored, and a re-run after the fix finishes it."""
+
+    _HOOK = (
+        "#!/bin/sh\n"
+        "if git diff --cached --name-only | grep -q workspace.toml; then\n"
+        "  echo 'pre-commit: workspace.toml is refused' >&2\n"
+        "  exit 1\n"
+        "fi\n"
+    )
+
+    def test_the_member_is_not_registered_and_the_fix_clears_it(self, ws):
+        TestAddStopsOnAFailedSync()._scaffolded_member_with_ci(ws, "api", _CI)
+        _commit_all(ws, "api")
+        before = _workspace_bytes(ws)
+        hook = ws / ".git" / "hooks" / "pre-commit"
+        hook.write_text(self._HOOK)
+        hook.chmod(0o755)
+
+        result = rlsbl.app.test(["monorepo", "add", "api", "--releasable", "api"])
+
+        assert result.exit_code == 1, result.stdout
+        assert "committing .rlsbl-monorepo/workspace.toml failed" in result.stderr
+        assert "member 'api' is not added" in result.stderr
+        assert "re-run this `rlsbl monorepo add`" in result.stderr
+        assert _workspace_bytes(ws) == before
+        assert "api" not in _member_paths(ws)
+        assert "monorepo: add api" not in _git(ws, "log", "--format=%s")
+
+        # The fix: what refused the commit, then the re-run.
+        hook.unlink()
+        result = rlsbl.app.test(["monorepo", "add", "api", "--releasable", "api"])
+        assert result.exit_code == 0, result.stderr
+        assert "api" in _member_paths(ws)
+        assert "monorepo: add api" in _git(ws, "log", "--format=%s")
+        assert _git(ws, "status", "--short", "--untracked-files=all") == ""
+
+
 class TestRemoveOfAnUnknownPath:
     def test_it_is_refused_naming_the_members_and_a_named_path_works(self, ws):
         _npm_member(ws, "web")
