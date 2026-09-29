@@ -157,6 +157,10 @@
       "name": "shares_workspace_environment"
     },
     {
+      "doc": "Lists the files its published upload carries without the network (overrides offline_upload_listing), so a member's upload can be checked for a nested member's files before a release starts.",
+      "name": "lists_upload_offline"
+    },
+    {
       "doc": "How this ecosystem's own test runner is told to skip the scaffolded scratch directories, so a probe left in one cannot break the suite.",
       "name": "scratch_test_exclusion"
     }
@@ -1460,6 +1464,10 @@
           "Workspace members of this target resolve into ONE shared environment."
         ],
         [
+          "lists_upload_offline",
+          "Lists the files its published upload carries without the network (overrides offline_upload_listing), so a member's upload can be checked for a nested member's files before a release starts."
+        ],
+        [
           "scratch_test_exclusion",
           "How this ecosystem's own test runner is told to skip the scaffolded scratch directories, so a probe left in one cannot break the suite."
         ]
@@ -2266,6 +2274,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "lists_upload_offline": false,
       "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
@@ -2332,6 +2341,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "lists_upload_offline": false,
       "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
@@ -2379,6 +2389,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "lists_upload_offline": false,
       "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
@@ -2424,6 +2435,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "lists_upload_offline": false,
       "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
@@ -2481,6 +2493,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": true,
       "lint_language": "go",
+      "lists_upload_offline": true,
       "mirror_identity_files": [
         "go.mod"
       ],
@@ -2544,6 +2557,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "lists_upload_offline": false,
       "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
@@ -2593,6 +2607,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": true,
       "lint_language": "maven",
+      "lists_upload_offline": false,
       "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
@@ -2638,6 +2653,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "lists_upload_offline": false,
       "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
@@ -2683,6 +2699,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "lists_upload_offline": false,
       "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
@@ -2748,6 +2765,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": true,
       "lint_language": "npm",
+      "lists_upload_offline": true,
       "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
@@ -2795,6 +2813,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "lists_upload_offline": false,
       "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
@@ -2840,6 +2859,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "lists_upload_offline": false,
       "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
@@ -2912,6 +2932,7 @@
       "format_version": "1.2.3rc1",
       "has_builtin_test_runner": true,
       "lint_language": "python",
+      "lists_upload_offline": false,
       "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
@@ -2959,6 +2980,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "lists_upload_offline": false,
       "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
@@ -3013,6 +3035,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "lists_upload_offline": false,
       "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
@@ -3058,6 +3081,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "lists_upload_offline": false,
       "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",
@@ -3114,6 +3138,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
+      "lists_upload_offline": false,
       "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",

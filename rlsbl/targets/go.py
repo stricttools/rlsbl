@@ -10,6 +10,7 @@ from .base import (
     PACKAGE_RENAME_GO_MODULE_PATH,
     BaseTarget,
     TemplateVars,
+    UploadListing,
 )
 from ..go_introspect import (
     go_pipeline_artifact,
@@ -341,6 +342,39 @@ class GoTarget(BaseTarget):
     def tag_format(self, version):
         """Return the git tag string for a Go release version."""
         return f"v{version}"
+
+    #: Directories the Go module zip never carries (golang.org/x/mod/zip).
+    _ZIP_EXCLUDED_DIRS = frozenset({"vendor", ".git", ".hg", ".svn", ".bzr"})
+
+    def offline_upload_listing(self, dir_path):
+        """The module zip the proxy would build, derived from the tracked files.
+
+        Go's rule: a subdirectory holding its own ``go.mod`` is another module
+        and is left out, and so are ``vendor/`` and version-control
+        directories. The proxy builds the zip from the tagged commit, so only
+        tracked files count.
+        """
+        from ..ldflags_symbols import git_tracked_files
+
+        tracked = git_tracked_files(dir_path)
+        nested_modules = {
+            os.path.dirname(rel) for rel in tracked
+            if os.path.basename(rel) == "go.mod" and os.path.dirname(rel)
+        }
+        files = tuple(
+            rel for rel in tracked
+            if not any(part in self._ZIP_EXCLUDED_DIRS for part in rel.split("/")[:-1])
+            and not any(rel.startswith(d + "/") for d in nested_modules)
+        )
+        return UploadListing(
+            label="the Go module zip",
+            files=files,
+            remedy=(
+                "The module proxy keeps a zip permanently. Move the nested "
+                "member out of the module's directory, or give it a go.mod of "
+                "its own, which Go leaves out of the zip."
+            ),
+        )
 
     def companion_tags(self, name, version, path=None):
         """Return Go module proxy companion tags for monorepo packages.

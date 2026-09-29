@@ -13,6 +13,19 @@ from conftest import make_nested_workspace, make_state_for_every_releasable, run
 from rlsbl.commands.monorepo.extract_cmd import ExtractError, resolve_departure
 
 
+@pytest.fixture(autouse=True)
+def _filter_repo_on_path(monkeypatch):
+    """Stand in for git-filter-repo's PATH lookup.
+
+    These tests stop at resolution -- nothing is filtered -- and the sandbox
+    runner cannot resolve the real executable, which resolution asks for.
+    """
+    monkeypatch.setattr(
+        "rlsbl.commands.monorepo.extract_cmd.require_filter_repo",
+        lambda: "/usr/bin/git-filter-repo",
+    )
+
+
 def _go_workspace(tmp_path):
     root = tmp_path / "ws"
     make_nested_workspace(root, "go")

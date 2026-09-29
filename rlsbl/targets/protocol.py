@@ -268,6 +268,20 @@ class ReleaseTarget(Protocol):
         """Return a glob pattern matching all monorepo version tags. Default: f'{name}@v*'."""
         ...
 
+    @property
+    def lists_upload_offline(self) -> bool:
+        """Whether ``offline_upload_listing`` gives a real answer for this target."""
+        ...
+
+    def offline_upload_listing(self, dir_path: str):
+        """The files this target's published upload of *dir_path* would carry.
+
+        An :class:`~rlsbl.targets.base.UploadListing` listed without the
+        network, or None when listing it takes a build that needs the network
+        or the target publishes no file set.
+        """
+        ...
+
     def companion_tags(self, name: str, version: str, path: str | None = None) -> list[str]:
         """Return additional tags to create alongside the primary release tag.
 

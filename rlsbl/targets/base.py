@@ -71,6 +71,20 @@ class ManifestRenamePlan:
 NOT_A_PROJECT_DIR = os.path.join(os.path.dirname(__file__), "__not_a_project__")
 
 
+@dataclass(frozen=True)
+class UploadListing:
+    """What one target's published upload of a directory would carry.
+
+    ``files`` are paths relative to the listed directory; ``label`` names the
+    upload in a finding (``"`npm pack`"``); ``remedy`` says how a file is kept
+    out of it.
+    """
+
+    label: str
+    files: tuple
+    remedy: str
+
+
 class TemplateVars(dict):
     """Dict subclass that auto-generates namespaced ``{target}.{key}`` entries.
 
@@ -473,6 +487,15 @@ class BaseTarget:
     def build(self, dir_path, version, *, config=None):
         """Build distributable artifacts for this target. No-op by default."""
         pass
+
+    def offline_upload_listing(self, dir_path):
+        """The files this target's upload of *dir_path* would carry, listed offline.
+
+        Returns an :class:`UploadListing`, or None when the target cannot list
+        its upload without the network (a Python sdist has to be built) or
+        publishes no file set at all. The default is None.
+        """
+        return None
 
     def companion_tags(self, name, version, path=None):
         """Return additional tags to create alongside the primary release tag.
@@ -928,6 +951,14 @@ class BaseTarget:
         target that does not override it has nothing to run.
         """
         return type(self).yank is not BaseTarget.yank
+
+    @property
+    def lists_upload_offline(self):
+        """Whether this target can list its published upload without the network.
+
+        Derived from the ``offline_upload_listing`` override.
+        """
+        return type(self).offline_upload_listing is not BaseTarget.offline_upload_listing
 
     @property
     def has_builtin_test_runner(self):
