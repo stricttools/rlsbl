@@ -120,6 +120,7 @@ from ...saferm import saferm_delete
 from ...snapshot import SNAPSHOT_FILE, generate_snapshot, write_snapshot
 from ...tag_glob import (
     TagMode,
+    TagScheme,
     parse_version_tag,
     releasable_tag_glob,
     resolve_monorepo_tag_glob,
@@ -369,6 +370,17 @@ def _git_tag_names(repo, pattern=None):
     return [t for t in _run_git(repo, *args).splitlines() if t.strip()]
 
 
+def _scheme_tag_names(repo, glob):
+    """The tags in ``repo`` that the scheme *glob* names actually owns.
+
+    The glob lists candidates; the scheme decides
+    (:meth:`~rlsbl.tag_glob.TagScheme.owns`). ``kernel/v*`` lists a nested
+    member's ``kernel/vulkan/v0.1.0``, and that tag is still not ``kernel``'s.
+    """
+    scheme = TagScheme.from_glob(glob)
+    return [t for t in _git_tag_names(repo, glob) if scheme.owns(t)]
+
+
 def _origin_url(repo):
     """``origin``'s URL, or the repository's own path when it has no remote."""
     try:
@@ -562,12 +574,12 @@ def _plan_tags(workspace_root, own_glob, foreign_globs,
     them, so they are resolved at apply time in the destination.
     """
     all_tags = set(_git_tag_names(workspace_root))
-    own_tags = [t for t in _git_tag_names(workspace_root, own_glob)]
+    own_tags = _scheme_tag_names(workspace_root, own_glob)
     own_set = set(own_tags)
 
     foreign_tags = set()
     for glob in foreign_globs:
-        foreign_tags.update(_git_tag_names(workspace_root, glob))
+        foreign_tags.update(_scheme_tag_names(workspace_root, glob))
 
     current_old_tag = own_format.format(name=releasable_name, version=version)
     translations = []
@@ -2104,7 +2116,7 @@ def _apply_tags(dep, item, run):
     # keeps it -- it is most likely this releasable's own history under a prefix
     # it used before a rename -- and says so, because a kept foreign-looking tag
     # in a fresh repository is otherwise a mystery.
-    own = set(_git_tag_names(dep.target_path, dep.departed_globs[0]))
+    own = set(_scheme_tag_names(dep.target_path, dep.departed_globs[0]))
     own |= {new for _old, new in dep.tag_plan.translations}
     if dep.tag_plan.alias:
         own.add(dep.tag_plan.alias[1])

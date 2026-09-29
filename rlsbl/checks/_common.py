@@ -3,6 +3,7 @@
 import os
 
 from ..check_context import WorkspaceCheckContext
+from ..tag_glob import releasable_tag_glob, resolve_monorepo_tag_glob
 
 # Universal project indicator: every scaffolded rlsbl project has this file.
 RLSBL_CONFIG = os.path.join(".rlsbl", "config.json")
@@ -189,8 +190,7 @@ def _resolve_changelog_context(ctx):
         changes_dir = get_releasable_changes_dir(ws_root, rel.name)
         if not os.path.isdir(changes_dir):
             return None
-        # tag_glob from releasable's tag_format: replace {version} with *
-        tag_glob = rel.effective_tag_format.replace("{version}", "*").replace("{name}", rel.name)
+        tag_glob = releasable_tag_glob(rel.effective_tag_format, rel.name)
         # All member projects of this releasable for commit scoping, plus the
         # releasable's own state directory, which belongs to no member.
         member_projects = members_of(rel.name, ctx.projects)
@@ -203,16 +203,9 @@ def _resolve_changelog_context(ctx):
     if not os.path.isdir(changes_dir):
         return None
 
-    # Use the target's monorepo_tag_glob() to get the correct
-    # tag pattern (e.g. Go uses "path/v*" not "name@v*").
-    from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir_for_ctx
-    rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
-    target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
-    if target_entries:
-        target = TARGETS[target_entries[0].name]
-        tag_glob = target.monorepo_tag_glob(proj['name'], path=proj['path'])
-    else:
-        tag_glob = f"{proj['name']}@v*"
+    # The target's monorepo scheme (Go tags "path/v*", not "name@v*"), or
+    # the workspace scheme for a member with no target: the one resolution.
+    tag_glob = resolve_monorepo_tag_glob(proj, ws_root)
 
     entries = read_unreleased(changes_dir)
     return changes_dir, tag_glob, OwnershipScope.for_member(ctx.projects, proj), entries
@@ -372,7 +365,7 @@ def _resolve_all_changelog_contexts(ctx):
         changes_dir = get_releasable_changes_dir(ws_root, rel.name)
         if not os.path.isdir(changes_dir):
             continue
-        tag_glob = rel.effective_tag_format.replace("{version}", "*").replace("{name}", rel.name)
+        tag_glob = releasable_tag_glob(rel.effective_tag_format, rel.name)
         member_projects = members_of(rel.name, ctx.projects)
         scope = OwnershipScope.for_releasable(ctx.projects, member_projects, rel.name)
         entries = read_unreleased(changes_dir)

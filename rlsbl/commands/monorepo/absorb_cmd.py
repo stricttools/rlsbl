@@ -108,7 +108,7 @@ from ...preview_apply import Preview, Reconciler, VerdictItem, reconcile
 from ...release_file import read_release_file, write_release_commit
 from ...saferm import saferm_delete
 from ...snapshot import SNAPSHOT_FILE, generate_snapshot, write_snapshot
-from ...tag_glob import TagMode, parse_version_tag, releasable_tag_glob
+from ...tag_glob import TagMode, TagScheme, parse_version_tag, releasable_tag_glob
 from ...utils import commit_files, is_clean_tree, working_tree_paths
 from ...workspace import (
     WORKSPACE_DIR,
@@ -682,10 +682,11 @@ def _plan_tags(workspace_root, source_repo, releasable_name, tag_format,
     """
     present = set(_git_tag_names(workspace_root))
     own_present = {}
+    scheme = TagScheme.from_glob(glob)
     for tag in _git_tag_names(workspace_root, glob):
-        parsed = parse_version_tag(tag, mode=TagMode.PRERELEASE_INCLUSIVE)
-        if parsed is not None:
-            own_present[parsed.version] = tag
+        own_version = scheme.version_of(tag, mode=TagMode.PRERELEASE_INCLUSIVE)
+        if own_version is not None:
+            own_present[own_version] = tag
 
     imports = []
     skipped = []

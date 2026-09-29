@@ -44,27 +44,6 @@ def _closed_release_history_subjects(root):
     }
 
 
-def _member_tag_glob(root, proj):
-    """The glob matching the version tags *proj* would own in this workspace.
-
-    A member outside every releasable has no ``tag_format`` of its own, so the
-    scheme is the one a member releasing under the workspace's own convention
-    would use: the target's ``monorepo_tag_glob``, and the workspace default
-    ``{name}@v*`` for a member with no detectable target.
-    """
-    from ..targets import TARGETS, detect_targets
-
-    try:
-        entries = detect_targets(os.path.join(root, proj["path"]))
-    except Exception:
-        entries = []
-    if entries:
-        return TARGETS[entries[0].name].monorepo_tag_glob(
-            proj["name"], path=proj["path"],
-        )
-    return f"{proj['name']}@v*"
-
-
 def _unreleasing_member_state(ctx):
     """Release state on members that release nothing, minus the declared exemptions.
 
@@ -79,8 +58,7 @@ def _unreleasing_member_state(ctx):
     caller says so in its outcome instead of reporting the narrower answer as
     if it were the whole one.
     """
-    import fnmatch
-
+    from ..tag_glob import TagScheme, resolve_monorepo_tag_glob
     from ..utils import local_tag_commits
     from ..workspace import project_is_releasable
 
@@ -125,8 +103,13 @@ def _unreleasing_member_state(ctx):
         if os.path.isdir(os.path.join(abs_pkg, ".rlsbl", "changes")):
             state.append(f"a changelog directory at {proj['path']}/.rlsbl/changes/")
 
-        glob = _member_tag_glob(root, proj)
-        matched = [name for name in tag_names if fnmatch.fnmatch(name, glob)]
+        # A member outside every releasable owns the tags its target's
+        # monorepo scheme renders (the workspace scheme `{name}@v*` with no
+        # target); a tag the scheme only LISTS -- a nested member's -- is not
+        # this member's.
+        glob = resolve_monorepo_tag_glob(proj, root)
+        scheme = TagScheme.from_glob(glob)
+        matched = [name for name in tag_names if scheme.owns(name)]
         if matched:
             state.append(
                 f"{len(matched)} version tag(s) matching {glob} ({matched[0]}...)"

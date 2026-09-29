@@ -241,8 +241,7 @@ def resolve_release_scope(root):
         return project, tag_glob, changes_dir, scope
 
     from .ownership import OwnershipScope
-    from .tag_glob import releasable_tag_glob
-    from .targets import TARGETS, detect_targets, resolve_releasable_config_dir
+    from .tag_glob import releasable_tag_glob, resolve_monorepo_tag_glob
     from .workspace import (
         get_releasable_changes_dir,
         load_releasables,
@@ -262,11 +261,9 @@ def resolve_release_scope(root):
         )
     else:
         scope = OwnershipScope.for_member(ws_projects, project)
-        rel_dir = resolve_releasable_config_dir(project, ws_root)
-        targets = detect_targets(root_str, releasable_config_dir=rel_dir)
-        if targets:
-            target = TARGETS[targets[0].name]
-            tag_glob = target.monorepo_tag_glob(
-                project["name"], path=project["path"],
-            )
+        # A member outside every releasable tags under its target's monorepo
+        # scheme, and a member with no target (a dev-node root member, say)
+        # under the workspace scheme `{name}@v*` -- never the standalone `v*`,
+        # which in a converted repository would claim its pre-conversion tags.
+        tag_glob = resolve_monorepo_tag_glob(project, ws_root)
     return project, tag_glob, changes_dir, scope
