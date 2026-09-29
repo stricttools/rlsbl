@@ -1,6 +1,6 @@
 +++
 title = "API Reference"
-description = "API reference index for rlsbl covering 205 modules"
+description = "API reference index for rlsbl covering 210 modules"
 generated = true
 seeded = true
 nav_group = "API Reference"
@@ -25,6 +25,9 @@ nav_order = 90
 - [rlsbl.checks](../rlsbl-checks/)
 - [rlsbl.checks._common](../rlsbl-checks-_common/)
 - [rlsbl.checks.changelog](../rlsbl-checks-changelog/)
+- [rlsbl.checks.go_tags](../rlsbl-checks-go_tags/)
+- [rlsbl.checks.go_workspace](../rlsbl-checks-go_workspace/)
+- [rlsbl.checks.nested](../rlsbl-checks-nested/)
 - [rlsbl.checks.prepush](../rlsbl-checks-prepush/)
 - [rlsbl.checks.project](../rlsbl-checks-project/)
 - [rlsbl.checks.quality](../rlsbl-checks-quality/)
@@ -107,6 +110,7 @@ nav_order = 90
 - [rlsbl.git_util](../rlsbl-git_util/)
 - [rlsbl.go_identity](../rlsbl-go_identity/)
 - [rlsbl.go_introspect](../rlsbl-go_introspect/)
+- [rlsbl.go_mod](../rlsbl-go_mod/)
 - [rlsbl.go_package_name](../rlsbl-go_package_name/)
 - [rlsbl.go_toolchain](../rlsbl-go_toolchain/)
 - [rlsbl.hook_hashes](../rlsbl-hook_hashes/)
@@ -132,6 +136,7 @@ nav_order = 90
 - [rlsbl.member_context](../rlsbl-member_context/)
 - [rlsbl.mirror_publication](../rlsbl-mirror_publication/)
 - [rlsbl.module_paths](../rlsbl-module_paths/)
+- [rlsbl.nested_exclusions](../rlsbl-nested_exclusions/)
 - [rlsbl.node_matrix](../rlsbl-node_matrix/)
 - [rlsbl.npm_wrapper](../rlsbl-npm_wrapper/)
 - [rlsbl.observe_allowlist](../rlsbl-observe_allowlist/)
