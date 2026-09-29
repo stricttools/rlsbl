@@ -42,9 +42,10 @@ What is deliberately NOT rewritten
   command's scope, on purpose: it renames a module, it does not sweep a
   repository for a string.  The one exception is
   ``.strictcli/schema.json``, whose ``project_id`` IS the module path for a
-  strictcli-based Go app: that single line is rewritten, because rlsbl already
-  writes this file during a release and a dump left on the old identity makes
-  the next one refuse.
+  strictcli-based Go app: that single line is rewritten, because after the
+  rename the program's ``help --json`` names the new module, and a committed
+  document still naming the old one would describe a program that no longer
+  exists until the next release rewrites it.
 * **``vendor/``, ``.git/``, and the project's scratch directories.**  A
   vendored tree is a third-party copy, not this module; ``.git`` is the
   repository's own storage; and ``experiments/`` and ``screenshots/`` hold
@@ -97,12 +98,12 @@ _WALK_EXCLUDED_DIRS = frozenset({*_EXCLUDED_COMPONENTS, ".git"})
 _TOKEN_BEFORE = r"(?<![A-Za-z0-9._/\-])"
 _TOKEN_AFTER = r"(?![A-Za-z0-9._\-])"
 
-#: The committed strictcli schema dump, relative to the module that owns it.
-#: A strictcli-based app dumps its whole CLI surface here, and for a Go app the
-#: document's ``project_id`` is the module path -- so a rename that skips this
-#: file leaves a dump claiming the old identity, and the next
-#: ``--dump-schema`` refuses to overwrite a schema "belonging to" another
-#: project.  rlsbl runs that dump itself at the release's schema-dump step.
+#: The committed strictcli schema dump, relative to the module that owns it:
+#: the app's help document (``<app> help --json``), which rlsbl writes here at
+#: the release's schema-dump step.  For a Go app the document's ``project_id``
+#: is the main module path from the program's build information -- so a rename
+#: that skips this file leaves a committed document claiming the old identity,
+#: which the program itself no longer reports.
 _SCHEMA_DUMP_DIR = ".strictcli"
 _SCHEMA_DUMP_NAME = "schema.json"
 

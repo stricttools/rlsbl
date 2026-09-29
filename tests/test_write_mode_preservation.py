@@ -29,33 +29,50 @@ def _umask_default():
     return 0o666 & ~current
 
 
-class TestSchemaDumpPatch:
-    """`.strictcli/schema.json` is committed and read by every consumer."""
+class TestSchemaDumpWrite:
+    """`.strictcli/schema.json` is committed and read by every consumer.
+
+    The release rewrites it from the program's `help --json` output.
+    """
+
+    _DOCUMENT = '{\n  "schema_version": 2,\n  "version": "0.1.0",\n  "name": "x"\n}\n'
 
     def _schema(self, tmp_path, mode=0o644):
         d = tmp_path / ".strictcli"
         d.mkdir()
         path = d / "schema.json"
-        path.write_text('{\n  "version": "0.1.0",\n  "name": "x"\n}\n')
+        path.write_text(self._DOCUMENT)
         os.chmod(path, mode)
         return path
 
-    def test_patching_the_version_keeps_the_files_mode(self, tmp_path):
-        from rlsbl.commands.release.validate import _patch_schema_version
+    def _write(self, tmp_path, monkeypatch):
+        import sys
 
+        from rlsbl.commands.release import validate
+
+        monkeypatch.setattr(validate, "detect_strictcli", lambda d: ("x", "python"))
+        monkeypatch.setattr(
+            validate, "_schema_dump_command",
+            lambda e, lang: [sys.executable, "-c",
+                             f"import sys; sys.stdout.write({self._DOCUMENT!r})"],
+        )
+        validate._run_strictcli_schema_dump(
+            {}, lambda m: None, project_dir=str(tmp_path), version="0.2.0",
+        )
+
+    def test_rewriting_the_schema_keeps_the_files_mode(self, tmp_path, monkeypatch):
         path = self._schema(tmp_path)
-        _patch_schema_version(str(tmp_path), "0.2.0")
+        self._write(tmp_path, monkeypatch)
 
         assert _mode(str(path)) == 0o644
         assert '"version": "0.2.0"' in path.read_text()
 
-    def test_a_locked_schema_stays_locked(self, tmp_path):
-        from rlsbl.commands.release.validate import _patch_schema_version
-
+    def test_a_locked_schema_stays_locked(self, tmp_path, monkeypatch):
         path = self._schema(tmp_path, mode=0o444)
-        _patch_schema_version(str(tmp_path), "0.2.0")
+        self._write(tmp_path, monkeypatch)
 
         assert _mode(str(path)) == 0o444
+        assert '"version": "0.2.0"' in path.read_text()
 
 
 class TestProjectConfigWrite:

@@ -26,7 +26,6 @@ class HookError(Exception):
 
 
 from ...release_file import VALID_BUMP_TYPES
-from ... import effects
 
 
 def validate_release_targets(release_config, project_root, *,
@@ -1684,36 +1683,70 @@ def _abort_on_private_repo_publishing(configs, *, gh_config, workflows_dir=None,
 
 
 def _schema_dump_command(entry_point: str, lang: str) -> list[str]:
-    """Build the command list for running --dump-schema based on language.
+    """Build the command that prints a strictcli program's help document.
 
-    One branch per strictcli implementation. TypeScript apps are npm packages
-    whose ``bin`` entry names a built JS file, so the dump runs that file
-    directly with node -- there is no install step to depend on, exactly as
-    ``go run`` needs no built binary.
+    ``<app> help --json`` prints the help document on stdout (the ``--json``
+    envelope goes to stderr) and writes no file; the release writes stdout to
+    ``.strictcli/schema.json`` itself. One branch per strictcli
+    implementation. TypeScript apps are npm packages whose ``bin`` entry names
+    a built JS file, so the command runs that file directly with node -- there
+    is no install step to depend on, exactly as ``go run`` needs no built
+    binary.
     """
     if lang == "python":
-        return ["uv", "run", entry_point, "--dump-schema"]
+        launcher = ["uv", "run", entry_point]
     elif lang == "go":
-        return ["go", "run", entry_point, "--dump-schema"]
+        launcher = ["go", "run", entry_point]
     elif lang == "typescript":
-        return ["node", entry_point, "--dump-schema"]
+        launcher = ["node", entry_point]
     else:
         raise ValueError(f"unsupported strictcli language: {lang}")
+    return launcher + ["help", "--json"]
+
+
+#: The last release of each strictcli implementation that has no ``help``
+#: command, only ``--dump-schema`` -- and how a project on that language moves
+#: past it. Named in the refusal a release gives such a project.
+_PRE_HELP_JSON_STRICTCLI = {
+    "python": (
+        "Python strictcli 0.43.0",
+        "raise the strictcli requirement in pyproject.toml above 0.43.0 and "
+        "run `uv lock --upgrade-package strictcli`",
+    ),
+    "go": (
+        "Go strictcli v0.36.0",
+        "run `go get github.com/stricttools/strictcli/go@latest` and "
+        "`go mod tidy`",
+    ),
+    "typescript": (
+        "TypeScript strictcli 0.42.0",
+        "run `npm install strictcli@latest`",
+    ),
+}
+
+#: What every strictcli without a ``help`` command answers ``help --json``
+#: with, on stderr, alongside exit 1. Read off real Go, Python, and TypeScript
+#: programs on the releases named above.
+_NO_HELP_COMMAND = "error: unknown command 'help'"
 
 
 def _run_strictcli_schema_dump(flags, log, project_dir=".", version=None):
-    """Run --dump-schema for strictcli projects to regenerate .strictcli/schema.json.
+    """Regenerate .strictcli/schema.json from ``<app> help --json``.
 
-    Detects strictcli usage via pyproject.toml or go.mod, runs the entry point
-    with --dump-schema, and logs the result. The generated file is picked up by
-    the hook-generated file mechanism (pre/post hook dirty snapshots).
+    Detects strictcli usage via pyproject.toml, go.mod, or package.json, runs
+    the entry point's ``help --json``, and writes its stdout -- the help
+    document, byte for byte -- to ``.strictcli/schema.json``. The generated
+    file is picked up by the hook-generated file mechanism (pre/post hook
+    dirty snapshots).
 
-    When *version* is given, the ``version`` key in the generated schema.json
-    is replaced with *version* after a successful dump (atomic write).
+    When *version* is given, the ``version`` key of the written document is
+    the release's *version* rather than what the program reported.
 
     A project that requires strictcli but whose entry point cannot be
     detected aborts validation (ReleaseValidationError) -- a silent skip
-    would ship a stale schema.
+    would ship a stale schema. So does a program on a strictcli that predates
+    ``help --json``: the refusal names the upgrade, and nothing falls back to
+    the retired ``--dump-schema``.
     """
     from . import effects as _effects, subprocess as _subprocess
     from ...strictcli_detect import StrictcliDetectError
@@ -1723,33 +1756,73 @@ def _run_strictcli_schema_dump(flags, log, project_dir=".", version=None):
     except StrictcliDetectError as e:
         raise ReleaseValidationError(str(e)) from e
 
-    # No dry-run branch for the dump itself: it is an ``effects.run`` and
+    # No dry-run branch for the command itself: it is an ``effects.run`` and
     # records itself in the would-do log.
     if not result:
         return
 
     entry_point, lang = result
     cmd = _schema_dump_command(entry_point, lang)
-    log(f"Dumping strictcli schema ({entry_point})...")
+    log(f"Writing strictcli help document ({entry_point})...")
 
     try:
-        _effects.run(
+        completed = _effects.run(
             cmd,
             cwd=project_dir,
             timeout=_SCHEMA_DUMP_TIMEOUT,
-            check=True,
+            capture_output=True,
+            text=True,
         )
     except _subprocess.TimeoutExpired:
         raise ReleaseValidationError(
-            f"strictcli schema dump timed out after {_SCHEMA_DUMP_TIMEOUT}s"
+            f"strictcli help document timed out after {_SCHEMA_DUMP_TIMEOUT}s: "
+            f"{' '.join(cmd)}"
         )
-    except (_subprocess.CalledProcessError, OSError) as e:
+    except OSError as e:
         raise ReleaseValidationError(
-            f"strictcli schema dump failed: {e}"
+            f"strictcli help document failed: {' '.join(cmd)}: {e}"
         ) from e
 
+    if _effects.unsettled(completed):
+        # A preview recorded the run; there is no document to write.
+        return
+
+    schema_path = os.path.join(project_dir, ".strictcli", "schema.json")
+    stderr = (completed.stderr or "").strip()
+    if completed.returncode != 0:
+        if _NO_HELP_COMMAND in stderr:
+            last, upgrade = _PRE_HELP_JSON_STRICTCLI[lang]
+            raise ReleaseValidationError(
+                f"`{' '.join(cmd)}` exited {completed.returncode}: {stderr}\n"
+                f"This program's strictcli predates `help --json`, the command "
+                f"that prints the help document the release writes to "
+                f"{schema_path}. {last} and every earlier release have only "
+                f"`--dump-schema`, which rlsbl no longer runs. To fix, upgrade "
+                f"strictcli: {upgrade}. Then rerun the release."
+            )
+        raise ReleaseValidationError(
+            f"strictcli help document failed: `{' '.join(cmd)}` exited "
+            f"{completed.returncode}" + (f": {stderr}" if stderr else "")
+        )
+
+    document = completed.stdout or ""
+    try:
+        parsed = json.loads(document)
+    except ValueError:
+        parsed = None
+    if not isinstance(parsed, dict) or "schema_version" not in parsed:
+        shown = document.strip()[:200] or "(nothing)"
+        raise ReleaseValidationError(
+            f"`{' '.join(cmd)}` exited 0 but its stdout is not a strictcli "
+            f"help document (a JSON object with a schema_version): {shown}"
+        )
+
     if version is not None:
-        _patch_schema_version(project_dir, version)
+        document = _stamp_schema_version(document, version, schema_path)
+
+    _effects.makedirs(os.path.dirname(schema_path), exist_ok=True)
+    # preserve_mode: an existing committed schema keeps its permission bits.
+    _effects.atomic_write_text(schema_path, document, preserve_mode=True)
 
 
 # The top-level ``version`` member of a canonically-encoded schema document:
@@ -1762,11 +1835,11 @@ _SCHEMA_VERSION_LINE = re.compile(
 )
 
 
-def _patch_schema_version(project_dir, version):
-    """Replace the top-level ``version`` value in .strictcli/schema.json.
+def _stamp_schema_version(content, version, schema_path):
+    """Return the help document *content* with its top-level version set.
 
-    The patch is TEXTUAL: it rewrites exactly one line and preserves every
-    other byte. strictcli writes this file in its own canonical encoding
+    The stamp is TEXTUAL: it rewrites exactly one line and preserves every
+    other byte. strictcli prints this document in its own canonical encoding
     (schema v2) -- raw UTF-8, no HTML escaping, canonical floats, two-space
     indent, one trailing newline -- and a decode/re-encode round trip through
     ``json.dumps`` silently produces a different document. Most visibly,
@@ -1775,42 +1848,21 @@ def _patch_schema_version(project_dir, version):
     consumer release rewrote its schema file into something no strictcli
     implementation would ever write.
 
-    Writes atomically via a temp file + os.replace.
+    *schema_path* is the file the document is bound for, named in errors.
     """
-    schema_path = os.path.join(project_dir, ".strictcli", "schema.json")
-    if not os.path.isfile(schema_path):
-        if effects.previewing():
-            # The dump above was RECORDED, not run, so a project whose schema
-            # file does not exist yet has nothing here to patch. Absence is
-            # then a statement about the preview, not about the project, and
-            # must not be reported as a failed dump.
-            return
-        raise ReleaseValidationError(
-            f"strictcli schema dump succeeded but {schema_path} does not exist"
-        )
-
-    with open(schema_path, "r", encoding="utf-8") as f:
-        content = f.read()
-
     match = _SCHEMA_VERSION_LINE.search(content)
     if match is None:
         raise ReleaseValidationError(
-            f"{schema_path} has no top-level 'version' key on a line of its "
-            "own. Either the schema declares no version, or the file is not in "
-            "strictcli's canonical encoding -- which means something other "
-            "than a strictcli dump wrote it."
+            f"The help document bound for {schema_path} has no top-level "
+            "'version' key on a line of its own. Either the program declares "
+            "no version, or the document is not in strictcli's canonical "
+            "encoding -- which means something other than strictcli printed it."
         )
 
     # The value is re-encoded as a JSON string literal in the same canonical
     # form the document uses (``ensure_ascii=False``), never spliced in raw.
     replacement = f'  "version": {json.dumps(version, ensure_ascii=False)}{match.group(1)}'
-    patched = content[:match.start()] + replacement + content[match.end():]
-
-    # preserve_mode: this is a REWRITE of a committed file strictcli dumped, so
-    # the patch changes what it says and nothing else. Pinning 0o600 here (the
-    # mode the older mkstemp-based hand-rolled write happened to leave) turned
-    # an ordinary 0o644 schema into an owner-only one on the first release.
-    effects.atomic_write_text(schema_path, patched, preserve_mode=True)
+    return content[:match.start()] + replacement + content[match.end():]
 
 
 def validate_blog_body(project_dir, blog_enabled, *, releases_dir=None):
