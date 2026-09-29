@@ -120,9 +120,9 @@ def targets_with_dep_floors():
 def targets_listing_uploads_offline():
     """Targets that list their published upload without the network.
 
-    Derived from the targets that override ``offline_upload_listing``; backs
-    the upload checks, which list exactly these uploads before a release
-    starts.
+    Derived from the targets that override ``offline_upload_listing``; the
+    ``upload-private-paths`` check lists these targets' uploads before a
+    release starts.
     """
     return frozenset(
         name for name, target in TARGETS.items() if target.lists_upload_offline
