@@ -1013,6 +1013,53 @@ def _rewrite_identity(clone_dir, remote, sub_config_path):
     return rewritten
 
 
+def _seed_member_bases(clone_dir, root, project_path):
+    """Give the mirror clone the member's scaffold merge bases.
+
+    A releasable member keeps its merge bases in its releasable's state
+    directory (see :func:`rlsbl.commands.init_cmd.scaffold_bases_dir`), outside
+    the member's directory, so the subtree split carries the member's
+    ``managed-files.json`` without them, and scaffold refuses a registry with
+    no bases. The bases are the member's own, read from the monorepo's HEAD --
+    the commit the split is taken from -- and written where the mirror's
+    standalone scaffold reads them, so it three-way merges the mirror's
+    rendering over the member's files as the member's own scaffold would.
+
+    Bases already inside the member's directory arrive with the split.
+    """
+    if not os.path.exists(os.path.join(clone_dir, ".rlsbl", "managed-files.json")):
+        return
+    from ..init_cmd import scaffold_bases_dir
+
+    root_real = os.path.realpath(str(root))
+    member_dir = os.path.join(root_real, project_path)
+    bases = os.path.relpath(os.path.realpath(scaffold_bases_dir(member_dir)), root_real)
+    member_rel = os.path.normpath(project_path)
+    if member_rel == "." or bases == member_rel or bases.startswith(member_rel + os.sep):
+        return
+    listed = _git_ok(
+        ["ls-tree", "-r", "--name-only", "HEAD", "--", bases], cwd=root_real,
+    ).splitlines()
+    if not listed:
+        raise MirrorError(
+            f"member '{project_path}' has a .rlsbl/managed-files.json but no "
+            f"merge bases committed at {bases}, so the mirror's scaffold cannot "
+            f"merge its files. Run `rlsbl scaffold` in {project_path} (it names "
+            f"how to heal the missing bases), commit the result, and re-run "
+            f"the mirror."
+        )
+    for path in listed:
+        shown = _git(["show", f"HEAD:{path}"], cwd=root_real)
+        if shown.returncode != 0:
+            raise MirrorError(
+                f"git show HEAD:{path} failed: {shown.stderr.strip()}"
+            )
+        dest = os.path.join(clone_dir, ".rlsbl", "bases", os.path.relpath(path, bases))
+        effects.makedirs(os.path.dirname(dest), exist_ok=True)
+        with effects.open_write(dest, "w", encoding="utf-8") as f:
+            f.write(shown.stdout)
+
+
 def _run_scaffold(clone_dir, sub_config_path, remote):
     """Copy the project's ``.rlsbl/config.json`` into the clone and scaffold.
 
@@ -1122,6 +1169,7 @@ def _converge(plan, remote, root, project_path, sub_config_path):
         #    scaffold reads the manifests it is about to describe.
         _rewrite_identity(clone_dir, remote, sub_config_path)
         print("Scaffolding CI in mirror...")
+        _seed_member_bases(clone_dir, root, project_path)
         _run_scaffold(clone_dir, sub_config_path, remote)
         _sweep_publish_workflows(clone_dir)
 
