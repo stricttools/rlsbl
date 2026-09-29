@@ -486,7 +486,7 @@ RELEASE_STEP = (
     "`.rlsbl/releases/unreleased.toml`, then run `rlsbl release run --watch`"
 )
 
-NPM_LOCKFILE_STEP = 'Run "npm install" and commit package-lock.json before pushing'
+NPM_LOCKFILE_STEP = 'Run "npm install" and commit package-lock.json before releasing'
 
 # A Go library's publish workflow does not run goreleaser at all -- it verifies
 # module availability on the proxy. Telling its author about goreleaser is
