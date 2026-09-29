@@ -550,6 +550,21 @@ def resolve_monorepo_context(monorepo_root, project_root, log):
         )
     releasable_name = rel_val
 
+    # A mirrored releasable's member must not enclose other members: the
+    # mirror publishes its whole subtree. Refused here, before anything is
+    # written, with the same text `rlsbl monorepo mirror` refuses with.
+    from ...commands.monorepo.mirror_cmd import nested_member_mirror_problem
+    from ...workspace import load_releasables, load_workspace, mirror_remote_for
+
+    ws_projects = load_workspace(monorepo_root)
+    remote = mirror_remote_for(project, load_releasables(monorepo_root, ws_projects))
+    if remote:
+        problem = nested_member_mirror_problem(
+            project, ws_projects, releasable_name, remote,
+        )
+        if problem is not None:
+            raise ReleaseValidationError(problem)
+
     return monorepo_name, monorepo_project_path, is_library, is_non_releasable, releasable_name
 
 

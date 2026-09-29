@@ -930,6 +930,47 @@ def _check_no_inflight(workspace_root, releasables):
             )
 
 
+def _refuse_staying_nested_members(releasable_name, members, projects):
+    """Refuse a departing member with a nested member that is not departing.
+
+    The departing members' directories are filtered into the new repository
+    and deleted from the source whole, so a member nested inside one of them
+    -- whatever it is: another releasable's member, a dev node, a member
+    outside every releasable -- would be carried out and deleted with it.
+    """
+    from ...ownership import member_path, nested_member_paths
+
+    departing = {m.name for m in members}
+    by_path = {member_path(p): p for p in projects}
+    for member in members:
+        for nested_path in nested_member_paths(member, projects):
+            stayer = by_path[nested_path]
+            if stayer.name in departing:
+                continue
+            owner = stayer.get("releasable")
+            if isinstance(owner, str) and owner:
+                where = f"releasable '{owner}'"
+                ways_out = (
+                    f"Extract '{owner}' first, or move it into releasable "
+                    f"'{releasable_name}' (its `releasable` key in "
+                    f"workspace.toml)."
+                )
+            else:
+                where = "outside every releasable"
+                ways_out = (
+                    f"Move its directory out of '{member_path(member)}', or "
+                    f"move it into releasable '{releasable_name}' (its "
+                    f"`releasable` key in workspace.toml)."
+                )
+            raise ExtractError(
+                f"releasable '{releasable_name}' cannot be extracted: member "
+                f"'{stayer.name}' ({nested_path}) lies inside departing member "
+                f"'{member.name}' and stays behind ({where}). Extracting would "
+                f"carry its files into the new repository and delete them "
+                f"here. {ways_out}"
+            )
+
+
 def resolve_departure(workspace_root, releasable_name, target_path, *,
                       delete_with_rm):
     """Resolve and validate one extraction. Reads only; refuses loudly.
@@ -962,6 +1003,8 @@ def resolve_departure(workspace_root, releasable_name, target_path, *,
             f"Move the root member into a releasable that stays, or give the "
             f"repository root a member of its own, before extracting."
         )
+
+    _refuse_staying_nested_members(releasable_name, members, projects)
 
     _check_member_contents(workspace_root, members)
 
