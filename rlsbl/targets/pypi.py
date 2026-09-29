@@ -486,6 +486,12 @@ class PypiTarget(BaseTarget):
         if nested:
             result["nestedMembers"] = " ".join(nested)
 
+        # CI builds the upload and refuses a private path in it, running the
+        # rule's own source (rlsbl.private_paths), indented for the step's
+        # `run: |` block.
+        from ..upload_exclusions import ci_check_script
+
+        result["privatePathCheck"] = ci_check_script(10)
         return TemplateVars(self.name, result)
 
     def template_mappings(self, ctx):

@@ -1124,6 +1124,27 @@ needs_network = false
 depends_on = []
 scope = "workspace"
 
+# upload-private-paths: an upload carries no private path -- planning notes
+# (todo/), release and family metadata (.rlsbl/, .strictmetadata/, ...), agent
+# instructions (CLAUDE.md, AGENTS.md, .claude/), scratch output (experiments/,
+# screenshots/), or environment files (.env*); rlsbl.private_paths holds the
+# rule. A registry keeps every upload permanently. The npm package is listed by
+# `npm pack --dry-run --ignore-scripts --offline`, the Go module zip derived
+# from the tracked files by Go's own rule, and the Docker build context from
+# the tracked files less .dockerignore, all offline. A Python upload can only
+# be listed by building it, which needs the network, so the pypi CI template
+# builds and checks it on the candidate commit instead. Impure (starts npm). In
+# "preflight" so a release refuses before it mutates anything.
+[checks.upload-private-paths]
+description = "No npm package, Go module zip, or Docker build context carries a private path."
+subject = "project"
+tags = ["project", "preflight"]
+severity = "error"
+fast = false
+pure = false
+needs_network = false
+depends_on = []
+
 # nested-member-uv-sources: uv refuses a `{ workspace = true }` source declared
 # in a member nested inside another member (probed with uv 0.9.17), while the
 # same entry in the uv workspace root's pyproject.toml resolves. Pure (reads

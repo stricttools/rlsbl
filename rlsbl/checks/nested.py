@@ -144,10 +144,12 @@ def upload_content_problems(workspace_root):
     that cannot list it offline -- a Python sdist has to be built -- answers
     None and is checked in CI instead.
     """
+    from . import targets_for_check
     from ..ownership import member_name, owner_of
     from ..targets import TARGETS, detect_targets, resolve_releasable_config_dir
     from ..workspace import load_workspace, nested_member_dirs
 
+    scope = targets_for_check("nested-member-upload-contents")
     root = os.path.realpath(str(workspace_root))
     projects = load_workspace(root)
     problems = []
@@ -159,7 +161,7 @@ def upload_content_problems(workspace_root):
             proj_dir, releasable_config_dir=resolve_releasable_config_dir(proj, root),
         )
         for entry in entries:
-            target = TARGETS.get(entry.name)
+            target = TARGETS.get(entry.name) if entry.name in scope else None
             listing = target.offline_upload_listing(entry.path) if target else None
             if listing is None:
                 continue

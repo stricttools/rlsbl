@@ -305,8 +305,9 @@ TARGET_AXES: tuple[TargetAxis, ...] = (
     TargetAxis(
         "lists_upload_offline",
         "Lists the files its published upload carries without the network "
-        "(overrides offline_upload_listing), so a member's upload can be "
-        "checked for a nested member's files before a release starts.",
+        "(overrides offline_upload_listing), so the upload can be checked "
+        "for private paths, and a member's upload for a nested member's "
+        "files, before a release starts.",
         _prop("lists_upload_offline"),
     ),
     TargetAxis(

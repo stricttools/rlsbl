@@ -124,6 +124,8 @@ EXPECTED_CHECKS = [
     "nested-member-runner-exclusion",
     # a member's npm package and Go module zip carry no nested member's files
     "nested-member-upload-contents",
+    # no npm package, Go module zip, or Docker build context carries a private path
+    "upload-private-paths",
     # a nested member declares no uv workspace source of its own
     "nested-member-uv-sources",
     # Go modules in one workspace: requires stay current, replace is refused

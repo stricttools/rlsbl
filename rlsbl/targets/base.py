@@ -2,7 +2,7 @@
 
 import os
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import Callable, ClassVar
 
 from ..scratch_dirs import NO_TEST_RUNNER_RECURSION
 
@@ -76,13 +76,16 @@ class UploadListing:
     """What one target's published upload of a directory would carry.
 
     ``files`` are paths relative to the listed directory; ``label`` names the
-    upload in a finding (``"`npm pack`"``); ``fix`` says how a file is kept
-    out of it.
+    upload in a finding (``"`npm pack`"``); ``fix`` says how a nested member's
+    file is kept out of it. ``private_path_fix(rel, rule, directory)`` says how
+    a private path (:func:`rlsbl.private_paths.private_match`) is kept out of
+    it, in the ecosystem's own exclusion.
     """
 
     label: str
     files: tuple
     fix: str
+    private_path_fix: Callable[[str, str, "str | None"], str]
 
 
 class TemplateVars(dict):

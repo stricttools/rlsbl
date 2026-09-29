@@ -157,7 +157,7 @@
       "name": "shares_workspace_environment"
     },
     {
-      "doc": "Lists the files its published upload carries without the network (overrides offline_upload_listing), so a member's upload can be checked for a nested member's files before a release starts.",
+      "doc": "Lists the files its published upload carries without the network (overrides offline_upload_listing), so the upload can be checked for private paths, and a member's upload for a nested member's files, before a release starts.",
       "name": "lists_upload_offline"
     },
     {
@@ -1246,6 +1246,14 @@
       "kind": "workspace",
       "targets": []
     },
+    "upload-private-paths": {
+      "kind": "targets",
+      "targets": [
+        "docker",
+        "go",
+        "npm"
+      ]
+    },
     "version-consistency": {
       "kind": "universal",
       "targets": [
@@ -1483,7 +1491,7 @@
         ],
         [
           "lists_upload_offline",
-          "Lists the files its published upload carries without the network (overrides offline_upload_listing), so a member's upload can be checked for a nested member's files before a release starts."
+          "Lists the files its published upload carries without the network (overrides offline_upload_listing), so the upload can be checked for private paths, and a member's upload for a nested member's files, before a release starts."
         ],
         [
           "scratch_test_exclusion",
@@ -1503,6 +1511,7 @@
         "swift",
         "swift-apple",
         "maven",
+        "docker",
         "flutter"
       ],
       "rows": [
@@ -1517,6 +1526,7 @@
           "no",
           "no",
           "yes",
+          "no",
           "no"
         ],
         [
@@ -1530,11 +1540,13 @@
           "no",
           "no",
           "yes",
+          "no",
           "yes"
         ],
         [
           "cross-repo-path-sources",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1556,6 +1568,7 @@
           "no",
           "no",
           "yes",
+          "no",
           "yes"
         ],
         [
@@ -1569,6 +1582,7 @@
           "no",
           "no",
           "yes",
+          "no",
           "yes"
         ],
         [
@@ -1576,6 +1590,7 @@
           "yes",
           "yes",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1595,6 +1610,7 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
@@ -1608,6 +1624,7 @@
           "no",
           "no",
           "yes",
+          "no",
           "yes"
         ],
         [
@@ -1621,6 +1638,7 @@
           "no",
           "no",
           "yes",
+          "no",
           "yes"
         ],
         [
@@ -1634,6 +1652,7 @@
           "no",
           "no",
           "yes",
+          "no",
           "yes"
         ],
         [
@@ -1647,11 +1666,13 @@
           "no",
           "no",
           "yes",
+          "no",
           "yes"
         ],
         [
           "dev-overlay-drift",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1673,11 +1694,13 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "format",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1699,12 +1722,14 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "go-module-identity",
           "no",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1725,12 +1750,14 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "go-toolchain-declared",
           "no",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1751,12 +1778,14 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "go-workspace-require-current",
           "no",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1777,6 +1806,7 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
@@ -1790,11 +1820,13 @@
           "no",
           "no",
           "yes",
+          "no",
           "no"
         ],
         [
           "lint",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1816,6 +1848,7 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
@@ -1829,6 +1862,7 @@
           "no",
           "no",
           "yes",
+          "no",
           "no"
         ],
         [
@@ -1842,6 +1876,7 @@
           "yes",
           "yes",
           "no",
+          "no",
           "no"
         ],
         [
@@ -1851,6 +1886,7 @@
           "no",
           "no",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1868,11 +1904,13 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "nested-member-uv-sources",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1894,12 +1932,14 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "path-tag-format-go-member",
           "no",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1920,11 +1960,13 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "ruff-lint",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1946,6 +1988,7 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
@@ -1959,11 +2002,13 @@
           "no",
           "no",
           "yes",
+          "no",
           "no"
         ],
         [
           "type-check",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1985,6 +2030,21 @@
           "no",
           "no",
           "no",
+          "no",
+          "no"
+        ],
+        [
+          "upload-private-paths",
+          "no",
+          "yes",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "yes",
           "no"
         ]
       ]
@@ -2446,7 +2506,7 @@
       "format_version": "1.2.3-rc.1",
       "has_builtin_test_runner": false,
       "lint_language": null,
-      "lists_upload_offline": false,
+      "lists_upload_offline": true,
       "mirror_identity_files": [],
       "monorepo_tag_format": "{name}@v{version}",
       "monorepo_tag_glob": "{name}@v*",

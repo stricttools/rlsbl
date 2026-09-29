@@ -219,7 +219,7 @@ class TestGenerateFeatureMatrixData:
         """Columns with no 'yes' among interesting rows are excluded.
 
         Pinned against a REGISTERED target that no target-specific check
-        supports -- ``docker``, whose every interesting cell is ``no``. The
+        supports -- ``zig``, whose every interesting cell is ``no``. The
         earlier form of this test named ``cargo``, which is not a registered
         target at all, so no rendering could ever have put it in the headers
         and the assertion could not fail.
@@ -231,9 +231,9 @@ class TestGenerateFeatureMatrixData:
             if any(v in ("yes", "no", "n/a") for v in row.values())
         ]
 
-        assert "docker" in MATRIX_COLUMNS
-        assert not any(row.get("docker") == "yes" for row in interesting)
-        assert "docker" not in headers
+        assert "zig" in MATRIX_COLUMNS
+        assert not any(row.get("zig") == "yes" for row in interesting)
+        assert "zig" not in headers
 
         # Every registered column left out is left out for the same reason,
         # and every column kept earned it with a "yes".

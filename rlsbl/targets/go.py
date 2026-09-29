@@ -33,6 +33,38 @@ from .utils import missing_version_file
 
 VERSION_FILE = "VERSION"
 
+
+def _go_private_path_fix(rel, rule, directory):
+    """Keep a private path out of the Go module zip.
+
+    Go leaves out of the zip only whole directories that hold a go.mod of their
+    own, so a private directory gets a stub module, and a private file either
+    moves into such a directory or stops being committed: the proxy zips the
+    committed tree of the tag.
+    """
+    if directory is not None:
+        written = " (`rlsbl scaffold` writes it)" if "/" not in directory else ""
+        return (
+            f"put a stub go.mod in {directory}/{written}; any `module` line "
+            f"does, and Go leaves a directory holding its own go.mod out of "
+            f"the zip"
+        )
+    parent = os.path.dirname(rel)
+    base = os.path.basename(rel)
+    if base == "CLAUDE.md":
+        home = f"{parent}/.claude" if parent else ".claude"
+        return (
+            f"Go cannot leave a single file out of the zip: move it to "
+            f"{home}/CLAUDE.md, which Claude Code reads, and put a stub go.mod "
+            f"in {home}/"
+        )
+    return (
+        f"Go cannot leave a single file out of the zip: stop committing it "
+        f"(`git rm --cached {rel}` and add it to .gitignore), or move it into "
+        f"a directory that holds a stub go.mod"
+    )
+
+
 _GO_VERSION_RE = re.compile(r"^go\s+(\d+\.\d+(?:\.\d+)?)", re.MULTILINE)
 
 # Goreleaser archive suffix and extension for each npm platform.
@@ -375,6 +407,7 @@ class GoTarget(BaseTarget):
                 "member out of the module's directory, or give it a go.mod of "
                 "its own, which Go leaves out of the zip."
             ),
+            private_path_fix=_go_private_path_fix,
         )
 
     def companion_tags(self, name, version, path=None):
