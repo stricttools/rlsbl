@@ -1,0 +1,1 @@
+{"format_version":1,"id":"18d9e7d08403e8369c00afa3b5e343488c789017fa067d31","commits":["fbeaffd069d7886959d2937a13f47df7d1e23e94"],"user_facing":true,"description":"The npm lockfile step in \\`rlsbl scaffold\\` next steps now says to commit package-lock.json before releasing, not before pushing: releases are the only push.","type":"fix"}
