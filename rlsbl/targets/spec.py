@@ -6,6 +6,7 @@ import os
 from .base import PACKAGE_RENAME_UNSUPPORTED
 from .base import BaseTarget, TemplateVars
 from .. import effects
+from .utils import missing_version_file
 
 
 class SpecTarget(BaseTarget):
@@ -52,8 +53,8 @@ class SpecTarget(BaseTarget):
         """Read version from version.json."""
         path = self._version_json_path(dir_path)
         if not os.path.exists(path):
-            raise FileNotFoundError(
-                "No version.json file found. Run 'rlsbl scaffold' first."
+            raise missing_version_file(
+                dir_path, "version.json file", create="version.json",
             )
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)

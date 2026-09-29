@@ -7,6 +7,27 @@ import tomllib
 from ..errors import VersionError
 
 
+def missing_version_file(dir_path, what, *, create):
+    """The FileNotFoundError for a version file missing from *dir_path*.
+
+    *what* names what was looked for, and *create* is the file the fix
+    creates. ``rlsbl scaffold`` creates it in a project, but does not scaffold
+    a workspace root, so at the root the fix is a hand edit.
+    """
+    from ..workspace import WORKSPACE_DIR
+
+    if os.path.isfile(os.path.join(str(dir_path), WORKSPACE_DIR, "workspace.toml")):
+        return FileNotFoundError(
+            f"No {what} found at the workspace root {dir_path}. `rlsbl "
+            f"scaffold` does not scaffold the workspace root, so create "
+            f"{create} there by hand holding the root member's current "
+            f"version (for a root member in a releasable, the version its "
+            f"releasable's version file under {WORKSPACE_DIR}/releasables/ "
+            f"records), and commit it."
+        )
+    return FileNotFoundError(f"No {what} found. Run 'rlsbl scaffold' first.")
+
+
 def detect_python_package_root(project_dir: str) -> str | None:
     """Return the package root (e.g., 'src/orxt') from hatch config or filesystem.
 

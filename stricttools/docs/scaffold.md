@@ -199,6 +199,8 @@ This means any hook content you write yourself (or modify from the scaffold vers
 
 In a monorepo workspace, each sub-project is scaffolded independently in its own directory. Afterward, `rlsbl monorepo sync` copies the generated workflow files from each project into the shared `.github/workflows/` directory at the repository root.
 
+The workspace root is not scaffolded. `rlsbl scaffold` run there does nothing and says so, whatever kind the root member is: its CI comes from `rlsbl monorepo sync`, which renders the router and publish workflows at the root, and every other file the root member needs is written by hand. A message about something missing at the root names that hand edit, not `rlsbl scaffold`: a root member whose target keeps its version in a file scaffold would create (`VERSION`, `version.json`) and has none is told to create it by hand holding the root member's current version (for a root member in a releasable, the version its releasable's version file records), and the root member's test-runner exclusions for nested members are named the same way (see [Nested members](monorepo.md#nested-members)).
+
 ```bash
 # Scaffold a specific sub-project
 cd packages/mylib

@@ -1161,6 +1161,13 @@ def cmd_scaffold(ctx, target, publish_mode, auto_commit, skip_shared, auto_tag):
         "dry-run": dry_run,
     }
 
+    from .commands.init_cmd import WORKSPACE_ROOT_SKIP, _is_workspace_root
+    if scaffold_root is not None and _is_workspace_root(scaffold_root):
+        # Before anything reads or auto-detects the root's targets: a note
+        # asking for a scaffold re-run would name a fix that does nothing.
+        print(WORKSPACE_ROOT_SKIP)
+        return
+
     ctx = create_context(scaffold_root) if scaffold_root else None
 
     resolved_target = target or None
