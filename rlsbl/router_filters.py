@@ -5,8 +5,9 @@ have to agree exactly:
 
 1. **Which patterns does the router emit for a member?**
    :class:`RouterFilters` derives them from the workspace itself -- ownership
-   territories, dependency territories, a small set of built-ins, and (for the
-   root member) negated excludes.  Nothing is hand-declared in
+   territories, dependency territories, a small set of built-ins, and negated
+   excludes for the members nested inside a member (for the root member, every
+   other member).  Nothing is hand-declared in
    ``workspace.toml``: the workspace's own structure states what a member's CI
    must react to.
 
@@ -28,7 +29,8 @@ The router therefore declares ``predicate-quantifier: some-with-excludes``
 non-negated pattern matches it and no negated pattern does.  Exclusion is
 final and order-independent -- an excluded file cannot be included back by a
 later pattern.  For a member whose pattern list carries no negation the two
-quantifiers agree exactly, so only the root member's filter changes meaning.
+quantifiers agree exactly, so only the filters of members that enclose other
+members change meaning.
 """
 
 from __future__ import annotations
@@ -285,6 +287,30 @@ class RouterFilters:
             ) from exc
         return [self._by_name[d] for d in dep_names if d in self._by_name]
 
+    def _nested_excludes(self, project, dep_members) -> list[str]:
+        """``!<path>/**`` for each member nested inside *project*, sorted.
+
+        A nested member whose territory holds one of *project*'s dependencies
+        -- the dependency itself, or a member enclosing it -- is NOT excluded:
+        under ``some-with-excludes`` an exclude is final, so ``!a/b/**`` would
+        also silence ``a/b/c/**`` even with that territory included, and a
+        dependency the filter cannot see is a job left ``skipped`` on the
+        commit a release tags. Over-triggering is safe; under-triggering is
+        the deadlock.
+        """
+        from .ownership import nested_member_paths
+
+        dep_paths = [member_path(m) for m in dep_members]
+        excludes = []
+        for path in nested_member_paths(project, self.projects):
+            holds_dependency = any(
+                dep and (dep == path or dep.startswith(path + "/"))
+                for dep in dep_paths
+            )
+            if not holds_dependency:
+                excludes.append(f"!{path}/**")
+        return sorted(set(excludes))
+
     def patterns_for(self, project) -> list[str]:
         """The dorny/paths-filter patterns the router emits for one member.
 
@@ -301,24 +327,17 @@ class RouterFilters:
         of the contract.
         """
         includes: list[str] = []
-        excludes: list[str] = []
         dep_members = self._dependency_members(project)
-        dep_names = {member_name(m) for m in dep_members}
+        # A member's territory holds only its own files: the members nested
+        # inside it own theirs, so each is excluded -- the rule the root
+        # member, which encloses everyone, has always followed.
+        excludes = self._nested_excludes(project, dep_members)
 
         if is_root_member(project):
             # The root member owns the residual, so its filter starts from
             # everything and subtracts the territories that belong to someone
-            # else. A member the root DEPENDS on is not subtracted: a change
-            # there is a change to the root member's own build.
+            # else.
             includes.append(MATCH_EVERYTHING)
-            for other in self.projects:
-                if member_name(other) == member_name(project):
-                    continue
-                path = member_path(other)
-                if not path or member_name(other) in dep_names:
-                    continue
-                excludes.append(f"!{path}/**")
-            excludes = sorted(set(excludes))
         else:
             includes.append(territory_pattern(project))
             # A dependency on the ROOT member contributes plain ``**``, not
