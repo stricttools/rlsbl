@@ -101,7 +101,7 @@ A registry keeps every upload permanently, so a release refuses an upload that c
 
 A Python project built with another backend gets a printed warning naming that backend's exclusion instead, since scaffold writes only hatchling's; its CI refuses the upload until the entries are added. `.npmignore` and `.dockerignore` are user-owned, so a project scaffolded before these entries existed adds them by hand when the refusal names them.
 
-Go cannot leave a single file out of a module zip, only a directory holding its own `go.mod`. A private file at the module root therefore moves or stops being committed: `CLAUDE.md` moves to `.claude/CLAUDE.md` (Claude Code reads it there) with a stub `go.mod` in `.claude/`, and an environment or local-only file leaves git.
+Go cannot leave a single file out of a module zip, only a directory holding its own `go.mod`. A private file at the module root therefore moves or stops being committed: `CLAUDE.md` moves to `.claude/CLAUDE.md` (Claude Code reads it there) with a stub `go.mod` in `.claude/`, and an environment or local-only file leaves git. A `CLAUDE.md` that selfdoc generated (its first line is selfdoc's generated-file header) is not moved by hand, since selfdoc would keep generating it at the root: the refusal names upgrading selfdoc and running `selfdoc layout migrate`, which moves it to `.claude/CLAUDE.md` and commits, and then `rlsbl scaffold`, which writes the stub `go.mod` in `.claude/` once git tracks a file there.
 
 ## Three-way merge
 
