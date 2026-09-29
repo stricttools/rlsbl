@@ -3794,6 +3794,20 @@
       "subject": "project",
       "scope": "workspace"
     },
+    "nested-member-uv-sources": {
+      "tags": [
+        "workspace",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": true,
+      "needs_network": false,
+      "depends_on": [],
+      "description": "No member nested inside another member declares its own uv workspace sources.",
+      "subject": "project",
+      "scope": "workspace"
+    },
     "npm-private-mismatch": {
       "tags": [
         "project"

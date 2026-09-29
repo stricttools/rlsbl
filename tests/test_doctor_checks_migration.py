@@ -124,6 +124,8 @@ EXPECTED_CHECKS = [
     "nested-member-runner-exclusion",
     # a member's npm package and Go module zip carry no nested member's files
     "nested-member-upload-contents",
+    # a nested member declares no uv workspace source of its own
+    "nested-member-uv-sources",
     # every -X linker flag names a symbol the Go source actually declares
     "ldflags-symbol",
     # the declared strictspec floor reaches every generated validator

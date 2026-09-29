@@ -85,6 +85,9 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # nested-member-upload-contents lists what npm and Go publish offline;
     # a Python upload is checked in CI (the pypi CI template).
     "nested-member-upload-contents": frozenset({"npm", "go"}),
+    # nested-member-uv-sources reads [tool.uv.sources], which only uv (pypi)
+    # projects declare.
+    "nested-member-uv-sources": frozenset({"pypi"}),
     # go-toolchain-declared asks whether go.mod carries a `toolchain` line,
     # which is Go's.
     "go-toolchain-declared": frozenset({"go"}),

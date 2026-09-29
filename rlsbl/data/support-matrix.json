@@ -795,6 +795,12 @@
         "npm"
       ]
     },
+    "nested-member-uv-sources": {
+      "kind": "targets",
+      "targets": [
+        "pypi"
+      ]
+    },
     "npm-private-mismatch": {
       "kind": "targets",
       "targets": [
@@ -1818,6 +1824,19 @@
           "no",
           "yes",
           "yes",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no",
+          "no"
+        ],
+        [
+          "nested-member-uv-sources",
+          "yes",
+          "no",
+          "no",
           "no",
           "no",
           "no",
