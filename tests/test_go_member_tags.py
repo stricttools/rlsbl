@@ -78,3 +78,48 @@ def test_a_past_release_listing_the_member_owes_its_tag(tmp_path):
         candidate_sha=SHA, tree_hashes={"gfx": TREE, "gfx/shader": TREE},
     )
     assert _refs(root, rel_dir, "0.1.0").companions == ("gfx/shader/v0.1.0",)
+
+
+# ---------------------------------------------------------------------------
+# go-companion-tags asks about released versions only
+# ---------------------------------------------------------------------------
+
+
+def _companion_check(root):
+    from rlsbl import app
+    from rlsbl.check_context import WorkspaceCheckContext
+    from rlsbl.workspace import load_releasables, load_workspace
+
+    projects = load_workspace(str(root))
+    ctx = WorkspaceCheckContext(
+        project_root=root, workspace_root=root, config={},
+        projects=projects, releasables=load_releasables(str(root), projects),
+    )
+    return app._check_defs["go-companion-tags"].impl(ctx)
+
+
+def test_a_releasable_that_never_released_owes_no_companion_tag(tmp_path):
+    from conftest import make_releasable_state, run_git
+
+    root, _rel_dir = _shared(tmp_path)
+    make_releasable_state(root, "gfx", version="0.0.0", config={"publish_mode": "ci"})
+    run_git(root, "init", "-q")
+    result = _companion_check(root)
+    assert not any("missing companion" in p.text for p in result.problems)
+
+
+def test_a_released_version_owes_the_nested_modules_tag(tmp_path):
+    from conftest import make_releasable_state, run_git
+
+    root, rel_dir = _shared(tmp_path)
+    make_releasable_state(root, "gfx", version="0.2.0", config={"publish_mode": "ci"})
+    write_archived_release_file(
+        f"{rel_dir}/releases", "0.2.0", bump="minor", include=["go"],
+        description="Second.", candidate_sha=SHA,
+        tree_hashes={"gfx": TREE, "gfx/shader": TREE},
+    )
+    run_git(root, "init", "-q")
+    result = _companion_check(root)
+    assert any(
+        "missing companion tag gfx/shader/v0.2.0" in p.text for p in result.problems
+    ), [p.text for p in result.problems]

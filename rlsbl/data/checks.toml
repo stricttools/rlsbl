@@ -907,7 +907,7 @@ depends_on = []
 scope = "workspace"
 
 [checks.go-companion-tags]
-description = "Every releasable's publishing Go members have companion tags for the current version."
+description = "Every releasable's publishing Go members have companion tags for its latest released version."
 subject = "workspace"
 tags = ["workspace"]
 severity = "error"
