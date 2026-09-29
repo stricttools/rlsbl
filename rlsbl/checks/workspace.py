@@ -1290,10 +1290,20 @@ def register_workspace_checks(app):
         has_rlsbl = os.path.isdir(os.path.join(root, ".rlsbl"))
         has_monorepo = os.path.isdir(os.path.join(root, ".rlsbl-monorepo"))
         if has_rlsbl and has_monorepo:
-            msg = (
-                "root .rlsbl/ conflicts with .rlsbl-monorepo/ "
-                "-- remove root .rlsbl/ after migrating its contents to the releasable"
-            )
+            from ..config import PROJECT_CONFIG_LABEL, config_file_label
+
+            where = config_file_label(root)
+            if where == PROJECT_CONFIG_LABEL:
+                fix = (
+                    "the root member belongs to no releasable, so it carries "
+                    "no config -- delete root .rlsbl/"
+                )
+            else:
+                fix = (
+                    f"the root member's config lives in {where} -- move the "
+                    "keys of .rlsbl/config.json there, then delete root .rlsbl/"
+                )
+            msg = f"root .rlsbl/ conflicts with .rlsbl-monorepo/: {fix}"
             reporter.error(msg)
             return reporter.found(msg)
         return reporter.passed("no root config conflict")

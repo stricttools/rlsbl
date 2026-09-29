@@ -45,9 +45,11 @@ class MemberContext:
         invalid (with releasable-level inheritance already applied). Consumers
         derive the old boolean via ``publish_mode == "none"``.
         """
-        from .config import get_publish_mode
+        from .config import config_file_label, get_publish_mode
 
-        return get_publish_mode(self.config)
+        return get_publish_mode(
+            self.config, where=config_file_label(self.member_dir),
+        )
 
     @cached_property
     def targets(self) -> list:

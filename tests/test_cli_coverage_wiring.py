@@ -455,7 +455,7 @@ class TestMonorepoDirectWiring:
     def test_init_root_releasable_carries_its_tag_format(self):
         result, m = _dispatch(
             ["monorepo", "init", "--root-releasable", "core",
-             "--tag-format", "v{version}"],
+             "--tag-format", "v{version}", "--publish-mode", "none"],
             "rlsbl.commands.monorepo._cmd_init",
         )
         assert result.exit_code == 0, result.stderr
@@ -463,6 +463,7 @@ class TestMonorepoDirectWiring:
             "auto-commit": True,
             "root-releasable": "core",
             "root-tag-format": "v{version}",
+            "root-publish-mode": "none",
         }
 
     def test_add(self):

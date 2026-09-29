@@ -11,7 +11,7 @@ rlsbl supports monorepo workflows via the `rlsbl monorepo` command family. A mon
 ```bash
 # Initialize a monorepo workspace (creates .rlsbl-monorepo/ with workspace.toml).
 # The root member's kind is a required choice: --root-dev-node, or
-# --root-releasable <name> --tag-format <format>.
+# --root-releasable <name> --tag-format <format> --publish-mode <ci|none>.
 rlsbl monorepo init --root-dev-node
 
 # Add projects to the workspace (the path is a positional argument, and
@@ -117,7 +117,9 @@ Its **kind** is a choice, and `rlsbl monorepo init` makes it a required one rath
 | Kind | Declaration | What it means |
 | --- | --- | --- |
 | Dev node | `dev_only = true`, `releasable = false` — `rlsbl monorepo init --root-dev-node` | The root files need no changelog coverage, and stand outside every releasable. |
-| Releasable member | `releasable = "<name>"` — `rlsbl monorepo init --root-releasable <name> --tag-format <format>` | The root files get changelog coverage under that releasable, which must then declare `tag_format` explicitly. |
+| Releasable member | `releasable = "<name>"` — `rlsbl monorepo init --root-releasable <name> --tag-format <format> --publish-mode <ci\|none>` | The root files get changelog coverage under that releasable, which must then declare `tag_format` explicitly. |
+
+A releasable root member's config lives in `.rlsbl-monorepo/releasables/<name>/config.json`, never in a root `.rlsbl/`: the `root-rlsbl-conflict` check refuses a root `.rlsbl/` beside `.rlsbl-monorepo/`, and `rlsbl scaffold` does not scaffold the workspace root. `rlsbl monorepo init --root-releasable` writes that file. `--publish-mode` has no default. With `ci` and a release target detected at the root, init also writes the root's `targets` and their default `pipelines`, and requires `--publish-gate-check-regex`: the regex matching the check-run names of the root's hand-authored CI, which the publish gate waits for on the release commit. Refusals about the root member's config name that file.
 
 ### What the loader refuses
 
@@ -547,7 +549,7 @@ Fourteen checks run under `rlsbl check --tag workspace`, covering CI configurati
 | `mirror-required` | error | Members consumed by repository URL (SPM) must belong to a releasable that declares a `subtree_remote` |
 | `workspace-unbuildable` | error | Workspace members build under `uv sync --all-packages` (pypi workspaces only); also tagged `preflight`, so a manifest that stopped resolving blocks the release rather than only narrowing the router's derived filters |
 | `scaffold-gitignore-stale` | warn | Workspace project `.gitignore` files contain all rlsbl-managed entries |
-| `root-rlsbl-conflict` | error | Root `.rlsbl/` must not coexist with `.rlsbl-monorepo/` |
+| `root-rlsbl-conflict` | error | Root `.rlsbl/` must not coexist with `.rlsbl-monorepo/`; the finding names the root releasable's `config.json` as the destination of its keys |
 | `go-companion-tags` | warn | Non-private Go members of releasables have companion tags for the current version |
 | `test-suite-workspace` | error | Runs tests for affected workspace projects (also tagged `prepush`) |
 

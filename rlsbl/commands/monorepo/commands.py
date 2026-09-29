@@ -55,6 +55,14 @@ def _cmd_init(flags, project_root):
         )
         sys.exit(1)
 
+    root_config = None
+    if root_releasable:
+        root_config = _root_releasable_config(
+            root_dir,
+            flags.get("root-publish-mode") or None,
+            flags.get("root-publish-gate-check-regex") or None,
+        )
+
     root_member = {"path": ROOT_MEMBER_PATH, "name": ROOT_MEMBER_NAME}
     if root_releasable:
         root_member["releasable"] = root_releasable
@@ -66,23 +74,148 @@ def _cmd_init(flags, project_root):
         root_member["releasable"] = False
         releasables = []
 
+    ws_dir = os.path.join(root_dir, WORKSPACE_DIR)
+    ws_dir_existed = os.path.isdir(ws_dir)
     save_workspace(root_dir, [root_member], releasables=releasables)
+    written = [os.path.join(WORKSPACE_DIR, WORKSPACE_FILE)]
+    if root_config is not None:
+        written.append(_write_root_releasable_config(root_dir, root_releasable, root_config))
     print("Initialized monorepo workspace in .rlsbl-monorepo/")
     if root_releasable:
         print(
             f"Root member '{ROOT_MEMBER_NAME}' belongs to releasable "
-            f"'{root_releasable}' (tag format: {root_tag_format})."
+            f"'{root_releasable}' (tag format: {root_tag_format}). Its config "
+            f"is {written[-1]}."
         )
     else:
         print(f"Root member '{ROOT_MEMBER_NAME}' is a dev node.")
 
-    rel_ws_file = os.path.join(WORKSPACE_DIR, WORKSPACE_FILE)
     if not flags.get("auto-commit", True):
-        print(f"Skipped commit (--no-auto-commit). Run `safegit commit -- {rel_ws_file}` manually.")
+        print(
+            "Skipped commit (--no-auto-commit). Run "
+            f"`safegit commit -- {' '.join(written)}` manually."
+        )
         return
 
-    # Auto-commit workspace.toml
-    commit_files("monorepo: init workspace", [rel_ws_file], allow_failure=True)
+    # The commit is the init's last step, and a failed one is fatal: an
+    # uncommitted workspace.toml is a workspace nothing records, which the
+    # next init refuses as "already initialized". Everything this command
+    # wrote is removed again, so a re-run starts from where this one did.
+    try:
+        commit_files("monorepo: init workspace", written, cwd=root_dir)
+    except Exception as exc:  # noqa: BLE001 -- every failure stops the init
+        detail = (getattr(exc, "stderr", None) or "").strip()
+        _remove_init_output(root_dir, written, ws_dir if not ws_dir_existed else None)
+        print(
+            f"Error: committing the workspace failed ({detail or exc}), so the "
+            f"workspace is not initialized: {', '.join(written)} "
+            "were removed again. Fix what the commit reports, then re-run "
+            "this `rlsbl monorepo init`.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+def _root_releasable_config(root_dir, publish_mode, gate_regex):
+    """The config a root releasable starts with, or a refusal naming the flag.
+
+    A workspace's root member has no ``.rlsbl/`` of its own (the
+    ``root-rlsbl-conflict`` check refuses one beside ``.rlsbl-monorepo/``), and
+    ``rlsbl scaffold`` does not scaffold the workspace root, so its config
+    lives in its releasable's ``config.json`` and this init writes it. The
+    publish mode has no default, as everywhere else. A root that publishes
+    (publish mode "ci" and a detected release target) gets its targets and
+    their default pipelines, and must name the check runs its publish gate
+    waits for: its CI is hand-authored, so rlsbl cannot infer them.
+    """
+    import re
+
+    from ...config import PUBLISH_MODES
+    from ...commands.init_cmd import default_pipeline_entry
+    from ...pipelines import PIPELINE_TYPES
+
+    if publish_mode not in PUBLISH_MODES:
+        print(
+            "Error: --publish-mode is required with --root-releasable, and "
+            f"must be one of {sorted(PUBLISH_MODES)}: \"ci\" publishes the "
+            "root member's targets from CI, \"none\" publishes nothing. "
+            "There is no default.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if gate_regex is not None:
+        try:
+            re.compile(gate_regex)
+        except re.error as exc:
+            print(
+                f"Error: --publish-gate-check-regex {gate_regex!r} is not a "
+                f"valid regular expression ({exc}).",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+    config = {"publish_mode": publish_mode}
+    if publish_mode == "ci":
+        entries = [e for e in detect_targets(root_dir) if e.name in TARGETS]
+        names = list(dict.fromkeys(e.name for e in entries))
+        if names:
+            config["targets"] = names
+            pipelines = {}
+            for entry in entries:
+                if entry.name in PIPELINE_TYPES and entry.name not in pipelines:
+                    pipelines[entry.name] = default_pipeline_entry(
+                        entry.name, lambda path=entry.path: path,
+                    )
+            if pipelines:
+                config["pipelines"] = pipelines
+            if gate_regex is None:
+                from .publish_inline import ROOT_GATE_REGEX_EXAMPLE
+
+                print(
+                    "Error: --publish-gate-check-regex is required with "
+                    "--root-releasable and --publish-mode ci when the root "
+                    f"publishes (release targets detected at the root: "
+                    f"{', '.join(names)}). The publish gate waits for the root "
+                    "package's CI check runs on the release commit, and that "
+                    "CI is hand-authored, so rlsbl cannot infer their names. "
+                    "Pass the regex that matches them, e.g. "
+                    f"--publish-gate-check-regex '{ROOT_GATE_REGEX_EXAMPLE}'.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+    if gate_regex is not None:
+        config["publish_gate_check_regex"] = gate_regex
+    return config
+
+
+def _write_root_releasable_config(root_dir, releasable, config):
+    """Write the root releasable's ``config.json``; return its relative path."""
+    import json
+
+    from ...workspace import get_releasable_dir
+    from ... import effects
+
+    rel_dir = get_releasable_dir(root_dir, releasable)
+    effects.makedirs(rel_dir, exist_ok=True)
+    path = os.path.join(rel_dir, "config.json")
+    effects.atomic_write_text(path, json.dumps(config, indent=2) + "\n")
+    return os.path.relpath(path, root_dir)
+
+
+def _remove_init_output(root_dir, written, created_ws_dir):
+    """Remove what a failed `monorepo init` wrote.
+
+    *created_ws_dir* is the ``.rlsbl-monorepo/`` directory when this init
+    created it (removed whole), else None (only the written files go).
+    """
+    from ...saferm import saferm_delete
+
+    reason = "rolling back a monorepo init whose commit failed"
+    if created_ws_dir is not None:
+        saferm_delete(created_ws_dir, description=reason, recursive=True)
+        return
+    for rel in written:
+        saferm_delete(os.path.join(root_dir, rel), description=reason, skip_missing=True)
 
 
 def _create_releasable(name, tag_format_flag, target_entries, path):

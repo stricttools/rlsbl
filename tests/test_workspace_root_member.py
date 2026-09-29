@@ -496,6 +496,7 @@ class TestMonorepoInitRootMember:
                 "auto-commit": False,
                 "root-releasable": "core",
                 "root-tag-format": "v{version}",
+                "root-publish-mode": "none",
             },
             project_root=tmp_path,
         )

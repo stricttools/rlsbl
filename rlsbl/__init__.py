@@ -2247,6 +2247,8 @@ class RootDevNode:
 class RootReleasable:
     value: str = strictcli.member_value(help="name of the releasable the root member belongs to; it is created in [[releasables]]")
     tag_format: str = strictcli.sub_flag(presence="required", help="tag format for that releasable, e.g. \"v{version}\" for bare version tags or \"{name}@v{version}\" for the workspace scheme; a root releasable never inherits a default")
+    publish_mode: str = strictcli.sub_flag(presence="required", help="the root member's publish mode, \"ci\" or \"none\", with no default; it is written to the releasable's .rlsbl-monorepo/releasables/<name>/config.json, where a root member's config lives")
+    publish_gate_check_regex: str = strictcli.sub_flag(presence="optional", help="regex matching the check-run names of the root's hand-authored CI, which the publish gate waits for on the release commit; required with --publish-mode ci when a release target is detected at the root")
 
 
 @mono.command(
@@ -2265,7 +2267,7 @@ class RootReleasable:
     presence="required",
     elect_by="member-flags", choices=[RootDevNode, RootReleasable],
 )
-@strictcli.flag(name="auto-commit", type=bool, presence="optional", help="Automatically commit the generated workspace.toml configuration file to git (the handler commits when neither form is passed)")
+@strictcli.flag(name="auto-commit", type=bool, presence="optional", help="Automatically commit the generated workspace.toml, and the root releasable's config.json when one is written, to git (the handler commits when neither form is passed)")
 @effects.handler
 def cmd_mono_init(ctx, root_member: RootDevNode | RootReleasable, auto_commit):
     """Create a new monorepo workspace with .rlsbl-monorepo/ and workspace.toml."""
@@ -2273,6 +2275,8 @@ def cmd_mono_init(ctx, root_member: RootDevNode | RootReleasable, auto_commit):
         _refuse_empty_flags(
             root_releasable=root_member.value,
             tag_format=root_member.tag_format,
+            publish_mode=root_member.publish_mode,
+            publish_gate_check_regex=root_member.publish_gate_check_regex,
         )
     auto_commit = _opt_default(auto_commit, True)
     # monorepo init does NOT require a pre-existing .rlsbl/ marker --
@@ -2300,6 +2304,9 @@ def cmd_mono_init(ctx, root_member: RootDevNode | RootReleasable, auto_commit):
     if isinstance(root_member, RootReleasable):
         init_flags["root-releasable"] = root_member.value
         init_flags["root-tag-format"] = root_member.tag_format
+        init_flags["root-publish-mode"] = root_member.publish_mode
+        if root_member.publish_gate_check_regex is not None:
+            init_flags["root-publish-gate-check-regex"] = root_member.publish_gate_check_regex
     else:
         init_flags["root-dev-node"] = True
     _cmd_init(init_flags, project_root=root)

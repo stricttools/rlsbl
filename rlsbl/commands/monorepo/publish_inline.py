@@ -333,6 +333,10 @@ from ...ci_router import _router_ci_check_regex  # noqa: E402
 from ... import effects
 
 
+#: The example regex the root publisher's gate-regex errors show.
+ROOT_GATE_REGEX_EXAMPLE = "^(test|lint)( \\(.*\\))?$"
+
+
 def _require_root_publish_gate_regex(project: dict, root: str) -> str:
     """Return the mandatory ``publish_gate_check_regex`` for a root publisher.
 
