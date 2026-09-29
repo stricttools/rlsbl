@@ -75,8 +75,10 @@ def _cmd_init(flags, project_root):
         root_member["releasable"] = False
         releasables = []
 
-    ws_dir = os.path.join(root_dir, WORKSPACE_DIR)
-    ws_dir_existed = os.path.isdir(ws_dir)
+    # Only a committing init has a failure to roll back.
+    before = (
+        _working_tree_snapshot(root_dir) if flags.get("auto-commit", True) else None
+    )
     save_workspace(root_dir, [root_member], releasables=releasables)
     written = [os.path.join(WORKSPACE_DIR, WORKSPACE_FILE)]
     if root_config is not None:
@@ -100,18 +102,19 @@ def _cmd_init(flags, project_root):
 
     # The commit is the init's last step, and a failed one is fatal: an
     # uncommitted workspace.toml is a workspace nothing records, which the
-    # next init refuses as "already initialized". Everything this command
-    # wrote is removed again, so a re-run starts from where this one did.
+    # next init refuses as "already initialized". The working tree is put
+    # back as this command found it, so a re-run starts from where this one
+    # did: what it created is removed, and a file it overwrote gets its bytes.
     try:
         commit_files("monorepo: init workspace", written, cwd=root_dir)
     except Exception as exc:  # noqa: BLE001 -- every failure stops the init
         detail = (getattr(exc, "stderr", None) or "").strip()
-        _remove_init_output(root_dir, written, ws_dir if not ws_dir_existed else None)
+        _restore_working_tree(root_dir, before, reason="rolling back a monorepo init whose commit failed")
         print(
             f"Error: committing the workspace failed ({detail or exc}), so the "
             f"workspace is not initialized: {', '.join(written)} "
-            "were removed again. Fix what the commit reports, then re-run "
-            "this `rlsbl monorepo init`.",
+            "are put back as they were before this command. Fix what the "
+            "commit reports, then re-run this `rlsbl monorepo init`.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -201,22 +204,6 @@ def _write_root_releasable_config(root_dir, releasable, config):
     path = os.path.join(rel_dir, "config.json")
     effects.atomic_write_text(path, json.dumps(config, indent=2) + "\n")
     return os.path.relpath(path, root_dir)
-
-
-def _remove_init_output(root_dir, written, created_ws_dir):
-    """Remove what a failed `monorepo init` wrote.
-
-    *created_ws_dir* is the ``.rlsbl-monorepo/`` directory when this init
-    created it (removed whole), else None (only the written files go).
-    """
-    from ...saferm import saferm_delete
-
-    reason = "rolling back a monorepo init whose commit failed"
-    if created_ws_dir is not None:
-        saferm_delete(created_ws_dir, description=reason, recursive=True)
-        return
-    for rel in written:
-        saferm_delete(os.path.join(root_dir, rel), description=reason, skip_missing=True)
 
 
 def _create_releasable(name, tag_format_flag, target_entries, path):
@@ -536,7 +523,9 @@ def _cmd_add(args, flags, project_root, dry_run=False):
         registered = True
     finally:
         if not registered:
-            _restore_working_tree(root, before)
+            _restore_working_tree(
+                root, before, reason="rolling back a monorepo add that failed",
+            )
 
 
 def _run_add_child(cmd, cwd, what, name):
@@ -606,7 +595,7 @@ def _changed_since(root, before):
     return written, touched
 
 
-def _restore_working_tree(root, before):
+def _restore_working_tree(root, before, *, reason):
     """Put every path changed since *before* back as it was then.
 
     A path unchanged before is restored from HEAD, or deleted when HEAD does
@@ -617,7 +606,6 @@ def _restore_working_tree(root, before):
 
     written, touched = _changed_since(root, before)
     env = {**os.environ, "GIT_LITERAL_PATHSPECS": "1"}
-    reason = "rolling back a monorepo add that failed"
     for rel in written:
         in_head = effects.run(
             ["git", "cat-file", "-e", f"HEAD:{rel}"],
