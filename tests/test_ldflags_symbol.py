@@ -380,6 +380,18 @@ class TestScannedFiles:
         result = _run(root)
         assert result.status == "pass", _text(result)
 
+    def test_workspace_scaffold_base_copies_are_skipped(self, tmp_path):
+        """A root Go module encloses `.rlsbl-monorepo/`, whose releasables keep
+        their members' scaffold base copies: not live configuration either."""
+        root = _go_project(tmp_path / "repo", {
+            ".rlsbl-monorepo/releasables/draw/bases/draw/.goreleaser.yml":
+                _goreleaser("main.Version", main="./cmd/draw"),
+            "version.go": _version_go("version"),
+            "main.go": _main_go('\tprintln(version)\n'),
+        })
+        result = _run(root)
+        assert result.status == "pass", _text(result)
+
     def test_goreleaser_output_is_skipped(self, tmp_path):
         root = _go_project(tmp_path / "repo", {
             "dist/config.yaml": _goreleaser("main.Version"),
