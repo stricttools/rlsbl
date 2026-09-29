@@ -1,16 +1,16 @@
 """Tests for lockfile sync during release execution.
 
 Covers:
-- _sync_lockfiles guard_file support
+- guard_file support in the owed lockfile syncs
 - Workspace root unconditional lockfile inclusion
 - go.work.sum conditional on go.work existence
 """
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 
-from rlsbl.commands.release.execute import _LOCKFILE_SPECS, _sync_lockfiles
+from rlsbl.commands.release.execute import _LOCKFILE_SPECS, _target_lockfile_syncs
 
 
 class TestLockfileSpecsSchema:
@@ -31,96 +31,28 @@ class TestLockfileSpecsSchema:
                 assert spec[3] is None, f"{spec[0]} should have no guard file"
 
 
-class TestSyncLockfilesGuardFile:
-    """Test that _sync_lockfiles respects the guard_file field."""
+def _owed(target_dir):
+    return _target_lockfile_syncs({"target": str(target_dir)}, lambda _m: None)
 
-    @patch("rlsbl.commands.release.effects")
+
+class TestGuardFile:
+    """The owed syncs respect a spec's guard_file."""
+
     @patch("shutil.which", return_value="/usr/bin/go")
-    def test_go_work_sum_skipped_without_go_work(self, mock_which, mock_subprocess, tmp_path):
-        """go.work.sum should not be synced when go.work does not exist."""
-        target_dir = tmp_path / "project"
-        target_dir.mkdir()
-        # Create go.work.sum but NOT go.work
-        (target_dir / "go.work.sum").write_text("h1:abc\n")
+    def test_go_work_sum_not_owed_without_go_work(self, _which, tmp_path):
+        (tmp_path / "go.work.sum").write_text("h1:abc\n")
+        assert _owed(tmp_path) == []
 
-        files_to_commit = []
-        log = MagicMock()
-
-        _sync_lockfiles({"target": str(target_dir)}, files_to_commit, log)
-
-        # go work sync should NOT have been called
-        assert not mock_subprocess.run.called
-        assert files_to_commit == []
-
-    @patch("rlsbl.commands.release.effects")
     @patch("shutil.which", return_value="/usr/bin/go")
-    def test_go_work_sum_synced_with_go_work(self, mock_which, mock_subprocess, tmp_path):
-        """go.work.sum should be synced when go.work exists."""
-        target_dir = tmp_path / "project"
-        target_dir.mkdir()
-        (target_dir / "go.work").write_text("go 1.21\n")
-        (target_dir / "go.work.sum").write_text("h1:abc\n")
+    def test_go_work_sum_owed_with_go_work(self, _which, tmp_path):
+        (tmp_path / "go.work").write_text("go 1.21\n")
+        (tmp_path / "go.work.sum").write_text("h1:abc\n")
+        assert [s["cmd"] for s in _owed(tmp_path)] == [["go", "work", "sync"]]
 
-        # Make the sync command succeed and simulate mtime change
-        mock_subprocess.run.return_value = MagicMock(returncode=0)
-        mock_subprocess.CalledProcessError = type("CalledProcessError", (Exception,), {})
-        mock_subprocess.TimeoutExpired = type("TimeoutExpired", (Exception,), {})
-
-        files_to_commit = []
-        log = MagicMock()
-
-        # We need mtime to change to trigger inclusion via _sync_lockfiles
-        original_stat = os.stat
-
-        call_count = [0]
-        lockfile_path = str(target_dir / "go.work.sum")
-
-        def fake_stat(path, *a, **kw):
-            result = original_stat(path, *a, **kw)
-            if str(path) == lockfile_path:
-                call_count[0] += 1
-                if call_count[0] > 1:
-                    # Second call (after sync): simulate changed mtime
-                    result = MagicMock(st_mtime_ns=result.st_mtime_ns + 1000)
-            return result
-
-        with patch("os.stat", side_effect=fake_stat):
-            _sync_lockfiles({"target": str(target_dir)}, files_to_commit, log)
-
-        # go work sync should have been called
-        mock_subprocess.run.assert_any_call(
-            ["go", "work", "sync"],
-            cwd=str(target_dir),
-            timeout=30,
-            check=True,
-            capture_output=True,
-        )
-
-    @patch("rlsbl.commands.release.effects")
     @patch("shutil.which", return_value="/usr/bin/uv")
-    def test_uv_lock_synced_without_guard(self, mock_which, mock_subprocess, tmp_path):
-        """uv.lock has no guard file and should be synced when present."""
-        target_dir = tmp_path / "project"
-        target_dir.mkdir()
-        (target_dir / "uv.lock").write_text("version = 1\n")
-
-        mock_subprocess.run.return_value = MagicMock(returncode=0)
-        mock_subprocess.CalledProcessError = type("CalledProcessError", (Exception,), {})
-        mock_subprocess.TimeoutExpired = type("TimeoutExpired", (Exception,), {})
-
-        files_to_commit = []
-        log = MagicMock()
-
-        _sync_lockfiles({"target": str(target_dir)}, files_to_commit, log)
-
-        # uv lock should have been called
-        mock_subprocess.run.assert_any_call(
-            ["uv", "lock"],
-            cwd=str(target_dir),
-            timeout=30,
-            check=True,
-            capture_output=True,
-        )
+    def test_uv_lock_owed_without_guard(self, _which, tmp_path):
+        (tmp_path / "uv.lock").write_text("version = 1\n")
+        assert [s["cmd"] for s in _owed(tmp_path)] == [["uv", "lock"]]
 
 
 class TestWorkspaceRootUnconditionalInclusion:
@@ -134,8 +66,7 @@ class TestWorkspaceRootUnconditionalInclusion:
     def _simulate_ws_inclusion(self, monorepo_root):
         """Simulate the workspace root unconditional inclusion loop from execute.py.
 
-        This mirrors the exact logic in _run_release_mutating after the
-        _sync_lockfiles call for the workspace root.
+        This mirrors the workspace root inclusion loop.
         """
         files_to_commit = []
         log_messages = []
@@ -276,66 +207,14 @@ class TestWorkspaceRootUnconditionalInclusion:
 
 
 class TestGradleLockfileWrapperCheck:
-    """Test that gradle lockfile sync uses path existence check, not shutil.which."""
+    """The gradle lockfile is re-locked by the project's wrapper, not by PATH."""
 
-    @patch("rlsbl.commands.release.effects")
     @patch("shutil.which", return_value=None)
-    def test_gradlew_present_syncs_despite_no_gradle_on_path(
-        self, mock_which, mock_subprocess, tmp_path
-    ):
-        """./gradlew in project dir should be used even when gradle is not on PATH."""
-        target_dir = tmp_path / "project"
-        target_dir.mkdir()
-        (target_dir / "gradle.lockfile").write_text("# lockfile\n")
-        # Create the gradlew wrapper
-        gradlew = target_dir / "gradlew"
+    def test_gradlew_present_is_owed_despite_no_gradle_on_path(self, _which, tmp_path):
+        (tmp_path / "gradle.lockfile").write_text("# lockfile\n")
+        gradlew = tmp_path / "gradlew"
         gradlew.write_text("#!/bin/sh\n")
         gradlew.chmod(0o755)
-
-        mock_subprocess.run.return_value = MagicMock(returncode=0)
-        mock_subprocess.CalledProcessError = type("CalledProcessError", (Exception,), {})
-        mock_subprocess.TimeoutExpired = type("TimeoutExpired", (Exception,), {})
-
-        files_to_commit = []
-        log = MagicMock()
-
-        _sync_lockfiles({"target": str(target_dir)}, files_to_commit, log)
-
-        # ./gradlew should have been called even though shutil.which("gradle") is None
-        mock_subprocess.run.assert_any_call(
-            ["./gradlew", "dependencies", "--write-locks"],
-            cwd=str(target_dir),
-            timeout=30,
-            check=True,
-            capture_output=True,
-        )
-
-    @patch("rlsbl.commands.release.effects")
-    @patch("shutil.which", return_value=None)
-    def test_gradlew_missing_skips_with_warning(
-        self, mock_which, mock_subprocess, tmp_path
-    ):
-        """Missing ./gradlew should skip sync with a warning about the wrapper."""
-        target_dir = tmp_path / "project"
-        target_dir.mkdir()
-        (target_dir / "gradle.lockfile").write_text("# lockfile\n")
-        # No gradlew created
-
-        files_to_commit = []
-        log_messages = []
-        log = lambda msg: log_messages.append(msg)
-
-        _sync_lockfiles({"target": str(target_dir)}, files_to_commit, log)
-
-        # Should warn about ./gradlew not being found, not about gradle on PATH
-        gradle_warnings = [m for m in log_messages if "gradlew" in m]
-        assert len(gradle_warnings) == 1
-        assert "./gradlew" in gradle_warnings[0]
-        assert "not found" in gradle_warnings[0]
-
-        # No subprocess calls for gradle
-        gradle_calls = [
-            c for c in mock_subprocess.run.call_args_list
-            if c[0][0][0] == "./gradlew"
-        ] if mock_subprocess.run.called else []
-        assert len(gradle_calls) == 0
+        assert [s["cmd"] for s in _owed(tmp_path)] == [
+            ["./gradlew", "dependencies", "--write-locks"]
+        ]
