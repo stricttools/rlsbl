@@ -119,7 +119,7 @@ def upload_content_problems(workspace_root):
                     continue
                 problems.append(
                     f"{proj['name']}: {listing.label} would ship {path}, which "
-                    f"member '{member_name(owner)}' owns. {listing.remedy}"
+                    f"member '{member_name(owner)}' owns. {listing.fix}"
                 )
     return problems
 

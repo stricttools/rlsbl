@@ -273,7 +273,7 @@ class NpmTarget(BaseTarget):
         return UploadListing(
             label="`npm pack`",
             files=tuple(entry["path"] for entry in listing[0]["files"]),
-            remedy=(
+            fix=(
                 'List only the member\'s own files in package.json\'s "files" '
                 "field (or exclude the nested member in .npmignore)."
             ),

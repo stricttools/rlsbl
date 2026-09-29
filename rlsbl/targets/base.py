@@ -76,13 +76,13 @@ class UploadListing:
     """What one target's published upload of a directory would carry.
 
     ``files`` are paths relative to the listed directory; ``label`` names the
-    upload in a finding (``"`npm pack`"``); ``remedy`` says how a file is kept
+    upload in a finding (``"`npm pack`"``); ``fix`` says how a file is kept
     out of it.
     """
 
     label: str
     files: tuple
-    remedy: str
+    fix: str
 
 
 class TemplateVars(dict):

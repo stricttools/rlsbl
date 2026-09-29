@@ -1,10 +1,10 @@
-"""The publish router's gate checks every member of a multi-member releasable.
+"""The publish router checks the CI of every member of a multi-member releasable.
 
 Every member of a releasable is tagged with the releasable's prefix, so a
 router built one ``case`` branch per member repeated that prefix, and a shell
 ``case`` takes the first match: members after the first were never checked.
 One branch per distinct prefix, whose regex covers every member's CI, is what
-makes the gate demand all of them.
+makes the router demand all of them.
 """
 
 import re

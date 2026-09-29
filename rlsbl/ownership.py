@@ -150,8 +150,8 @@ def canonical_member_path(raw) -> str | None:
     """The one spelling of member path *raw*, or ``None`` when there is none.
 
     ``None`` means *raw* names no directory inside the repository: it is
-    absolute, or it climbs out through ``..``. Every other spelling has exactly
-    one canonical form (``draw//cmd/`` is ``draw/cmd``, ``./`` is ``.``).
+    absolute, or it climbs out through ``..``. Every other spelling has one
+    canonical form, and only one (``draw//cmd/`` is ``draw/cmd``, ``./`` is ``.``).
     """
     import posixpath
 
@@ -168,7 +168,7 @@ def member_path_problem(raw) -> str | None:
     """Why *raw* is not a canonical member path, or ``None`` when it is.
 
     The answer names the spelling to write when one exists. Member paths are
-    accepted in exactly one spelling and never tidied at load: a tidied path is
+    accepted in one spelling only and never tidied at load: a tidied path is
     a guess about what the operator meant, and every tool that reads the file
     would have to repeat the same guess.
     """
@@ -325,7 +325,7 @@ def nested_member_paths(member, members) -> list:
     """The declared paths of the members lying inside *member*'s territory, sorted.
 
     A member's own files are the ones under its path that no more specific
-    member claims, so these are exactly the directories a walk over *member*'s
+    member claims, so these are the directories a walk over *member*'s
     own files must leave out. For the root member that is every other member.
     Computed from the declared paths alone -- no filesystem, no git -- so every
     walker asks the same question and gets the same answer.

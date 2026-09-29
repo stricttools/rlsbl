@@ -1,4 +1,4 @@
-"""Workspace member paths are accepted in exactly one spelling.
+"""Workspace member paths are accepted in one spelling only.
 
 A member path is repository-relative and '/'-separated, with no '.', '..' or
 empty segment, no leading or trailing '/', and no backslash; the repository
