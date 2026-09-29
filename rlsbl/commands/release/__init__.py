@@ -126,6 +126,34 @@ from .release_state import (
 )
 
 
+def _abort_on_untidy_go_modules(target_paths, *, member_package_paths,
+                                monorepo_root, releasable_cfg_dir):
+    """Refuse, before anything mutates, a Go module the release's tidy changes.
+
+    The owed syncs are the ones the mutating phase plans
+    (:func:`~.execute.release_lock_targets` and
+    :func:`~.execute._target_lockfile_syncs`), so the guard judges the
+    modules that phase tidies.
+    """
+    from .execute import (
+        UntidyGoModuleError,
+        _target_lockfile_syncs,
+        refuse_untidy_go_modules,
+        release_lock_targets,
+    )
+
+    owed = []
+    for paths in release_lock_targets(
+        target_paths, member_package_paths=member_package_paths,
+        monorepo_root=monorepo_root, releasable_cfg_dir=releasable_cfg_dir,
+    ):
+        owed.extend(_target_lockfile_syncs(paths, lambda _msg: None))
+    try:
+        refuse_untidy_go_modules(owed)
+    except UntidyGoModuleError as exc:
+        raise ReleaseValidationError(str(exc)) from exc
+
+
 def _resolve_git_root(cwd):
     """The git work-tree root for *cwd*, or None when git cannot answer.
 
@@ -457,6 +485,14 @@ def _resume_cmd_inner(saved_state, flags, *, ctx):
                 member_package_paths = [p["path"] for p in member_projs]
         except Exception:
             pass  # Best-effort for resume
+
+    # Untidy-Go-module guard: the resume adopts what was committed while the
+    # release was stopped, so the modules are judged again.
+    _abort_on_untidy_go_modules(
+        target_paths,
+        member_package_paths=member_package_paths if releasable_name else None,
+        monorepo_root=monorepo_root, releasable_cfg_dir=_rel_cfg_dir,
+    )
 
     # Resolve changes_dir
     changes_dir = None
@@ -904,6 +940,13 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     target = TARGETS[registry]
     target_paths = resolve_target_paths(project_dir, releasable_config_dir=_rel_cfg_dir)
     primary_path = target_paths.get(registry, project_dir)
+
+    # Untidy-Go-module guard (pre-mutation).
+    _abort_on_untidy_go_modules(
+        target_paths,
+        member_package_paths=member_package_paths if releasable_name else None,
+        monorepo_root=monorepo_root, releasable_cfg_dir=_rel_cfg_dir,
+    )
 
     # Resolve the canonical (target, pipeline) pairs for the release flow.
     # Required (no fallback): the mutating phase derives the registry, primary

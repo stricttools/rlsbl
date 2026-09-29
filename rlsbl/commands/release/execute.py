@@ -5,6 +5,7 @@ import json
 import os
 import pathlib
 import shutil
+import subprocess
 import sys
 import time
 
@@ -1803,13 +1804,18 @@ def resolve_release_targets(primary, flags, project_dir=".", *, config,
     return baseline
 
 
+#: The sync a release owes a Go module's go.sum, and the argv that reports
+#: what it would change without changing anything.
+GO_TIDY = ["go", "mod", "tidy"]
+GO_TIDY_DIFF = GO_TIDY + ["-diff"]
+
 # Lockfile specs: (lockfile, tool_name, sync_cmd, guard_file)
 # guard_file: if set, the spec only applies when this file exists in the same directory.
 # This distinguishes e.g. go.sum (per-module) from go.work.sum (workspace root only).
 _LOCKFILE_SPECS = [
     ("uv.lock", "uv", ["uv", "lock"], None),
     ("package-lock.json", "npm", ["npm", "install", "--package-lock-only"], None),
-    ("go.sum", "go", ["go", "mod", "tidy"], None),
+    ("go.sum", "go", GO_TIDY, None),
     ("go.work.sum", "go", ["go", "work", "sync"], "go.work"),
     ("gradle.lockfile", "gradle", ["./gradlew", "dependencies", "--write-locks"], None),
 ]
@@ -1886,6 +1892,88 @@ def _target_lockfile_syncs(target_paths, log, specs=None):
                 "timeout": _LOCKFILE_SYNC_TIMEOUT,
             })
     return syncs
+
+
+def release_lock_targets(target_paths, *, member_package_paths, monorepo_root,
+                         releasable_cfg_dir):
+    """The target-path maps whose lockfiles a release refreshes.
+
+    The project's own targets; in a releasable release, each publishing
+    member's targets too; and the workspace root in a monorepo. Handed to
+    :func:`_target_lockfile_syncs` to learn which syncs are owed.
+    """
+    lock_targets = [dict(target_paths)]
+    if member_package_paths and monorepo_root:
+        from ...member_context import resolve_member_context
+
+        for mp_path in member_package_paths:
+            mp_abs = os.path.join(str(monorepo_root), mp_path)
+            if not os.path.isdir(mp_abs):
+                continue
+            member = resolve_member_context(
+                mp_abs, releasable_config_dir=releasable_cfg_dir,
+            )
+            if member.publish_mode == "none":
+                continue
+            if member.target_paths:
+                lock_targets.append(dict(member.target_paths))
+    if monorepo_root:
+        lock_targets.append({"workspace_root": str(monorepo_root)})
+    return lock_targets
+
+
+class UntidyGoModuleError(Exception):
+    """A Go module the release would tidy is not tidy in the commit."""
+
+
+def refuse_untidy_go_modules(syncs):
+    """Refuse when the release's ``go mod tidy`` would change a module.
+
+    Nothing a release writes changes a Go module's requirements, so on a tidy
+    module the owed ``go mod tidy`` is a no-op that refreshes nothing. On an
+    untidy one it rewrites ``go.mod`` or ``go.sum`` beyond the release's own
+    edits -- dependency changes nobody committed or reviewed -- so the module is
+    refused before the release mutates anything, naming the tidy and the
+    commit that fix it. ``go mod tidy -diff`` reports the change and writes
+    nothing but the module cache.
+
+    Raises :class:`UntidyGoModuleError`.
+    """
+    from ...release_checkout import live_path
+
+    for sync in syncs:
+        if sync["cmd"] != GO_TIDY:
+            continue
+        cwd = sync["cwd"]
+        # The fix is made in the working tree, not the release checkout.
+        where = live_path(cwd)
+        try:
+            probe = effects.run(
+                GO_TIDY_DIFF, cwd=cwd, capture_output=True, text=True,
+                timeout=sync["timeout"],
+            )
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            raise UntidyGoModuleError(
+                f"`go mod tidy -diff` could not run in {where}: {exc}. The "
+                f"release runs `go mod tidy` there and must first know it "
+                f"changes nothing."
+            ) from exc
+        if effects.unsettled(probe) or probe.returncode == 0:
+            continue
+        if probe.stdout.strip():
+            raise UntidyGoModuleError(
+                f"The Go module at {where} is not tidy. The release runs `go mod "
+                f"tidy` there to refresh go.sum, and it would change what the "
+                f"release commits beyond the release's own edits. `go mod "
+                f"tidy -diff` reports:\n{probe.stdout.rstrip()}\nRun `go mod "
+                f"tidy` in {where}, commit go.mod and go.sum, and re-run the "
+                f"release."
+            )
+        raise UntidyGoModuleError(
+            f"`go mod tidy -diff` failed in {where} (exit {probe.returncode}): "
+            f"{(probe.stderr or '').strip()}. The release runs `go mod tidy` "
+            f"there and must first know it changes nothing."
+        )
 
 
 # The uv entry of :data:`_LOCKFILE_SPECS`, by name rather than by index, so a

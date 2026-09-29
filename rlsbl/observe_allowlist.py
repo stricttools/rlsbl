@@ -295,6 +295,12 @@ OBSERVE_ALLOWLIST = (
         "and the format string only shapes stdout",
     ),
     ObserveEntry(
+        ("go", "mod", "tidy", "-diff"), "network-read",
+        "reports what `go mod tidy` would change without changing go.mod or "
+        "go.sum (the release's untidy-module guard); its only write is the "
+        "module cache",
+    ),
+    ObserveEntry(
         ("go", "env", "GOVERSION"), "self-report",
         "prints the installed Go's version (the pgdesign scaffold seeds "
         ".go-version from it)",
