@@ -12,7 +12,7 @@ ONE module onto a new path:
   import spec, and only inside that spec's quoted literal.
 
 Containment is never a bare ``startswith``.  Both halves ask
-:mod:`rlsbl.module_paths`, so a neighbouring module whose path merely begins
+:mod:`rlsbl.module_paths`, so a neighboring module whose path merely begins
 with the same letters (``github.com/o/foobar`` beside ``github.com/o/foo``) is
 left alone.
 
@@ -300,7 +300,7 @@ def rewrite_schema_project_id(text, old, new, nested=()):
 
     A dump whose ``project_id`` is not under *old* is not this module's, and is
     reported as nothing to do: a Python or TypeScript app's ``project_id`` is a
-    bare distribution name, and a neighbouring Go module's merely starts with
+    bare distribution name, and a neighboring Go module's merely starts with
     the same letters.
     """
     match = _SCHEMA_PROJECT_ID_LINE.search(text)
