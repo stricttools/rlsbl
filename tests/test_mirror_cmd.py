@@ -626,3 +626,77 @@ class TestStrandedScaffoldCommitRegression:
         _git(tmp_path, "clone", "-q", remote, str(work))
         parent = _git(work, "log", "-1", "--format=%P", "main")
         assert parent == split
+
+
+class TestMirrorOfAMemberScaffoldedInTheMonorepo:
+    """A member the monorepo scaffolded carries its managed-files registry in
+    the split, while its merge bases live in its releasable's state directory,
+    outside the split. The mirror's scaffold must get those bases, or it
+    refuses the registry as a project scaffolded before base tracking."""
+
+    def _scaffold_member(self, mono):
+        import sys
+
+        r = subprocess.run(
+            [sys.executable, "-P", "-m", "rlsbl", "scaffold", "--no-auto-commit"],
+            cwd=str(mono / "mylib"), capture_output=True, text=True,
+        )
+        assert r.returncode == 0, r.stderr + r.stdout
+        _git(mono, "add", "-A")
+        _git(mono, "commit", "-q", "-m", "rlsbl scaffold")
+        assert (mono / "mylib" / ".rlsbl" / "managed-files.json").exists()
+        assert not (mono / "mylib" / ".rlsbl" / "bases").exists()
+
+    def test_the_mirror_converges(self, mono, tmp_path):
+        remote = _init_bare(tmp_path / "mirror.git")
+        _make_monorepo(mono, subtree_remote=remote)
+        self._scaffold_member(mono)
+
+        _cmd_mirror({"project": "mylib"}, project_root=mono)
+
+        plan = observe(remote, str(mono), "mylib")
+        assert plan.state == "converged", plan
+        work = tmp_path / "verify"
+        _git(tmp_path, "clone", "-q", remote, str(work))
+        assert (work / ".rlsbl" / "managed-files.json").exists()
+        assert (work / ".rlsbl" / "bases").is_dir()
+
+    def test_a_member_with_no_committed_bases_is_refused_until_rescaffolded(
+        self, mono, tmp_path, capsys,
+    ):
+        import shutil
+        import sys
+
+        remote = _init_bare(tmp_path / "mirror.git")
+        _make_monorepo(mono, subtree_remote=remote)
+        self._scaffold_member(mono)
+        bases = mono / WORKSPACE_DIR / "releasables" / "mylib" / "bases"
+        assert bases.is_dir()
+        shutil.rmtree(bases)
+        _git(mono, "add", "-A")
+        _git(mono, "commit", "-q", "-m", "lose the bases")
+
+        with pytest.raises(SystemExit) as exc:
+            _cmd_mirror({"project": "mylib"}, project_root=mono)
+        assert exc.value.code == 1
+        assert "Run `rlsbl scaffold` in mylib" in capsys.readouterr().err
+
+        # The fix: scaffold the member, following the heal its refusal names,
+        # commit, and re-run the mirror.
+        r = subprocess.run(
+            [sys.executable, "-P", "-m", "rlsbl", "scaffold", "--no-auto-commit"],
+            cwd=str(mono / "mylib"), capture_output=True, text=True,
+        )
+        assert r.returncode != 0 and "mkdir -p" in r.stderr
+        heal = r.stderr.split("mkdir -p ", 1)[1].split(" &&", 1)[0]
+        (mono / "mylib" / heal).mkdir(parents=True)
+        r = subprocess.run(
+            [sys.executable, "-P", "-m", "rlsbl", "scaffold", "--no-auto-commit"],
+            cwd=str(mono / "mylib"), capture_output=True, text=True,
+        )
+        assert r.returncode == 0, r.stderr + r.stdout
+        _git(mono, "add", "-A")
+        _git(mono, "commit", "-q", "-m", "rlsbl scaffold")
+
+        _cmd_mirror({"project": "mylib"}, project_root=mono)
+        assert observe(remote, str(mono), "mylib").state == "converged"

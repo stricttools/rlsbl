@@ -403,6 +403,8 @@ The mirror command follows an observe-then-converge reconciliation pattern. In d
 
 The desired state of the mirror's `main` is exactly one scaffold commit atop the **current split-ancestry commit**, where that commit is the deterministic branchless `git subtree split` of the project's current history, and the scaffold commit touches only scaffold-owned paths.
 
+The scaffold layer is rendered by a standalone `rlsbl scaffold` in a clone of the split. A member the monorepo scaffolded carries its `.rlsbl/managed-files.json` in the split, while its merge bases live in its releasable's state directory, outside the split; the mirror copies those bases, as committed at the monorepo's HEAD, into the clone's `.rlsbl/bases/` first, so the mirror's scaffold three-way merges over the member's files as the member's own scaffold would. A member whose registry has no bases committed there is refused before scaffolding, naming `rlsbl scaffold` in the member as the fix.
+
 Observation reports one of the following for the mirror's **branch**, and, beside it, one item per released version for the mirror's **tags** (see [Release tags on the mirror](#release-tags-on-the-mirror)):
 
 | State | Meaning | What apply does |
