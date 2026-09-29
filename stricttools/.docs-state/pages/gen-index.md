@@ -1,6 +1,6 @@
 +++
 title = "API Reference"
-description = "API reference index for rlsbl covering 210 modules"
+description = "API reference index for rlsbl covering 214 modules"
 generated = true
 seeded = true
 nav_group = "API Reference"
@@ -34,6 +34,7 @@ nav_order = 90
 - [rlsbl.checks.release](../rlsbl-checks-release/)
 - [rlsbl.checks.scope](../rlsbl-checks-scope/)
 - [rlsbl.checks.strictspec_gate](../rlsbl-checks-strictspec_gate/)
+- [rlsbl.checks.upload_private_paths](../rlsbl-checks-upload_private_paths/)
 - [rlsbl.checks.workspace](../rlsbl-checks-workspace/)
 - [rlsbl.ci_checks](../rlsbl-ci_checks/)
 - [rlsbl.ci_router](../rlsbl-ci_router/)
@@ -138,6 +139,7 @@ nav_order = 90
 - [rlsbl.module_paths](../rlsbl-module_paths/)
 - [rlsbl.nested_exclusions](../rlsbl-nested_exclusions/)
 - [rlsbl.node_matrix](../rlsbl-node_matrix/)
+- [rlsbl.npm_token](../rlsbl-npm_token/)
 - [rlsbl.npm_wrapper](../rlsbl-npm_wrapper/)
 - [rlsbl.observe_allowlist](../rlsbl-observe_allowlist/)
 - [rlsbl.options](../rlsbl-options/)
@@ -160,6 +162,7 @@ nav_order = 90
 - [rlsbl.pipelines.pypi](../rlsbl-pipelines-pypi/)
 - [rlsbl.prepush_utils](../rlsbl-prepush_utils/)
 - [rlsbl.preview_apply](../rlsbl-preview_apply/)
+- [rlsbl.private_paths](../rlsbl-private_paths/)
 - [rlsbl.private_repo_publishing](../rlsbl-private_repo_publishing/)
 - [rlsbl.publication_probe](../rlsbl-publication_probe/)
 - [rlsbl.publish_gate](../rlsbl-publish_gate/)
@@ -214,6 +217,7 @@ nav_order = 90
 - [rlsbl.tool_checks](../rlsbl-tool_checks/)
 - [rlsbl.transition_record](../rlsbl-transition_record/)
 - [rlsbl.transition_record_followup](../rlsbl-transition_record_followup/)
+- [rlsbl.upload_exclusions](../rlsbl-upload_exclusions/)
 - [rlsbl.upstream](../rlsbl-upstream/)
 - [rlsbl.utils](../rlsbl-utils/)
 - [rlsbl.uv_workspace](../rlsbl-uv_workspace/)
