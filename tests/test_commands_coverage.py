@@ -1650,10 +1650,12 @@ class TestScrubNoRefname:
         _scrub_full(tmp_path, [SAFEGIT_OK, "", safegit_result, "", "", ""], flags, gh_auth=True, gh_installed=True)
 
 
-class TestScrubMonorepoFallbackScan:
-    """Covers lines 356-364: monorepo fallback scanning all projects."""
+class TestScrubMonorepoUnownedTag:
+    """A tag no member's scheme renders is refused, never matched by scanning."""
 
-    def test_fallback_scan_all_projects(self, tmp_path, capsys):
+    def test_an_unowned_tag_is_refused(self, tmp_path, capsys):
+        from conftest import make_workspace
+        from rlsbl.errors import RlsblError
         from rlsbl.commands.release_scrub import run_cmd
         from rlsbl.workspace import WorkspaceProject
 
@@ -1669,8 +1671,11 @@ class TestScrubMonorepoFallbackScan:
         (proj_dir / "CHANGELOG.md").write_text("## 1.0.0\n\n- found it\n")
 
         workspace_projects = [WorkspaceProject({"name": "alpha", "path": "pkg/alpha"})]
-        # A monorepo tag whose project prefix ("beta@") is not in the tag prefix
-        # index (only "alpha@" is) -- reaches the scan-all-projects fallback.
+        make_workspace(ws_root, [{"path": "pkg/alpha", "name": "alpha"}])
+        from rlsbl.workspace import load_workspace
+        workspace_projects = load_workspace(str(ws_root))
+        # A monorepo tag no member's scheme renders ("beta@" belongs to no
+        # member here): refused rather than attributed by scanning.
         safegit_result = _safegit_envelope({
             "rewrites": {"old": "new"},
             "tags": [{"refname": "refs/tags/beta@v1.0.0"}],
@@ -1700,9 +1705,11 @@ class TestScrubMonorepoFallbackScan:
                 f"{MOD_SCRUB}.extract_changelog_entry": MagicMock(return_value="- found it"),
             }.items():
                 stack.enter_context(patch(t, v))
-            run_cmd(flags, ctx=_ctx(str(proj_dir), workspace_root=str(ws_root)))
+            with pytest.raises(RlsblError) as exc:
+                run_cmd(flags, ctx=_ctx(str(proj_dir), workspace_root=str(ws_root)))
 
-        assert "no prefix match" in capsys.readouterr().err
+        assert "tag 'beta@v1.0.0' belongs to no releasable or member" in str(exc.value)
+        assert "--non-version-tag beta@v1.0.0" in str(exc.value)
 
 
 # ============================================================================

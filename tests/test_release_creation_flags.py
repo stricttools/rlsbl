@@ -89,7 +89,7 @@ class TestTheScrubsReleaseRewrite:
         return update_github_releases(
             [{"refname": "refs/tags/v1.0.0"}], ctx=_Ctx(str(tmp_path)),
             project_root=str(tmp_path), workspace_projects=None,
-            tag_prefix_index=None, gh=gh, gh_installed=lambda: True,
+            tag_schemes=None, gh=gh, gh_installed=lambda: True,
             gh_auth=lambda: True, extract_entry=lambda _p, _v: "- A change.\n",
         )
 
