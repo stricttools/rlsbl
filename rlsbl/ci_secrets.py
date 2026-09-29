@@ -26,6 +26,7 @@ unknown as an error. "We could not ask" is not evidence that the secret is
 there, and a release that trusted it would discover otherwise after tagging.
 """
 
+import json
 import subprocess
 
 from . import effects
@@ -37,11 +38,12 @@ NPM_TOKEN = "NPM_TOKEN"
 def probe_repo_secret(slug, name, *, timeout=15):
     """Does the GitHub repository *slug* have an Actions secret called *name*?
 
-    Returns {"status": "present"}, {"status": "absent"}, or
-    {"status": "unknown", "message": ...}. A 404 from this endpoint is the
-    API's way of saying the secret does not exist; every other non-zero exit is
-    unknown, because a permission or network failure must never read as
-    absence (or as presence).
+    Returns {"status": "present", "updated_at": ...}, {"status": "absent"},
+    or {"status": "unknown", "message": ...}. ``updated_at`` is the API's
+    timestamp of the secret's last write (ISO 8601), or None when the answer
+    carried none. A 404 from this endpoint is the API's way of saying the
+    secret does not exist; every other non-zero exit is unknown, because a
+    permission or network failure must never read as absence (or as presence).
     """
     argv = [
         "api", "--method", "GET", f"repos/{slug}/actions/secrets/{name}",
@@ -55,7 +57,12 @@ def probe_repo_secret(slug, name, *, timeout=15):
     if effects.unsettled(result):
         return {"status": "unknown", "message": "the gh call was not performed"}
     if result.returncode == 0:
-        return {"status": "present"}
+        try:
+            data = json.loads(result.stdout or "{}")
+        except ValueError:
+            data = {}
+        updated_at = data.get("updated_at") if isinstance(data, dict) else None
+        return {"status": "present", "updated_at": updated_at}
     stderr = (result.stderr or "").strip()
     if "(HTTP 404)" in stderr or "Not Found" in stderr:
         return {"status": "absent"}

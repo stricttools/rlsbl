@@ -167,6 +167,26 @@ pure = false
 needs_network = true
 depends_on = []
 
+# npm-token-synced: the npm token in ~/.npmrc is accepted by npm, and the
+# repository's NPM_TOKEN secret was set no earlier than that token was created.
+# A secret set before it holds an older token, and once that one expires the
+# CI npm publish fails after the release has tagged and pushed. The one
+# networked check in "preflight", by decision: a replaced token goes stale in
+# every repository at once, and only a check that blocks the release before
+# anything is tagged catches the next release of each of them. Fail-closed like
+# the rest: an unanswered probe or an undeterminable time is an error, and the
+# finding names `rlsbl secrets sync-npm-token` as the fix. Impure because it
+# runs `npm token list --json`, which the observe allowlist does not admit.
+[checks.npm-token-synced]
+description = "The npm token in ~/.npmrc is accepted by npm, and the repository's NPM_TOKEN secret was set no earlier than that token was created (requires network)."
+subject = "release"
+tags = ["release", "preflight"]
+severity = "error"
+fast = true
+pure = false
+needs_network = true
+depends_on = []
+
 # private-repo-publishing: npm build provenance, PyPI attestations, and the Go
 # module proxy need a public source repository; on a private one they fail after
 # the tag is public or record the private repository in a public log. The
