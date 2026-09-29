@@ -603,10 +603,18 @@ def _cmd_sync(flags, project_root):
             cwd=root,
         )
 
+    # The workspace root's .gitignore carries rlsbl's run-state entries:
+    # scaffold never runs at the root, and its scrub result and releasables'
+    # in-progress state live under it.
+    from ...utils import ensure_gitignore_entries, rlsbl_gitignore_entries
+
+    root_gitignore = ensure_gitignore_entries(root, rlsbl_gitignore_entries())
+
     workflows_dir = os.path.join(root, ".github", "workflows")
     effects.makedirs(workflows_dir, exist_ok=True)
 
-    written_files = []
+    # Committed with the sync's workflows below.
+    written_files = [root_gitignore] if root_gitignore else []
     current_project_names = set()
 
     # Track which projects have CI and publish workflows
