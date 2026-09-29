@@ -29,7 +29,7 @@ The router therefore declares ``predicate-quantifier: some-with-excludes``
 non-negated pattern matches it and no negated pattern does.  Exclusion is
 final and order-independent -- an excluded file cannot be included back by a
 later pattern.  For a member whose pattern list carries no negation the two
-quantifiers agree exactly, so only the filters of members that enclose other
+quantifiers agree in every case, so only the filters of members that enclose other
 members change meaning.
 """
 

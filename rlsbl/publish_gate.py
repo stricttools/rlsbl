@@ -426,8 +426,8 @@ def build_router_gate_job(prefix_regex_pairs: list[tuple[str, str]]) -> dict:
     ]
     for prefix in sorted(grouped, key=len, reverse=True):
         regexes = grouped[prefix]
-        # Each alternative keeps its own anchors, so the union matches
-        # exactly what any one member's regex matched.
+        # Each alternative keeps its own ^ and ' / ', so the union matches
+        # what any one member's regex matched, and nothing more.
         regex = regexes[0] if len(regexes) == 1 else "(" + "|".join(regexes) + ")"
         lines.append(f'  "{prefix}"*)')
         lines.append(f"    regex='{regex}'")

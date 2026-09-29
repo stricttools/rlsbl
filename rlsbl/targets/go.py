@@ -369,7 +369,7 @@ class GoTarget(BaseTarget):
         return UploadListing(
             label="the Go module zip",
             files=files,
-            remedy=(
+            fix=(
                 "The module proxy keeps a zip permanently. Move the nested "
                 "member out of the module's directory, or give it a go.mod of "
                 "its own, which Go leaves out of the zip."

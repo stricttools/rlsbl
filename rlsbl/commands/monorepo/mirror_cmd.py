@@ -1301,7 +1301,7 @@ def nested_member_mirror_problem(project, projects, releasable_name, remote):
     """Why *project* cannot be mirrored while members sit inside it, or None.
 
     A mirror is the subtree split of the member's directory, so every member
-    nested in it -- whatever releasable it belongs to -- would ride into the
+    nested in it -- whatever releasable it belongs to -- would go into the
     mirror's history and be published there as this releasable's. Shared by
     ``rlsbl monorepo mirror`` and by the release, which refuses before
     anything is written.

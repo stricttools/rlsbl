@@ -1,8 +1,8 @@
 """workspace-unregistered finds an undeclared project at any depth.
 
 workspace.toml is the explicit member list, and a project nobody declared
-falls to whichever member encloses it: its changes land in the wrong
-changelog, a Go module is never released, and an npm or Python parent ships
+falls to whichever member encloses it: its changes are attributed to the
+wrong changelog, a Go module is never released, and an npm or Python parent ships
 it inside its own artifact. The check reads every manifest git lists, at any
 depth. Manifests under a tests/, testdata/ or fixtures/ folder are test
 inputs, and a scratch directory's contents are throwaway probes.

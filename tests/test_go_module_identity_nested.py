@@ -1,6 +1,6 @@
 """go-module-identity's printed rewrites, executed as printed, in a workspace with nested modules.
 
-Each moved module gets a remedy of its own. Renaming a parent used to rename
+Each moved module gets a fix of its own. Renaming a parent used to rename
 the nested module too, so running the parent's printed command left the nested
 module's printed command naming a path that no longer existed anywhere.
 """

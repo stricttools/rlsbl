@@ -3,7 +3,7 @@
 A tag glob is a listing aid, not an ownership rule: ``kernel/v*`` also matches
 ``kernel/vulkan/v0.1.0``, the tag of a member nested inside ``kernel``, and the
 root releasable's ``v*`` matches ``vendor/v0.1.0``. A tag belongs to a scheme
-exactly when rendering the scheme's format at the version the tag carries
+when, and only when, rendering the scheme's format at the version the tag carries
 yields the tag itself.
 """
 

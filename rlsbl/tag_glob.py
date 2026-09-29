@@ -99,8 +99,8 @@ class TagScheme:
 
     ``pattern`` is the tag format with the name filled in and the version left
     as ``{version}`` (``kernel/v{version}``, ``www@v{version}``,
-    ``v{version}``). A tag belongs to the scheme exactly when it is the
-    pattern rendered at the version it carries: ``kernel/v*`` also LISTS
+    ``v{version}``). A tag belongs to the scheme when, and only when, it is
+    the pattern rendered at the version it carries: ``kernel/v*`` also LISTS
     ``kernel/vulkan/v0.1.0``, but no version renders ``kernel/v{version}`` as
     that tag, so it is not ``kernel``'s. A glob is only ever the listing aid
     (:meth:`list_glob`); ownership is always :meth:`owns`.
@@ -111,7 +111,7 @@ class TagScheme:
     def __post_init__(self):
         if self.pattern.count("{version}") != 1:
             raise ValueError(
-                f"a tag scheme has exactly one {{version}} slot; "
+                f"a tag scheme has one {{version}} slot and no other; "
                 f"{self.pattern!r} has {self.pattern.count('{version}')}"
             )
 
@@ -126,13 +126,13 @@ class TagScheme:
 
         Every glob rlsbl builds is its format with ``{version}`` replaced by
         ``*`` (:func:`releasable_tag_glob`, the targets' ``monorepo_tag_glob``),
-        so a glob with exactly one ``*`` names exactly one scheme. Anything
+        so a glob with a single ``*`` names one scheme and no other. Anything
         else is refused rather than read as a guess.
         """
         if glob.count("*") != 1 or any(ch in glob for ch in "?["):
             raise ValueError(
                 f"tag glob {glob!r} does not name one tag scheme: it must hold "
-                f"exactly one '*' (the version) and no other glob character"
+                f"a single '*' (the version) and no other glob character"
             )
         return cls(glob.replace("*", "{version}"))
 

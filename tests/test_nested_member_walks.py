@@ -2,7 +2,7 @@
 
 Every walk over one member's sources -- library lint, ruff, the ldflags check,
 the dependency import scan -- reads the member's own territory and nothing a
-nested member owns: a nested member's files are that member's, exactly as the
+nested member owns: a nested member's files are that member's, just as the
 root member's walks already leave every other member alone.
 """
 
