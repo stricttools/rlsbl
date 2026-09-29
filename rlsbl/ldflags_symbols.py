@@ -59,8 +59,10 @@ from dataclasses import dataclass, field
 from .go_identity import read_module_line
 
 #: Directories never scanned for build configuration: scaffold base copies
-#: (which are not live configuration) and goreleaser's own output.
-_EXCLUDED_PREFIXES = (".rlsbl/bases/", "dist/")
+#: (which are not live configuration), a workspace's ``.rlsbl-monorepo/``
+#: (which keeps its members' base copies, and which a root Go module encloses),
+#: and goreleaser's own output.
+_EXCLUDED_PREFIXES = (".rlsbl/bases/", ".rlsbl-monorepo/", "dist/")
 
 #: goreleaser's document, in both spellings and with or without the dot.
 _GORELEASER_NAMES = frozenset({
