@@ -143,11 +143,24 @@ def ensure_github_topic(quiet=False):
 
 
 def ensure_tags(registries, target_paths=None, quiet=False, *, project_root):
-    """Tag manifests and GitHub repo based on detected registries."""
+    """Tag manifests and GitHub repo based on detected registries.
+
+    Returns the manifest paths it edited, relative to the current directory,
+    so the caller can commit them.
+    """
     if target_paths is None:
         target_paths = {}
-    if "npm" in registries:
-        ensure_npm_keyword(target_paths.get("npm", "."), quiet=quiet, project_root=project_root)
-    if "pypi" in registries:
-        ensure_pypi_keyword(target_paths.get("pypi", "."), quiet=quiet, project_root=project_root)
+    edited = []
+    for registry, manifest, ensure in (
+        ("npm", "package.json", ensure_npm_keyword),
+        ("pypi", "pyproject.toml", ensure_pypi_keyword),
+    ):
+        if registry not in registries:
+            continue
+        dir_path = target_paths.get(registry, ".")
+        if ensure(dir_path, quiet=quiet, project_root=project_root):
+            if project_root is not None and dir_path == ".":
+                dir_path = str(project_root)
+            edited.append(os.path.relpath(os.path.join(dir_path, manifest)))
     ensure_github_topic(quiet=quiet)
+    return edited

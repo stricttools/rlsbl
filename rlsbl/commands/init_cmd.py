@@ -1559,9 +1559,26 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
             description="legacy hashes.json no longer used by scaffold",
         )
 
-    # Ecosystem tagging
+    # Ecosystem tagging. A manifest the keyword edit touches is committed with
+    # the scaffold when it had no uncommitted changes of its own: committing
+    # it then records only this edit. A manifest the operator is editing is
+    # left to them, with the keyword in it.
+    tagged_manifests = []
     if should_tag(flags, config):
-        ensure_tags(registries, target_paths=target_paths, project_root=project_root)
+        clean_before = {
+            path: not _has_uncommitted_changes(path)
+            for path in _keyword_manifests(registries, target_paths, project_root)
+        }
+        for path in ensure_tags(registries, target_paths=target_paths, project_root=project_root):
+            if clean_before.get(path, False):
+                tagged_manifests.append(path)
+            else:
+                print(
+                    f"Note: {path} has uncommitted changes of its own, so the "
+                    '"rlsbl" keyword added to it is not committed with the '
+                    "scaffold; it is committed with your changes.",
+                    file=sys.stderr,
+                )
 
     # Print unified file list with dot-padded status column
     _print_file_status_table(created, skipped)
@@ -1623,6 +1640,9 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
         )
         for cf in conflicted_files:
             print(f"  {cf}", file=sys.stderr)
+    for manifest in tagged_manifests:
+        if manifest not in files_to_commit:
+            files_to_commit.append(manifest)
     # Include .rlsbl/ internal files written during scaffold
     config_file = os.path.join(".rlsbl", "config.json")
     for rlsbl_file in [MANAGED_FILES, os.path.join(".rlsbl", "version"), config_file]:
@@ -1673,6 +1693,34 @@ def _finalize_scaffold(all_hash_dicts, created, skipped, warnings, *,
 
     if commit_files("rlsbl scaffold", files_to_commit, allow_failure=True):
         print("Committed scaffold changes.")
+
+
+def _keyword_manifests(registries, target_paths, project_root):
+    """The manifest paths ``ensure_tags`` may edit, as it reports them."""
+    paths = []
+    for registry, manifest in (("npm", "package.json"), ("pypi", "pyproject.toml")):
+        if registry in registries:
+            dir_path = (target_paths or {}).get(registry, ".")
+            if project_root is not None and dir_path == ".":
+                dir_path = str(project_root)
+            paths.append(os.path.relpath(os.path.join(dir_path, manifest)))
+    return paths
+
+
+def _has_uncommitted_changes(path):
+    """True when git reports *path* modified, staged, or untracked.
+
+    Outside a git repository there is nothing to commit, and the answer is
+    True so nothing is added to a commit.
+    """
+    try:
+        result = effects.run(
+            ["git", "--no-optional-locks", "status", "--porcelain", "--", path],
+            capture_output=True, text=True, check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return True
+    return bool(result.stdout.strip())
 
 
 def _resolve_publish_mode(flags, ctx):
