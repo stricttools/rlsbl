@@ -18,8 +18,9 @@ rlsbl monorepo init --root-dev-node
 # --releasable is required -- a name, or the literal `false` to opt out).
 # A name that [[releasables]] does not declare yet is CREATED as a singleton
 # releasable, with its tag_format written out explicitly (see below).
-# Each add scaffolds the member and runs `rlsbl monorepo sync`; if either
-# fails, the add exits 1 and workspace.toml is restored to its state before it.
+# Each add scaffolds the member, runs `rlsbl monorepo sync`, and commits the
+# entry; if any of them fails, the add exits 1 and workspace.toml is restored
+# to its state before it.
 rlsbl monorepo add packages/mylib --name mylib --library true --releasable mylib
 rlsbl monorepo add packages/cli --name cli --depends-on mylib --releasable cli
 rlsbl monorepo add packages/tests --name tests --dev-only true --releasable false
