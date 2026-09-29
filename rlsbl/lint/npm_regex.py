@@ -118,7 +118,10 @@ class NpmRegexLinter:
             results.extend(_check_entry_points(project_path, config))
 
         # Source file checks
-        for filepath in walk_source_files(project_path, _ALL_EXTENSIONS, config.exclude_patterns):
+        for filepath in walk_source_files(
+            project_path, _ALL_EXTENSIONS, config.exclude_patterns,
+            exclude_dirs=config.exclude_dirs,
+        ):
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     source = f.read()

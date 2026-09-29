@@ -20,6 +20,11 @@ class LanguageLintConfig:
     entry_point_enabled: bool = True
     entry_point_ignore: list[str] = field(default_factory=list)
     exclude_patterns: list[str] = field(default_factory=list)
+    #: Absolute directories of the workspace members nested inside the linted
+    #: member. Never read from TOML: :func:`rlsbl.lint.lint_library` derives it
+    #: from the workspace, so a member is never linted on another member's
+    #: files.
+    exclude_dirs: list[str] = field(default_factory=list)
 
 
 def _require_table(data: dict, key: str, config_path: str) -> dict:

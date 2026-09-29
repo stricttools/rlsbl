@@ -14,7 +14,7 @@ from .lint.go_ast import scan_imports as _go_scan_imports
 from .lint.npm_ast import NpmAstLinter
 from .lint.python_ast import PythonAstLinter
 from .lint.utils import walk_source_files
-from .module_paths import dotted_under_module, go_import_under_module
+from .module_paths import GO_SEP, dotted_under_module, owning_module
 from .scratch_dirs import prune_scratch_dirs
 from .targets.utils import detect_python_package_root, normalize_pypi
 from .utils import read_go_module_path
@@ -503,18 +503,20 @@ class GoImportScanner:
         if not module_path_map:
             return []
 
-        # Read this project's own module path to exclude self-imports
+        # This project's own module path: an import it owns is no dependency.
         own_module_path = read_go_module_path(project_path)
 
-        # Build reverse lookup: module_path -> workspace_name
-        # Only include other projects (not self)
-        module_to_name: dict[str, str] = {}
-        for ws_name, mod_path in module_path_map.items():
-            if mod_path == own_module_path:
-                continue
-            module_to_name[mod_path] = ws_name
+        # Reverse lookup, module_path -> workspace_name. The project's own
+        # module stays in it: an import is attributed to the longest module
+        # containing it, and a sub-package of a nested module must resolve to
+        # that module, never to the module enclosing it.
+        module_to_name: dict[str, str | None] = {
+            mod_path: ws_name for ws_name, mod_path in module_path_map.items()
+        }
+        if own_module_path:
+            module_to_name[own_module_path] = None
 
-        if not module_to_name:
+        if not any(name is not None for name in module_to_name.values()):
             return []
 
         go_files = walk_source_files(
@@ -543,17 +545,16 @@ class GoImportScanner:
     @staticmethod
     def _match_workspace_import(
         import_path: str,
-        module_to_name: dict[str, str],
+        module_to_name: dict[str, str | None],
     ) -> str | None:
-        """Check if an import path belongs to a workspace sibling.
+        """The workspace sibling an import path belongs to, or ``None``.
 
-        Containment is the shared rule (:mod:`rlsbl.module_paths`): the import
-        path equals the module path or continues past it at a '/' boundary.
+        The longest containing module path owns the import
+        (:func:`rlsbl.module_paths.owning_module`); an import owned by the
+        scanning project's own module (mapped to ``None``) is no dependency.
         """
-        for mod_path, ws_name in module_to_name.items():
-            if go_import_under_module(import_path, mod_path):
-                return ws_name
-        return None
+        owner = owning_module(import_path, module_to_name, sep=GO_SEP)
+        return None if owner is None else module_to_name[owner]
 
 
 def build_jvm_package_map(

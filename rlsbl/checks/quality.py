@@ -116,12 +116,25 @@ def register_quality_checks(app):
             )
             return reporter.found(f"ruff {found_ver} is below the {min_ver} floor")
 
+        # A nested workspace member's Python files are that member's; ruff
+        # reaches them through its own run, never through the enclosing one.
+        command = [
+            "ruff", "check", str(ctx.project_root),
+            "--output-format=json", "--quiet",
+        ]
+        if ctx.workspace_root is not None and ctx.projects:
+            rel = os.path.relpath(
+                os.path.realpath(str(ctx.project_root)),
+                os.path.realpath(str(ctx.workspace_root)),
+            ).replace(os.sep, "/")
+            nested = _sibling_exclude_dirs(
+                str(ctx.workspace_root), rel, ctx.projects,
+            )
+            if nested:
+                command += ["--extend-exclude", ",".join(nested)]
         try:
             result = effects.run(
-                [
-                    "ruff", "check", str(ctx.project_root),
-                    "--output-format=json", "--quiet",
-                ],
+                command,
                 capture_output=True,
                 text=True,
                 timeout=timeout,

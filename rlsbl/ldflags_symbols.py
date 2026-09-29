@@ -286,6 +286,38 @@ def _explicit_build_target(text, line_index):
 
 
 # ---------------------------------------------------------------------------
+# What belongs to the module
+# ---------------------------------------------------------------------------
+
+
+def foreign_dirs(module_dir, rel_paths):
+    """Module-relative directories under *module_dir* that are not the module's.
+
+    Two kinds, both of which own their files outright: a nested Go module (any
+    directory below the root holding its own ``go.mod`` -- Go's own module
+    boundary, which the module zip honors too), and a workspace member nested
+    inside this one. *rel_paths* is the module's file listing, from which the
+    nested ``go.mod`` files are read.
+    """
+    from .workspace import nested_member_dirs
+
+    dirs = {
+        os.path.dirname(rel).replace(os.sep, "/")
+        for rel in rel_paths
+        if os.path.basename(rel) == "go.mod" and os.path.dirname(rel)
+    }
+    real = os.path.realpath(module_dir)
+    for nested in nested_member_dirs(module_dir):
+        dirs.add(os.path.relpath(nested, real).replace(os.sep, "/"))
+    return frozenset(dirs)
+
+
+def _inside_any(rel_path, dirs):
+    rel = rel_path.replace(os.sep, "/")
+    return any(rel == d or rel.startswith(d + "/") for d in dirs)
+
+
+# ---------------------------------------------------------------------------
 # The Go source
 # ---------------------------------------------------------------------------
 
@@ -324,17 +356,21 @@ class _GoSource:
         """Every non-test ``.go`` file in the module, module-relative.
 
         ``vendor/`` and ``testdata/`` are other people's code and fixtures, and
-        the module's scratch directories hold throwaway probes; a symbol
-        declared in any of them is not this module's.  Like every source walk,
+        the module's scratch directories hold throwaway probes, and a nested
+        module or nested workspace member owns its own files
+        (:func:`foreign_dirs`); a symbol declared in any of them is not this
+        module's.  Like every source walk,
         this reads only what git lists (tracked, plus untracked files that are
         not ignored): an ignored file is not this module's either.
         """
         if self._go_files is not None:
             return self._go_files
-        from .lint.utils import walk_source_files
+        from .lint.utils import git_listed_files, walk_source_files
 
+        foreign = foreign_dirs(self.module_dir, git_listed_files(self.module_dir))
         found = walk_source_files(
             self.module_dir, (".go",), [],
+            exclude_dirs=sorted(foreign),
             excluded_dir_names=frozenset(
                 {".git", "vendor", "testdata", "node_modules"}),
         )
@@ -659,8 +695,10 @@ def evaluate_ldflags_symbols(module_dirs, *, list_tracked=None):
 
 def _evaluate_module(directory, module_path, source, enumerate_tracked,
                      verdict, warned):
-    for rel_path in sorted(enumerate_tracked(directory)):
-        if not is_build_file(rel_path):
+    tracked = sorted(enumerate_tracked(directory))
+    foreign = foreign_dirs(directory, tracked)
+    for rel_path in tracked:
+        if not is_build_file(rel_path) or _inside_any(rel_path, foreign):
             continue
         text = _read_text(os.path.join(directory, rel_path))
         if text is None or "-X" not in text:
