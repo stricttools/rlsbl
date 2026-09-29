@@ -4762,8 +4762,18 @@
         },
         {
           "level": 3,
+          "text": "`_runner_exclusion_fix`",
+          "anchor": "_runner_exclusion_fix"
+        },
+        {
+          "level": 3,
           "text": "`register_nested_checks`",
           "anchor": "register_nested_checks"
+        },
+        {
+          "level": 3,
+          "text": "`_uploads`",
+          "anchor": "_uploads"
         },
         {
           "level": 3,
@@ -9401,8 +9411,8 @@
         },
         {
           "level": 3,
-          "text": "`_patch_schema_version`",
-          "anchor": "_patch_schema_version"
+          "text": "`_stamp_schema_version`",
+          "anchor": "_stamp_schema_version"
         },
         {
           "level": 3,
@@ -23479,7 +23489,7 @@
       ]
     }
   ],
-  "last_gen": "2026-09-29T01:22:37.086102+00:00",
+  "last_gen": "2026-09-29T02:34:47.503146+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
