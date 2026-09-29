@@ -92,6 +92,20 @@ UNVERIFIED_KEY = "safegit_failed_after_rewrite"
 PRUNE_COMMAND = "git reflog expire --expire=now --all && git gc --prune=now"
 
 
+def _is_scrub_commit_on(new_head):
+    """Is HEAD the scrub commit the COMMITTED step made on *new_head*?
+
+    Its one parent is the rewrite's new head, and it carries the
+    ``Scrub-remap: <old>..<new>`` trailer naming that head.
+    """
+    try:
+        parent = run("git", ["rev-parse", "HEAD^"])
+        message = run("git", ["log", "-1", "--format=%B", "HEAD"])
+    except Exception:
+        return False
+    return parent == new_head and f"..{new_head}" in message
+
+
 def _lock_home(ctx):
     """The state home whose advisory lock the scrub takes, and its root."""
     if ctx.workspace_root:
@@ -982,9 +996,16 @@ def run_cmd(flags, *, ctx):
     if os.path.exists(scrub_result_path):
         with open(scrub_result_path, "r", encoding="utf-8") as f:
             scrub_data = json.load(f)
-        # Check if the saved new_head matches current HEAD
+        # The saved run's HEAD is the rewrite's new head, or, once the
+        # COMMITTED step made the scrub commit, that commit on top of it.
         current_head = run("git", ["rev-parse", "HEAD"])
         saved_head = scrub_data.get("new_head")
+        if (
+            saved_head and saved_head != current_head
+            and "COMMITTED" in scrub_data.get("completed_steps", [])
+            and _is_scrub_commit_on(saved_head)
+        ):
+            saved_head = current_head
         if saved_head and saved_head == current_head:
             print("Resuming from saved scrub result...")
             resuming = True
