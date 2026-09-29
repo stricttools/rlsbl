@@ -10,7 +10,7 @@ nav_order = 91
 
 # rlsbl CLI Reference
 
-Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding. Ships 62 commands organized into 14 top-level commands and 8 command groups (release, changelog, monorepo, dev, rewrite, transition, upstream, options). Covers 17 release targets: npm, pypi, go, swift, swift-apple, spec, hex, deno, dart, docker, flutter, maven, native-android, native-ios, zig, pgdesign, plain.
+Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding. Ships 63 commands organized into 14 top-level commands and 9 command groups (release, changelog, monorepo, dev, rewrite, transition, upstream, secrets, options). Covers 17 release targets: npm, pypi, go, swift, swift-apple, spec, hex, deno, dart, docker, flutter, maven, native-android, native-ios, zig, pgdesign, plain.
 
 Version: :-: var key="project.version"
 
@@ -40,6 +40,7 @@ Version: :-: var key="project.version"
 - [rewrite](../cli-rewrite/) -- Sweeping rewrites of the current working tree, each previewed before it is performed. Every command in this group observes the tree, reports a per-file plan with occurrence counts, and refuses to apply when a count moved between the preview and the write.
 - [transition](../cli-transition/) -- Record the transition-record facts an operator states. Most events in a repository's transition record are written by the operation that performed them; the ones here are statements about a repository somebody read -- two that nothing can derive at all, and one whose command exists but which a rename performed by hand leaves unrecorded.
 - [upstream](../cli-upstream/) -- Manage a fork's relation to its upstream, which the fork declares in .strictmetadata/upstream/upstream.toml (host, owner, repo, and branch; a repository without that file is not a fork, and no upstream is ever inferred from a git remote). Changelog coverage in a fork leaves out every commit reachable from the upstream branch, fetched into refs/upstream/<host>/<owner>/<repo>/<branch>, and from the inherited tags kept under refs/tags-of/<host>/<owner>/<repo>/.
+- [secrets](../cli-secrets/) -- Keep the Actions secrets CI publishes with in step with the credentials on this machine. No secret value is ever printed or passed as an argument.
 - [options](../cli-options/) -- Print rlsbl's options registry, and write this repository's entries for rlsbl's options in .strictmetadata/options/ at its git root. Every rlsbl check is an option, rlsbl:<check name>, and so is rlsbl:test-sandbox: an error check ranks error > warn > off, a warning check warn > off, and `rlsbl check` and every release apply each entry's current value (off: the check does not run; warn: it runs and reports, never blocking; error: as registered). The options that stand for an adoption (rlsbl:dep-floors, rlsbl:format, rlsbl:lint, rlsbl:strictspec-certificate-gate, rlsbl:test-sandbox, rlsbl:type-check) default to off and accept a path scope naming one workspace member. Invalid entries stop every check run and every release.
 
 ## Framework flags

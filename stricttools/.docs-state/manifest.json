@@ -1238,6 +1238,33 @@
       ]
     },
     {
+      "path": "cli-secrets.md",
+      "title": "rlsbl secrets",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl secrets",
+          "anchor": "rlsbl-secrets"
+        },
+        {
+          "level": 2,
+          "text": "secrets sync-npm-token",
+          "anchor": "secrets-sync-npm-token"
+        },
+        {
+          "level": 3,
+          "text": "Flags",
+          "anchor": "flags"
+        },
+        {
+          "level": 3,
+          "text": "Grants",
+          "anchor": "grants"
+        }
+      ]
+    },
+    {
       "path": "cli-status.md",
       "title": "rlsbl status",
       "type": "doc",
@@ -1483,6 +1510,16 @@
           "level": 3,
           "text": "`old_private_key_message`",
           "anchor": "old_private_key_message"
+        },
+        {
+          "level": 3,
+          "text": "`is_workspace_root_dir`",
+          "anchor": "is_workspace_root_dir"
+        },
+        {
+          "level": 3,
+          "text": "`config_file_label`",
+          "anchor": "config_file_label"
         },
         {
           "level": 3,
@@ -4656,6 +4693,11 @@
         },
         {
           "level": 3,
+          "text": "`_changelog_label`",
+          "anchor": "_changelog_label"
+        },
+        {
+          "level": 3,
           "text": "`_scope_is_releasable`",
           "anchor": "_scope_is_releasable"
         },
@@ -5006,6 +5048,38 @@
           "level": 3,
           "text": "`register_strictspec_gate_checks`",
           "anchor": "register_strictspec_gate_checks"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-checks-upload_private_paths.md",
+      "title": "rlsbl.checks.upload_private_paths",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.checks.upload_private_paths",
+          "anchor": "rlsblchecksupload_private_paths"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.checks.upload_private_paths`",
+          "anchor": "rlsblchecksupload_private_paths"
+        },
+        {
+          "level": 3,
+          "text": "`_publishing_roots`",
+          "anchor": "_publishing_roots"
+        },
+        {
+          "level": 3,
+          "text": "`upload_private_path_problems`",
+          "anchor": "upload_private_path_problems"
+        },
+        {
+          "level": 3,
+          "text": "`register_upload_private_path_checks`",
+          "anchor": "register_upload_private_path_checks"
         }
       ]
     },
@@ -6133,6 +6207,11 @@
         },
         {
           "level": 3,
+          "text": "`_print_next_steps`",
+          "anchor": "_print_next_steps"
+        },
+        {
+          "level": 3,
           "text": "`process_template`",
           "anchor": "process_template"
         },
@@ -6243,6 +6322,16 @@
         },
         {
           "level": 3,
+          "text": "`_keyword_manifests`",
+          "anchor": "_keyword_manifests"
+        },
+        {
+          "level": 3,
+          "text": "`_has_uncommitted_changes`",
+          "anchor": "_has_uncommitted_changes"
+        },
+        {
+          "level": 3,
           "text": "`_resolve_publish_mode`",
           "anchor": "_resolve_publish_mode"
         },
@@ -6275,6 +6364,11 @@
           "level": 3,
           "text": "`_ensure_pipeline_config`",
           "anchor": "_ensure_pipeline_config"
+        },
+        {
+          "level": 3,
+          "text": "`default_pipeline_entry`",
+          "anchor": "default_pipeline_entry"
         },
         {
           "level": 3,
@@ -6829,6 +6923,21 @@
         },
         {
           "level": 3,
+          "text": "`_commit_detail`",
+          "anchor": "_commit_detail"
+        },
+        {
+          "level": 3,
+          "text": "`_unrename`",
+          "anchor": "_unrename"
+        },
+        {
+          "level": 3,
+          "text": "`_archive_renames`",
+          "anchor": "_archive_renames"
+        },
+        {
+          "level": 3,
           "text": "`_advance_branch`",
           "anchor": "_advance_branch"
         },
@@ -6916,6 +7025,11 @@
           "level": 3,
           "text": "`_batch_release_releasables`",
           "anchor": "_batch_release_releasables"
+        },
+        {
+          "level": 3,
+          "text": "`_is_the_plans_own_batch_file`",
+          "anchor": "_is_the_plans_own_batch_file"
         },
         {
           "level": 3,
@@ -7048,6 +7162,16 @@
         },
         {
           "level": 3,
+          "text": "`_root_releasable_config`",
+          "anchor": "_root_releasable_config"
+        },
+        {
+          "level": 3,
+          "text": "`_write_root_releasable_config`",
+          "anchor": "_write_root_releasable_config"
+        },
+        {
+          "level": 3,
           "text": "`_create_releasable`",
           "anchor": "_create_releasable"
         },
@@ -7060,6 +7184,26 @@
           "level": 3,
           "text": "`_add_step_failed`",
           "anchor": "_add_step_failed"
+        },
+        {
+          "level": 3,
+          "text": "`_read_or_none`",
+          "anchor": "_read_or_none"
+        },
+        {
+          "level": 3,
+          "text": "`_working_tree_snapshot`",
+          "anchor": "_working_tree_snapshot"
+        },
+        {
+          "level": 3,
+          "text": "`_changed_since`",
+          "anchor": "_changed_since"
+        },
+        {
+          "level": 3,
+          "text": "`_restore_working_tree`",
+          "anchor": "_restore_working_tree"
         },
         {
           "level": 3,
@@ -7940,6 +8084,11 @@
         },
         {
           "level": 3,
+          "text": "`root_publisher_check_regex_problem`",
+          "anchor": "root_publisher_check_regex_problem"
+        },
+        {
+          "level": 3,
           "text": "`_render_root_publisher_jobs`",
           "anchor": "_render_root_publisher_jobs"
         },
@@ -8530,6 +8679,26 @@
         },
         {
           "level": 3,
+          "text": "`_unpublished_requirement`",
+          "anchor": "_unpublished_requirement"
+        },
+        {
+          "level": 3,
+          "text": "`lockfile_sync_failure`",
+          "anchor": "lockfile_sync_failure"
+        },
+        {
+          "level": 3,
+          "text": "`LockfileToolMissingError`",
+          "anchor": "lockfiletoolmissingerror"
+        },
+        {
+          "level": 4,
+          "text": "`message`",
+          "anchor": "message"
+        },
+        {
+          "level": 3,
           "text": "`_target_lockfile_syncs`",
           "anchor": "_target_lockfile_syncs"
         },
@@ -8545,6 +8714,26 @@
         },
         {
           "level": 3,
+          "text": "`go_preflight_failure`",
+          "anchor": "go_preflight_failure"
+        },
+        {
+          "level": 3,
+          "text": "`_go_json`",
+          "anchor": "_go_json"
+        },
+        {
+          "level": 3,
+          "text": "`go_work_sync_changes`",
+          "anchor": "go_work_sync_changes"
+        },
+        {
+          "level": 3,
+          "text": "`refuse_go_work_sync_changes`",
+          "anchor": "refuse_go_work_sync_changes"
+        },
+        {
+          "level": 3,
           "text": "`refuse_untidy_go_modules`",
           "anchor": "refuse_untidy_go_modules"
         },
@@ -8557,11 +8746,6 @@
           "level": 3,
           "text": "`_devnode_lock_syncs`",
           "anchor": "_devnode_lock_syncs"
-        },
-        {
-          "level": 3,
-          "text": "`_sync_lockfiles`",
-          "anchor": "_sync_lockfiles"
         },
         {
           "level": 3,
@@ -9456,6 +9640,11 @@
         },
         {
           "level": 3,
+          "text": "`_go_strictcli_upgrade`",
+          "anchor": "_go_strictcli_upgrade"
+        },
+        {
+          "level": 3,
           "text": "`_run_strictcli_schema_dump`",
           "anchor": "_run_strictcli_schema_dump"
         },
@@ -9945,8 +10134,23 @@
         },
         {
           "level": 3,
-          "text": "`_remove_release_checkout`",
-          "anchor": "_remove_release_checkout"
+          "text": "`_in_flight_releases`",
+          "anchor": "_in_flight_releases"
+        },
+        {
+          "level": 3,
+          "text": "`_refuse_in_flight_releases`",
+          "anchor": "_refuse_in_flight_releases"
+        },
+        {
+          "level": 3,
+          "text": "`_refuse_unignored_lock`",
+          "anchor": "_refuse_unignored_lock"
+        },
+        {
+          "level": 3,
+          "text": "`_lock_and_remove_release_checkout`",
+          "anchor": "_lock_and_remove_release_checkout"
         },
         {
           "level": 3,
@@ -9967,6 +10171,11 @@
           "level": 3,
           "text": "`compose_rewrites`",
           "anchor": "compose_rewrites"
+        },
+        {
+          "level": 3,
+          "text": "`_require_same_scrub`",
+          "anchor": "_require_same_scrub"
         },
         {
           "level": 3,
@@ -10990,6 +11199,16 @@
         },
         {
           "level": 3,
+          "text": "`is_workspace_root_dir`",
+          "anchor": "is_workspace_root_dir"
+        },
+        {
+          "level": 3,
+          "text": "`config_file_label`",
+          "anchor": "config_file_label"
+        },
+        {
+          "level": 3,
           "text": "`get_publish_mode`",
           "anchor": "get_publish_mode"
         },
@@ -11783,6 +12002,11 @@
           "level": 3,
           "text": "`run`",
           "anchor": "run"
+        },
+        {
+          "level": 3,
+          "text": "`_is_observe`",
+          "anchor": "_is_observe"
         },
         {
           "level": 3,
@@ -13885,6 +14109,93 @@
       ]
     },
     {
+      "path": "rlsbl-npm_token.md",
+      "title": "rlsbl.npm_token",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.npm_token",
+          "anchor": "rlsblnpm_token"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.npm_token`",
+          "anchor": "rlsblnpm_token"
+        },
+        {
+          "level": 3,
+          "text": "`NpmTokenError`",
+          "anchor": "npmtokenerror"
+        },
+        {
+          "level": 3,
+          "text": "`npmrc_path`",
+          "anchor": "npmrc_path"
+        },
+        {
+          "level": 3,
+          "text": "`read_npmrc_token`",
+          "anchor": "read_npmrc_token"
+        },
+        {
+          "level": 3,
+          "text": "`npm_whoami`",
+          "anchor": "npm_whoami"
+        },
+        {
+          "level": 3,
+          "text": "`_listing_matches`",
+          "anchor": "_listing_matches"
+        },
+        {
+          "level": 3,
+          "text": "`parse_timestamp`",
+          "anchor": "parse_timestamp"
+        },
+        {
+          "level": 3,
+          "text": "`token_created_at`",
+          "anchor": "token_created_at"
+        },
+        {
+          "level": 3,
+          "text": "`SyncVerdict`",
+          "anchor": "syncverdict"
+        },
+        {
+          "level": 4,
+          "text": "`ok`",
+          "anchor": "ok"
+        },
+        {
+          "level": 3,
+          "text": "`evaluate_npm_token_sync`",
+          "anchor": "evaluate_npm_token_sync"
+        },
+        {
+          "level": 3,
+          "text": "`_gh_lines`",
+          "anchor": "_gh_lines"
+        },
+        {
+          "level": 3,
+          "text": "`visible_repositories`",
+          "anchor": "visible_repositories"
+        },
+        {
+          "level": 3,
+          "text": "`set_npm_token_secret`",
+          "anchor": "set_npm_token_secret"
+        },
+        {
+          "level": 3,
+          "text": "`sync_npm_token`",
+          "anchor": "sync_npm_token"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-npm_wrapper.md",
       "title": "rlsbl.npm_wrapper",
       "type": "doc",
@@ -15205,6 +15516,58 @@
           "level": 3,
           "text": "`reconcile`",
           "anchor": "reconcile"
+        }
+      ]
+    },
+    {
+      "path": "rlsbl-private_paths.md",
+      "title": "rlsbl.private_paths",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.private_paths",
+          "anchor": "rlsblprivate_paths"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.private_paths`",
+          "anchor": "rlsblprivate_paths"
+        },
+        {
+          "level": 3,
+          "text": "`exclude_entries`",
+          "anchor": "exclude_entries"
+        },
+        {
+          "level": 3,
+          "text": "`private_match`",
+          "anchor": "private_match"
+        },
+        {
+          "level": 3,
+          "text": "`private_paths_in`",
+          "anchor": "private_paths_in"
+        },
+        {
+          "level": 3,
+          "text": "`archive_paths`",
+          "anchor": "archive_paths"
+        },
+        {
+          "level": 3,
+          "text": "`read_build_backend`",
+          "anchor": "read_build_backend"
+        },
+        {
+          "level": 3,
+          "text": "`python_fix`",
+          "anchor": "python_fix"
+        },
+        {
+          "level": 3,
+          "text": "`main`",
+          "anchor": "main"
         }
       ]
     },
@@ -17016,6 +17379,11 @@
         },
         {
           "level": 3,
+          "text": "`go_strictcli_requirements`",
+          "anchor": "go_strictcli_requirements"
+        },
+        {
+          "level": 3,
           "text": "`_go_mod_has_strictcli`",
           "anchor": "_go_mod_has_strictcli"
         },
@@ -17874,6 +18242,26 @@
         },
         {
           "level": 3,
+          "text": "`_dockerignore_regex`",
+          "anchor": "_dockerignore_regex"
+        },
+        {
+          "level": 3,
+          "text": "`read_dockerignore`",
+          "anchor": "read_dockerignore"
+        },
+        {
+          "level": 3,
+          "text": "`dockerignore_excludes`",
+          "anchor": "dockerignore_excludes"
+        },
+        {
+          "level": 3,
+          "text": "`_docker_private_path_fix`",
+          "anchor": "_docker_private_path_fix"
+        },
+        {
+          "level": 3,
           "text": "`DockerTarget`",
           "anchor": "dockertarget"
         },
@@ -17921,6 +18309,11 @@
           "level": 4,
           "text": "`template_mappings`",
           "anchor": "template_mappings"
+        },
+        {
+          "level": 4,
+          "text": "`offline_upload_listing`",
+          "anchor": "offline_upload_listing"
         },
         {
           "level": 4,
@@ -17990,6 +18383,16 @@
           "level": 2,
           "text": "`rlsbl.targets.go`",
           "anchor": "rlsbltargetsgo"
+        },
+        {
+          "level": 3,
+          "text": "`_selfdoc_generated`",
+          "anchor": "_selfdoc_generated"
+        },
+        {
+          "level": 3,
+          "text": "`_go_private_path_fix`",
+          "anchor": "_go_private_path_fix"
         },
         {
           "level": 3,
@@ -18679,6 +19082,16 @@
           "level": 3,
           "text": "`_npmrc_has_login`",
           "anchor": "_npmrc_has_login"
+        },
+        {
+          "level": 3,
+          "text": "`_npm_npmignore_fix`",
+          "anchor": "_npm_npmignore_fix"
+        },
+        {
+          "level": 3,
+          "text": "`_npm_files_field_fix`",
+          "anchor": "_npm_files_field_fix"
         },
         {
           "level": 3,
@@ -20083,6 +20496,11 @@
         },
         {
           "level": 3,
+          "text": "`targets_listing_uploads_offline`",
+          "anchor": "targets_listing_uploads_offline"
+        },
+        {
+          "level": 3,
           "text": "`targets_with_builtin_tests`",
           "anchor": "targets_with_builtin_tests"
         },
@@ -20582,6 +21000,53 @@
       ]
     },
     {
+      "path": "rlsbl-upload_exclusions.md",
+      "title": "rlsbl.upload_exclusions",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl.upload_exclusions",
+          "anchor": "rlsblupload_exclusions"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl.upload_exclusions`",
+          "anchor": "rlsblupload_exclusions"
+        },
+        {
+          "level": 3,
+          "text": "`dockerignore_entry`",
+          "anchor": "dockerignore_entry"
+        },
+        {
+          "level": 3,
+          "text": "`npmignore_block`",
+          "anchor": "npmignore_block"
+        },
+        {
+          "level": 3,
+          "text": "`dockerignore_block`",
+          "anchor": "dockerignore_block"
+        },
+        {
+          "level": 3,
+          "text": "`ci_check_script`",
+          "anchor": "ci_check_script"
+        },
+        {
+          "level": 3,
+          "text": "`go_stub_directories`",
+          "anchor": "go_stub_directories"
+        },
+        {
+          "level": 3,
+          "text": "`apply_upload_exclusions`",
+          "anchor": "apply_upload_exclusions"
+        }
+      ]
+    },
+    {
       "path": "rlsbl-upstream.md",
       "title": "rlsbl.upstream",
       "type": "doc",
@@ -21057,6 +21522,16 @@
           "level": 3,
           "text": "`read_go_module_path`",
           "anchor": "read_go_module_path"
+        },
+        {
+          "level": 3,
+          "text": "`rlsbl_gitignore_entries`",
+          "anchor": "rlsbl_gitignore_entries"
+        },
+        {
+          "level": 3,
+          "text": "`ensure_gitignore_entries`",
+          "anchor": "ensure_gitignore_entries"
         }
       ]
     },
@@ -22145,6 +22620,11 @@
         },
         {
           "level": 3,
+          "text": "`cmd_secrets_sync_npm_token`",
+          "anchor": "cmd_secrets_sync_npm_token"
+        },
+        {
+          "level": 3,
           "text": "`cmd_options_registry`",
           "anchor": "cmd_options_registry"
         },
@@ -22219,6 +22699,11 @@
           "level": 3,
           "text": "Checks never look inside them",
           "anchor": "checks-never-look-inside-them"
+        },
+        {
+          "level": 2,
+          "text": "Private paths",
+          "anchor": "private-paths"
         },
         {
           "level": 2,
@@ -23583,6 +24068,21 @@
           "level": 3,
           "text": "Use case",
           "anchor": "use-case-1"
+        },
+        {
+          "level": 2,
+          "text": "`rlsbl secrets sync-npm-token`",
+          "anchor": "rlsbl-secrets-sync-npm-token"
+        },
+        {
+          "level": 3,
+          "text": "Usage",
+          "anchor": "usage-6"
+        },
+        {
+          "level": 3,
+          "text": "Behavior",
+          "anchor": "behavior-2"
         }
       ]
     }
@@ -23599,7 +24099,7 @@
       ]
     }
   ],
-  "last_gen": "2026-09-29T04:10:12.751967+00:00",
+  "last_gen": "2026-09-29T20:37:55.884745+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [

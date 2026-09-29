@@ -84,7 +84,7 @@
   "project_id": "rlsbl",
   "name": "rlsbl",
   "version": "0.129.0",
-  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding. Ships 62 commands organized into 14 top-level commands and 8 command groups (release, changelog, monorepo, dev, rewrite, transition, upstream, options). Covers 17 release targets: npm, pypi, go, swift, swift-apple, spec, hex, deno, dart, docker, flutter, maven, native-android, native-ios, zig, pgdesign, plain.",
+  "help": "Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding. Ships 63 commands organized into 14 top-level commands and 9 command groups (release, changelog, monorepo, dev, rewrite, transition, upstream, secrets, options). Covers 17 release targets: npm, pypi, go, swift, swift-apple, spec, hex, deno, dart, docker, flutter, maven, native-android, native-ios, zig, pgdesign, plain.",
   "proc_observe_allowlist": [
     [
       "git",
@@ -340,6 +340,18 @@
       "mod",
       "tidy",
       "-diff"
+    ],
+    [
+      "go",
+      "mod",
+      "edit",
+      "-json"
+    ],
+    [
+      "go",
+      "work",
+      "edit",
+      "-json"
     ],
     [
       "go",
@@ -2046,6 +2058,22 @@
                         "type": "string"
                       },
                       "presence": "required"
+                    },
+                    {
+                      "name": "publish-mode",
+                      "help": "the root member's publish mode, \"ci\" or \"none\", with no default; it is written to the releasable's .rlsbl-monorepo/releasables/<name>/config.json, where a root member's config lives",
+                      "value_schema": {
+                        "type": "string"
+                      },
+                      "presence": "required"
+                    },
+                    {
+                      "name": "publish-gate-check-regex",
+                      "help": "regex matching the check-run names of the root's hand-authored CI, which publishing waits for on the release commit; required with --publish-mode ci when a release target is detected at the root",
+                      "value_schema": {
+                        "type": "string"
+                      },
+                      "presence": "optional"
                     }
                   ]
                 }
@@ -2054,7 +2082,7 @@
             },
             {
               "name": "auto-commit",
-              "help": "Automatically commit the generated workspace.toml configuration file to git (the handler commits when neither form is passed)",
+              "help": "Automatically commit the generated workspace.toml, and the root releasable's config.json when one is written, to git (the handler commits when neither form is passed)",
               "value_schema": {
                 "type": "boolean"
               },
@@ -2065,7 +2093,7 @@
         },
         "add": {
           "name": "add",
-          "help": "Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optional settings cover display name, target registry, inter-project dependencies, releasable membership, registry identity, and flags marking the project as a shared library or a dev-only leaf. A --releasable naming a group [[releasables]] does not declare yet creates it, as absorb creates one for an arriving member: a singleton entry whose tag_format is written out explicitly, derived from the member's primary target scheme unless --tag-format states it. The mirror destination is not among them: it is a releasable-level key, declared in workspace.toml beside the releasable it binds. What CI reacts to is not among them: the router's paths filters are derived from the workspace, never declared per project. After writing the entry the command scaffolds the member (unless it already has a .rlsbl/config.json) and runs monorepo sync; if either fails, or the commit of the entry that follows them fails, the command exits 1 with workspace.toml restored to what it was before.",
+          "help": "Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optional settings cover display name, target registry, inter-project dependencies, releasable membership, registry identity, and flags marking the project as a shared library or a dev-only leaf. A --releasable naming a group [[releasables]] does not declare yet creates it, as absorb creates one for an arriving member: a singleton entry whose tag_format is written out explicitly, derived from the member's primary target scheme unless --tag-format states it. The mirror destination is not among them: it is a releasable-level key, declared in workspace.toml beside the releasable it binds. What CI reacts to is not among them: the router's paths filters are derived from the workspace, never declared per project. After writing the entry the command scaffolds the member (unless it already has a .rlsbl/config.json) and runs monorepo sync, then commits what the three wrote as one commit, leaving uncommitted, and naming, a file that had uncommitted changes before the add; if the scaffold, the sync, or the commit fails, the command exits 1 with the working tree as it was before and nothing committed.",
           "effect": "mutating",
           "flags": [
             {
@@ -2967,6 +2995,36 @@
         }
       }
     },
+    "secrets": {
+      "name": "secrets",
+      "help": "Keep the Actions secrets CI publishes with in step with the credentials on this machine. No secret value is ever printed or passed as an argument.",
+      "commands": {
+        "sync-npm-token": {
+          "name": "sync-npm-token",
+          "help": "Copy the npm token in ~/.npmrc (the //registry.npmjs.org/:_authToken= line) into the NPM_TOKEN Actions secret of repositories that already have one. Refuses when ~/.npmrc holds no token, and when npm does not accept it (asked with GET https://registry.npmjs.org/-/whoami); otherwise prints the npm user it authenticates. Without --all the target is the current repository, named by its origin remote, and a repository without an NPM_TOKEN secret is refused: the secret is never created. With --all the targets are every repository the authenticated gh account can see (its own and those of every organization it belongs to) that has an NPM_TOKEN secret; archived repositories are named and skipped, since GitHub refuses writes to them. Each target is set with `gh secret set NPM_TOKEN --repo <owner/repo>`, the token piped on stdin, and printed with its outcome. Exits 1 when any target could not be read or set. The token is never printed.",
+          "effect": "mutating",
+          "consequential": true,
+          "flags": [
+            {
+              "name": "all",
+              "help": "Target every repository the authenticated gh account can see that has an NPM_TOKEN secret, instead of the current repository (the handler targets the current repository when --all is not passed)",
+              "value_schema": {
+                "type": "boolean"
+              },
+              "presence": "optional",
+              "negatable": true
+            }
+          ],
+          "grants": [
+            {
+              "name": "set-secret",
+              "reason": "replaces the NPM_TOKEN Actions secret a repository's CI publishes to npm with",
+              "kind": "proc_mutate"
+            }
+          ]
+        }
+      }
+    },
     "options": {
       "name": "options",
       "help": "Print rlsbl's options registry, and write this repository's entries for rlsbl's options in .strictmetadata/options/ at its git root. Every rlsbl check is an option, rlsbl:<check name>, and so is rlsbl:test-sandbox: an error check ranks error > warn > off, a warning check warn > off, and `rlsbl check` and every release apply each entry's current value (off: the check does not run; warn: it runs and reports, never blocking; error: as registered). The options that stand for an adoption (rlsbl:dep-floors, rlsbl:format, rlsbl:lint, rlsbl:strictspec-certificate-gate, rlsbl:test-sandbox, rlsbl:type-check) default to off and accept a path scope naming one workspace member. Invalid entries stop every check run and every release.",
@@ -3855,6 +3913,19 @@
       "description": "A package.json with private: true does not contradict publish_mode ci.",
       "subject": "project"
     },
+    "npm-token-synced": {
+      "tags": [
+        "release",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": true,
+      "pure": false,
+      "needs_network": true,
+      "depends_on": [],
+      "description": "The npm token in ~/.npmrc is accepted by npm, and the repository's NPM_TOKEN secret was set no earlier than that token was created (requires network).",
+      "subject": "release"
+    },
     "old-repo-archived": {
       "tags": [
         "release"
@@ -4247,6 +4318,19 @@
       "description": "No releasable member has a runtime dependency on an unversioned member.",
       "subject": "workspace",
       "scope": "workspace"
+    },
+    "upload-private-paths": {
+      "tags": [
+        "project",
+        "preflight"
+      ],
+      "severity": "error",
+      "fast": false,
+      "pure": false,
+      "needs_network": false,
+      "depends_on": [],
+      "description": "No npm package, Go module zip, or Docker build context carries a private path.",
+      "subject": "project"
     },
     "version-consistency": {
       "tags": [
