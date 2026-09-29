@@ -126,6 +126,9 @@ EXPECTED_CHECKS = [
     "nested-member-upload-contents",
     # a nested member declares no uv workspace source of its own
     "nested-member-uv-sources",
+    # Go modules in one workspace: requires stay current, replace is refused
+    "go-workspace-require-current",
+    "go-workspace-replace",
     # every -X linker flag names a symbol the Go source actually declares
     "ldflags-symbol",
     # the declared strictspec floor reaches every generated validator

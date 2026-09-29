@@ -88,6 +88,9 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # nested-member-uv-sources reads [tool.uv.sources], which only uv (pypi)
     # projects declare.
     "nested-member-uv-sources": frozenset({"pypi"}),
+    # go-workspace-require-current and go-workspace-replace read go.mod.
+    "go-workspace-require-current": frozenset({"go"}),
+    "go-workspace-replace": frozenset({"go"}),
     # go-toolchain-declared asks whether go.mod carries a `toolchain` line,
     # which is Go's.
     "go-toolchain-declared": frozenset({"go"}),
@@ -491,6 +494,7 @@ def register_checks(app):
     from .strictspec_gate import register_strictspec_gate_checks
     from .go_tags import register_go_tag_checks
     from .nested import register_nested_checks
+    from .go_workspace import register_go_workspace_checks
 
     register_project_checks(app)
     register_release_checks(app)
@@ -501,3 +505,4 @@ def register_checks(app):
     register_strictspec_gate_checks(app)
     register_go_tag_checks(app)
     register_nested_checks(app)
+    register_go_workspace_checks(app)

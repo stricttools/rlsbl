@@ -1140,6 +1140,38 @@ needs_network = false
 depends_on = []
 scope = "workspace"
 
+# go-workspace-require-current: rlsbl does not bump a Go module's require line
+# when a sibling module in the workspace releases (go.sum needs the new
+# version's hash, which exists only once the tag reaches the proxy), so a
+# require below the sibling's latest release is refused, naming the `go get`
+# that raises it. Pure (reads go.mod and the release archives). In "preflight"
+# so a release never ships a module built against a superseded sibling.
+[checks.go-workspace-require-current]
+description = "No Go member requires a sibling workspace module below that module's latest release."
+subject = "project"
+tags = ["workspace", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+# go-workspace-replace: a releasable Go member's replace directive pointing at
+# a workspace directory makes `go install module@version` reject the module,
+# and its consumers never see it. Development uses a committed go.work
+# instead. Pure (reads go.mod). In "preflight" so no such module is released.
+[checks.go-workspace-replace]
+description = "No releasable Go member replaces a module with a directory in the workspace."
+subject = "project"
+tags = ["workspace", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
 # go-toolchain-declared: setup-go installs the Go named by go.mod's `toolchain`
 # line and falls back to the `go` directive -- the consumers' floor -- without
 # one, so CI would test on an older Go than the project is developed with.
