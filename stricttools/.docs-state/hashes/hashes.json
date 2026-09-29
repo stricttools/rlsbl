@@ -81,9 +81,9 @@
     "schema_hash": "6bf61b345615538d2a83180e7b498ab5eea7397122e629c8925c2d84f3d867ce"
   },
   "en/cli-monorepo.md": {
-    "content": "0aa2765f0bd1e59c030e7dcf7324286dcea61bef60d9f853f0daccdae1b3d054",
+    "content": "a1df9d4fa76efd90a0305dab9ac7d4c8a6c303943ea8e94e8dd64c8aa39b927a",
     "description": "651df98c12c7c974b36d4da3b1746d0cead7cc6e5b0df5c15b392584aad74cff",
-    "schema_hash": "c62ba2fbe1e54bf2fe6dfa62bde201efd1f6380555c2815f08e2bd5b46a7676e",
+    "schema_hash": "3d56d02a587ccc849bcd5c6b5d14b89599cb44043d00ee6758a7f15e598a4a66",
     "seed_hash": "651df98c12c7c974b36d4da3b1746d0cead7cc6e5b0df5c15b392584aad74cff"
   },
   "en/cli-options.md": {
@@ -121,9 +121,9 @@
     "seed_hash": "834f34d30bf5b3f057ba3ec1746a807f12f823ec51ce9fffb90286426a77b60e"
   },
   "en/cli-rewrite.md": {
-    "content": "58b10a1e28dd1b5a688a966f4a400ccfe2ccf410e52f3402f4e3def8f6594ffd",
+    "content": "30de18c8d1f1ac929215bb329ee1a4801f24f8e49e6ba6c2dac006c3f3a6890d",
     "description": "10cbade59f0391bbb170f13eb2eede251075ef56638157d66bb556a2b56bb189",
-    "schema_hash": "f20f4cc554d6baab4195bcca40b7a102f0c52ee4a7798265d99d4b2910bba43e",
+    "schema_hash": "d084eca9f3b535990fa0f68efc5eb7d3b830e8171f17c3cc2b2a1592424cddfb",
     "seed_hash": "10cbade59f0391bbb170f13eb2eede251075ef56638157d66bb556a2b56bb189"
   },
   "en/cli-scaffold.md": {
@@ -157,9 +157,9 @@
     "seed_hash": "0654316e75563bb96bcc2b43404ff68e821ebd04074f160c6094ad505b8ab41c"
   },
   "en/cli-upstream.md": {
-    "content": "dbba03f716302ba80b7318745b9b463377ff81722ba770aeaf7f25f79e707dc6",
+    "content": "e6199d4b3a869805314183a9a9cbe694ff84406f2a8407cf332b5e25b86a33c2",
     "description": "452c7a96a5a9c20684336e569020d3e93cd9e393559c8ac47b697b1fbd41b7e1",
-    "schema_hash": "3edfe4b94159f9873b85ade929cb11782d4c6b054d4591011db6c9ccdde190fa",
+    "schema_hash": "5472fd195aa9e329213a71f5c8e179a4ef6794d6f7e91e7841cdd003220f2731",
     "seed_hash": "452c7a96a5a9c20684336e569020d3e93cd9e393559c8ac47b697b1fbd41b7e1"
   },
   "en/cli-watch.md": {
