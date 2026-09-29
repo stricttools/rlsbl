@@ -24,6 +24,7 @@ from githarness import (
     add_remote as _add_remote,
     commit_file as _commit_file,
     git as _git,
+    ignore_rlsbl_lock,
     init_repo,
     remote_ref as _remote_ref,
     snapshot_remote_refs as _snapshot_remote_refs,
@@ -39,6 +40,7 @@ REPLACEMENT = "REDACTEDVALUE"
 
 def _init_repo(repo):
     init_repo(repo, email="e2e@test.local", name="E2E")
+    ignore_rlsbl_lock(repo)
 
 
 def _jsonl_line(commits, user_facing=False, description=None, type_=None):

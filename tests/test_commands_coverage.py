@@ -1349,7 +1349,7 @@ def _scrub_simple(tmp_path, run_side_effect, flags, **extra_patches):
         f"{MOD_SCRUB}.require_tool": MagicMock(),
         f"{MOD_SCRUB}.run": mock_run,
         # git runs for real in the checkout removal; this repo is faked.
-        f"{MOD_SCRUB}._remove_release_checkout": MagicMock(return_value=None),
+        f"{MOD_SCRUB}._lock_and_remove_release_checkout": MagicMock(return_value=None),
         **extra_patches,
     }
     import contextlib
@@ -1381,7 +1381,7 @@ def _scrub_full(tmp_path, run_side_effect, flags, *, gh_auth=False, gh_installed
         f"{MOD_SCRUB}.require_tool": MagicMock(),
         f"{MOD_SCRUB}.run": mock_run,
         # git runs for real in the checkout removal; this repo is faked.
-        f"{MOD_SCRUB}._remove_release_checkout": MagicMock(return_value=None),
+        f"{MOD_SCRUB}._lock_and_remove_release_checkout": MagicMock(return_value=None),
     }
     if run_gh_side_effect is not None:
         mock_run_gh = MagicMock(side_effect=run_gh_side_effect)
@@ -1710,7 +1710,7 @@ class TestScrubMonorepoUnownedTag:
                 f"{MOD_SCRUB}.run_gh": mock_run_gh,
                 f"{MOD_SCRUB}.load_workspace": MagicMock(return_value=workspace_projects),
                 f"{MOD_SCRUB}.extract_changelog_entry": MagicMock(return_value="- found it"),
-                f"{MOD_SCRUB}._remove_release_checkout": MagicMock(return_value=None),
+                f"{MOD_SCRUB}._lock_and_remove_release_checkout": MagicMock(return_value=None),
             }.items():
                 stack.enter_context(patch(t, v))
             with pytest.raises(RlsblError) as exc:

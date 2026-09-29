@@ -48,7 +48,7 @@ def test_the_scrub_refuses_a_stopped_release_and_runs_once_it_is_abandoned(
     repo = build(tmp_path, files="0.29.4")
     commit_file(repo, "config.env", f"token={SECRET}\n", "add config")
     commit_file(repo, ".gitignore", ".rlsbl/releases/scrub-result.json\n"
-                ".rlsbl/releases/in-progress.json\n", "ignore run state")
+                ".rlsbl/releases/in-progress.json\n.rlsbl/lock\n", "ignore run state")
     generate_changelog(str(repo))
     git(repo, "add", "CHANGELOG.md")
     git(repo, "commit", "-q", "-m", "generate changelog")
@@ -151,3 +151,93 @@ def test_a_release_that_stops_while_the_scrub_waits_for_the_lock_is_refused(
     assert "stopped mid-flight" in err and state in err
     assert os.path.isdir(checkout), "the release checkout was removed"
     assert git(repo, "rev-parse", "HEAD") == head
+
+
+def _scrubbable(tmp_path, monkeypatch, safegit_bin, *, ignore_lock=True):
+    monkeypatch.setenv(
+        "PATH", str(safegit_bin.parent) + os.pathsep + os.environ.get("PATH", ""),
+    )
+    repo = build(tmp_path, files="0.29.4")
+    commit_file(repo, "config.env", f"token={SECRET}\n", "add config")
+    commit_file(repo, ".gitignore", ".rlsbl/releases/scrub-result.json\n"
+                ".rlsbl/releases/in-progress.json\n"
+                + (".rlsbl/lock\n" if ignore_lock else ""), "ignore run state")
+    generate_changelog(str(repo))
+    git(repo, "add", "CHANGELOG.md")
+    git(repo, "commit", "-q", "-m", "generate changelog")
+    head = git(repo, "rev-parse", "HEAD")
+    checkout = release_checkout.prepare_checkout(str(repo), head)
+    monkeypatch.chdir(repo)
+    return repo, checkout
+
+
+def test_a_release_starting_after_the_checkout_is_removed_waits_for_the_rewrite(
+    safegit_bin, tmp_path, monkeypatch,
+):
+    """The scrub removes the release checkout and then rewrites history. A
+    release starting between the two would take the lock, re-create the
+    checkout on the old history, and run while safegit rewrites it. The lock
+    is held from the removal through the rewrite: a release that asks for it
+    once the checkout is gone gets it only after the rewrite is done."""
+    import fcntl
+    import threading
+
+    from rlsbl.utils import run as real_run
+
+    repo, checkout = _scrubbable(tmp_path, monkeypatch, safegit_bin)
+    lock_path = repo / ".rlsbl" / "lock"
+    rewritten = threading.Event()
+    seen = {}
+
+    def release_starting():
+        # A release taking the lock, the way rlsbl.lock does: a blocking flock.
+        with open(lock_path, "a") as fd:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            seen["rewritten_when_locked"] = rewritten.is_set()
+            fcntl.flock(fd, fcntl.LOCK_UN)
+
+    contender = threading.Thread(target=release_starting)
+
+    def run(cmd, args=None, **kwargs):
+        if cmd == "safegit" and args and "scrub" in args:
+            assert not os.path.isdir(checkout), "safegit ran before the checkout was removed"
+            contender.start()
+            contender.join(timeout=1.0)  # returns early only if it got the lock
+            out = real_run(cmd, args, **kwargs)
+            rewritten.set()
+            return out
+        return real_run(cmd, args, **kwargs)
+
+    with patch(f"{MOD}.run", side_effect=run):
+        _scrub(repo)
+    contender.join(timeout=30)
+    assert seen == {"rewritten_when_locked": True}
+    assert SECRET not in git(repo, "log", "--all", "-p")
+
+
+def test_a_lock_file_git_does_not_ignore_is_refused_until_ignored(
+    safegit_bin, tmp_path, monkeypatch, capsys,
+):
+    """The lock the scrub holds through the rewrite is a file in the working
+    tree; git must ignore it, or safegit sees a dirty tree. Refused before
+    anything is removed or rewritten, naming the .gitignore line."""
+    repo, checkout = _scrubbable(tmp_path, monkeypatch, safegit_bin, ignore_lock=False)
+    head = git(repo, "rev-parse", "HEAD")
+
+    with pytest.raises(SystemExit) as exc:
+        _scrub(repo)
+    assert exc.value.code == 1
+    err = capsys.readouterr().err
+    assert "Add `.rlsbl/lock` to .gitignore" in err
+    assert os.path.isdir(checkout)
+    assert git(repo, "rev-parse", "HEAD") == head
+    assert not (repo / ".rlsbl" / "lock").exists()
+
+    # The named fix: ignore the lock file, commit, re-run.
+    with open(repo / ".gitignore", "a") as f:
+        f.write(".rlsbl/lock\n")
+    git(repo, "add", ".gitignore")
+    git(repo, "commit", "-q", "-m", "ignore the rlsbl lock")
+    _scrub(repo)
+    assert SECRET not in git(repo, "log", "--all", "-p")
+    assert not os.path.isdir(checkout)

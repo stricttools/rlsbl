@@ -27,7 +27,7 @@ def _no_release_checkout():
     """These tests fake every git call through the module's run(); the release
     checkout's removal runs git itself, so it is stubbed out as absent. The
     real removal is covered by test_scrub_release_checkout_e2e.py."""
-    with patch(f"{MOD}._remove_release_checkout", return_value=None):
+    with patch(f"{MOD}._lock_and_remove_release_checkout", return_value=None):
         yield
 
 # Mocked `safegit --version` output pinned to the floor the scrub flow requires.

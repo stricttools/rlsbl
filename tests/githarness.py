@@ -79,6 +79,21 @@ def init_repo(repo, *, email="test@test.local", name="Test", branch="main"):
     git(repo, "config", "user.name", name)
 
 
+def ignore_rlsbl_lock(repo):
+    """Have git ignore rlsbl's lock files in ``repo``, as scaffold's .gitignore does.
+
+    Written to ``.git/info/exclude``, so no commit is added: ``release scrub``
+    holds the lock through the safegit rewrite and refuses a lock file git does
+    not ignore.
+    """
+    exclude = Path(git(repo, "rev-parse", "--git-path", "info/exclude"))
+    if not exclude.is_absolute():
+        exclude = repo / exclude
+    exclude.parent.mkdir(parents=True, exist_ok=True)
+    with open(exclude, "a") as f:
+        f.write(".rlsbl/lock\n.rlsbl-monorepo/lock\n")
+
+
 def commit_file(repo, relpath, content, message):
     """Write ``content`` to ``relpath`` under ``repo``, add, and commit.
 
