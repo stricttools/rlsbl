@@ -474,6 +474,15 @@ requires = []
 description = "Every detected target reports the same package name."
 
 [[option]]
+name = "nested-member-runner-exclusion"
+subject = "tests"
+values = "error > warn > off"
+default = "error"
+scope = "none"
+requires = []
+description = "Every member's test runner excludes the members nested inside it."
+
+[[option]]
 name = "npm-private-mismatch"
 subject = "project"
 values = "error > warn > off"

@@ -79,6 +79,9 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # with its Go members' paths; go-module-major-suffix reads go.mod.
     "path-tag-format-go-member": frozenset({"go"}),
     "go-module-major-suffix": frozenset({"go"}),
+    # nested-member-runner-exclusion writes into the runners rlsbl can
+    # configure: pytest (pypi) and deno.
+    "nested-member-runner-exclusion": frozenset({"pypi", "deno"}),
     # go-toolchain-declared asks whether go.mod carries a `toolchain` line,
     # which is Go's.
     "go-toolchain-declared": frozenset({"go"}),
@@ -481,6 +484,7 @@ def register_checks(app):
     from .prepush import register_prepush_checks
     from .strictspec_gate import register_strictspec_gate_checks
     from .go_tags import register_go_tag_checks
+    from .nested import register_nested_checks
 
     register_project_checks(app)
     register_release_checks(app)
@@ -490,3 +494,4 @@ def register_checks(app):
     register_prepush_checks(app)
     register_strictspec_gate_checks(app)
     register_go_tag_checks(app)
+    register_nested_checks(app)

@@ -120,6 +120,8 @@ EXPECTED_CHECKS = [
     "path-tag-format-go-member",
     # no go.mod module path carries a major-version suffix
     "go-module-major-suffix",
+    # a member's test runner excludes the members nested inside it
+    "nested-member-runner-exclusion",
     # every -X linker flag names a symbol the Go source actually declares
     "ldflags-symbol",
     # the declared strictspec floor reaches every generated validator

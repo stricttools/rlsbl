@@ -777,6 +777,13 @@
         "spec"
       ]
     },
+    "nested-member-runner-exclusion": {
+      "kind": "targets",
+      "targets": [
+        "deno",
+        "pypi"
+      ]
+    },
     "npm-private-mismatch": {
       "kind": "targets",
       "targets": [
@@ -1458,6 +1465,7 @@
         "go",
         "npm",
         "dart",
+        "deno",
         "hex",
         "swift",
         "swift-apple",
@@ -1470,6 +1478,7 @@
           "no",
           "no",
           "yes",
+          "no",
           "no",
           "yes",
           "no",
@@ -1486,12 +1495,14 @@
           "no",
           "no",
           "no",
+          "no",
           "yes",
           "yes"
         ],
         [
           "cross-repo-path-sources",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1510,6 +1521,7 @@
           "no",
           "no",
           "no",
+          "no",
           "yes",
           "yes"
         ],
@@ -1522,6 +1534,7 @@
           "no",
           "no",
           "no",
+          "no",
           "yes",
           "yes"
         ],
@@ -1530,6 +1543,7 @@
           "yes",
           "yes",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1547,6 +1561,7 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
@@ -1555,6 +1570,7 @@
           "yes",
           "yes",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1570,6 +1586,7 @@
           "no",
           "no",
           "no",
+          "no",
           "yes",
           "yes"
         ],
@@ -1579,6 +1596,7 @@
           "yes",
           "yes",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1594,12 +1612,14 @@
           "no",
           "no",
           "no",
+          "no",
           "yes",
           "yes"
         ],
         [
           "dev-overlay-drift",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1619,11 +1639,13 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "format",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1643,12 +1665,14 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "go-module-identity",
           "no",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1667,12 +1691,14 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "go-toolchain-declared",
           "no",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1691,6 +1717,7 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
@@ -1702,12 +1729,14 @@
           "no",
           "no",
           "no",
+          "no",
           "yes",
           "no"
         ],
         [
           "lint",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1727,10 +1756,12 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "maven-central-metadata",
+          "no",
           "no",
           "no",
           "no",
@@ -1748,8 +1779,22 @@
           "no",
           "no",
           "no",
+          "no",
           "yes",
           "yes",
+          "no",
+          "no"
+        ],
+        [
+          "nested-member-runner-exclusion",
+          "yes",
+          "no",
+          "no",
+          "no",
+          "yes",
+          "no",
+          "no",
+          "no",
           "no",
           "no"
         ],
@@ -1763,12 +1808,14 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "path-tag-format-go-member",
           "no",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1787,11 +1834,13 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "ruff-lint",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1811,6 +1860,7 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
@@ -1818,6 +1868,7 @@
           "yes",
           "yes",
           "yes",
+          "no",
           "no",
           "no",
           "no",
@@ -1835,11 +1886,13 @@
           "no",
           "no",
           "no",
+          "no",
           "no"
         ],
         [
           "type-check-scope-guard",
           "yes",
+          "no",
           "no",
           "no",
           "no",

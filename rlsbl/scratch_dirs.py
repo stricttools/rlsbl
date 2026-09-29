@@ -262,6 +262,18 @@ def apply_scratch_test_exclusions(target_paths, *, dry_run=False):
         if handler is None:
             continue
         handler(target_paths[name] or ".", created, skipped, warnings, dry_run)
+
+    # The members nested inside this one are skipped the same way, one
+    # path-exact exclusion each (rlsbl.nested_exclusions).
+    from .nested_exclusions import apply_nested_member_exclusions
+    from .workspace import nested_member_dirs
+
+    n_created, n_skipped, n_warnings = apply_nested_member_exclusions(
+        target_paths, nested_member_dirs(os.getcwd()), dry_run=dry_run,
+    )
+    created.extend(n_created)
+    skipped.extend(n_skipped)
+    warnings.extend(n_warnings)
     return created, skipped, warnings
 
 
