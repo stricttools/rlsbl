@@ -2571,6 +2571,9 @@ class TestStandaloneTagNoPrefix:
         (proj_changes / "unreleased.jsonl").write_text("")
         releases_dir = proj_dir / ".rlsbl" / "releases"
         releases_dir.mkdir(parents=True, exist_ok=True)
+        # Every member declares publish_mode; the companion-tag question
+        # reads it for a tag no member's scheme renders.
+        (proj_dir / ".rlsbl" / "config.json").write_text('{"publish_mode": "none"}\n')
 
         workspace_projects = [
             WorkspaceProject({"name": "myproj", "path": "packages/myproj"}),

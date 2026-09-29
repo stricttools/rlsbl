@@ -1673,6 +1673,9 @@ class TestScrubMonorepoUnownedTag:
         changes_dir.mkdir(parents=True)
         (changes_dir / "unreleased.jsonl").write_text("")
         (proj_dir / "CHANGELOG.md").write_text("## 1.0.0\n\n- found it\n")
+        # Every member declares publish_mode; the companion-tag question
+        # reads it for a tag no member's scheme renders.
+        (proj_dir / ".rlsbl" / "config.json").write_text('{"publish_mode": "none"}\n')
 
         workspace_projects = [WorkspaceProject({"name": "alpha", "path": "pkg/alpha"})]
         make_workspace(ws_root, [{"path": "pkg/alpha", "name": "alpha"}])
