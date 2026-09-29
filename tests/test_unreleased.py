@@ -151,7 +151,7 @@ def _make_npm_project(base_path, subdir, name=None, version="0.1.0"):
     if name is None:
         name = subdir
     with open(os.path.join(proj_dir, "package.json"), "w") as f:
-        json.dump({"name": name, "version": version}, f)
+        json.dump({"name": name, "version": version, "engines": {"node": ">=22"}}, f)
 
 
 def _commit_file(repo, name, content="x\n", message="change"):
