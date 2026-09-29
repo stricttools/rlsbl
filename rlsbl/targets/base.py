@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass
 from typing import Callable, ClassVar
 
-from ..scratch_dirs import NO_TEST_RUNNER_RECURSION
+from ..scratch_dirs import GO_NESTED_MODULE, NO_TEST_RUNNER_RECURSION
 
 # The scaffold template that makes a target's directory a source of CI
 # workflows. Its presence is what ``provides_ci_templates`` answers from.
@@ -395,9 +395,22 @@ class BaseTarget:
         # every ecosystem, so they are shared mappings like the three above.
         # What a project's targets declare decides only whether a directory
         # also carries the module file that keeps the go command out of it.
-        mappings.extend(scratch_template_mappings(
-            scratch_mechanisms({self.name} | self._extract_target_names(ctx))
-        ))
+        mechanisms = scratch_mechanisms({self.name} | self._extract_target_names(ctx))
+        mappings.extend(scratch_template_mappings(mechanisms))
+        # A Go module zip leaves out only directories holding a go.mod of
+        # their own, so each private directory at the root gets a stub module
+        # (rlsbl.upload_exclusions); the same marker keeps the go command out.
+        if GO_NESTED_MODULE in mechanisms:
+            from ..upload_exclusions import (
+                PRIVATE_GO_MODULE_TEMPLATE,
+                go_stub_directories,
+            )
+
+            root = getattr(ctx, "project_root", None) or os.getcwd()
+            mappings.extend(
+                {"template": PRIVATE_GO_MODULE_TEMPLATE, "target": f"{name}/go.mod"}
+                for name in go_stub_directories(root)
+            )
         mappings.extend(self._lint_config_mappings(ctx))
         # Sandboxed test runner: emitted only while the project's
         # rlsbl:test-sandbox option is on (the testisolation floor's outer

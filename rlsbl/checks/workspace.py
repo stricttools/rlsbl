@@ -11,6 +11,7 @@ test-suite-workspace.
 import os
 import subprocess
 
+from ..private_paths import PRIVATE_ROOT_DIRS
 from ..scratch_dirs import is_scratch_dir_name
 from ..utils import get_check_timeout, tag_exists_locally
 from ..workspace import WorkspaceProject, members_of, project_is_dev_only
@@ -556,11 +557,14 @@ def register_workspace_checks(app):
             if any(part in _TEST_INPUT_DIRS for part in parts):
                 continue
             # A scratch directory at a member's root holds throwaway probes
-            # and produced repositories, never members.
+            # and produced repositories, never members; a private directory
+            # there holds at most the stub go.mod that keeps it out of a Go
+            # module zip (rlsbl.upload_exclusions).
             owner = owner_of(directory + "/x", ctx.projects)
             base = member_path(owner) if owner is not None else ""
             owned = directory[len(base):].lstrip("/")
-            if owned and is_scratch_dir_name(owned.split("/", 1)[0]):
+            first = owned.split("/", 1)[0]
+            if owned and (is_scratch_dir_name(first) or first in PRIVATE_ROOT_DIRS):
                 continue
             found_project_dirs.add(directory)
 

@@ -366,6 +366,9 @@ class NpmTarget(BaseTarget):
             if m:
                 result["minRequiredNode"] = m.group(1)
 
+        from ..upload_exclusions import npmignore_block
+
+        result["privatePathIgnore"] = npmignore_block()
         return TemplateVars(self.name, result)
 
     def ci_template_vars(self, dir_path):

@@ -5,12 +5,11 @@ __tests__/
 .github/
 scripts/
 docs/
-todo/
 e2e/
 
-# rlsbl metadata
-.rlsbl/
-.rlsbl-monorepo/
+# Private paths: the upload-private-paths check refuses a release whose
+# package carries any of them
+{{npm.privatePathIgnore}}
 
 # Python artifacts (for multi-target projects)
 __pycache__/
@@ -26,9 +25,6 @@ coverage/
 # Editor/OS
 .DS_Store
 *.log
-.env
-.env.local
 
 # Selfdoc
-.selfdoc/
 selfdoc.json
