@@ -41,6 +41,18 @@ from conftest import make_workspace, workspace_toml, declared_members
 # stops on a nonzero exit; these tests stand both in with a successful run.
 _CHILD_SUCCEEDED = subprocess.CompletedProcess([], 0)
 
+_REAL_EFFECTS_RUN = __import__("rlsbl.effects", fromlist=["run"]).run
+
+
+def _children_succeed(cmd, *args, **kwargs):
+    """Stand in the add's rlsbl children with a successful run; run git for real.
+
+    The add reads the working tree with git before and after its children.
+    """
+    if cmd and cmd[0] == "git":
+        return _REAL_EFFECTS_RUN(cmd, *args, **kwargs)
+    return _CHILD_SUCCEEDED
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -349,7 +361,7 @@ class TestMonorepoAddReleasable:
         self._setup_explicit_workspace(mock_git_repo)
         self._make_project_dir(mock_git_repo, "app")
 
-        with patch("rlsbl.effects.run", return_value=_CHILD_SUCCEEDED):
+        with patch("rlsbl.effects.run", side_effect=_children_succeed):
             _cmd_add(["app"], {
                 "releasable": "www",
                 "auto-commit": False,
@@ -364,7 +376,7 @@ class TestMonorepoAddReleasable:
         self._setup_explicit_workspace(mock_git_repo)
         self._make_project_dir(mock_git_repo, "infra")
 
-        with patch("rlsbl.effects.run", return_value=_CHILD_SUCCEEDED):
+        with patch("rlsbl.effects.run", side_effect=_children_succeed):
             _cmd_add(["infra"], {
                 "releasable": "false",
                 "auto-commit": False,
@@ -391,7 +403,7 @@ class TestMonorepoAddReleasable:
         self._setup_explicit_workspace(mock_git_repo)
         self._make_project_dir(mock_git_repo, "app")
 
-        with patch("rlsbl.effects.run", return_value=_CHILD_SUCCEEDED):
+        with patch("rlsbl.effects.run", side_effect=_children_succeed):
             _cmd_add(["app"], {
                 "releasable": "newgroup",
                 "auto-commit": False,
@@ -416,7 +428,7 @@ class TestMonorepoAddReleasable:
         self._make_project_dir(mock_git_repo, "lib")
 
         with pytest.raises(SystemExit):
-            with patch("rlsbl.effects.run", return_value=_CHILD_SUCCEEDED):
+            with patch("rlsbl.effects.run", side_effect=_children_succeed):
                 _cmd_add(["lib"], {
                     "auto-commit": False,
                 }, project_root=mock_git_repo)

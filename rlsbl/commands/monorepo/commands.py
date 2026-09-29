@@ -1,6 +1,7 @@
 """Monorepo workspace management commands: init, add, remove, list, status, outdated, and check-names."""
 
 import os
+import shlex
 import sys
 import time
 
@@ -468,16 +469,14 @@ def _cmd_add(args, flags, project_root, dry_run=False):
         return
 
     no_commit = not flags.get("auto-commit", True)
-    ws_file = os.path.join(WORKSPACE_DIR, WORKSPACE_FILE)
-    ws_path = os.path.join(root, ws_file)
 
     # The registration is written first, because `rlsbl scaffold` in a
     # directory the workspace does not declare writes a standalone project's
-    # layout instead of a member's. Its bytes before this command are kept so
-    # a failed scaffold or sync restores them: the member is never left
-    # registered without the scaffold and the sync it depends on.
-    with open(ws_path, "r", encoding="utf-8", newline="") as f:
-        workspace_before = f.read()
+    # layout instead of a member's. The scaffold and the sync then run without
+    # committing, and the add commits what all three wrote as one commit, so
+    # a failure anywhere puts the tree back as this snapshot holds it: the
+    # member is never left registered, scaffolded, or in the CI router alone.
+    before = _working_tree_snapshot(root)
 
     projects.append(project)
     # ``releasables`` is the full desired list only when this add created one;
@@ -503,33 +502,41 @@ def _cmd_add(args, flags, project_root, dry_run=False):
             # (a root module shadowing a stdlib/dep name would break rlsbl imports).
             # No confirmation-skip flag: `scaffold` is `mutating` but not
             # `consequential`, so strictcli never prompts for it.
-            cmd = [sys.executable, "-P", "-m", "rlsbl", "scaffold"]
+            cmd = [sys.executable, "-P", "-m", "rlsbl", "scaffold", "--no-auto-commit"]
             if explicit_target:
                 cmd.extend(["--target", explicit_target])
-            if no_commit:
-                cmd.append("--no-auto-commit")
             _run_add_child(cmd, abs_path, f"`rlsbl scaffold` in {path}", name)
 
         # Sync CI workflows
-        sync_cmd = [sys.executable, "-P", "-m", "rlsbl", "monorepo", "sync"]
-        if no_commit:
-            sync_cmd.append("--no-auto-commit")
+        sync_cmd = [sys.executable, "-P", "-m", "rlsbl", "monorepo", "sync",
+                    "--no-auto-commit"]
         _run_add_child(sync_cmd, root, "`rlsbl monorepo sync`", name)
 
+        written, touched = _changed_since(root, before)
+        if touched:
+            print(
+                "Left uncommitted, since each had uncommitted changes before "
+                f"this add wrote to it: {', '.join(touched)}"
+            )
         if no_commit:
-            print(f"Skipped commit (--no-auto-commit). Run `safegit commit -- {ws_file}` manually.")
+            print(
+                "Skipped commit (--no-auto-commit). Run "
+                f"`safegit commit -m \"monorepo: add {name}\" -- "
+                f"{' '.join(shlex.quote(p) for p in written)}` to commit "
+                f"what the add wrote."
+            )
         else:
             try:
-                commit_files(f"monorepo: add {name}", [ws_file], cwd=root)
+                commit_files(f"monorepo: add {name}", written, cwd=root)
             except Exception as exc:  # noqa: BLE001 -- every failure stops the add
                 detail = (getattr(exc, "stderr", None) or "").strip()
                 _add_step_failed(
-                    f"committing {ws_file} failed ({detail or exc})", name,
+                    f"committing what the add wrote failed ({detail or exc})", name,
                 )
         registered = True
     finally:
         if not registered:
-            effects.atomic_write_text(ws_path, workspace_before, preserve_mode=True)
+            _restore_working_tree(root, before)
 
 
 def _run_add_child(cmd, cwd, what, name):
@@ -549,14 +556,100 @@ def _run_add_child(cmd, cwd, what, name):
 def _add_step_failed(failure, name):
     """Stop `monorepo add` after a failed step; the caller restores workspace.toml."""
     print(
-        f"Error: {failure}, so member '{name}' is not added: "
-        f"{os.path.join(WORKSPACE_DIR, WORKSPACE_FILE)} is restored to what it "
-        f"was before this command. Files the scaffold and the sync already "
-        f"wrote stay, and register nothing. Fix what it reports, then re-run "
-        f"this `rlsbl monorepo add`.",
+        f"Error: {failure}, so member '{name}' is not added: the working tree "
+        f"is restored to what it was before this command, with what the "
+        f"registration, the scaffold, and the sync wrote taken back and "
+        f"nothing committed. Fix what it reports, then re-run this "
+        f"`rlsbl monorepo add`.",
         file=sys.stderr,
     )
     sys.exit(1)
+
+
+def _read_or_none(path):
+    """A file's bytes, or None when there is no file at *path*."""
+    try:
+        with open(path, "rb") as f:
+            return f.read()
+    except (FileNotFoundError, IsADirectoryError, NotADirectoryError):
+        return None
+
+
+def _working_tree_snapshot(root):
+    """Each path the working tree reports changed, with its bytes (None: absent).
+
+    Untracked files are listed one by one, so a later comparison sees each
+    file a step adds inside a directory that was already untracked.
+    """
+    from ...utils import working_tree_paths
+
+    return {
+        rel: _read_or_none(os.path.join(root, rel))
+        for rel in working_tree_paths(cwd=root, untracked="all")
+    }
+
+
+def _changed_since(root, before):
+    """``(written, touched)``: the paths changed since *before* was taken.
+
+    *written* were unchanged before (a commit may take them); *touched* had
+    uncommitted changes of their own before, which a commit must not sweep in.
+    """
+    from ...utils import working_tree_paths
+
+    now = working_tree_paths(cwd=root, untracked="all")
+    written = [rel for rel in now if rel not in before]
+    touched = [
+        rel for rel in before
+        if _read_or_none(os.path.join(root, rel)) != before[rel]
+    ]
+    return written, touched
+
+
+def _restore_working_tree(root, before):
+    """Put every path changed since *before* back as it was then.
+
+    A path unchanged before is restored from HEAD, or deleted when HEAD does
+    not have it, along with the directories its deletion leaves empty; a path
+    changed before gets its bytes back.
+    """
+    from ...saferm import saferm_delete
+
+    written, touched = _changed_since(root, before)
+    env = {**os.environ, "GIT_LITERAL_PATHSPECS": "1"}
+    reason = "rolling back a monorepo add that failed"
+    for rel in written:
+        in_head = effects.run(
+            ["git", "cat-file", "-e", f"HEAD:{rel}"],
+            cwd=root, capture_output=True, text=True, env=env,
+        ).returncode == 0
+        if in_head:
+            effects.run(
+                ["git", "restore", "--source=HEAD", "--staged", "--worktree",
+                 "--", rel],
+                cwd=root, capture_output=True, text=True, check=True, env=env,
+            )
+            continue
+        effects.run(
+            ["git", "rm", "-q", "--cached", "--ignore-unmatch", "--", rel],
+            cwd=root, capture_output=True, text=True, check=True, env=env,
+        )
+        path = os.path.join(root, rel)
+        if os.path.lexists(path):
+            saferm_delete(path, description=reason, skip_missing=True)
+        parent = os.path.dirname(path)
+        while os.path.realpath(parent) != os.path.realpath(root) and not os.listdir(parent):
+            effects.rmdir(parent)
+            parent = os.path.dirname(parent)
+    for rel in touched:
+        path = os.path.join(root, rel)
+        if before[rel] is None:
+            if os.path.lexists(path):
+                saferm_delete(path, description=reason, skip_missing=True)
+            continue
+        effects.makedirs(os.path.dirname(path), exist_ok=True)
+        with effects.open_write(path, "wb") as f:
+            f.write(before[rel])
 
 
 def _cmd_remove(args, flags, project_root):
