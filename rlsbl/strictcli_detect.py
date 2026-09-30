@@ -158,7 +158,7 @@ def go_strictcli_requirements(project_dir: str) -> list[str]:
     Only require directives count -- both the single-line form
     (`require path version`) and the block form (`require ( ... )`).
     The `module` declaration is never a match: the strictcli library's
-    own go.mod declares `module github.com/smm-h/strictcli/go`, and
+    own go.mod declares `module github.com/stricttools/strictcli/go`, and
     treating that as a dependency made rlsbl demand a strictcli entry
     point from the strictcli library itself.
     """

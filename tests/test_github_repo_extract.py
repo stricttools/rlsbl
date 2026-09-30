@@ -19,22 +19,22 @@ from rlsbl.utils import (
 
 class TestExtractGithubRepoFromRemote:
     def test_https_with_git_suffix(self):
-        assert extract_github_repo_from_remote("https://github.com/smm-h/rlsbl.git") == "smm-h/rlsbl"
+        assert extract_github_repo_from_remote("https://github.com/stricttools/rlsbl.git") == "stricttools/rlsbl"
 
     def test_https_without_git_suffix(self):
-        assert extract_github_repo_from_remote("https://github.com/smm-h/rlsbl") == "smm-h/rlsbl"
+        assert extract_github_repo_from_remote("https://github.com/stricttools/rlsbl") == "stricttools/rlsbl"
 
     def test_scp_github(self):
-        assert extract_github_repo_from_remote("git@github.com:smm-h/rlsbl.git") == "smm-h/rlsbl"
+        assert extract_github_repo_from_remote("git@github.com:stricttools/rlsbl.git") == "stricttools/rlsbl"
 
     def test_scp_ssh_alias(self):
         assert extract_github_repo_from_remote("git@gw:GreenCapitals/shopkeep.git") == "GreenCapitals/shopkeep"
 
     def test_scp_bare_alias(self):
-        assert extract_github_repo_from_remote("gp:smm-h/rlsbl.git") == "smm-h/rlsbl"
+        assert extract_github_repo_from_remote("gp:stricttools/rlsbl.git") == "stricttools/rlsbl"
 
     def test_scp_without_git_suffix(self):
-        assert extract_github_repo_from_remote("git@gp:smm-h/rlsbl") == "smm-h/rlsbl"
+        assert extract_github_repo_from_remote("git@gp:stricttools/rlsbl") == "stricttools/rlsbl"
 
     def test_invalid_url(self):
         assert extract_github_repo_from_remote("not-a-url") is None
@@ -48,8 +48,8 @@ class TestExtractGithubRepoFromRemote:
 
 class TestGetOriginRepo:
     def test_returns_parsed_repo(self):
-        with patch("rlsbl.utils.run", return_value="git@github.com:smm-h/rlsbl.git"):
-            assert get_origin_repo() == "smm-h/rlsbl"
+        with patch("rlsbl.utils.run", return_value="git@github.com:stricttools/rlsbl.git"):
+            assert get_origin_repo() == "stricttools/rlsbl"
 
     def test_returns_none_on_error(self):
         with patch("rlsbl.utils.run", side_effect=subprocess.CalledProcessError(1, "git")):
@@ -68,18 +68,18 @@ class TestGetGithubRepo:
 
     def test_config_none_falls_back_to_remote(self):
         """config=None falls back to get_origin_repo."""
-        with patch("rlsbl.utils.get_origin_repo", return_value="smm-h/rlsbl"):
-            assert get_github_repo(None) == "smm-h/rlsbl"
+        with patch("rlsbl.utils.get_origin_repo", return_value="stricttools/rlsbl"):
+            assert get_github_repo(None) == "stricttools/rlsbl"
 
     def test_config_without_key_falls_back_to_remote(self):
         """Config dict without github_repo key falls back to remote."""
-        with patch("rlsbl.utils.get_origin_repo", return_value="smm-h/rlsbl"):
-            assert get_github_repo({"other_key": "value"}) == "smm-h/rlsbl"
+        with patch("rlsbl.utils.get_origin_repo", return_value="stricttools/rlsbl"):
+            assert get_github_repo({"other_key": "value"}) == "stricttools/rlsbl"
 
     def test_config_empty_string_falls_back(self):
         """Empty string in config is falsy, so falls back to remote."""
-        with patch("rlsbl.utils.get_origin_repo", return_value="smm-h/rlsbl"):
-            assert get_github_repo({"github_repo": ""}) == "smm-h/rlsbl"
+        with patch("rlsbl.utils.get_origin_repo", return_value="stricttools/rlsbl"):
+            assert get_github_repo({"github_repo": ""}) == "stricttools/rlsbl"
 
     def test_no_config_no_remote(self):
         """Both sources fail: returns None."""
@@ -104,13 +104,13 @@ class TestRunGh:
 
     def test_sets_gh_repo_when_resolvable(self):
         """run_gh sets GH_REPO in the child env when the repo is resolved."""
-        with patch("rlsbl.utils.get_github_repo", return_value="smm-h/rlsbl"), \
+        with patch("rlsbl.utils.get_github_repo", return_value="stricttools/rlsbl"), \
              patch("rlsbl.effects.run", return_value=_completed()) as mock_run:
-            result = run_gh(["release", "list"], config={"github_repo": "smm-h/rlsbl"})
+            result = run_gh(["release", "list"], config={"github_repo": "stricttools/rlsbl"})
             assert result == "ok"
             mock_run.assert_called_once()
             assert mock_run.call_args[0] == (["gh", "release", "list"],)
-            assert mock_run.call_args[1]["env"]["GH_REPO"] == "smm-h/rlsbl"
+            assert mock_run.call_args[1]["env"]["GH_REPO"] == "stricttools/rlsbl"
 
     def test_no_gh_repo_when_unresolvable(self):
         """run_gh does not set GH_REPO when the repo cannot be resolved."""
@@ -126,7 +126,7 @@ class TestRunGh:
     def test_does_not_mutate_os_environ(self):
         """run_gh must not modify os.environ (thread-safety)."""
         original_environ = os.environ.copy()
-        with patch("rlsbl.utils.get_github_repo", return_value="smm-h/rlsbl"), \
+        with patch("rlsbl.utils.get_github_repo", return_value="stricttools/rlsbl"), \
              patch("rlsbl.effects.run", return_value=_completed()):
             run_gh(["release", "list"])
             assert "GH_REPO" not in os.environ
@@ -134,7 +134,7 @@ class TestRunGh:
 
     def test_forwards_timeout_and_cwd(self):
         """run_gh forwards timeout and cwd through to the process primitive."""
-        with patch("rlsbl.utils.get_github_repo", return_value="smm-h/rlsbl"), \
+        with patch("rlsbl.utils.get_github_repo", return_value="stricttools/rlsbl"), \
              patch("rlsbl.effects.run", return_value=_completed()) as mock_run:
             run_gh(["release", "list"], config=None, timeout=30, cwd="/tmp")
             call_kwargs = mock_run.call_args[1]
@@ -161,7 +161,7 @@ class TestRunGhUnscoped:
     """The repo-independent gh calls stay on the seam without GH_REPO."""
 
     def test_never_injects_gh_repo(self):
-        with patch("rlsbl.utils.get_github_repo", return_value="smm-h/rlsbl"), \
+        with patch("rlsbl.utils.get_github_repo", return_value="stricttools/rlsbl"), \
              patch("rlsbl.effects.run", return_value=_completed()) as mock_run:
             assert run_gh_unscoped(["auth", "token"]) == "ok"
             assert mock_run.call_args[0] == (["gh", "auth", "token"],)
