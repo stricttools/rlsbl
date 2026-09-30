@@ -466,7 +466,7 @@ def _safegit_local_source():
     for candidate in candidates:
         gomod = candidate / "go.mod"
         try:
-            if gomod.is_file() and "module github.com/smm-h/safegit" in gomod.read_text():
+            if gomod.is_file() and "module github.com/stricttools/safegit" in gomod.read_text():
                 return candidate
         except OSError:
             continue
@@ -490,7 +490,7 @@ def _acquire_safegit(pin, gobin, binary):
     #    day the floor is published.
     env = {**os.environ, "GOBIN": str(gobin)}
     proxy = subprocess.run(
-        ["go", "install", f"github.com/smm-h/safegit@{pin}"],
+        ["go", "install", f"github.com/stricttools/safegit@{pin}"],
         env=env, timeout=600, capture_output=True, text=True,
     )
     if proxy.returncode == 0:
@@ -516,7 +516,7 @@ def _acquire_safegit(pin, gobin, binary):
     if source is None:
         return (
             f"safegit {pin} is unavailable. The module proxy cannot resolve "
-            f"github.com/smm-h/safegit@{pin} -- rlsbl's SAFEGIT_MIN_VERSION "
+            f"github.com/stricttools/safegit@{pin} -- rlsbl's SAFEGIT_MIN_VERSION "
             f"floor is not published yet -- and no local safegit source "
             f"checkout is reachable from here (set {SAFEGIT_SRC_ENV}=/path/to/"
             f"safegit, or run outside the sandbox where a sibling checkout is "
@@ -532,7 +532,7 @@ def _acquire_safegit(pin, gobin, binary):
     if build.returncode != 0:
         return (
             f"safegit {pin} is unavailable. The module proxy cannot resolve "
-            f"github.com/smm-h/safegit@{pin} (the floor is not published yet), "
+            f"github.com/stricttools/safegit@{pin} (the floor is not published yet), "
             f"and building it from the local checkout at {source} failed.\n"
             f"go build stderr: {build.stderr.strip()[-500:]}"
         )

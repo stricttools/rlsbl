@@ -461,9 +461,9 @@ class TestGo:
     def test_go_is_automatically_satisfied(self, tmp_path):
         (tmp_path / "go.mod").write_text(
             "module example.com/consumer\n\ngo 1.23\n\n"
-            "require github.com/smm-h/strictcli v0.36.0\n"
+            "require github.com/stricttools/strictcli v0.36.0\n"
         )
-        result = _run(tmp_path, _config(names=["github.com/smm-h/strictcli"]))
+        result = _run(tmp_path, _config(names=["github.com/stricttools/strictcli"]))
         assert result.status == "pass"
         assert "go.mod" in result.message
 

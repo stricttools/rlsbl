@@ -160,7 +160,7 @@ class TestPushGuard:
 
     def test_push_to_https_remote_is_blocked(self, tmp_path):
         repo = self._repo_with_remote(tmp_path,
-                                      "https://github.com/smm-h/rlsbl.git")
+                                      "https://github.com/stricttools/rlsbl.git")
         with pytest.raises(Failed) as exc:
             subprocess.run(["git", "push", "origin", "main"], cwd=str(repo),
                            capture_output=True, text=True)
@@ -172,13 +172,13 @@ class TestPushGuard:
         repo = self._repo_with_remote(tmp_path, "https://example.com/x.git")
         with pytest.raises(Failed) as exc:
             subprocess.run(
-                ["git", "push", "https://github.com/smm-h/rlsbl.git", "main"],
+                ["git", "push", "https://github.com/stricttools/rlsbl.git", "main"],
                 cwd=str(repo), capture_output=True, text=True,
             )
         assert "BLOCKED" in str(exc.value)
 
     def test_push_to_scp_style_remote_is_blocked(self, tmp_path):
-        repo = self._repo_with_remote(tmp_path, "git@github.com:smm-h/rlsbl.git")
+        repo = self._repo_with_remote(tmp_path, "git@github.com:stricttools/rlsbl.git")
         with pytest.raises(Failed):
             subprocess.run(["git", "push", "origin", "main"], cwd=str(repo),
                            capture_output=True, text=True)

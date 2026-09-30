@@ -94,7 +94,7 @@ def _stage(tmp_path, *, cache_files, staged_binary=True, safegit_src=True):
     )
 
     cache = tmp_path / "download"
-    vdir = cache / "github.com" / "smm-h" / "safegit" / "@v"
+    vdir = cache / "github.com" / "stricttools" / "safegit" / "@v"
     vdir.mkdir(parents=True)
     for ext in cache_files:
         (vdir / f"{PIN}.{ext}").write_text("cached\n")
@@ -109,7 +109,7 @@ def _stage(tmp_path, *, cache_files, staged_binary=True, safegit_src=True):
     src = tmp_path / "safegit"
     if safegit_src:
         src.mkdir()
-        (src / "go.mod").write_text("module github.com/smm-h/safegit\n\ngo 1.25\n")
+        (src / "go.mod").write_text("module github.com/stricttools/safegit\n\ngo 1.25\n")
 
     bindir = tmp_path / "bin"
     bindir.mkdir()
@@ -162,7 +162,7 @@ class TestModuleCacheGate:
     def test_partial_entry_with_zero_byte_zip_is_not_cached(self, tmp_path):
         """A truncated .zip is as unusable as a missing one."""
         env, staged_bin = _stage(tmp_path, cache_files=["info", "mod"])
-        (tmp_path / "download" / "github.com" / "smm-h" / "safegit" / "@v"
+        (tmp_path / "download" / "github.com" / "stricttools" / "safegit" / "@v"
          / f"{PIN}.zip").write_text("")
         env["FAKE_GO_INSTALL_EXIT"] = "1"
 

@@ -79,7 +79,7 @@ rm -rf "${HATCH_PROBE}"
 # serve -- and the fallback binary was deleted on the strength of that lie,
 # leaving the sandbox with neither route and silently skipping every
 # real-binary safegit test.
-MODULE_CACHE_V="${GO_DOWNLOAD_CACHE}/github.com/smm-h/safegit/@v"
+MODULE_CACHE_V="${GO_DOWNLOAD_CACHE}/github.com/stricttools/safegit/@v"
 cache_entry_complete() {
   local ext
   for ext in info mod zip; do
@@ -101,7 +101,7 @@ fi
 # produce nothing, and any of those must leave the fallback in place.
 PROBE_GOBIN="$(mktemp -d)"
 trap 'rm -rf "${PROBE_GOBIN}" "${STAGED_BIN}.new"' EXIT
-if GOBIN="${PROBE_GOBIN}" go install "github.com/smm-h/safegit@${SAFEGIT_PIN}" \
+if GOBIN="${PROBE_GOBIN}" go install "github.com/stricttools/safegit@${SAFEGIT_PIN}" \
    && [ -x "${PROBE_GOBIN}/safegit" ]; then
   # The pin is published and installable, so a locally-built stand-in for it
   # is now a lie. Drop it; the fixture prefers the module anyway, but leaving
@@ -117,7 +117,7 @@ fi
 # exercises the real binary the floor describes instead of skipping the whole
 # real-binary suite.
 if [ -f "${SAFEGIT_SRC}/go.mod" ] && \
-   grep -q '^module github.com/smm-h/safegit$' "${SAFEGIT_SRC}/go.mod"; then
+   grep -q '^module github.com/stricttools/safegit$' "${SAFEGIT_SRC}/go.mod"; then
   # ALWAYS rebuilt, never reused. An unpublished pin names a MOVING local
   # checkout, so a binary staged yesterday is a stale snapshot of a version
   # number that has not shipped yet, and reusing it silently exercises the
