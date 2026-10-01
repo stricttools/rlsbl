@@ -608,14 +608,41 @@ def write_scope(*, live_root, project_dirs, state_homes, extra=()):
     return sorted(scope)
 
 
+def checkout_gowork(path) -> str:
+    """The ``GOWORK`` every process of a release in the checkout at *path* gets.
+
+    The checkout lives inside the live repository, and Go looks for a
+    ``go.work`` in every parent directory, so without this a Go command in the
+    checkout would find the live tree's uncommitted ``go.work`` and build
+    against unreleased local modules (or fail to find the checkout's packages
+    at all). A release builds committed state only: the checkout's own
+    ``go.work`` when its root tracks one, and no workspace otherwise.
+    """
+    tracked = _git(
+        ["ls-files", "--error-unmatch", "--", "go.work"],
+        cwd=path, check=False, env=_literal_env(),
+    )
+    if tracked.returncode == 0:
+        return os.path.join(path, "go.work")
+    return "off"
+
+
+def release_environment(path) -> dict[str, str]:
+    """The environment variables every process of a release in the checkout
+    at *path* gets: ``GOWORK`` from :func:`checkout_gowork`."""
+    return {"GOWORK": checkout_gowork(path)}
+
+
 @contextlib.contextmanager
 def entered(live_root, *, branch, sha, cwd):
     """Enter the release checkout at *sha* for the duration of the block.
 
-    Prepares the checkout, makes it the active one, and moves the process
-    into the checkout directory that corresponds to *cwd*. On the way out the
-    process returns to *cwd* and no checkout is active; the checkout itself is
-    left as it is, to be reset by the next release.
+    Prepares the checkout, makes it the active one, and moves the process into
+    the checkout directory that corresponds to *cwd*, with
+    :func:`release_environment` set for every process the release starts. On
+    the way out the process returns to *cwd*, the environment is restored, and
+    no checkout is active; the checkout itself is left as it is, to be reset by
+    the next release.
     """
     global _active
     if _active is not None:
@@ -625,14 +652,22 @@ def entered(live_root, *, branch, sha, cwd):
         )
     live_root = os.path.realpath(live_root)
     path = prepare_checkout(live_root, sha)
+    overrides = release_environment(path)
     co = ReleaseCheckout(live_root=live_root, path=path, branch=branch, tip=sha)
     here = os.getcwd()
+    saved = {name: os.environ.get(name) for name in overrides}
     _active = co
     try:
+        os.environ.update(overrides)
         os.chdir(co.to_checkout(cwd))
         yield co
     finally:
         _active = None
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
         os.chdir(here)
 
 
