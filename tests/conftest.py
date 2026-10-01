@@ -7,7 +7,7 @@ import subprocess
 import time
 import types
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -922,7 +922,7 @@ def bypass_upfront_validation():
 
 
 @pytest.fixture(autouse=True)
-def _mock_saferm():
+def _mock_saferm(monkeypatch):
     """Mock saferm and selfdoc subprocess calls across rlsbl modules.
 
     Intercepts subprocess.run calls where the first arg is 'saferm'
@@ -960,8 +960,17 @@ def _mock_saferm():
     # of recording it on the effects handle.  rlsbl._effects_direct.run is the
     # layer that actually reaches subprocess, and it is only consulted in live
     # mode -- which is exactly what this fixture is neutralizing.
-    with patch("rlsbl._effects_direct.run", side_effect=_mock_run):
-        yield
+    #
+    # Installed through the test's own ``monkeypatch``, not ``patch``: a test
+    # that monkeypatches ``_effects_direct.run`` itself then shares one undo
+    # stack with this fixture, so teardown restores the real primitive. With
+    # two separate undo mechanisms, a ``monkeypatch`` set up before this
+    # fixture restored this fixture's mock AFTER it had exited, leaving it
+    # installed for every later test in the process.
+    from rlsbl import _effects_direct
+
+    monkeypatch.setattr(_effects_direct, "run", MagicMock(side_effect=_mock_run))
+    yield
 
 
 @pytest.fixture(autouse=True)
