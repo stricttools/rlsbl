@@ -56,6 +56,10 @@ from .errors import GitError, RlsblError
 
 #: The checkout's location, relative to the repository's git common directory.
 CHECKOUT_RELATIVE = os.path.join("rlsbl", "release-checkout")
+#: The release's directory for binaries, relative to the git common directory.
+RELEASE_BIN_RELATIVE = os.path.join("rlsbl", "release-bin")
+#: The variable naming that directory to the release's hooks.
+RELEASE_BIN_ENV = "RLSBL_RELEASE_BIN"
 
 
 class ReleaseCheckoutError(RlsblError):
@@ -627,22 +631,50 @@ def checkout_gowork(path) -> str:
     return "off"
 
 
-def release_environment(path) -> dict[str, str]:
-    """The environment variables every process of a release in the checkout
-    at *path* gets: ``GOWORK`` from :func:`checkout_gowork`."""
-    return {"GOWORK": checkout_gowork(path)}
+def prepare_release_bin(live_root) -> str:
+    """Create the release's own, empty directory for binaries; return its path.
+
+    A hook builds into it (``$RLSBL_RELEASE_BIN``) a tool the release must run
+    in its unreleased form -- selfdoc releasing itself runs the selfdoc it is
+    about to ship -- without installing that build for every session on the
+    machine. It sits beside the release checkout under the git common
+    directory, outside the working tree and outside the checkout, and each
+    release starts it empty.
+    """
+    path = os.path.join(_common_dir(live_root), RELEASE_BIN_RELATIVE)
+    if os.path.lexists(path):
+        effects.rmtree(path)
+    effects.makedirs(path)
+    return path
+
+
+def release_environment(path, release_bin) -> dict[str, str]:
+    """The environment variables every process of a release gets.
+
+    *path* is the release checkout and *release_bin* the release's directory
+    for binaries: ``GOWORK`` from :func:`checkout_gowork`, ``RLSBL_RELEASE_BIN``
+    naming *release_bin*, and ``PATH`` with *release_bin* first, so a tool a
+    hook built there is the one rlsbl's own steps and later hooks run.
+    """
+    return {
+        "GOWORK": checkout_gowork(path),
+        RELEASE_BIN_ENV: release_bin,
+        "PATH": os.pathsep.join(
+            p for p in (release_bin, os.environ.get("PATH")) if p
+        ),
+    }
 
 
 @contextlib.contextmanager
 def entered(live_root, *, branch, sha, cwd):
     """Enter the release checkout at *sha* for the duration of the block.
 
-    Prepares the checkout, makes it the active one, and moves the process into
-    the checkout directory that corresponds to *cwd*, with
-    :func:`release_environment` set for every process the release starts. On
-    the way out the process returns to *cwd*, the environment is restored, and
-    no checkout is active; the checkout itself is left as it is, to be reset by
-    the next release.
+    Prepares the checkout and the release's directory for binaries, makes the
+    checkout the active one, and moves the process into the checkout directory
+    that corresponds to *cwd*, with :func:`release_environment` set for every
+    process the release starts. On the way out the process returns to *cwd*,
+    the environment is restored, and no checkout is active; the checkout itself
+    is left as it is, to be reset by the next release.
     """
     global _active
     if _active is not None:
@@ -652,7 +684,7 @@ def entered(live_root, *, branch, sha, cwd):
         )
     live_root = os.path.realpath(live_root)
     path = prepare_checkout(live_root, sha)
-    overrides = release_environment(path)
+    overrides = release_environment(path, prepare_release_bin(live_root))
     co = ReleaseCheckout(live_root=live_root, path=path, branch=branch, tip=sha)
     here = os.getcwd()
     saved = {name: os.environ.get(name) for name in overrides}
