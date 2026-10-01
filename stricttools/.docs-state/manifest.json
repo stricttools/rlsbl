@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "name": "release-checkout",
+  "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.129.0",
+  "version": "0.130.0",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
   "language": "python",
   "base_url": "https://smmh.dev/rlsbl",
@@ -3692,6 +3692,11 @@
         },
         {
           "level": 3,
+          "text": "The release's environment",
+          "anchor": "the-releases-environment"
+        },
+        {
+          "level": 3,
           "text": "Hooks override",
           "anchor": "hooks-override"
         },
@@ -6474,6 +6479,11 @@
           "level": 3,
           "text": "`_merge_template_vars`",
           "anchor": "_merge_template_vars"
+        },
+        {
+          "level": 3,
+          "text": "`_refuse_new_version_disagreement`",
+          "anchor": "_refuse_new_version_disagreement"
         },
         {
           "level": 3,
@@ -16392,6 +16402,21 @@
         },
         {
           "level": 3,
+          "text": "`checkout_gowork`",
+          "anchor": "checkout_gowork"
+        },
+        {
+          "level": 3,
+          "text": "`prepare_release_bin`",
+          "anchor": "prepare_release_bin"
+        },
+        {
+          "level": 3,
+          "text": "`release_environment`",
+          "anchor": "release_environment"
+        },
+        {
+          "level": 3,
           "text": "`entered`",
           "anchor": "entered"
         },
@@ -24099,7 +24124,7 @@
       ]
     }
   ],
-  "last_gen": "2026-09-29T20:55:31.210913+00:00",
+  "last_gen": "2026-10-01T22:53:40.070255+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
