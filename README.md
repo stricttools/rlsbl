@@ -308,6 +308,7 @@ Supports architectural layer rules via `[layers]` in `workspace.toml` for enforc
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `RLSBL_VERSION` | -- | Set when running pre-release and post-release hooks; contains the version being released |
+| `RLSBL_RELEASE_BIN` | -- | Set for every hook and step of a release; the release's own directory for binaries, first on `PATH`, where a hook can build a tool the release must run in its unreleased form |
 | `RLSBL_DIST_DIR` | -- | Set when running `custom_assets` build commands; points to the distribution directory for output files |
 | `GITHUB_TOKEN` | -- | Used by `gh` CLI for GitHub API calls; `discover` works unauthenticated for public repos |
 
