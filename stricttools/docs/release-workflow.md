@@ -509,6 +509,20 @@ Three shell scripts in `.rlsbl/hooks/` provide extension points at different sta
 | `pre-release.sh` | 11 | Scaffold-managed | Yes | Non-zero aborts release |
 | `post-release.sh` | 25 | Scaffold-managed | Yes | Non-fatal (release continues) |
 
+### The release's environment
+
+Every process a release starts in the release checkout -- the hooks, rlsbl's own producer and Go invocations, the tests, and the checks -- runs with these variables, set when the release enters the checkout and restored when it leaves:
+
+| Variable | Value |
+| --- | --- |
+| `RLSBL_RELEASE_BIN` | The absolute path of the release's own directory for binaries, `<git common dir>/rlsbl/release-bin`: outside the working tree and outside the release checkout, and empty when each release starts. |
+| `PATH` | `$RLSBL_RELEASE_BIN` first, then the `PATH` rlsbl was started with. |
+| `GOWORK` | The release checkout's own `go.work` when the repository root tracks one, and `off` otherwise. |
+
+A project whose release must run its own unreleased build of a tool rlsbl runs as a producer -- selfdoc releasing itself runs the selfdoc it is about to ship -- builds it into `$RLSBL_RELEASE_BIN` from `pre-checks.sh` (for a Go program, `GOBIN="$RLSBL_RELEASE_BIN" go install .`). The selfdoc steps and every later hook then run that build, and the copy installed for every other session on the machine is never touched, whether the release succeeds or fails.
+
+`GOWORK` keeps a release on committed state: the checkout sits inside the live repository, and without it Go would find the working tree's uncommitted, gitignored `go.work` from inside the checkout and build against unreleased local modules.
+
 ### Hooks override
 
 When `pre-release.sh` has been customized — meaning its content hash does not match any known scaffold template version — steps 9 (built-in tests) and 10 (built-in lint) are skipped entirely. The assumption is that a customized pre-release hook handles testing and linting itself.
