@@ -654,12 +654,20 @@ def _go_sum_keys(path):
 
 
 def _find_go_work_sum(root):
-    """A ``go.work.sum`` of the go workspace above *root*, or None."""
+    """A ``go.work.sum`` of the go workspace above *root*, or None.
+
+    The search stops at the root of the repository holding *root* (the first
+    directory with a ``.git``, a directory or a worktree's file): a go.work
+    above it, such as the live tree's around the release checkout at
+    ``<live>/.git/rlsbl/release-checkout``, is not this repository's.
+    """
     current = os.path.realpath(root)
     while True:
         if os.path.isfile(os.path.join(current, "go.work")):
             candidate = os.path.join(current, "go.work.sum")
             return candidate if os.path.isfile(candidate) else None
+        if os.path.lexists(os.path.join(current, ".git")):
+            return None
         parent = os.path.dirname(current)
         if parent == current:
             return None

@@ -587,6 +587,29 @@ class TestGo:
         result = _run(mod)
         assert result.status == "pass"
 
+    def test_a_go_work_sum_above_the_repository_root_is_not_read(self, tmp_path):
+        """The release checkout sits inside the live repository
+        (``<live>/.git/rlsbl/release-checkout``, a worktree whose ``.git`` is a
+        file); the live tree's uncommitted go.work.sum must not vouch for it."""
+        live = tmp_path / "live"
+        (live / ".git").mkdir(parents=True)
+        (live / "go.work").write_text("go 1.23\n\nuse .\n")
+        (live / "go.work.sum").write_text(
+            "github.com/spf13/cobra v1.8.0 h1:abc=\n"
+            "github.com/spf13/cobra v1.8.0/go.mod h1:def=\n"
+        )
+        checkout = live / ".git" / "rlsbl" / "release-checkout"
+        checkout.mkdir(parents=True)
+        (checkout / ".git").write_text("gitdir: ../../worktrees/release-checkout\n")
+        (checkout / "go.mod").write_text(
+            "module example.com/m\n\ngo 1.23\n\n"
+            "require github.com/spf13/cobra v1.8.0\n"
+        )
+        (checkout / "go.sum").write_text("")
+        result = _run(checkout)
+        assert result.status == "fail"
+        assert "github.com/spf13/cobra" in _text(result)
+
 
 class TestGoModParsing:
     def test_block_and_single_line_requires(self):
