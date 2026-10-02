@@ -2,6 +2,28 @@
 
 # Changelog
 
+## 0.131.0
+
+Releases build against the release checkout's own committed go.work, and every release gets a private RLSBL_RELEASE_BIN directory for its own builds of tools
+
+<details>
+<summary>Context</summary>
+
+The release checkout sits inside the live repository, so Go found the working tree's uncommitted go.work from there and selfdoc's release failed. Releases now pin GOWORK to the checkout, the dep-locks check stops its go.work.sum search at the repository root, and a hook can build an unreleased tool into RLSBL_RELEASE_BIN without installing it for every other session.
+
+</details>
+
+### Features
+
+- **A release can run its own unreleased build of a tool.** Every release gets a private, empty directory for binaries, named to every hook as `RLSBL_RELEASE_BIN` and placed first on `PATH` for the hooks and every step rlsbl runs. A `pre-checks.sh` that builds a tool there (`GOBIN="$RLSBL_RELEASE_BIN" go install .`) has the selfdoc steps and later hooks run that build, without installing it for every other session on the machine.
+
+### Fixes
+
+- The npm lockfile step in `rlsbl scaffold` next steps now says to commit package-lock.json before releasing, not before pushing: releases are the only push.
+- `rlsbl scaffold` no longer crashes with `unresolved template variables: goreleaserMain, brewsSection` on an npm+go project whose first registry is npm: every scaffolded file now renders with its own target's values, whichever registry is primary.
+- **A release no longer builds against the working tree's uncommitted `go.work`.** The release checkout sits inside the live repository, so Go found the working tree's gitignored `go.work` from there: a hook's `go install .` failed with "main module does not contain package", and where it did not fail the release built against unreleased local modules. Every process a release starts now runs with the checkout's own committed `go.work` when the repository root tracks one, and with `GOWORK=off` otherwise.
+- **The `dep-locks` check no longer accepts sums from a `go.work.sum` outside the repository.** Its search for a Go workspace's sums now stops at the repository root, so in the release checkout the working tree's uncommitted `go.work.sum` can no longer vouch for a module whose own `go.sum` is missing entries.
+
 ## 0.130.0
 
 Forks, rlsbl release abandon, every check as an option, nested workspace members, a refusal of uploads carrying private paths, releases run in a detached checkout of the committed commit (--allow-dirty removed), and rlsbl secrets sync-npm-token with the npm-token-synced check.
