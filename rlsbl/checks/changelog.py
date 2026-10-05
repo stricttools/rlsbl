@@ -36,6 +36,45 @@ def _batch_limits_labels_for_ctx(ctx):
     )
 
 
+def _batch_limits_for_changes_dir(ctx, changes_dir):
+    """``(batch_config, labels)`` governing the changelog in *changes_dir*.
+
+    At the workspace root the batch checks walk every releasable's changelog,
+    and each must meet its own releasable's limits, not the root context's.
+    A releasable changelog the context was not built for is judged by the
+    config its representative (first declared) member reads.
+    """
+    from ..changelog.validate import _get_batch_limits_config
+    from ..config import batch_limits_labels, read_project_config
+    from ..targets import resolve_releasable_config_dir_for_ctx
+    from ..workspace import (
+        get_releasable_changes_dir,
+        get_releasable_dir,
+        members_of,
+    )
+
+    ws_root = getattr(ctx, "workspace_root", None)
+    if ws_root is not None:
+        ws_root = str(ws_root)
+        for rel in getattr(ctx, "releasables", None) or []:
+            rel_changes = get_releasable_changes_dir(ws_root, rel.name)
+            if os.path.realpath(rel_changes) != os.path.realpath(changes_dir):
+                continue
+            rel_dir = get_releasable_dir(ws_root, rel.name)
+            own = resolve_releasable_config_dir_for_ctx(ctx)
+            if own is not None and os.path.realpath(own) == os.path.realpath(rel_dir):
+                break
+            members = members_of(rel.name, ctx.projects)
+            member_dir = (
+                os.path.join(ws_root, members[0]["path"]) if members else ws_root
+            )
+            labels = batch_limits_labels(member_dir, rel_dir)
+            config = read_project_config(member_dir, releasable_config_dir=rel_dir)
+            return _get_batch_limits_config(config, labels), labels
+    labels = _batch_limits_labels_for_ctx(ctx)
+    return _get_batch_limits_config(ctx.config, labels), labels
+
+
 def _changelog_label(changes_dir):
     """The releasable a releasable's changes directory belongs to, by name."""
     return os.path.basename(os.path.dirname(os.path.normpath(changes_dir)))
@@ -316,18 +355,16 @@ def register_changelog_checks(app):
     @app.error_check("changelog-batch-commits")
     def check_changelog_batch_commits(ctx, reporter):
         """No entry should have more commits than max_commits_per_entry."""
-        from ..changelog.validate import check_batch_size_commits, _get_batch_limits_config
+        from ..changelog.validate import check_batch_size_commits
 
         all_contexts = _get_all_changelog_contexts(ctx)
         if not all_contexts:
             return reporter.skipped("no .rlsbl/changes/ directory")
 
-        labels = _batch_limits_labels_for_ctx(ctx)
-        batch_config = _get_batch_limits_config(ctx.config, labels)
-
         all_details = []
         all_passed = True
-        for _changes_dir, _tag_glob, _scope, entries in all_contexts:
+        for changes_dir, _tag_glob, _scope, entries in all_contexts:
+            batch_config, labels = _batch_limits_for_changes_dir(ctx, changes_dir)
             passed, details = check_batch_size_commits(entries, batch_config, labels, version="unreleased")
             if not passed:
                 all_passed = False
@@ -344,7 +381,6 @@ def register_changelog_checks(app):
         """No commit should appear in more entries than max_entries_per_commit."""
         from ..changelog.validate import (
             check_batch_size_entries,
-            _get_batch_limits_config,
             _read_all_versioned_entries,
         )
 
@@ -352,12 +388,10 @@ def register_changelog_checks(app):
         if not all_contexts:
             return reporter.skipped("no .rlsbl/changes/ directory")
 
-        labels = _batch_limits_labels_for_ctx(ctx)
-        batch_config = _get_batch_limits_config(ctx.config, labels)
-
         all_details = []
         all_passed = True
         for changes_dir, _tag_glob, _scope, _entries in all_contexts:
+            batch_config, labels = _batch_limits_for_changes_dir(ctx, changes_dir)
             entries_by_version = _read_all_versioned_entries(changes_dir)
             passed, details = check_batch_size_entries(entries_by_version, batch_config, labels)
             if not passed:

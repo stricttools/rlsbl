@@ -577,3 +577,78 @@ class TestRefusalNamesTheFixThatWorks:
         })
         shas = [_make_commit(repo, f"file{i}.txt", f"change {i}") for i in range(5)]
         self._assert_refusal_then_fix(repo, shas, capsys)
+
+
+class TestWorkspaceRootBatchChecksUseEachReleasablesConfig:
+    """At the workspace root each releasable's changelog meets its own limits."""
+
+    def _workspace(self, tmp_path, monkeypatch):
+        from rlsbl.changelog.files import append_entry
+        from rlsbl.changelog.schema import ChangelogEntry
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _run_git(repo, "init", "-q", "-b", "main")
+        _run_git(repo, "config", "user.email", "test@test.local")
+        _run_git(repo, "config", "user.name", "Test")
+        (repo / "README.md").write_text("# test\n")
+        _run_git(repo, "add", "README.md")
+        _run_git(repo, "commit", "-q", "-m", "initial")
+        _make_explicit_workspace(repo, [{"name": "a"}, {"name": "b"}], [
+            {"path": "pa", "name": "pa", "releasable": "a"},
+            {"path": "pb", "name": "pb", "releasable": "b"},
+        ])
+        for name, member in (("a", "pa"), ("b", "pb")):
+            (repo / member).mkdir()
+            rel_dir = get_releasable_dir(str(repo), name)
+            os.makedirs(get_releasable_changes_dir(str(repo), name), exist_ok=True)
+            limits = {"max_commits_per_entry": 3} if name == "a" else {}
+            with open(os.path.join(rel_dir, "config.json"), "w") as f:
+                json.dump({"publish_mode": "ci", "batch_limits": limits}, f)
+        shas = [_make_commit(repo / "pa", f"f{i}.txt", f"c{i}") for i in range(4)]
+        append_entry(
+            get_releasable_changes_dir(str(repo), "a"),
+            ChangelogEntry(commits=shas, user_facing=False),
+        )
+        return repo
+
+    def _root_ctx(self, repo):
+        from pathlib import Path
+
+        from rlsbl.check_context import WorkspaceCheckContext
+        from rlsbl.workspace import load_releasables, load_workspace
+
+        projects = load_workspace(str(repo))
+        return WorkspaceCheckContext(
+            project_root=Path(repo), workspace_root=Path(repo), config={},
+            projects=projects,
+            releasables=load_releasables(str(repo), projects=projects),
+        )
+
+    def test_batch_commits_uses_the_releasable_limit(self, tmp_path, monkeypatch):
+        from rlsbl import app
+
+        repo = self._workspace(tmp_path, monkeypatch)
+        result = app._check_defs["changelog-batch-commits"].impl(self._root_ctx(repo))
+        assert result.status == "fail", repr(result)
+        assert f"batch_limits.exclusions in .rlsbl-monorepo/releasables/a/config.json" in repr(result)
+
+    def test_batch_entries_uses_the_releasable_limit(self, tmp_path, monkeypatch):
+        from rlsbl import app
+        from rlsbl.changelog.files import append_entry
+        from rlsbl.changelog.schema import ChangelogEntry
+
+        repo = self._workspace(tmp_path, monkeypatch)
+        rel_dir = get_releasable_dir(str(repo), "b")
+        with open(os.path.join(rel_dir, "config.json"), "w") as f:
+            json.dump({"publish_mode": "ci",
+                       "batch_limits": {"max_entries_per_commit": 1}}, f)
+        sha = _make_commit(repo / "pb", "g.txt", "g")
+        for _ in range(2):
+            append_entry(
+                get_releasable_changes_dir(str(repo), "b"),
+                ChangelogEntry(commits=[sha], user_facing=False),
+            )
+        result = app._check_defs["changelog-batch-entries"].impl(self._root_ctx(repo))
+        assert result.status == "fail", repr(result)
