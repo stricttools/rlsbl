@@ -1415,24 +1415,56 @@ def register_workspace_checks(app):
         what it released, and the operator says so with a
         ``release-history-closed`` transition record event naming it.
         """
-        from ..releasable_cleanup import verify_minimal_rlsbl
+        from ..releasable_cleanup import (
+            cleanup_per_package_release_state,
+            verify_minimal_rlsbl,
+        )
 
         if not ctx.releasables:
             return reporter.skipped("no releasables defined")
 
         root = str(ctx.workspace_root)
-        findings = []
+        # What `rlsbl monorepo cleanup` would remove, asked of cleanup itself
+        # (its dry run deletes nothing), so the promise below never drifts
+        # from what the command does. It is asked only when there is residue,
+        # because it reads member configs.
+        residue = []
         for rel in ctx.releasables:
             for proj in members_of(rel.name, ctx.projects):
                 abs_pkg = os.path.join(root, proj["path"])
                 if os.path.realpath(abs_pkg) == os.path.realpath(root):
                     continue
                 for entry in verify_minimal_rlsbl(abs_pkg):
-                    findings.append(f"{rel.name}/{proj['name']}: .rlsbl/{entry}")
+                    residue.append((rel, proj, abs_pkg, entry))
+        removable = set()
+        if residue:
+            removable = {
+                os.path.realpath(p)
+                for p in cleanup_per_package_release_state(
+                    root, projects=ctx.projects, releasables=ctx.releasables,
+                    dry_run=True,
+                )
+            }
+        findings = []
+        cleanup_count = 0
+        by_hand_count = 0
+        for rel, proj, abs_pkg, entry in residue:
+            path = os.path.realpath(os.path.join(abs_pkg, ".rlsbl", entry))
+            if path in removable:
+                cleanup_count += 1
+                how = "`rlsbl monorepo cleanup` removes it"
+            else:
+                by_hand_count += 1
+                how = (
+                    "`rlsbl monorepo cleanup` does not remove it; "
+                    "remove it by hand"
+                )
+            findings.append(
+                f"{rel.name}/{proj['name']}: .rlsbl/{entry} ({how})"
+            )
 
         from ..errors import RlsblError
 
-        cleanup_count = len(findings)
         try:
             unreleasing, tags_unreadable = _unreleasing_member_state(ctx)
         except RlsblError as exc:
@@ -1460,6 +1492,14 @@ def register_workspace_checks(app):
                 summary += (
                     f"; `rlsbl monorepo cleanup` removes the {cleanup_count} "
                     f"per-package one(s)"
+                )
+            if by_hand_count:
+                summary += (
+                    f"; the other {by_hand_count} per-package one(s) need "
+                    f"removing by hand"
+                    if cleanup_count else
+                    f"; the {by_hand_count} per-package one(s) need removing "
+                    f"by hand (`rlsbl monorepo cleanup` does not remove them)"
                 )
             return reporter.found(summary + caveat)
         return reporter.passed("no misplaced release state" + caveat)

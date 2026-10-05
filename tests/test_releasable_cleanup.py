@@ -673,6 +673,32 @@ releasable = "core"
         result = self._impl()(self._ctx(tmp_project))
         assert result.status == "pass", result.message
 
+    def test_summary_promises_cleanup_only_for_what_cleanup_removes(self, tmp_project):
+        """A finding outside cleanup's removals is not promised to cleanup."""
+        pkg = tmp_project / "pkg"
+        _make_rlsbl_dir(pkg, subdirs=["changes"], files=["stray.txt"])
+        _write_workspace(tmp_project, """\
+[[releasables]]
+name = "core"
+
+[[projects]]
+path = "pkg"
+name = "pkg"
+releasable = "core"
+""")
+        result = self._impl()(self._ctx(tmp_project))
+        assert result.status == "fail"
+        texts = [p.text for p in result.problems]
+        changes = next(t for t in texts if t.startswith("core/pkg: .rlsbl/changes"))
+        stray = next(t for t in texts if t.startswith("core/pkg: .rlsbl/stray.txt"))
+        assert "`rlsbl monorepo cleanup` removes it" in changes
+        assert "monorepo cleanup" not in stray.replace(
+            "`rlsbl monorepo cleanup` does not remove it", "",
+        )
+        assert "remove it by hand" in stray
+        assert "`rlsbl monorepo cleanup` removes the 1 per-package one(s)" in result.message
+        assert "the other 1 per-package one(s) need removing by hand" in result.message
+
     def test_root_member_exempt(self, tmp_project):
         _make_rlsbl_dir(tmp_project, subdirs=["changes", "releases"],
                         files=["version"])
