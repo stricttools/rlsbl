@@ -123,3 +123,27 @@ def test_a_member_missing_its_releasable_level_bases_is_told_why_and_the_remedy_
     _scaffold(proj_dir)
     assert os.path.isdir(bases)
     assert verify_minimal_rlsbl(str(proj_dir)) == []
+
+
+def _go_member(mock_git_repo, monkeypatch):
+    proj_dir = _member(mock_git_repo, monkeypatch)
+    (proj_dir / "go.mod").write_text("module example.invalid/app\n\ngo 1.22\n")
+    (proj_dir / "main.go").write_text("package main\n\nfunc main() {}\n")
+    return proj_dir
+
+
+def test_a_go_member_scaffold_passes_the_residue_rule(mock_git_repo, monkeypatch):
+    """Scaffold's own .rlsbl/go.mod stub in a Go member is not residue."""
+    proj_dir = _go_member(mock_git_repo, monkeypatch)
+    run_cmd("go", [], dict(FLAGS), ctx=create_context(proj_dir))
+
+    assert (proj_dir / ".rlsbl" / "go.mod").is_file()
+    assert verify_minimal_rlsbl(str(proj_dir)) == []
+
+
+def test_a_go_mod_that_is_not_the_stub_is_still_residue(mock_git_repo, monkeypatch):
+    proj_dir = _go_member(mock_git_repo, monkeypatch)
+    run_cmd("go", [], dict(FLAGS), ctx=create_context(proj_dir))
+    (proj_dir / ".rlsbl" / "go.mod").write_text("module example.invalid/other\n")
+
+    assert verify_minimal_rlsbl(str(proj_dir)) == ["go.mod"]

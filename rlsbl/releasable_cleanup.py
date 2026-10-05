@@ -35,6 +35,10 @@ EXPECTED_RLSBL_CONTENTS = frozenset({
     "hooks",
 })
 
+# The stub module scaffold writes into a Go project's .rlsbl/ (see
+# rlsbl.upload_exclusions). Allowed only while its content is the stub's.
+PRIVATE_GO_STUB_NAME = "go.mod"
+
 
 def cleanup_per_package_release_state(workspace_root, projects=None,
                                       releasables=None, dry_run=False):
@@ -222,6 +226,16 @@ def run_cleanup_command(workspace_root, *, dry_run=False, auto_commit=True):
     return removed
 
 
+def _is_private_go_stub(path):
+    """True when *path* is a regular file holding scaffold's stub ``go.mod``."""
+    from .upload_exclusions import private_go_stub_content
+
+    if not os.path.isfile(path) or os.path.islink(path):
+        return False
+    with open(path, encoding="utf-8") as f:
+        return f.read() == private_go_stub_content()
+
+
 def verify_minimal_rlsbl(project_path):
     """Return unexpected files/dirs in .rlsbl/ for a releasable member package.
 
@@ -231,6 +245,7 @@ def verify_minimal_rlsbl(project_path):
     - ``config.json`` (only if it has overrides differing from releasable config)
     - ``lint/`` (only if it has overrides differing from releasable lint config)
     - ``hooks/`` (per-package script hooks are a live feature)
+    - ``go.mod`` (only the stub module scaffold writes, byte for byte)
 
     Args:
         project_path: absolute or relative path to the project directory.
@@ -245,8 +260,13 @@ def verify_minimal_rlsbl(project_path):
 
     unexpected = []
     for entry in sorted(os.listdir(rlsbl_dir)):
-        if entry not in EXPECTED_RLSBL_CONTENTS:
-            unexpected.append(entry)
+        if entry in EXPECTED_RLSBL_CONTENTS:
+            continue
+        if entry == PRIVATE_GO_STUB_NAME and _is_private_go_stub(
+            os.path.join(rlsbl_dir, entry),
+        ):
+            continue
+        unexpected.append(entry)
 
     return unexpected
 

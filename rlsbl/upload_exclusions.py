@@ -29,6 +29,29 @@ from .private_paths import (
 PRIVATE_GO_MODULE_TEMPLATE = "private/go.mod.tpl"
 
 
+def private_go_stub_content():
+    """The bytes scaffold writes as the stub ``go.mod`` in a private directory.
+
+    Rendered through scaffold's own template processing with no variables, so
+    a template that ever gains one is refused here rather than compared
+    unrendered.
+    """
+    from .commands.init_cmd import process_template
+
+    path = os.path.join(
+        os.path.dirname(__file__), "templates", "shared", PRIVATE_GO_MODULE_TEMPLATE,
+    )
+    with open(path, encoding="utf-8") as f:
+        content, unreplaced = process_template(f.read(), {}, path)
+    if unreplaced:
+        raise ValueError(
+            f"{path}: the private go.mod stub template has variables "
+            f"({', '.join(unreplaced)}), so its scaffolded content cannot be "
+            f"known without a project"
+        )
+    return content
+
+
 def dockerignore_entry(rule):
     """*rule* (gitignore syntax) in ``.dockerignore`` syntax.
 
