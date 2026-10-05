@@ -24,7 +24,12 @@ from ..changelog.validate import (
     _foreign_owner_description,
     _get_batch_limits_config,
 )
-from ..config import read_project_config
+from ..config import (
+    PROJECT_CONFIG_LABEL,
+    batch_limits_labels,
+    read_project_config,
+    releasable_config_label,
+)
 from ..git_util import filter_commits_for_scope
 from ..ownership import OwnershipError, OwnershipScope, releasable_state_dir
 from ..utils import commit_files, run, working_tree_paths
@@ -530,16 +535,18 @@ def _cmd_add_commit(flags, project_root, ws_context, config, dry_run):
         releasable_config_dir = get_releasable_dir(
             ws_context.ws_root, ws_context.releasable.name,
         )
-    batch_config = _get_batch_limits_config(config)
+    labels = batch_limits_labels(project_root, releasable_config_dir)
+    batch_config = _get_batch_limits_config(config, labels)
     max_commits = batch_config.get("max_commits_per_entry", 5)
     if len(resolved_commits) > max_commits:
         allow_batch = flags.get("allow-batch", False)
         if not allow_batch:
             print(
                 f"Error: entry has {len(resolved_commits)} commits but the limit is "
-                f"{max_commits} (batch_limits.max_commits_per_entry in .rlsbl/config.json).\n"
+                f"{max_commits} (batch_limits.max_commits_per_entry in "
+                f"{labels['max_commits_per_entry']}).\n"
                 f"Either split into smaller entries, add an exclusion to "
-                f"batch_limits.exclusions in .rlsbl/config.json, or re-run with "
+                f"batch_limits.exclusions in {labels['exclusions']}, or re-run with "
                 f"--allow-batch to auto-create an exclusion.",
                 file=sys.stderr,
             )
@@ -556,10 +563,10 @@ def _cmd_add_commit(flags, project_root, ws_context, config, dry_run):
         }
         if releasable_config_dir is not None:
             config_path = os.path.join(releasable_config_dir, "config.json")
-            config_label = os.path.relpath(config_path, ws_context.ws_root)
+            config_label = releasable_config_label(releasable_config_dir)
         else:
             config_path = os.path.join(project_root, ".rlsbl", "config.json")
-            config_label = os.path.join(".rlsbl", "config.json")
+            config_label = PROJECT_CONFIG_LABEL
         if dry_run:
             print(f"Would auto-create batch exclusion for line {line_number} in {config_label}")
         else:

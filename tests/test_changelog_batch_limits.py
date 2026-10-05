@@ -26,6 +26,7 @@ from rlsbl.changelog.validate import (
     validate_unreleased,
 )
 from rlsbl.errors import ConfigError
+from rlsbl.config import PROJECT_BATCH_LIMITS_LABELS
 
 
 @pytest.fixture
@@ -63,13 +64,13 @@ def _write_config(repo, batch_limits):
 
 class TestGetBatchLimitsConfig:
     def test_defaults_when_no_config(self):
-        cfg = _get_batch_limits_config({})
+        cfg = _get_batch_limits_config({}, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert cfg["max_commits_per_entry"] == 5
         assert cfg["max_entries_per_commit"] == 5
         assert cfg["exclusions"] == []
 
     def test_defaults_when_partial_config(self):
-        cfg = _get_batch_limits_config({"batch_limits": {"max_commits_per_entry": 7}})
+        cfg = _get_batch_limits_config({"batch_limits": {"max_commits_per_entry": 7}}, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert cfg["max_commits_per_entry"] == 7
         assert cfg["max_entries_per_commit"] == 5
         assert cfg["exclusions"] == []
@@ -79,7 +80,7 @@ class TestGetBatchLimitsConfig:
             "max_commits_per_entry": 10,
             "max_entries_per_commit": 4,
             "exclusions": [{"reason": "x", "commits": ["abc"]}],
-        }})
+        }}, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert cfg["max_commits_per_entry"] == 10
         assert cfg["max_entries_per_commit"] == 4
         assert cfg["exclusions"] == [{"reason": "x", "commits": ["abc"]}]
@@ -91,7 +92,7 @@ class TestGetBatchLimitsConfig:
         with pytest.raises(ConfigError) as exc_info:
             _get_batch_limits_config({"batch_limits": {
                 "max_commits_per_entry": "not-an-int",
-            }})
+            }}, labels=PROJECT_BATCH_LIMITS_LABELS)
         msg = str(exc_info.value)
         assert "max_commits_per_entry" in msg
         assert "not-an-int" in msg
@@ -103,7 +104,7 @@ class TestGetBatchLimitsConfig:
         with pytest.raises(ConfigError) as exc_info:
             _get_batch_limits_config({"batch_limits": {
                 "exclusions": "not-a-list",
-            }})
+            }}, labels=PROJECT_BATCH_LIMITS_LABELS)
         msg = str(exc_info.value)
         assert "exclusions" in msg
 
@@ -116,14 +117,14 @@ class TestCheckBatchSizeCommits:
     def test_default_max_5_passes_with_5(self, git_repo):
         entries = [ChangelogEntry(commits=["a" * 7] * 5, user_facing=False)]
         cfg = {"max_commits_per_entry": 5, "exclusions": []}
-        passed, details = check_batch_size_commits(entries, cfg)
+        passed, details = check_batch_size_commits(entries, cfg, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert passed is True
         assert details == []
 
     def test_default_max_5_fails_with_6(self, git_repo):
         entries = [ChangelogEntry(commits=[f"{c}" * 7 for c in "abcdef"], user_facing=False)]
         cfg = {"max_commits_per_entry": 5, "exclusions": []}
-        passed, details = check_batch_size_commits(entries, cfg)
+        passed, details = check_batch_size_commits(entries, cfg, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert passed is False
         assert "6 commits" in details[0]
         assert "max: 5" in details[0]
@@ -132,13 +133,13 @@ class TestCheckBatchSizeCommits:
     def test_override_max_3_passes(self, git_repo):
         entries = [ChangelogEntry(commits=["a" * 7, "b" * 7, "c" * 7], user_facing=False)]
         cfg = {"max_commits_per_entry": 3, "exclusions": []}
-        passed, details = check_batch_size_commits(entries, cfg)
+        passed, details = check_batch_size_commits(entries, cfg, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert passed is True
 
     def test_override_max_3_fails_with_4(self, git_repo):
         entries = [ChangelogEntry(commits=["a" * 7, "b" * 7, "c" * 7, "d" * 7], user_facing=False)]
         cfg = {"max_commits_per_entry": 3, "exclusions": []}
-        passed, details = check_batch_size_commits(entries, cfg)
+        passed, details = check_batch_size_commits(entries, cfg, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert passed is False
         assert "4 commits" in details[0]
         assert "max: 3" in details[0]
@@ -153,7 +154,7 @@ class TestCheckBatchSizeCommits:
             "max_commits_per_entry": 5,
             "exclusions": [{"reason": "early-project batch entry", "entries": [{"version": "0.5.0", "line": 18}]}],
         }
-        passed, details = check_batch_size_commits(entries, cfg, version="0.5.0")
+        passed, details = check_batch_size_commits(entries, cfg, version="0.5.0", labels=PROJECT_BATCH_LIMITS_LABELS)
         assert passed is True
         assert details == []
 
@@ -166,12 +167,12 @@ class TestCheckBatchSizeCommits:
             "max_commits_per_entry": 5,
             "exclusions": [{"reason": "irrelevant", "entries": [{"version": "0.5.0", "line": 18}]}],
         }
-        passed, details = check_batch_size_commits(entries, cfg, version="unreleased")
+        passed, details = check_batch_size_commits(entries, cfg, version="unreleased", labels=PROJECT_BATCH_LIMITS_LABELS)
         assert passed is False
         assert "unreleased.jsonl line 18" in details[0]
 
     def test_empty_entries_passes(self, git_repo):
-        passed, details = check_batch_size_commits([], {"max_commits_per_entry": 5, "exclusions": []})
+        passed, details = check_batch_size_commits([], {"max_commits_per_entry": 5, "exclusions": []}, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert passed is True
         assert details == []
 
@@ -193,7 +194,7 @@ class TestCheckBatchSizeEntries:
             ],
         }
         cfg = {"max_entries_per_commit": 5, "exclusions": []}
-        passed, details = check_batch_size_entries(entries_by_version, cfg)
+        passed, details = check_batch_size_entries(entries_by_version, cfg, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert passed is True
 
     def test_commit_in_six_entries_fails_default(self, git_repo):
@@ -209,7 +210,7 @@ class TestCheckBatchSizeEntries:
             ],
         }
         cfg = {"max_entries_per_commit": 5, "exclusions": []}
-        passed, details = check_batch_size_entries(entries_by_version, cfg)
+        passed, details = check_batch_size_entries(entries_by_version, cfg, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert passed is False
         assert "6 entries" in details[0]
         assert "max: 5" in details[0]
@@ -225,7 +226,7 @@ class TestCheckBatchSizeEntries:
             "max_entries_per_commit": 5,
             "exclusions": [{"reason": "retroactive", "commits": [commit]}],
         }
-        passed, details = check_batch_size_entries(entries_by_version, cfg)
+        passed, details = check_batch_size_entries(entries_by_version, cfg, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert passed is True
         assert details == []
 
@@ -241,7 +242,7 @@ class TestCheckBatchSizeEntries:
             "exclusions": [{"reason": "stale", "commits": [bogus]}],
         }
         with pytest.raises(ConfigError) as exc_info:
-            check_batch_size_entries(entries_by_version, cfg)
+            check_batch_size_entries(entries_by_version, cfg, labels=PROJECT_BATCH_LIMITS_LABELS)
         msg = str(exc_info.value)
         assert bogus in msg
         assert "does not resolve" in msg
@@ -257,7 +258,7 @@ class TestCheckBatchSizeEntries:
             "0.32.0": filler + [ChangelogEntry(commits=[commit], user_facing=False)] * 4,
         }
         cfg = {"max_entries_per_commit": 5, "exclusions": []}
-        passed, details = check_batch_size_entries(entries_by_version, cfg)
+        passed, details = check_batch_size_entries(entries_by_version, cfg, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert passed is True
 
     def test_cross_version_check_fails_above_max(self, git_repo):
@@ -274,7 +275,7 @@ class TestCheckBatchSizeEntries:
             "0.32.0": [ChangelogEntry(commits=[commit], user_facing=False)],
         }
         cfg = {"max_entries_per_commit": 5, "exclusions": []}
-        passed, details = check_batch_size_entries(entries_by_version, cfg)
+        passed, details = check_batch_size_entries(entries_by_version, cfg, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert passed is False
         # message lists both unreleased and 0.32.0 locations
         assert "unreleased.jsonl:1" in details[0]
@@ -282,7 +283,7 @@ class TestCheckBatchSizeEntries:
         assert "0.32.0.jsonl:1" in details[0]
 
     def test_empty_entries_passes(self, git_repo):
-        passed, details = check_batch_size_entries({}, {"max_entries_per_commit": 5, "exclusions": []})
+        passed, details = check_batch_size_entries({}, {"max_entries_per_commit": 5, "exclusions": []}, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert passed is True
         assert details == []
 
@@ -299,7 +300,7 @@ class TestValidateUnreleasedIntegration:
             commits=[sha], user_facing=True, description="New feature", type="feature",
         ))
 
-        result = validate_unreleased(changes, config={})
+        result = validate_unreleased(changes, config={}, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert result["passed"] is True
         for key in (
             "hashes_resolve",
@@ -321,7 +322,7 @@ class TestValidateUnreleasedIntegration:
         shas = [_make_commit(git_repo, f"f{i}.txt") for i in range(6)]
         append_entry(changes, ChangelogEntry(commits=shas, user_facing=False))
 
-        result = validate_unreleased(changes, config={})
+        result = validate_unreleased(changes, config={}, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert result["passed"] is False
         passed, details = result["checks"]["batch_size_commits"]
         assert passed is False
@@ -334,7 +335,7 @@ class TestValidateUnreleasedIntegration:
         for _ in range(6):
             append_entry(changes, ChangelogEntry(commits=[sha], user_facing=False))
 
-        result = validate_unreleased(changes, config={})
+        result = validate_unreleased(changes, config={}, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert result["passed"] is False
         passed, details = result["checks"]["batch_size_entries"]
         assert passed is False
@@ -359,7 +360,7 @@ class TestValidateUnreleasedIntegration:
         # And unreleased references it once more (total 6 > max 5).
         append_entry(str(changes), ChangelogEntry(commits=[sha], user_facing=False))
 
-        result = validate_unreleased(str(changes), config={})
+        result = validate_unreleased(str(changes), config={}, labels=PROJECT_BATCH_LIMITS_LABELS)
         passed, details = result["checks"]["batch_size_entries"]
         assert passed is False
         assert "6 entries" in details[0]
@@ -385,6 +386,6 @@ class TestValidateUnreleasedIntegration:
         # Pass a config that exempts this commit.
         exclusion_config = {"batch_limits": {"exclusions": [{"reason": "test", "commits": [sha]}]}}
 
-        result = validate_unreleased(str(changes), config=exclusion_config)
+        result = validate_unreleased(str(changes), config=exclusion_config, labels=PROJECT_BATCH_LIMITS_LABELS)
         passed, _ = result["checks"]["batch_size_entries"]
         assert passed is True

@@ -3,6 +3,7 @@
 import pytest
 
 from conftest import run_git as _run_git, git_head as _git_head, make_commit as _make_commit
+from rlsbl.config import PROJECT_BATCH_LIMITS_LABELS
 
 
 @pytest.fixture
@@ -408,7 +409,7 @@ class TestExclusionHashResolution:
             "exclusions": [{"reason": "test", "commits": [short]}],
         }
 
-        passed, details = check_batch_size_entries(entries_by_version, config)
+        passed, details = check_batch_size_entries(entries_by_version, config, labels=PROJECT_BATCH_LIMITS_LABELS)
         # With the fix, the abbreviated hash resolves to the full SHA and matches
         assert passed is True, f"Abbreviated exclusion hash should match. Details: {details}"
 
@@ -431,7 +432,7 @@ class TestExclusionHashResolution:
             "exclusions": [{"reason": "test", "commits": [sha]}],
         }
 
-        passed, details = check_batch_size_entries(entries_by_version, config)
+        passed, details = check_batch_size_entries(entries_by_version, config, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert passed is True
 
     def test_unresolvable_exclusion_hash_raises(self, git_repo):
@@ -457,7 +458,7 @@ class TestExclusionHashResolution:
         }
 
         with pytest.raises(ConfigError) as exc_info:
-            check_batch_size_entries(entries_by_version, config)
+            check_batch_size_entries(entries_by_version, config, labels=PROJECT_BATCH_LIMITS_LABELS)
         msg = str(exc_info.value)
         assert "does not resolve" in msg
         assert "deadbeef" in msg

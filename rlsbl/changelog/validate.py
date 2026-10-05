@@ -35,7 +35,7 @@ _BATCH_LIMITS_DEFAULTS = {
 }
 
 
-def _get_batch_limits_config(config) -> dict:
+def _get_batch_limits_config(config, labels) -> dict:
     """Return the resolved batch_limits config with defaults applied.
 
     ``config`` is the project config dict (already loaded).
@@ -52,7 +52,7 @@ def _get_batch_limits_config(config) -> dict:
     the key, the offending value, and the accepted type -- invalid config
     must never be silently replaced with a default.
     """
-    raw = get_changelog_validation_config(config) or {}
+    raw = get_changelog_validation_config(config, labels["batch_limits"]) or {}
     resolved: dict = {}
 
     for key, default in _BATCH_LIMITS_DEFAULTS.items():
@@ -65,7 +65,7 @@ def _get_batch_limits_config(config) -> dict:
             isinstance(value, bool) and not isinstance(default, bool)
         ):
             raise ConfigError(
-                f"Invalid batch_limits.{key} in .rlsbl/config.json: "
+                f"Invalid batch_limits.{key} in {labels[key]}: "
                 f"{value!r} (type {type(value).__name__}). "
                 f"Must be of type {type(default).__name__}."
             )
@@ -545,6 +545,7 @@ def check_has_user_facing(entries: list[ChangelogEntry]) -> tuple[bool, list[str
 def check_batch_size_commits(
     entries: list[ChangelogEntry],
     config: dict,
+    labels: dict,
     version: str = "unreleased",
 ) -> tuple[bool, list[str]]:
     """Check that no entry has more commits than ``max_commits_per_entry``.
@@ -581,7 +582,7 @@ def check_batch_size_commits(
             )
     if details:
         details.append(
-            "Hint: add an exclusion to batch_limits.exclusions in .rlsbl/config.json, "
+            f"Hint: add an exclusion to batch_limits.exclusions in {labels['exclusions']}, "
             "or use `rlsbl changelog add --allow-batch` to auto-create one."
         )
     return (len(details) == 0, details)
@@ -590,6 +591,7 @@ def check_batch_size_commits(
 def check_batch_size_entries(
     entries_by_version: dict[str, list[ChangelogEntry]],
     config: dict,
+    labels: dict,
 ) -> tuple[bool, list[str]]:
     """Check that no commit appears in more than ``max_entries_per_commit`` entries.
 
@@ -619,7 +621,7 @@ def check_batch_size_entries(
                     # fix the hash, remove the stale exclusion, or run
                     # `rlsbl changelog remap` after a history rewrite.
                     raise ConfigError(
-                        f"Invalid batch_limits exclusion in .rlsbl/config.json: "
+                        f"Invalid batch_limits exclusion in {labels['exclusions']}: "
                         f"commit hash {commit!r} does not resolve to any commit in "
                         f"history. Remove the stale exclusion or run "
                         f"`rlsbl changelog remap` after a history rewrite."
@@ -669,7 +671,7 @@ def _read_all_versioned_entries(changes_dir: str) -> dict[str, list[ChangelogEnt
 # Combined validation
 # ---------------------------------------------------------------------------
 
-def validate_unreleased(changes_dir: str, tag_glob: str | None = None, scope=None, *, config: dict, bump_type: str | None = None) -> dict:
+def validate_unreleased(changes_dir: str, tag_glob: str | None = None, scope=None, *, config: dict, labels: dict, bump_type: str | None = None) -> dict:
     """Run all 8 validation checks on unreleased.jsonl.
 
     Returns a dict with:
@@ -692,7 +694,7 @@ def validate_unreleased(changes_dir: str, tag_glob: str | None = None, scope=Non
     that appear in too many entries across versions.
     """
     entries = read_unreleased(changes_dir)
-    batch_config = _get_batch_limits_config(config)
+    batch_config = _get_batch_limits_config(config, labels)
 
     # Check cache
     if _is_cache_valid(changes_dir):
@@ -727,8 +729,8 @@ def validate_unreleased(changes_dir: str, tag_glob: str | None = None, scope=Non
         "coverage": check_coverage(entries, releases_dir, tag_glob, scope=scope),
         "no_orphans": check_no_orphans(entries, releases_dir, tag_glob, scope=scope),
         "schema": check_schema(entries),
-        "batch_size_commits": check_batch_size_commits(entries, batch_config, version="unreleased"),
-        "batch_size_entries": check_batch_size_entries(entries_by_version, batch_config),
+        "batch_size_commits": check_batch_size_commits(entries, batch_config, labels, version="unreleased"),
+        "batch_size_entries": check_batch_size_entries(entries_by_version, batch_config, labels),
         "user_facing": check_has_user_facing(entries),
     }
 

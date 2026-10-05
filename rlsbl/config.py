@@ -162,7 +162,7 @@ def read_deploy_config(config):
     return targets, errors
 
 
-def get_changelog_validation_config(config):
+def get_changelog_validation_config(config, label):
     """Read changelog validation config from a project config dict.
 
     Returns the batch_limits section as a dict like
@@ -176,17 +176,17 @@ def get_changelog_validation_config(config):
 
     Returns an empty dict when ``batch_limits`` is absent. A present but
     non-dict ``batch_limits`` is a hard error (:class:`ConfigError`) --
-    never silently treated as absent.
+    never silently treated as absent. ``label`` names the config file the
+    section was read from (see :func:`batch_limits_labels`).
     """
     batch_limits = config.get("batch_limits", {})
     if not isinstance(batch_limits, dict):
         raise ConfigError(
-            f"Invalid batch_limits in .rlsbl/config.json: {batch_limits!r} "
+            f"Invalid batch_limits in {label}: {batch_limits!r} "
             f"(type {type(batch_limits).__name__}). "
             f"Must be a JSON object (dict)."
         )
     return batch_limits
-
 
 
 # The closed set of valid publish_mode values. "ci" publishes via CI
@@ -210,6 +210,54 @@ def old_private_key_message():
 
 
 PROJECT_CONFIG_LABEL = ".rlsbl/config.json"
+
+
+BATCH_LIMITS_SECTION = "batch_limits"
+BATCH_LIMITS_KEYS = ("max_commits_per_entry", "max_entries_per_commit", "exclusions")
+# A standalone project reads every batch_limits setting from one file.
+PROJECT_BATCH_LIMITS_LABELS = {
+    n: PROJECT_CONFIG_LABEL for n in (BATCH_LIMITS_SECTION, *BATCH_LIMITS_KEYS)
+}
+
+
+def releasable_config_label(releasable_config_dir):
+    """A releasable's ``config.json``, relative to its workspace root."""
+    from .workspace_types import RELEASABLES_DIR, WORKSPACE_DIR
+
+    name = os.path.basename(os.path.normpath(str(releasable_config_dir)))
+    return os.path.join(WORKSPACE_DIR, RELEASABLES_DIR, name, "config.json")
+
+
+def batch_limits_labels(project_root, releasable_config_dir=None):
+    """Name the config file each effective ``batch_limits`` setting is read from.
+
+    Returns a dict keyed by ``BATCH_LIMITS_SECTION`` (the section itself) and
+    each of ``BATCH_LIMITS_KEYS``, mapping to a file label for messages.
+
+    Mirrors :func:`read_project_config`'s merge: the per-package
+    ``.rlsbl/config.json`` wins for a key it declares (and for every key when
+    its ``batch_limits`` is not a dict, since that value replaces the
+    releasable's whole section); otherwise the releasable's ``config.json``
+    supplies it. A setting declared in neither file is named by the file it
+    belongs in: the releasable's ``config.json`` for a releasable member (the
+    file ``changelog add --allow-batch`` writes exclusions to),
+    ``.rlsbl/config.json`` otherwise.
+    """
+    if releasable_config_dir is None:
+        return dict(PROJECT_BATCH_LIMITS_LABELS)
+
+    rel_label = releasable_config_label(releasable_config_dir)
+    pkg_config = read_json_config(_project_config(project_root))
+    labels = {}
+    for n in PROJECT_BATCH_LIMITS_LABELS:
+        label = rel_label
+        if BATCH_LIMITS_SECTION in pkg_config:
+            section = pkg_config[BATCH_LIMITS_SECTION]
+            if (n == BATCH_LIMITS_SECTION or not isinstance(section, dict)
+                    or n in section):
+                label = PROJECT_CONFIG_LABEL
+        labels[n] = label
+    return labels
 
 
 def is_workspace_root_dir(project_dir):

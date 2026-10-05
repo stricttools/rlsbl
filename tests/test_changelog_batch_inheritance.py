@@ -341,3 +341,180 @@ class TestStandaloneExclusionRegression:
         exclusions = pkg_config["batch_limits"]["exclusions"]
         assert len(exclusions) == 1
         assert exclusions[0]["reason"] == "Big standalone batch"
+
+
+REL_LABEL = ".rlsbl-monorepo/releasables/www/config.json"
+PKG_LABEL = ".rlsbl/config.json"
+
+
+def _batch_flags(shas, *, allow_batch):
+    return {
+        "commits": ",".join(shas),
+        "description": "Big batch feature",
+        "type": "feature",
+        "user-facing": True,
+        "auto-commit": False,
+        "allow-batch": allow_batch,
+    }
+
+
+def _write_json(path, data):
+    path.write_text(json.dumps(data, indent=2) + "\n")
+
+
+class TestBatchLimitMessagesNameTheSourceFile:
+    """Each batch_limits message names the file its setting was read from."""
+
+    def test_refusal_names_releasable_config_for_inherited_limit(self, tmp_path, monkeypatch, capsys):
+        repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=3)
+        shas = [_make_commit(proj_dir, f"file{i}.txt", f"change {i}") for i in range(5)]
+
+        with pytest.raises(SystemExit):
+            cmd_add(_batch_flags(shas, allow_batch=False), project_root=proj_dir)
+
+        err = capsys.readouterr().err
+        assert f"batch_limits.max_commits_per_entry in {REL_LABEL}" in err
+        assert f"batch_limits.exclusions in {REL_LABEL}" in err
+        assert PKG_LABEL not in err
+
+    def test_refusal_names_member_config_for_member_limit(self, tmp_path, monkeypatch, capsys):
+        repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=10)
+        _write_json(proj_dir / ".rlsbl" / "config.json", {
+            "publish_mode": "ci",
+            "batch_limits": {"max_commits_per_entry": 3},
+        })
+        shas = [_make_commit(proj_dir, f"file{i}.txt", f"change {i}") for i in range(5)]
+
+        with pytest.raises(SystemExit):
+            cmd_add(_batch_flags(shas, allow_batch=False), project_root=proj_dir)
+
+        err = capsys.readouterr().err
+        assert f"batch_limits.max_commits_per_entry in {PKG_LABEL}" in err
+        # The member declares no exclusions, so the effective list is the
+        # releasable's.
+        assert f"batch_limits.exclusions in {REL_LABEL}" in err
+
+    def test_invalid_key_names_releasable_config(self, tmp_path, monkeypatch):
+        from rlsbl.errors import ConfigError
+
+        repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=3)
+        rel_config = os.path.join(get_releasable_dir(str(repo), "www"), "config.json")
+        with open(rel_config, "w") as f:
+            json.dump({"batch_limits": {"max_commits_per_entry": "five"}}, f)
+        shas = [_make_commit(proj_dir, "file0.txt", "change 0")]
+
+        with pytest.raises(ConfigError) as exc_info:
+            cmd_add(_batch_flags(shas, allow_batch=False), project_root=proj_dir)
+        assert f"batch_limits.max_commits_per_entry in {REL_LABEL}" in str(exc_info.value)
+
+    def test_invalid_key_names_member_config(self, tmp_path, monkeypatch):
+        from rlsbl.errors import ConfigError
+
+        repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=3)
+        _write_json(proj_dir / ".rlsbl" / "config.json", {
+            "batch_limits": {"max_commits_per_entry": "five"},
+        })
+        shas = [_make_commit(proj_dir, "file0.txt", "change 0")]
+
+        with pytest.raises(ConfigError) as exc_info:
+            cmd_add(_batch_flags(shas, allow_batch=False), project_root=proj_dir)
+        assert f"batch_limits.max_commits_per_entry in {PKG_LABEL}" in str(exc_info.value)
+
+    def test_invalid_section_names_releasable_config(self, tmp_path, monkeypatch):
+        from rlsbl.errors import ConfigError
+
+        repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=3)
+        rel_config = os.path.join(get_releasable_dir(str(repo), "www"), "config.json")
+        with open(rel_config, "w") as f:
+            json.dump({"batch_limits": "not-a-dict"}, f)
+        shas = [_make_commit(proj_dir, "file0.txt", "change 0")]
+
+        with pytest.raises(ConfigError) as exc_info:
+            cmd_add(_batch_flags(shas, allow_batch=False), project_root=proj_dir)
+        assert f"Invalid batch_limits in {REL_LABEL}" in str(exc_info.value)
+
+    def test_invalid_section_names_member_config(self, tmp_path, monkeypatch):
+        from rlsbl.errors import ConfigError
+
+        repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=3)
+        _write_json(proj_dir / ".rlsbl" / "config.json", {"batch_limits": [1, 2]})
+        shas = [_make_commit(proj_dir, "file0.txt", "change 0")]
+
+        with pytest.raises(ConfigError) as exc_info:
+            cmd_add(_batch_flags(shas, allow_batch=False), project_root=proj_dir)
+        assert f"Invalid batch_limits in {PKG_LABEL}" in str(exc_info.value)
+
+    def test_unresolvable_exclusion_names_releasable_config(self, tmp_path, monkeypatch):
+        from rlsbl.changelog.schema import ChangelogEntry
+        from rlsbl.changelog.validate import (
+            _get_batch_limits_config,
+            check_batch_size_entries,
+        )
+        from rlsbl.config import batch_limits_labels, read_project_config
+        from rlsbl.errors import ConfigError
+
+        repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=3)
+        rel_dir = get_releasable_dir(str(repo), "www")
+        with open(os.path.join(rel_dir, "config.json"), "w") as f:
+            json.dump({"batch_limits": {"exclusions": [
+                {"reason": "stale", "commits": ["0" * 40]},
+            ]}}, f)
+        sha = _make_commit(proj_dir, "file0.txt", "change 0")
+
+        labels = batch_limits_labels(str(proj_dir), rel_dir)
+        config = _get_batch_limits_config(
+            read_project_config(str(proj_dir), releasable_config_dir=rel_dir), labels,
+        )
+        entries = {"unreleased": [ChangelogEntry(commits=[sha], user_facing=False)]}
+        with pytest.raises(ConfigError) as exc_info:
+            check_batch_size_entries(entries, config, labels)
+        assert f"exclusion in {REL_LABEL}" in str(exc_info.value)
+
+    def test_batch_commits_check_hint_names_releasable_config(self, tmp_path, monkeypatch):
+        from rlsbl import _check_context_factory, app
+
+        repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=3)
+        shas = [_make_commit(proj_dir, f"file{i}.txt", f"change {i}") for i in range(5)]
+        cmd_add(_batch_flags(shas, allow_batch=True), project_root=proj_dir)
+        # Drop the auto-created exclusion so the check fails and prints its hint.
+        rel_config = os.path.join(get_releasable_dir(str(repo), "www"), "config.json")
+        data = json.loads(open(rel_config).read())
+        data["batch_limits"]["exclusions"] = []
+        with open(rel_config, "w") as f:
+            json.dump(data, f)
+
+        ctx = _check_context_factory(project_root=str(proj_dir))
+        result = app._check_defs["changelog-batch-commits"].impl(ctx)
+        assert result.status == "fail"
+        text = repr(result)
+        assert f"batch_limits.exclusions in {REL_LABEL}" in text
+
+
+class TestStandaloneBatchLimitMessages:
+    """A standalone project's batch_limits messages name .rlsbl/config.json."""
+
+    def test_refusal_names_project_config(self, tmp_path, monkeypatch, capsys):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _run_git(repo, "init", "-q")
+        _run_git(repo, "config", "user.email", "test@test.local")
+        _run_git(repo, "config", "user.name", "Test")
+        (repo / "README.md").write_text("# test\n")
+        _run_git(repo, "add", "README.md")
+        _run_git(repo, "commit", "-q", "-m", "initial")
+        _run_git(repo, "tag", "v0.0.0")
+        (repo / ".rlsbl" / "changes").mkdir(parents=True)
+        _write_json(repo / ".rlsbl" / "config.json", {
+            "publish_mode": "ci",
+            "batch_limits": {"max_commits_per_entry": 3},
+        })
+        shas = [_make_commit(repo, f"file{i}.txt", f"change {i}") for i in range(5)]
+
+        with pytest.raises(SystemExit):
+            cmd_add(_batch_flags(shas, allow_batch=False), project_root=repo)
+
+        err = capsys.readouterr().err
+        assert f"batch_limits.max_commits_per_entry in {PKG_LABEL}" in err
+        assert f"batch_limits.exclusions in {PKG_LABEL}" in err
+

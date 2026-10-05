@@ -9,6 +9,7 @@ from rlsbl.changelog.files import get_changes_dir, read_unreleased
 from rlsbl.changelog.schema import ChangelogEntry
 from rlsbl.changelog.validate import check_batch_size_commits
 from rlsbl.commands.changelog_cmd import cmd_add
+from rlsbl.config import PROJECT_BATCH_LIMITS_LABELS
 
 
 @pytest.fixture
@@ -179,7 +180,7 @@ class TestBatchCheckHintMessage:
             "max_entries_per_commit": 5,
             "exclusions": [],
         }
-        passed, details = check_batch_size_commits(entries, config, version="unreleased")
+        passed, details = check_batch_size_commits(entries, config, version="unreleased", labels=PROJECT_BATCH_LIMITS_LABELS)
         assert passed is False
         assert len(details) >= 2
         # The last detail should be the hint message

@@ -16,6 +16,7 @@ from rlsbl.changelog.generate import (
 )
 from rlsbl.changelog.schema import ChangelogEntry
 from rlsbl.changelog.validate import validate_unreleased
+from rlsbl.config import PROJECT_BATCH_LIMITS_LABELS
 from rlsbl.errors import ReleaseFileError
 from rlsbl.utils import bump_version
 
@@ -75,7 +76,7 @@ class TestValidateUnreleasedInfra:
             f.write(json.dumps({"commits": [sha], "user_facing": False}) + "\n")
 
         result = validate_unreleased(
-            changes_dir, config={}, bump_type="infra",
+            changes_dir, config={}, bump_type="infra", labels=PROJECT_BATCH_LIMITS_LABELS,
         )
         assert result["passed"] is True
         assert result["checks"]["user_facing"] == (True, [])
@@ -93,7 +94,7 @@ class TestValidateUnreleasedInfra:
             }) + "\n")
 
         result = validate_unreleased(
-            changes_dir, config={}, bump_type="infra",
+            changes_dir, config={}, bump_type="infra", labels=PROJECT_BATCH_LIMITS_LABELS,
         )
         assert result["passed"] is False
         assert "infra_no_user_facing" in result["checks"]
@@ -109,7 +110,7 @@ class TestValidateUnreleasedInfra:
             f.write(json.dumps({"commits": [sha], "user_facing": False}) + "\n")
 
         result = validate_unreleased(
-            changes_dir, config={}, bump_type="patch",
+            changes_dir, config={}, bump_type="patch", labels=PROJECT_BATCH_LIMITS_LABELS,
         )
         assert result["passed"] is False
         passed, _ = result["checks"]["user_facing"]
@@ -124,7 +125,7 @@ class TestValidateUnreleasedInfra:
             f.write(json.dumps({"commits": [sha], "user_facing": False}) + "\n")
 
         result = validate_unreleased(
-            changes_dir, config={}, bump_type=None,
+            changes_dir, config={}, bump_type=None, labels=PROJECT_BATCH_LIMITS_LABELS,
         )
         assert result["passed"] is False
         passed, _ = result["checks"]["user_facing"]

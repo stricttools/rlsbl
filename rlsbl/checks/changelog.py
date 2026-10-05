@@ -22,6 +22,20 @@ def _changes_dirs_for_ctx(ctx):
     return [changes_dir for changes_dir, _tag, _scope, _entries in _get_all_changelog_contexts(ctx)]
 
 
+def _batch_limits_labels_for_ctx(ctx):
+    """The config file each batch_limits setting of ``ctx.config`` came from.
+
+    Resolves the releasable config directory the same way the check context
+    loaded ``ctx.config`` (releasable base, per-package on top).
+    """
+    from ..config import batch_limits_labels
+    from ..targets import resolve_releasable_config_dir_for_ctx
+
+    return batch_limits_labels(
+        str(ctx.project_root), resolve_releasable_config_dir_for_ctx(ctx),
+    )
+
+
 def _changelog_label(changes_dir):
     """The releasable a releasable's changes directory belongs to, by name."""
     return os.path.basename(os.path.dirname(os.path.normpath(changes_dir)))
@@ -308,12 +322,13 @@ def register_changelog_checks(app):
         if not all_contexts:
             return reporter.skipped("no .rlsbl/changes/ directory")
 
-        batch_config = _get_batch_limits_config(ctx.config)
+        labels = _batch_limits_labels_for_ctx(ctx)
+        batch_config = _get_batch_limits_config(ctx.config, labels)
 
         all_details = []
         all_passed = True
         for _changes_dir, _tag_glob, _scope, entries in all_contexts:
-            passed, details = check_batch_size_commits(entries, batch_config, version="unreleased")
+            passed, details = check_batch_size_commits(entries, batch_config, labels, version="unreleased")
             if not passed:
                 all_passed = False
                 all_details.extend(details)
@@ -337,13 +352,14 @@ def register_changelog_checks(app):
         if not all_contexts:
             return reporter.skipped("no .rlsbl/changes/ directory")
 
-        batch_config = _get_batch_limits_config(ctx.config)
+        labels = _batch_limits_labels_for_ctx(ctx)
+        batch_config = _get_batch_limits_config(ctx.config, labels)
 
         all_details = []
         all_passed = True
         for changes_dir, _tag_glob, _scope, _entries in all_contexts:
             entries_by_version = _read_all_versioned_entries(changes_dir)
-            passed, details = check_batch_size_entries(entries_by_version, batch_config)
+            passed, details = check_batch_size_entries(entries_by_version, batch_config, labels)
             if not passed:
                 all_passed = False
                 all_details.extend(details)

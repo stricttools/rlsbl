@@ -7,6 +7,7 @@ import subprocess
 import pytest
 
 from conftest import make_commit as _make_commit, make_ctx
+from rlsbl.config import PROJECT_BATCH_LIMITS_LABELS
 from rlsbl.changelog import (
     ChangelogEntry,
     append_entry,
@@ -89,7 +90,7 @@ class TestReleaseWithJsonl:
 
         # Validate should pass (the range is v0.0.0..HEAD, so every commit made
         # above is unreleased and must be covered by the entries written above).
-        result = validate_unreleased(changes_dir, config={})
+        result = validate_unreleased(changes_dir, config={}, labels=PROJECT_BATCH_LIMITS_LABELS)
         assert result["passed"], result
 
         # Generate should produce CHANGELOG.md
@@ -141,7 +142,7 @@ class TestReleaseJsonlValidationFails:
 
         from rlsbl.changelog import validate_unreleased
 
-        result = validate_unreleased(changes_dir, config={})
+        result = validate_unreleased(changes_dir, config={}, labels=PROJECT_BATCH_LIMITS_LABELS)
         # Coverage check should fail since no entries cover the commit
         passed, details = result["checks"]["coverage"]
         assert not passed
