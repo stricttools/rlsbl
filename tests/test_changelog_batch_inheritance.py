@@ -518,3 +518,23 @@ class TestStandaloneBatchLimitMessages:
         assert f"batch_limits.max_commits_per_entry in {PKG_LABEL}" in err
         assert f"batch_limits.exclusions in {PKG_LABEL}" in err
 
+
+class TestAllowBatchWithoutReleasableConfig:
+    """--allow-batch creates the releasable's config.json when it is absent."""
+
+    def test_creates_releasable_config(self, tmp_path, monkeypatch, capsys):
+        repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=3)
+        rel_config = os.path.join(get_releasable_dir(str(repo), "www"), "config.json")
+        os.remove(rel_config)
+        _write_json(proj_dir / ".rlsbl" / "config.json", {
+            "publish_mode": "ci",
+            "batch_limits": {"max_commits_per_entry": 3},
+        })
+        shas = [_make_commit(proj_dir, f"file{i}.txt", f"change {i}") for i in range(5)]
+
+        cmd_add(_batch_flags(shas, allow_batch=True), project_root=proj_dir)
+
+        data = json.loads(open(rel_config).read())
+        assert data["batch_limits"]["exclusions"][0]["reason"] == "Big batch feature"
+        out = capsys.readouterr().out
+        assert f"Auto-created batch exclusion for line 1 in {REL_LABEL}" in out

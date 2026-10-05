@@ -27,6 +27,7 @@ from ..changelog.validate import (
 from ..config import (
     PROJECT_CONFIG_LABEL,
     batch_limits_labels,
+    read_json_config,
     read_project_config,
     releasable_config_label,
 )
@@ -570,14 +571,18 @@ def _cmd_add_commit(flags, project_root, ws_context, config, dry_run):
         if dry_run:
             print(f"Would auto-create batch exclusion for line {line_number} in {config_label}")
         else:
-            with open(config_path, "r", encoding="utf-8") as f:
-                config_data = json.load(f)
+            # A releasable configured only by its members has no config.json
+            # yet: start from an empty one, written the way rlsbl writes
+            # releasable configs elsewhere.
+            config_data = read_json_config(config_path)
             batch_limits = config_data.setdefault("batch_limits", {})
             exclusions = batch_limits.setdefault("exclusions", [])
             exclusions.append(exclusion)
-            with effects.open_write(config_path, "w", encoding="utf-8") as f:
-                json.dump(config_data, f, indent=2)
-                f.write("\n")
+            effects.makedirs(os.path.dirname(config_path), exist_ok=True)
+            effects.atomic_write_text(
+                config_path, json.dumps(config_data, indent=2) + "\n",
+                preserve_mode=True,
+            )
             print(f"Auto-created batch exclusion for line {line_number} in {config_label}")
 
     changes_dir = _resolve_changes_dir(ws_context, project_root)
