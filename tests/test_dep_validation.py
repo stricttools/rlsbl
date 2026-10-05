@@ -1239,8 +1239,8 @@ class TestFindDeadGoPackages:
         dead = find_dead_go_packages(str(tmp_path))
         assert dead == []
 
-    def test_test_files_do_not_count_as_references(self, tmp_path):
-        """_test.go files importing an internal package do not save it."""
+    def test_own_test_files_do_not_count_as_references(self, tmp_path):
+        """A package's own _test.go files importing it do not save it."""
         (tmp_path / "go.mod").write_text(self._GO_MOD)
         (tmp_path / "main.go").write_text(
             'package main\n\nfunc main() {}\n'
@@ -1250,15 +1250,72 @@ class TestFindDeadGoPackages:
         (internal / "helper.go").write_text(
             'package helper\n\nfunc H() {}\n'
         )
-        # Only a test file imports this package
-        (tmp_path / "main_test.go").write_text(
-            'package main\n\n'
+        # Only the package's own external test package imports it
+        (internal / "helper_ext_test.go").write_text(
+            'package helper_test\n\n'
             'import "github.com/user/myapp/internal/helper"\n\n'
             'func TestX() { helper.H() }\n'
         )
 
         dead = find_dead_go_packages(str(tmp_path))
         assert "internal/helper" in dead
+
+    def test_other_package_test_files_count_as_references(self, tmp_path):
+        """A test-helper package imported by another package's _test.go is alive."""
+        (tmp_path / "go.mod").write_text(self._GO_MOD)
+        (tmp_path / "main.go").write_text(
+            'package main\n\nfunc main() {}\n'
+        )
+        clitest = tmp_path / "internal" / "cli" / "clitest"
+        clitest.mkdir(parents=True)
+        (clitest / "clitest.go").write_text(
+            'package clitest\n\nfunc Run() {}\n'
+        )
+        (tmp_path / "main_test.go").write_text(
+            'package main\n\n'
+            'import "github.com/user/myapp/internal/cli/clitest"\n\n'
+            'func TestX() { clitest.Run() }\n'
+        )
+
+        dead = find_dead_go_packages(str(tmp_path))
+        assert "internal/cli/clitest" not in dead
+
+    def test_testdata_files_do_not_count_as_references(self, tmp_path):
+        """A _test.go file under testdata/ is a fixture and saves nothing."""
+        (tmp_path / "go.mod").write_text(self._GO_MOD)
+        (tmp_path / "main.go").write_text(
+            'package main\n\nfunc main() {}\n'
+        )
+        internal = tmp_path / "internal" / "helper"
+        internal.mkdir(parents=True)
+        (internal / "helper.go").write_text(
+            'package helper\n\nfunc H() {}\n'
+        )
+        fixture = tmp_path / "testdata" / "fixture"
+        fixture.mkdir(parents=True)
+        (fixture / "x_test.go").write_text(
+            'package fixture\n\n'
+            'import "github.com/user/myapp/internal/helper"\n\n'
+            'func TestX() { helper.H() }\n'
+        )
+
+        dead = find_dead_go_packages(str(tmp_path))
+        assert "internal/helper" in dead
+
+    def test_main_package_is_an_entry_point(self, tmp_path):
+        """An internal package main (run with go run) is never reported dead."""
+        (tmp_path / "go.mod").write_text(self._GO_MOD)
+        (tmp_path / "main.go").write_text(
+            'package main\n\nfunc main() {}\n'
+        )
+        printpage = tmp_path / "internal" / "procedurepage" / "printpage"
+        printpage.mkdir(parents=True)
+        (printpage / "print.go").write_text(
+            'package main\n\nfunc main() {}\n'
+        )
+
+        dead = find_dead_go_packages(str(tmp_path))
+        assert "internal/procedurepage/printpage" not in dead
 
     def test_no_go_mod_returns_empty(self, tmp_path):
         """A directory without go.mod returns empty list."""

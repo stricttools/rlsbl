@@ -634,17 +634,29 @@ def _go_package_dir(filepath: str) -> str:
     return os.path.dirname(filepath)
 
 
+def _is_go_test_file(filepath: str, project_dir: str) -> bool:
+    """A ``*_test.go`` file outside any ``testdata/`` directory."""
+    if not filepath.endswith("_test.go"):
+        return False
+    rel = os.path.relpath(filepath, project_dir)
+    return "testdata" not in rel.split(os.sep)[:-1]
+
+
 def find_dead_go_packages(
     project_dir: str,
     exclude_dirs: list[str] | None = None,
     suppress: set[str] | None = None,
 ) -> list[str]:
-    """Find Go internal packages not referenced by any non-test code.
+    """Find Go internal packages not referenced from outside themselves.
 
-    A Go internal package is dead if no non-test .go file outside that
-    package imports it. Only packages under ``internal/`` subdirectories
-    are checked, since those are the packages with restricted visibility
-    in Go's module system.
+    A Go internal package is dead if no .go file outside that package's
+    directory imports it. Test files of OTHER packages count as uses (a
+    test-helper package such as ``internal/cli/clitest`` lives through the
+    tests that import it); a package's own test files never do, and files
+    under ``testdata/`` never do. A ``package main`` directory is an entry
+    point (a binary, possibly run with ``go run``), never a candidate. Only
+    packages under ``internal/`` subdirectories are checked, since those are
+    the packages with restricted visibility in Go's module system.
 
     Args:
         project_dir: absolute path to the Go project root (where go.mod lives).
@@ -698,14 +710,31 @@ def find_dead_go_packages(
     if not internal_pkg_dirs:
         return []
 
-    # Collect imports per non-test .go file, keyed by the file's package dir
-    # file_imports: list of (pkg_dir, set_of_import_paths) for non-test files
+    # A package main directory is an entry point, never dead. The go
+    # toolchain is the authority on package names (see go_introspect).
+    from .go_introspect import list_main_packages
+
+    main_dirs = {
+        os.path.realpath(os.path.join(project_dir, p.rel_dir))
+        for p in list_main_packages(project_dir)
+    }
+    internal_pkg_dirs = {
+        d: ip for d, ip in internal_pkg_dirs.items() if d not in main_dirs
+    }
+    if not internal_pkg_dirs:
+        return []
+
+    # Collect imports per .go file, keyed by the file's package dir.
+    # Test files are included: the same-directory skip below keeps a
+    # package's own tests from saving it, while another package's tests
+    # importing it are a use.
     file_imports: list[tuple[str, set[str]]] = []
     for filepath in all_go_files:
-        if _is_test_context(filepath, project_dir):
-            # Test-context files' imports must not keep a production package
-            # alive (no test-only reachability, no testdata laundering). This
-            # subsumes the *_test.go check via _is_test_context Layer 3.
+        if _is_test_context(filepath, project_dir) and not _is_go_test_file(
+            filepath, project_dir,
+        ):
+            # testdata/ fixtures and other non-test-file test contexts must
+            # not keep a production package alive (no testdata laundering).
             continue
         pkg_dir_of_file = _go_package_dir(filepath)
         rel_pkg_dir = os.path.relpath(pkg_dir_of_file, project_dir)
@@ -715,8 +744,8 @@ def find_dead_go_packages(
         imports = {ip for ip, _fp, _ln in _go_scan_imports(filepath)}
         file_imports.append((pkg_dir_of_file, imports))
 
-    # Check each internal package: is it imported by any non-test file
-    # outside its own directory?
+    # Check each internal package: is it imported by any file outside its
+    # own directory?
     dead = []
     for pkg_dir, import_path in sorted(internal_pkg_dirs.items(), key=lambda x: x[1]):
         is_referenced = False
