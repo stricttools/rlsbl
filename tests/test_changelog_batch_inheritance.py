@@ -374,7 +374,7 @@ class TestBatchLimitMessagesNameTheSourceFile:
 
         err = capsys.readouterr().err
         assert f"batch_limits.max_commits_per_entry in {REL_LABEL}" in err
-        assert f"batch_limits.exclusions in {REL_LABEL}" in err
+        assert f"records a batch exclusion for the entry in {REL_LABEL}" in err
         assert PKG_LABEL not in err
 
     def test_refusal_names_member_config_for_member_limit(self, tmp_path, monkeypatch, capsys):
@@ -390,9 +390,9 @@ class TestBatchLimitMessagesNameTheSourceFile:
 
         err = capsys.readouterr().err
         assert f"batch_limits.max_commits_per_entry in {PKG_LABEL}" in err
-        # The member declares no exclusions, so the effective list is the
-        # releasable's.
-        assert f"batch_limits.exclusions in {REL_LABEL}" in err
+        # The member declares no exclusions, so --allow-batch records the
+        # exclusion in the releasable's config.
+        assert f"records a batch exclusion for the entry in {REL_LABEL}" in err
 
     def test_invalid_key_names_releasable_config(self, tmp_path, monkeypatch):
         from rlsbl.errors import ConfigError
@@ -516,7 +516,7 @@ class TestStandaloneBatchLimitMessages:
 
         err = capsys.readouterr().err
         assert f"batch_limits.max_commits_per_entry in {PKG_LABEL}" in err
-        assert f"batch_limits.exclusions in {PKG_LABEL}" in err
+        assert f"records a batch exclusion for the entry in {PKG_LABEL}" in err
 
 
 class TestAllowBatchWithoutReleasableConfig:
@@ -538,3 +538,42 @@ class TestAllowBatchWithoutReleasableConfig:
         assert data["batch_limits"]["exclusions"][0]["reason"] == "Big batch feature"
         out = capsys.readouterr().out
         assert f"Auto-created batch exclusion for line 1 in {REL_LABEL}" in out
+
+
+class TestRefusalNamesTheFixThatWorks:
+    """The over-limit refusal names --allow-batch, and doing it clears it."""
+
+    def _assert_refusal_then_fix(self, project_dir, shas, capsys):
+        flags = _batch_flags(shas, allow_batch=False)
+        with pytest.raises(SystemExit):
+            cmd_add(dict(flags), project_root=project_dir)
+        err = capsys.readouterr().err
+        assert "re-run this command with --allow-batch" in err
+        assert "add an exclusion to" not in err
+
+        cmd_add(dict(flags, **{"allow-batch": True}), project_root=project_dir)
+        assert "Added entry with 5 commit(s)" in capsys.readouterr().out
+
+    def test_workspace_member(self, tmp_path, monkeypatch, capsys):
+        repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=3)
+        shas = [_make_commit(proj_dir, f"file{i}.txt", f"change {i}") for i in range(5)]
+        self._assert_refusal_then_fix(proj_dir, shas, capsys)
+
+    def test_standalone(self, tmp_path, monkeypatch, capsys):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        _run_git(repo, "init", "-q")
+        _run_git(repo, "config", "user.email", "test@test.local")
+        _run_git(repo, "config", "user.name", "Test")
+        (repo / "README.md").write_text("# test\n")
+        _run_git(repo, "add", "README.md")
+        _run_git(repo, "commit", "-q", "-m", "initial")
+        _run_git(repo, "tag", "v0.0.0")
+        (repo / ".rlsbl" / "changes").mkdir(parents=True)
+        _write_json(repo / ".rlsbl" / "config.json", {
+            "publish_mode": "ci",
+            "batch_limits": {"max_commits_per_entry": 3},
+        })
+        shas = [_make_commit(repo, f"file{i}.txt", f"change {i}") for i in range(5)]
+        self._assert_refusal_then_fix(repo, shas, capsys)

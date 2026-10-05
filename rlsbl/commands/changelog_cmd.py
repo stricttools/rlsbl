@@ -540,34 +540,35 @@ def _cmd_add_commit(flags, project_root, ws_context, config, dry_run):
     batch_config = _get_batch_limits_config(config, labels)
     max_commits = batch_config.get("max_commits_per_entry", 5)
     if len(resolved_commits) > max_commits:
-        allow_batch = flags.get("allow-batch", False)
-        if not allow_batch:
-            print(
-                f"Error: entry has {len(resolved_commits)} commits but the limit is "
-                f"{max_commits} (batch_limits.max_commits_per_entry in "
-                f"{labels['max_commits_per_entry']}).\n"
-                f"Either split into smaller entries, add an exclusion to "
-                f"batch_limits.exclusions in {labels['exclusions']}, or re-run with "
-                f"--allow-batch to auto-create an exclusion.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        # Auto-create an exclusion in config.json
-        # In releasable mode, write to releasable-level config.json
-        changes_dir_for_line = _resolve_changes_dir(ws_context, project_root)
-        existing_for_line = read_unreleased(changes_dir_for_line)
-        line_number = len(existing_for_line) + 1
-        reason = description if description else "non-user-facing batch"
-        exclusion = {
-            "reason": reason,
-            "entries": [{"version": "unreleased", "line": line_number}],
-        }
+        # The file --allow-batch records the exclusion in.
         if releasable_config_dir is not None:
             config_path = os.path.join(releasable_config_dir, "config.json")
             config_label = releasable_config_label(releasable_config_dir)
         else:
             config_path = os.path.join(project_root, ".rlsbl", "config.json")
             config_label = PROJECT_CONFIG_LABEL
+        reason = description if description else "non-user-facing batch"
+        allow_batch = flags.get("allow-batch", False)
+        if not allow_batch:
+            print(
+                f"Error: entry has {len(resolved_commits)} commits but the limit is "
+                f"{max_commits} (batch_limits.max_commits_per_entry in "
+                f"{labels['max_commits_per_entry']}).\n"
+                f"Split it into entries of at most {max_commits} commits, or, when "
+                f"the commits are one cohesive change, re-run this command with "
+                f"--allow-batch: it records a batch exclusion for the entry in "
+                f"{config_label}, with the entry's description as the exclusion's "
+                f"reason (\"non-user-facing batch\" for a --no-user-facing entry).",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        changes_dir_for_line = _resolve_changes_dir(ws_context, project_root)
+        existing_for_line = read_unreleased(changes_dir_for_line)
+        line_number = len(existing_for_line) + 1
+        exclusion = {
+            "reason": reason,
+            "entries": [{"version": "unreleased", "line": line_number}],
+        }
         if dry_run:
             print(f"Would auto-create batch exclusion for line {line_number} in {config_label}")
         else:
