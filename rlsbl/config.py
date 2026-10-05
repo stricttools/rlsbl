@@ -123,6 +123,30 @@ def should_tag(flags, config):
     return True
 
 
+def _refuse_member_exclusions(project_root, pkg_config, releasable_config_dir):
+    """Refuse ``batch_limits.exclusions`` in a releasable member's own config.
+
+    Exclusions name lines of the releasable's changelog, so their one home is
+    the releasable's ``config.json``: there ``changelog add --allow-batch``
+    writes them and the release removes the stale ones. A member's own list
+    would replace the releasable's in the merge and outlive every release.
+    """
+    section = pkg_config.get(BATCH_LIMITS_SECTION)
+    if not (isinstance(section, dict) and "exclusions" in section):
+        return
+    rel_dir = os.path.normpath(str(releasable_config_dir))
+    workspace_root = os.path.dirname(os.path.dirname(os.path.dirname(rel_dir)))
+    member_config = os.path.relpath(_project_config(project_root), workspace_root)
+    rel_label = releasable_config_label(releasable_config_dir)
+    raise ConfigError(
+        f"batch_limits.exclusions in {member_config} is refused: exclusions "
+        f"name lines of the releasable's changelog, so in a workspace they "
+        f"belong in {rel_label}. Move every entry of that list into "
+        f"batch_limits.exclusions in {rel_label}, then delete the exclusions "
+        f"key from {member_config}."
+    )
+
+
 def read_project_config(project_root, releasable_config_dir=None):
     """Read project config with optional releasable-level inheritance.
 
@@ -134,11 +158,16 @@ def read_project_config(project_root, releasable_config_dir=None):
     2. Releasable config.json (lowest)
 
     When ``releasable_config_dir`` is None, loads only the per-package level.
+
+    A member that declares ``batch_limits.exclusions`` in its own config is a
+    hard error (:func:`_refuse_member_exclusions`).
     """
     pkg_config = read_json_config(_project_config(project_root))
 
     if releasable_config_dir is None:
         return pkg_config
+
+    _refuse_member_exclusions(project_root, pkg_config, releasable_config_dir)
 
     # Load releasable level
     rel_config_path = os.path.join(str(releasable_config_dir), "config.json")

@@ -652,3 +652,62 @@ class TestWorkspaceRootBatchChecksUseEachReleasablesConfig:
             )
         result = app._check_defs["changelog-batch-entries"].impl(self._root_ctx(repo))
         assert result.status == "fail", repr(result)
+
+
+class TestMemberExclusionsRefused:
+    """In a workspace, batch_limits.exclusions belong in the releasable's config."""
+
+    def test_member_exclusions_are_refused_until_moved(self, tmp_path, monkeypatch):
+        from rlsbl.errors import ConfigError
+
+        repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=3)
+        exclusion = {"reason": "old batch", "commits": []}
+        _write_json(proj_dir / ".rlsbl" / "config.json", {
+            "publish_mode": "ci",
+            "batch_limits": {"max_commits_per_entry": 4, "exclusions": [exclusion]},
+        })
+        shas = [_make_commit(proj_dir, "file0.txt", "change 0")]
+
+        with pytest.raises(ConfigError) as exc_info:
+            cmd_add(_batch_flags(shas, allow_batch=False), project_root=proj_dir)
+        msg = str(exc_info.value)
+        assert "app/.rlsbl/config.json" in msg
+        assert REL_LABEL in msg
+
+        # Move the exclusions to the releasable's config.json, as the error says.
+        _write_json(proj_dir / ".rlsbl" / "config.json", {
+            "publish_mode": "ci",
+            "batch_limits": {"max_commits_per_entry": 4},
+        })
+        rel_config = os.path.join(get_releasable_dir(str(repo), "www"), "config.json")
+        data = json.loads(open(rel_config).read())
+        data["batch_limits"]["exclusions"].append(exclusion)
+        with open(rel_config, "w") as f:
+            json.dump(data, f)
+
+        cmd_add(_batch_flags(shas, allow_batch=False), project_root=proj_dir)
+        entries = read_unreleased(get_releasable_changes_dir(str(repo), "www"))
+        assert len(entries) == 1
+
+    def test_an_empty_member_list_is_refused_too(self, tmp_path, monkeypatch):
+        from rlsbl.config import read_project_config
+        from rlsbl.errors import ConfigError
+
+        repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=3)
+        _write_json(proj_dir / ".rlsbl" / "config.json", {
+            "publish_mode": "ci", "batch_limits": {"exclusions": []},
+        })
+        with pytest.raises(ConfigError):
+            read_project_config(
+                str(proj_dir),
+                releasable_config_dir=get_releasable_dir(str(repo), "www"),
+            )
+
+    def test_standalone_exclusions_stay_allowed(self, tmp_path):
+        from rlsbl.config import read_project_config
+
+        (tmp_path / ".rlsbl").mkdir()
+        _write_json(tmp_path / ".rlsbl" / "config.json", {
+            "batch_limits": {"exclusions": [{"reason": "r", "commits": []}]},
+        })
+        assert read_project_config(str(tmp_path))["batch_limits"]["exclusions"]

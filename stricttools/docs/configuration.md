@@ -143,6 +143,8 @@ Each entry in `exclusions` is a dict with:
 | `commits` | array | At least one of `commits` or `entries` | Commit hashes to exclude from the `batch_size_entries` check. |
 | `entries` | array | At least one of `commits` or `entries` | Entry identifiers (commit lists) to exclude from the `batch_size_commits` check. |
 
+In a monorepo workspace, `exclusions` belong in the releasable's `.rlsbl-monorepo/releasables/<name>/config.json`, because they name lines of the releasable's changelog. A member's own `.rlsbl/config.json` that declares `batch_limits.exclusions` is a hard error; the member may still declare `max_commits_per_entry` and `max_entries_per_commit`.
+
 Example:
 
 ```json
