@@ -554,13 +554,15 @@ def _cmd_add_commit(flags, project_root, ws_context, config, dry_run):
             "reason": reason,
             "entries": [{"version": "unreleased", "line": line_number}],
         }
-        if dry_run:
-            print(f"Would auto-create batch exclusion for line {line_number} in .rlsbl/config.json")
+        if releasable_config_dir is not None:
+            config_path = os.path.join(releasable_config_dir, "config.json")
+            config_label = os.path.relpath(config_path, ws_context.ws_root)
         else:
-            if releasable_config_dir is not None:
-                config_path = os.path.join(releasable_config_dir, "config.json")
-            else:
-                config_path = os.path.join(project_root, ".rlsbl", "config.json")
+            config_path = os.path.join(project_root, ".rlsbl", "config.json")
+            config_label = os.path.join(".rlsbl", "config.json")
+        if dry_run:
+            print(f"Would auto-create batch exclusion for line {line_number} in {config_label}")
+        else:
             with open(config_path, "r", encoding="utf-8") as f:
                 config_data = json.load(f)
             batch_limits = config_data.setdefault("batch_limits", {})
@@ -569,7 +571,7 @@ def _cmd_add_commit(flags, project_root, ws_context, config, dry_run):
             with effects.open_write(config_path, "w", encoding="utf-8") as f:
                 json.dump(config_data, f, indent=2)
                 f.write("\n")
-            print(f"Auto-created batch exclusion for line {line_number} in .rlsbl/config.json")
+            print(f"Auto-created batch exclusion for line {line_number} in {config_label}")
 
     changes_dir = _resolve_changes_dir(ws_context, project_root)
     existing = read_unreleased(changes_dir)

@@ -237,10 +237,51 @@ class TestReleasableExclusionWrites:
         assert len(entries[0].commits) == 5
 
 
+class TestExclusionMessageNamesWrittenFile:
+    """The --allow-batch message names the config file the exclusion goes to."""
+
+    def _flags(self, shas, dry_run):
+        return {
+            "commits": ",".join(shas),
+            "description": "Big batch feature",
+            "type": "feature",
+            "user-facing": True,
+            "auto-commit": False,
+            "allow-batch": True,
+            "dry-run": dry_run,
+        }
+
+    def test_releasable_message_names_releasable_config(self, tmp_path, monkeypatch, capsys):
+        repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=3)
+        shas = [_make_commit(proj_dir, f"file{i}.txt", f"change {i}") for i in range(5)]
+
+        cmd_add(self._flags(shas, dry_run=False), project_root=proj_dir)
+
+        out = capsys.readouterr().out
+        assert (
+            "Auto-created batch exclusion for line 1 in "
+            ".rlsbl-monorepo/releasables/www/config.json"
+        ) in out
+        assert ".rlsbl/config.json" not in out
+
+    def test_releasable_dry_run_message_names_releasable_config(self, tmp_path, monkeypatch, capsys):
+        repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=3)
+        shas = [_make_commit(proj_dir, f"file{i}.txt", f"change {i}") for i in range(5)]
+
+        cmd_add(self._flags(shas, dry_run=True), project_root=proj_dir)
+
+        out = capsys.readouterr().out
+        assert (
+            "Would auto-create batch exclusion for line 1 in "
+            ".rlsbl-monorepo/releasables/www/config.json"
+        ) in out
+        assert ".rlsbl/config.json" not in out
+
+
 class TestStandaloneExclusionRegression:
     """In standalone mode, exclusions still go to per-package config.json."""
 
-    def test_standalone_exclusion_in_pkg_config(self, tmp_path, monkeypatch):
+    def test_standalone_exclusion_in_pkg_config(self, tmp_path, monkeypatch, capsys):
         """Standalone project writes exclusions to per-package .rlsbl/config.json."""
         repo = tmp_path / "repo"
         repo.mkdir()
@@ -291,6 +332,9 @@ class TestStandaloneExclusionRegression:
             "allow-batch": True,
         }
         cmd_add(flags, project_root=repo)
+
+        out = capsys.readouterr().out
+        assert "Auto-created batch exclusion for line 1 in .rlsbl/config.json" in out
 
         # Verify exclusion is in per-package config.json
         pkg_config = json.loads((repo / ".rlsbl" / "config.json").read_text())
