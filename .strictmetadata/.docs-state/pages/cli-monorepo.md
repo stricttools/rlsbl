@@ -236,3 +236,43 @@ Rename a releasable group. Rewrites the [[releasables]] name and every member's 
 | --- | --- | --- | --- |
 | `old_name` | str | required | Current name of the releasable group in workspace.toml |
 | `new_name` | str | required | New name for the releasable group in workspace.toml and state directories |
+
+## monorepo release
+
+Release commands for monorepo workspaces. Provides 3 subcommands: run (batch release), init (scaffold release file), order (topological release order).
+
+## monorepo release run
+
+Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. The whole batch runs in the release checkout, a detached checkout of the release branch's committed tip, as rlsbl release run does: an uncommitted change to a path the batch writes (the workspace's release state, a member's version files, the workspace changelog) refuses it, naming the path, and every other uncommitted change is listed and left alone. Supports --dry-run, which reports those changes instead of refusing, and --approve-consequential.
+
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+
+### Flags
+
+| Name | Short | Type | Presence | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--push-timeout` |  | int | optional |  | Timeout in seconds for each git push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default. |
+| `--ci-timeout` |  | int | optional |  | Timeout in seconds for the release CI gate (the wait for CI to conclude on the pushed release candidate). Overrides the ci_timeout config key; when omitted, ci_timeout applies, else the shipped default. |
+| `--check-timeout` |  | int | optional |  | Timeout in seconds for each preflight check subprocess (tests, lint, external checks). Overrides the check_timeout config key; when omitted, check_timeout applies, else the shipped default. |
+| `--hook-timeout` |  | int | optional |  | Timeout in seconds for each release hook. Overrides the hook_timeout config key; when omitted, hook_timeout applies, else no timeout. |
+| `--watch`, `--no-watch` |  | bool | required |  | After batch release, automatically watch CI runs to completion (--no-watch to skip) |
+
+## monorepo release init
+
+Scaffold a batch release file for the workspace's releasables by auto-detecting each releasable's release targets and generating one configuration section per releasable. Creates .rlsbl-monorepo/releases/unreleased.toml with a [releasables.<name>] section for each releasable declared in workspace.toml, carrying an empty bump type and description for you to fill in and the detected include list. A releasable with no unreleased commits since its last tag is rendered as a commented-out section; one with no members or no detected targets is skipped with a warning.
+
+**Effect:** mutating
+
+**Dry run:** not supported — the command scaffolds a batch release file whose point is that you edit it before releasing; printing it instead of writing it leaves nothing to edit
+
+### Flags
+
+| Name | Short | Type | Presence | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--releasables` |  | str | optional |  | Comma-separated releasable names to include (every releasable when omitted) |
+
+## monorepo release order
+
+Compute and display the topological release order for all projects in the monorepo workspace based on their declared depends-on relationships. Projects with no dependencies are listed first, followed by projects that depend on them, ensuring each project is released only after its dependencies. Detects and reports circular dependency errors.
+
+**Effect:** read_only

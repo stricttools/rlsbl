@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "name": "release-checkout",
+  "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.130.0",
+  "version": "0.131.0",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
   "language": "python",
   "base_url": "https://smmh.dev/rlsbl",
@@ -992,6 +992,36 @@
           "level": 3,
           "text": "Arguments",
           "anchor": "arguments-5"
+        },
+        {
+          "level": 2,
+          "text": "monorepo release",
+          "anchor": "monorepo-release"
+        },
+        {
+          "level": 2,
+          "text": "monorepo release run",
+          "anchor": "monorepo-release-run"
+        },
+        {
+          "level": 3,
+          "text": "Flags",
+          "anchor": "flags-9"
+        },
+        {
+          "level": 2,
+          "text": "monorepo release init",
+          "anchor": "monorepo-release-init"
+        },
+        {
+          "level": 3,
+          "text": "Flags",
+          "anchor": "flags-10"
+        },
+        {
+          "level": 2,
+          "text": "monorepo release order",
+          "anchor": "monorepo-release-order"
         }
       ]
     },
@@ -1493,6 +1523,11 @@
         },
         {
           "level": 3,
+          "text": "`_refuse_member_exclusions`",
+          "anchor": "_refuse_member_exclusions"
+        },
+        {
+          "level": 3,
           "text": "`read_project_config`",
           "anchor": "read_project_config"
         },
@@ -1510,6 +1545,16 @@
           "level": 3,
           "text": "`old_private_key_message`",
           "anchor": "old_private_key_message"
+        },
+        {
+          "level": 3,
+          "text": "`releasable_config_label`",
+          "anchor": "releasable_config_label"
+        },
+        {
+          "level": 3,
+          "text": "`batch_limits_labels`",
+          "anchor": "batch_limits_labels"
         },
         {
           "level": 3,
@@ -1605,11 +1650,6 @@
           "level": 3,
           "text": "`clean_stale_exclusions`",
           "anchor": "clean_stale_exclusions"
-        },
-        {
-          "level": 3,
-          "text": "`update_last_build_release`",
-          "anchor": "update_last_build_release"
         },
         {
           "level": 3,
@@ -1967,6 +2007,11 @@
         },
         {
           "level": 3,
+          "text": "`_is_go_test_file`",
+          "anchor": "_is_go_test_file"
+        },
+        {
+          "level": 3,
           "text": "`find_dead_go_packages`",
           "anchor": "find_dead_go_packages"
         },
@@ -2002,31 +2047,6 @@
         },
         {
           "level": 3,
-          "text": "`_read_dart_package_name`",
-          "anchor": "_read_dart_package_name"
-        },
-        {
-          "level": 3,
-          "text": "`_resolve_dart_entry_points`",
-          "anchor": "_resolve_dart_entry_points"
-        },
-        {
-          "level": 3,
-          "text": "`_resolve_dart_import`",
-          "anchor": "_resolve_dart_import"
-        },
-        {
-          "level": 3,
-          "text": "`_build_dart_import_graph`",
-          "anchor": "_build_dart_import_graph"
-        },
-        {
-          "level": 3,
-          "text": "`find_dead_dart_modules`",
-          "anchor": "find_dead_dart_modules"
-        },
-        {
-          "level": 3,
           "text": "`DeadWorkspacePackage`",
           "anchor": "deadworkspacepackage"
         },
@@ -2054,31 +2074,6 @@
           "level": 3,
           "text": "`find_circular_npm_deps`",
           "anchor": "find_circular_npm_deps"
-        },
-        {
-          "level": 3,
-          "text": "`find_circular_dart_deps`",
-          "anchor": "find_circular_dart_deps"
-        },
-        {
-          "level": 3,
-          "text": "`_build_jvm_class_index`",
-          "anchor": "_build_jvm_class_index"
-        },
-        {
-          "level": 3,
-          "text": "`_build_jvm_import_graph`",
-          "anchor": "_build_jvm_import_graph"
-        },
-        {
-          "level": 3,
-          "text": "`find_dead_jvm_modules`",
-          "anchor": "find_dead_jvm_modules"
-        },
-        {
-          "level": 3,
-          "text": "`find_circular_jvm_deps`",
-          "anchor": "find_circular_jvm_deps"
         },
         {
           "level": 2,
@@ -2112,21 +2107,6 @@
         },
         {
           "level": 3,
-          "text": "`DartImportScanner`",
-          "anchor": "dartimportscanner"
-        },
-        {
-          "level": 4,
-          "text": "`scan`",
-          "anchor": "scan-1"
-        },
-        {
-          "level": 4,
-          "text": "`_check_generated_files`",
-          "anchor": "_check_generated_files"
-        },
-        {
-          "level": 3,
           "text": "`_extract_npm_bare_name`",
           "anchor": "_extract_npm_bare_name"
         },
@@ -2138,7 +2118,7 @@
         {
           "level": 4,
           "text": "`scan`",
-          "anchor": "scan-2"
+          "anchor": "scan-1"
         },
         {
           "level": 3,
@@ -2148,37 +2128,12 @@
         {
           "level": 4,
           "text": "`scan`",
-          "anchor": "scan-3"
+          "anchor": "scan-2"
         },
         {
           "level": 4,
           "text": "`_match_workspace_import`",
           "anchor": "_match_workspace_import"
-        },
-        {
-          "level": 3,
-          "text": "`build_jvm_package_map`",
-          "anchor": "build_jvm_package_map"
-        },
-        {
-          "level": 3,
-          "text": "`_JvmImportScannerBase`",
-          "anchor": "_jvmimportscannerbase"
-        },
-        {
-          "level": 4,
-          "text": "`scan`",
-          "anchor": "scan-4"
-        },
-        {
-          "level": 3,
-          "text": "`JavaImportScanner`",
-          "anchor": "javaimportscanner"
-        },
-        {
-          "level": 3,
-          "text": "`KotlinImportScanner`",
-          "anchor": "kotlinimportscanner"
         }
       ]
     },
@@ -2605,21 +2560,6 @@
         },
         {
           "level": 3,
-          "text": "`DartImportScanner`",
-          "anchor": "dartimportscanner"
-        },
-        {
-          "level": 4,
-          "text": "`scan`",
-          "anchor": "scan-1"
-        },
-        {
-          "level": 4,
-          "text": "`_check_generated_files`",
-          "anchor": "_check_generated_files"
-        },
-        {
-          "level": 3,
           "text": "`_extract_npm_bare_name`",
           "anchor": "_extract_npm_bare_name"
         },
@@ -2631,7 +2571,7 @@
         {
           "level": 4,
           "text": "`scan`",
-          "anchor": "scan-2"
+          "anchor": "scan-1"
         },
         {
           "level": 3,
@@ -2641,37 +2581,12 @@
         {
           "level": 4,
           "text": "`scan`",
-          "anchor": "scan-3"
+          "anchor": "scan-2"
         },
         {
           "level": 4,
           "text": "`_match_workspace_import`",
           "anchor": "_match_workspace_import"
-        },
-        {
-          "level": 3,
-          "text": "`build_jvm_package_map`",
-          "anchor": "build_jvm_package_map"
-        },
-        {
-          "level": 3,
-          "text": "`_JvmImportScannerBase`",
-          "anchor": "_jvmimportscannerbase"
-        },
-        {
-          "level": 4,
-          "text": "`scan`",
-          "anchor": "scan-4"
-        },
-        {
-          "level": 3,
-          "text": "`JavaImportScanner`",
-          "anchor": "javaimportscanner"
-        },
-        {
-          "level": 3,
-          "text": "`KotlinImportScanner`",
-          "anchor": "kotlinimportscanner"
         },
         {
           "level": 2,
@@ -3247,103 +3162,6 @@
       ]
     },
     {
-      "path": "native-targets.md",
-      "title": "Native targets",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "Native targets",
-          "anchor": "native-targets"
-        },
-        {
-          "level": 2,
-          "text": "Overview",
-          "anchor": "overview"
-        },
-        {
-          "level": 2,
-          "text": "Comparison",
-          "anchor": "comparison"
-        },
-        {
-          "level": 2,
-          "text": "native-ios",
-          "anchor": "native-ios"
-        },
-        {
-          "level": 3,
-          "text": "Detection",
-          "anchor": "detection"
-        },
-        {
-          "level": 3,
-          "text": "Version reading",
-          "anchor": "version-reading"
-        },
-        {
-          "level": 3,
-          "text": "Build number",
-          "anchor": "build-number"
-        },
-        {
-          "level": 3,
-          "text": "Multi-target projects",
-          "anchor": "multi-target-projects"
-        },
-        {
-          "level": 3,
-          "text": "Tuist support",
-          "anchor": "tuist-support"
-        },
-        {
-          "level": 3,
-          "text": "version_file()",
-          "anchor": "version_file"
-        },
-        {
-          "level": 2,
-          "text": "native-android",
-          "anchor": "native-android"
-        },
-        {
-          "level": 3,
-          "text": "Detection",
-          "anchor": "detection-1"
-        },
-        {
-          "level": 3,
-          "text": "Mutual exclusion with Maven",
-          "anchor": "mutual-exclusion-with-maven"
-        },
-        {
-          "level": 3,
-          "text": "Version reading",
-          "anchor": "version-reading-1"
-        },
-        {
-          "level": 3,
-          "text": "Build number",
-          "anchor": "build-number-1"
-        },
-        {
-          "level": 3,
-          "text": "Version writing",
-          "anchor": "version-writing"
-        },
-        {
-          "level": 2,
-          "text": "No CI templates",
-          "anchor": "no-ci-templates"
-        },
-        {
-          "level": 2,
-          "text": "Decision table: which target to use",
-          "anchor": "decision-table-which-target-to-use"
-        }
-      ]
-    },
-    {
       "path": "pipelines.md",
       "title": "Pipelines",
       "type": "doc",
@@ -3450,31 +3268,6 @@
         },
         {
           "level": 3,
-          "text": "deno",
-          "anchor": "deno"
-        },
-        {
-          "level": 3,
-          "text": "hex",
-          "anchor": "hex"
-        },
-        {
-          "level": 3,
-          "text": "maven",
-          "anchor": "maven"
-        },
-        {
-          "level": 3,
-          "text": "maven-central",
-          "anchor": "maven-central"
-        },
-        {
-          "level": 3,
-          "text": "docker",
-          "anchor": "docker"
-        },
-        {
-          "level": 3,
           "text": "cloudflare-pages",
           "anchor": "cloudflare-pages"
         },
@@ -3564,11 +3357,6 @@
           "level": 3,
           "text": "Description and context",
           "anchor": "description-and-context"
-        },
-        {
-          "level": 3,
-          "text": "Per-target configuration sections",
-          "anchor": "per-target-configuration-sections"
         },
         {
           "level": 2,
@@ -4695,6 +4483,16 @@
           "level": 3,
           "text": "`_changes_dirs_for_ctx`",
           "anchor": "_changes_dirs_for_ctx"
+        },
+        {
+          "level": 3,
+          "text": "`_batch_limits_labels_for_ctx`",
+          "anchor": "_batch_limits_labels_for_ctx"
+        },
+        {
+          "level": 3,
+          "text": "`_batch_limits_for_changes_dir`",
+          "anchor": "_batch_limits_for_changes_dir"
         },
         {
           "level": 3,
@@ -6479,6 +6277,11 @@
           "level": 3,
           "text": "`_merge_template_vars`",
           "anchor": "_merge_template_vars"
+        },
+        {
+          "level": 3,
+          "text": "`_refuse_new_version_disagreement`",
+          "anchor": "_refuse_new_version_disagreement"
         },
         {
           "level": 3,
@@ -9460,11 +9263,6 @@
         },
         {
           "level": 3,
-          "text": "`validate_ota_mode`",
-          "anchor": "validate_ota_mode"
-        },
-        {
-          "level": 3,
           "text": "`validate_config_integrity`",
           "anchor": "validate_config_integrity"
         },
@@ -11184,6 +10982,11 @@
         },
         {
           "level": 3,
+          "text": "`_refuse_member_exclusions`",
+          "anchor": "_refuse_member_exclusions"
+        },
+        {
+          "level": 3,
           "text": "`read_project_config`",
           "anchor": "read_project_config"
         },
@@ -11201,6 +11004,16 @@
           "level": 3,
           "text": "`old_private_key_message`",
           "anchor": "old_private_key_message"
+        },
+        {
+          "level": 3,
+          "text": "`releasable_config_label`",
+          "anchor": "releasable_config_label"
+        },
+        {
+          "level": 3,
+          "text": "`batch_limits_labels`",
+          "anchor": "batch_limits_labels"
         },
         {
           "level": 3,
@@ -11296,11 +11109,6 @@
           "level": 3,
           "text": "`clean_stale_exclusions`",
           "anchor": "clean_stale_exclusions"
-        },
-        {
-          "level": 3,
-          "text": "`update_last_build_release`",
-          "anchor": "update_last_build_release"
         },
         {
           "level": 3,
@@ -11761,6 +11569,11 @@
         },
         {
           "level": 3,
+          "text": "`_is_go_test_file`",
+          "anchor": "_is_go_test_file"
+        },
+        {
+          "level": 3,
           "text": "`find_dead_go_packages`",
           "anchor": "find_dead_go_packages"
         },
@@ -11796,31 +11609,6 @@
         },
         {
           "level": 3,
-          "text": "`_read_dart_package_name`",
-          "anchor": "_read_dart_package_name"
-        },
-        {
-          "level": 3,
-          "text": "`_resolve_dart_entry_points`",
-          "anchor": "_resolve_dart_entry_points"
-        },
-        {
-          "level": 3,
-          "text": "`_resolve_dart_import`",
-          "anchor": "_resolve_dart_import"
-        },
-        {
-          "level": 3,
-          "text": "`_build_dart_import_graph`",
-          "anchor": "_build_dart_import_graph"
-        },
-        {
-          "level": 3,
-          "text": "`find_dead_dart_modules`",
-          "anchor": "find_dead_dart_modules"
-        },
-        {
-          "level": 3,
           "text": "`DeadWorkspacePackage`",
           "anchor": "deadworkspacepackage"
         },
@@ -11848,31 +11636,6 @@
           "level": 3,
           "text": "`find_circular_npm_deps`",
           "anchor": "find_circular_npm_deps"
-        },
-        {
-          "level": 3,
-          "text": "`find_circular_dart_deps`",
-          "anchor": "find_circular_dart_deps"
-        },
-        {
-          "level": 3,
-          "text": "`_build_jvm_class_index`",
-          "anchor": "_build_jvm_class_index"
-        },
-        {
-          "level": 3,
-          "text": "`_build_jvm_import_graph`",
-          "anchor": "_build_jvm_import_graph"
-        },
-        {
-          "level": 3,
-          "text": "`find_dead_jvm_modules`",
-          "anchor": "find_dead_jvm_modules"
-        },
-        {
-          "level": 3,
-          "text": "`find_circular_jvm_deps`",
-          "anchor": "find_circular_jvm_deps"
         }
       ]
     },
@@ -12852,21 +12615,6 @@
         },
         {
           "level": 3,
-          "text": "`DartImportScanner`",
-          "anchor": "dartimportscanner"
-        },
-        {
-          "level": 4,
-          "text": "`scan`",
-          "anchor": "scan-1"
-        },
-        {
-          "level": 4,
-          "text": "`_check_generated_files`",
-          "anchor": "_check_generated_files"
-        },
-        {
-          "level": 3,
           "text": "`_extract_npm_bare_name`",
           "anchor": "_extract_npm_bare_name"
         },
@@ -12878,7 +12626,7 @@
         {
           "level": 4,
           "text": "`scan`",
-          "anchor": "scan-2"
+          "anchor": "scan-1"
         },
         {
           "level": 3,
@@ -12888,37 +12636,12 @@
         {
           "level": 4,
           "text": "`scan`",
-          "anchor": "scan-3"
+          "anchor": "scan-2"
         },
         {
           "level": 4,
           "text": "`_match_workspace_import`",
           "anchor": "_match_workspace_import"
-        },
-        {
-          "level": 3,
-          "text": "`build_jvm_package_map`",
-          "anchor": "build_jvm_package_map"
-        },
-        {
-          "level": 3,
-          "text": "`_JvmImportScannerBase`",
-          "anchor": "_jvmimportscannerbase"
-        },
-        {
-          "level": 4,
-          "text": "`scan`",
-          "anchor": "scan-4"
-        },
-        {
-          "level": 3,
-          "text": "`JavaImportScanner`",
-          "anchor": "javaimportscanner"
-        },
-        {
-          "level": 3,
-          "text": "`KotlinImportScanner`",
-          "anchor": "kotlinimportscanner"
         }
       ]
     },
@@ -13301,33 +13024,6 @@
           "level": 3,
           "text": "`get_language`",
           "anchor": "get_language"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-lint-maven.md",
-      "title": "rlsbl.lint.maven",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.lint.maven",
-          "anchor": "rlsbllintmaven"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.lint.maven`",
-          "anchor": "rlsbllintmaven"
-        },
-        {
-          "level": 3,
-          "text": "`MavenLinter`",
-          "anchor": "mavenlinter"
-        },
-        {
-          "level": 4,
-          "text": "`lint`",
-          "anchor": "lint"
         }
       ]
     },
@@ -13793,53 +13489,6 @@
           "level": 3,
           "text": "`rlsbl_lock`",
           "anchor": "rlsbl_lock"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-maven_central.md",
-      "title": "rlsbl.maven_central",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.maven_central",
-          "anchor": "rlsblmaven_central"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.maven_central`",
-          "anchor": "rlsblmaven_central"
-        },
-        {
-          "level": 3,
-          "text": "`_find_element`",
-          "anchor": "_find_element"
-        },
-        {
-          "level": 3,
-          "text": "`_validate_pom_metadata`",
-          "anchor": "_validate_pom_metadata"
-        },
-        {
-          "level": 3,
-          "text": "`_check_source_javadoc_jars`",
-          "anchor": "_check_source_javadoc_jars"
-        },
-        {
-          "level": 3,
-          "text": "`_check_signing_configuration`",
-          "anchor": "_check_signing_configuration"
-        },
-        {
-          "level": 3,
-          "text": "`_try_generate_pom`",
-          "anchor": "_try_generate_pom"
-        },
-        {
-          "level": 3,
-          "text": "`validate_maven_central_metadata`",
-          "anchor": "validate_maven_central_metadata"
         }
       ]
     },
@@ -14818,26 +14467,6 @@
           "level": 4,
           "text": "`required_env_vars`",
           "anchor": "required_env_vars-1"
-        },
-        {
-          "level": 3,
-          "text": "`CredentialPipeline`",
-          "anchor": "credentialpipeline"
-        },
-        {
-          "level": 4,
-          "text": "`__init__`",
-          "anchor": "__init__-2"
-        },
-        {
-          "level": 4,
-          "text": "`publish`",
-          "anchor": "publish-2"
-        },
-        {
-          "level": 4,
-          "text": "`required_env_vars`",
-          "anchor": "required_env_vars-2"
         }
       ]
     },
@@ -14911,95 +14540,6 @@
       ]
     },
     {
-      "path": "rlsbl-pipelines-deno.md",
-      "title": "rlsbl.pipelines.deno",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.pipelines.deno",
-          "anchor": "rlsblpipelinesdeno"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.pipelines.deno`",
-          "anchor": "rlsblpipelinesdeno"
-        },
-        {
-          "level": 3,
-          "text": "`DenoPipeline`",
-          "anchor": "denopipeline"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir"
-        },
-        {
-          "level": 4,
-          "text": "`template_mappings`",
-          "anchor": "template_mappings"
-        },
-        {
-          "level": 4,
-          "text": "`publish`",
-          "anchor": "publish"
-        },
-        {
-          "level": 4,
-          "text": "`_publish_command`",
-          "anchor": "_publish_command"
-        },
-        {
-          "level": 4,
-          "text": "`required_env_vars`",
-          "anchor": "required_env_vars"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-pipelines-docker.md",
-      "title": "rlsbl.pipelines.docker",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.pipelines.docker",
-          "anchor": "rlsblpipelinesdocker"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.pipelines.docker`",
-          "anchor": "rlsblpipelinesdocker"
-        },
-        {
-          "level": 3,
-          "text": "`DockerPipeline`",
-          "anchor": "dockerpipeline"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir"
-        },
-        {
-          "level": 4,
-          "text": "`template_mappings`",
-          "anchor": "template_mappings"
-        },
-        {
-          "level": 4,
-          "text": "`publish`",
-          "anchor": "publish"
-        },
-        {
-          "level": 4,
-          "text": "`_publish_command`",
-          "anchor": "_publish_command"
-        }
-      ]
-    },
-    {
       "path": "rlsbl-pipelines-go.md",
       "title": "rlsbl.pipelines.go",
       "type": "doc",
@@ -15052,48 +14592,6 @@
       ]
     },
     {
-      "path": "rlsbl-pipelines-hex.md",
-      "title": "rlsbl.pipelines.hex",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.pipelines.hex",
-          "anchor": "rlsblpipelineshex"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.pipelines.hex`",
-          "anchor": "rlsblpipelineshex"
-        },
-        {
-          "level": 3,
-          "text": "`HexPipeline`",
-          "anchor": "hexpipeline"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir"
-        },
-        {
-          "level": 4,
-          "text": "`template_mappings`",
-          "anchor": "template_mappings"
-        },
-        {
-          "level": 4,
-          "text": "`publish`",
-          "anchor": "publish"
-        },
-        {
-          "level": 4,
-          "text": "`_publish_command`",
-          "anchor": "_publish_command"
-        }
-      ]
-    },
-    {
       "path": "rlsbl-pipelines-introspect.md",
       "title": "rlsbl.pipelines.introspect",
       "type": "doc",
@@ -15122,73 +14620,6 @@
           "level": 3,
           "text": "`generate_pipeline_table_data`",
           "anchor": "generate_pipeline_table_data"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-pipelines-maven.md",
-      "title": "rlsbl.pipelines.maven",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.pipelines.maven",
-          "anchor": "rlsblpipelinesmaven"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.pipelines.maven`",
-          "anchor": "rlsblpipelinesmaven"
-        },
-        {
-          "level": 3,
-          "text": "`MavenPipeline`",
-          "anchor": "mavenpipeline"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir"
-        },
-        {
-          "level": 4,
-          "text": "`template_mappings`",
-          "anchor": "template_mappings"
-        },
-        {
-          "level": 4,
-          "text": "`publish`",
-          "anchor": "publish"
-        },
-        {
-          "level": 4,
-          "text": "`required_env_vars`",
-          "anchor": "required_env_vars"
-        },
-        {
-          "level": 3,
-          "text": "`MavenCentralPipeline`",
-          "anchor": "mavencentralpipeline"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir-1"
-        },
-        {
-          "level": 4,
-          "text": "`template_mappings`",
-          "anchor": "template_mappings-1"
-        },
-        {
-          "level": 4,
-          "text": "`publish`",
-          "anchor": "publish-1"
-        },
-        {
-          "level": 4,
-          "text": "`required_env_vars`",
-          "anchor": "required_env_vars-1"
         }
       ]
     },
@@ -15935,6 +15366,11 @@
           "level": 3,
           "text": "`run_cleanup_command`",
           "anchor": "run_cleanup_command"
+        },
+        {
+          "level": 3,
+          "text": "`_is_private_go_stub`",
+          "anchor": "_is_private_go_stub"
         },
         {
           "level": 3,
@@ -17243,11 +16679,6 @@
         },
         {
           "level": 3,
-          "text": "`_apply_deno_exclude`",
-          "anchor": "_apply_deno_exclude"
-        },
-        {
-          "level": 3,
           "text": "`scratch_dir_paths`",
           "anchor": "scratch_dir_paths"
         },
@@ -18072,324 +17503,6 @@
       ]
     },
     {
-      "path": "rlsbl-targets-dart.md",
-      "title": "rlsbl.targets.dart",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.targets.dart",
-          "anchor": "rlsbltargetsdart"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.targets.dart`",
-          "anchor": "rlsbltargetsdart"
-        },
-        {
-          "level": 3,
-          "text": "`DartTarget`",
-          "anchor": "darttarget"
-        },
-        {
-          "level": 4,
-          "text": "`name`",
-          "anchor": "name"
-        },
-        {
-          "level": 4,
-          "text": "`find_dead_modules`",
-          "anchor": "find_dead_modules"
-        },
-        {
-          "level": 4,
-          "text": "`find_circular_dependencies`",
-          "anchor": "find_circular_dependencies"
-        },
-        {
-          "level": 4,
-          "text": "`detect`",
-          "anchor": "detect"
-        },
-        {
-          "level": 4,
-          "text": "`read_version`",
-          "anchor": "read_version"
-        },
-        {
-          "level": 4,
-          "text": "`write_version`",
-          "anchor": "write_version"
-        },
-        {
-          "level": 4,
-          "text": "`_compute_version_with_build_number`",
-          "anchor": "_compute_version_with_build_number"
-        },
-        {
-          "level": 4,
-          "text": "`version_file`",
-          "anchor": "version_file"
-        },
-        {
-          "level": 4,
-          "text": "`read_name`",
-          "anchor": "read_name"
-        },
-        {
-          "level": 4,
-          "text": "`read_metadata`",
-          "anchor": "read_metadata"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir"
-        },
-        {
-          "level": 4,
-          "text": "`template_mappings`",
-          "anchor": "template_mappings"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-targets-deno.md",
-      "title": "rlsbl.targets.deno",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.targets.deno",
-          "anchor": "rlsbltargetsdeno"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.targets.deno`",
-          "anchor": "rlsbltargetsdeno"
-        },
-        {
-          "level": 3,
-          "text": "`DenoTarget`",
-          "anchor": "denotarget"
-        },
-        {
-          "level": 4,
-          "text": "`name`",
-          "anchor": "name"
-        },
-        {
-          "level": 4,
-          "text": "`read_name`",
-          "anchor": "read_name"
-        },
-        {
-          "level": 4,
-          "text": "`_config_path`",
-          "anchor": "_config_path"
-        },
-        {
-          "level": 4,
-          "text": "`_strip_comments`",
-          "anchor": "_strip_comments"
-        },
-        {
-          "level": 4,
-          "text": "`read_version`",
-          "anchor": "read_version"
-        },
-        {
-          "level": 4,
-          "text": "`write_version`",
-          "anchor": "write_version"
-        },
-        {
-          "level": 4,
-          "text": "`version_file`",
-          "anchor": "version_file"
-        },
-        {
-          "level": 4,
-          "text": "`tag_format`",
-          "anchor": "tag_format"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir"
-        },
-        {
-          "level": 4,
-          "text": "`template_vars`",
-          "anchor": "template_vars"
-        },
-        {
-          "level": 4,
-          "text": "`template_mappings`",
-          "anchor": "template_mappings"
-        },
-        {
-          "level": 4,
-          "text": "`check_project_exists`",
-          "anchor": "check_project_exists"
-        },
-        {
-          "level": 4,
-          "text": "`get_project_init_hint`",
-          "anchor": "get_project_init_hint"
-        },
-        {
-          "level": 4,
-          "text": "`dev_install_command`",
-          "anchor": "dev_install_command"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-targets-docker.md",
-      "title": "rlsbl.targets.docker",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.targets.docker",
-          "anchor": "rlsbltargetsdocker"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.targets.docker`",
-          "anchor": "rlsbltargetsdocker"
-        },
-        {
-          "level": 3,
-          "text": "`_dockerignore_regex`",
-          "anchor": "_dockerignore_regex"
-        },
-        {
-          "level": 3,
-          "text": "`read_dockerignore`",
-          "anchor": "read_dockerignore"
-        },
-        {
-          "level": 3,
-          "text": "`dockerignore_excludes`",
-          "anchor": "dockerignore_excludes"
-        },
-        {
-          "level": 3,
-          "text": "`_docker_private_path_fix`",
-          "anchor": "_docker_private_path_fix"
-        },
-        {
-          "level": 3,
-          "text": "`DockerTarget`",
-          "anchor": "dockertarget"
-        },
-        {
-          "level": 4,
-          "text": "`name`",
-          "anchor": "name"
-        },
-        {
-          "level": 4,
-          "text": "`read_name`",
-          "anchor": "read_name"
-        },
-        {
-          "level": 4,
-          "text": "`read_version`",
-          "anchor": "read_version"
-        },
-        {
-          "level": 4,
-          "text": "`write_version`",
-          "anchor": "write_version"
-        },
-        {
-          "level": 4,
-          "text": "`version_file`",
-          "anchor": "version_file"
-        },
-        {
-          "level": 4,
-          "text": "`tag_format`",
-          "anchor": "tag_format"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir"
-        },
-        {
-          "level": 4,
-          "text": "`template_vars`",
-          "anchor": "template_vars"
-        },
-        {
-          "level": 4,
-          "text": "`template_mappings`",
-          "anchor": "template_mappings"
-        },
-        {
-          "level": 4,
-          "text": "`offline_upload_listing`",
-          "anchor": "offline_upload_listing"
-        },
-        {
-          "level": 4,
-          "text": "`check_project_exists`",
-          "anchor": "check_project_exists"
-        },
-        {
-          "level": 4,
-          "text": "`get_project_init_hint`",
-          "anchor": "get_project_init_hint"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-targets-flutter.md",
-      "title": "rlsbl.targets.flutter",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.targets.flutter",
-          "anchor": "rlsbltargetsflutter"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.targets.flutter`",
-          "anchor": "rlsbltargetsflutter"
-        },
-        {
-          "level": 3,
-          "text": "`FlutterTarget`",
-          "anchor": "fluttertarget"
-        },
-        {
-          "level": 4,
-          "text": "`name`",
-          "anchor": "name"
-        },
-        {
-          "level": 4,
-          "text": "`detect`",
-          "anchor": "detect"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir"
-        },
-        {
-          "level": 4,
-          "text": "`template_mappings`",
-          "anchor": "template_mappings"
-        }
-      ]
-    },
-    {
       "path": "rlsbl-targets-go.md",
       "title": "rlsbl.targets.go",
       "type": "doc",
@@ -18582,88 +17695,6 @@
       ]
     },
     {
-      "path": "rlsbl-targets-hex.md",
-      "title": "rlsbl.targets.hex",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.targets.hex",
-          "anchor": "rlsbltargetshex"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.targets.hex`",
-          "anchor": "rlsbltargetshex"
-        },
-        {
-          "level": 3,
-          "text": "`HexTarget`",
-          "anchor": "hextarget"
-        },
-        {
-          "level": 4,
-          "text": "`name`",
-          "anchor": "name"
-        },
-        {
-          "level": 4,
-          "text": "`read_name`",
-          "anchor": "read_name"
-        },
-        {
-          "level": 4,
-          "text": "`read_version`",
-          "anchor": "read_version"
-        },
-        {
-          "level": 4,
-          "text": "`write_version`",
-          "anchor": "write_version"
-        },
-        {
-          "level": 4,
-          "text": "`version_file`",
-          "anchor": "version_file"
-        },
-        {
-          "level": 4,
-          "text": "`tag_format`",
-          "anchor": "tag_format"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir"
-        },
-        {
-          "level": 4,
-          "text": "`template_vars`",
-          "anchor": "template_vars"
-        },
-        {
-          "level": 4,
-          "text": "`template_mappings`",
-          "anchor": "template_mappings"
-        },
-        {
-          "level": 4,
-          "text": "`check_project_exists`",
-          "anchor": "check_project_exists"
-        },
-        {
-          "level": 4,
-          "text": "`get_project_init_hint`",
-          "anchor": "get_project_init_hint"
-        },
-        {
-          "level": 4,
-          "text": "`dev_install_command`",
-          "anchor": "dev_install_command"
-        }
-      ]
-    },
-    {
       "path": "rlsbl-targets-introspect.md",
       "title": "rlsbl.targets.introspect",
       "type": "doc",
@@ -18757,329 +17788,6 @@
           "level": 3,
           "text": "`write_matrix`",
           "anchor": "write_matrix"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-targets-maven.md",
-      "title": "rlsbl.targets.maven",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.targets.maven",
-          "anchor": "rlsbltargetsmaven"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.targets.maven`",
-          "anchor": "rlsbltargetsmaven"
-        },
-        {
-          "level": 3,
-          "text": "`MavenTarget`",
-          "anchor": "maventarget"
-        },
-        {
-          "level": 4,
-          "text": "`name`",
-          "anchor": "name"
-        },
-        {
-          "level": 4,
-          "text": "`_read_project_name`",
-          "anchor": "_read_project_name"
-        },
-        {
-          "level": 4,
-          "text": "`read_name`",
-          "anchor": "read_name"
-        },
-        {
-          "level": 4,
-          "text": "`read_metadata`",
-          "anchor": "read_metadata"
-        },
-        {
-          "level": 4,
-          "text": "`_read_pom_metadata`",
-          "anchor": "_read_pom_metadata"
-        },
-        {
-          "level": 4,
-          "text": "`_read_gradle_metadata`",
-          "anchor": "_read_gradle_metadata"
-        },
-        {
-          "level": 4,
-          "text": "`_is_android_app`",
-          "anchor": "_is_android_app"
-        },
-        {
-          "level": 4,
-          "text": "`find_dead_modules`",
-          "anchor": "find_dead_modules"
-        },
-        {
-          "level": 4,
-          "text": "`find_circular_dependencies`",
-          "anchor": "find_circular_dependencies"
-        },
-        {
-          "level": 4,
-          "text": "`detect`",
-          "anchor": "detect"
-        },
-        {
-          "level": 4,
-          "text": "`_resolve_version_catalog_key`",
-          "anchor": "_resolve_version_catalog_key"
-        },
-        {
-          "level": 4,
-          "text": "`_find_version_file`",
-          "anchor": "_find_version_file"
-        },
-        {
-          "level": 4,
-          "text": "`_read_version_catalog`",
-          "anchor": "_read_version_catalog"
-        },
-        {
-          "level": 4,
-          "text": "`_write_version_catalog`",
-          "anchor": "_write_version_catalog"
-        },
-        {
-          "level": 4,
-          "text": "`read_version`",
-          "anchor": "read_version"
-        },
-        {
-          "level": 4,
-          "text": "`write_version`",
-          "anchor": "write_version"
-        },
-        {
-          "level": 4,
-          "text": "`version_file`",
-          "anchor": "version_file"
-        },
-        {
-          "level": 4,
-          "text": "`tag_format`",
-          "anchor": "tag_format"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir"
-        },
-        {
-          "level": 4,
-          "text": "`template_vars`",
-          "anchor": "template_vars"
-        },
-        {
-          "level": 4,
-          "text": "`template_mappings`",
-          "anchor": "template_mappings"
-        },
-        {
-          "level": 4,
-          "text": "`check_project_exists`",
-          "anchor": "check_project_exists"
-        },
-        {
-          "level": 4,
-          "text": "`get_project_init_hint`",
-          "anchor": "get_project_init_hint"
-        },
-        {
-          "level": 4,
-          "text": "`build`",
-          "anchor": "build"
-        },
-        {
-          "level": 4,
-          "text": "`detect_lint_command`",
-          "anchor": "detect_lint_command"
-        },
-        {
-          "level": 4,
-          "text": "`run_tests`",
-          "anchor": "run_tests"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-targets-native_android.md",
-      "title": "rlsbl.targets.native_android",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.targets.native_android",
-          "anchor": "rlsbltargetsnative_android"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.targets.native_android`",
-          "anchor": "rlsbltargetsnative_android"
-        },
-        {
-          "level": 3,
-          "text": "`NativeAndroidTarget`",
-          "anchor": "nativeandroidtarget"
-        },
-        {
-          "level": 4,
-          "text": "`name`",
-          "anchor": "name"
-        },
-        {
-          "level": 4,
-          "text": "`_gradle_file`",
-          "anchor": "_gradle_file"
-        },
-        {
-          "level": 4,
-          "text": "`_is_android_app`",
-          "anchor": "_is_android_app"
-        },
-        {
-          "level": 4,
-          "text": "`detect`",
-          "anchor": "detect"
-        },
-        {
-          "level": 4,
-          "text": "`read_version`",
-          "anchor": "read_version"
-        },
-        {
-          "level": 4,
-          "text": "`write_version`",
-          "anchor": "write_version"
-        },
-        {
-          "level": 4,
-          "text": "`version_file`",
-          "anchor": "version_file"
-        },
-        {
-          "level": 4,
-          "text": "`read_name`",
-          "anchor": "read_name"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir"
-        },
-        {
-          "level": 4,
-          "text": "`template_mappings`",
-          "anchor": "template_mappings"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-targets-native_changes.md",
-      "title": "rlsbl.targets.native_changes",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.targets.native_changes",
-          "anchor": "rlsbltargetsnative_changes"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.targets.native_changes`",
-          "anchor": "rlsbltargetsnative_changes"
-        },
-        {
-          "level": 3,
-          "text": "`detect_native_changes`",
-          "anchor": "detect_native_changes"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-targets-native_ios.md",
-      "title": "rlsbl.targets.native_ios",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.targets.native_ios",
-          "anchor": "rlsbltargetsnative_ios"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.targets.native_ios`",
-          "anchor": "rlsbltargetsnative_ios"
-        },
-        {
-          "level": 3,
-          "text": "`NativeIosTarget`",
-          "anchor": "nativeiostarget"
-        },
-        {
-          "level": 4,
-          "text": "`name`",
-          "anchor": "name"
-        },
-        {
-          "level": 4,
-          "text": "`_find_pbxproj`",
-          "anchor": "_find_pbxproj"
-        },
-        {
-          "level": 4,
-          "text": "`_find_tuist`",
-          "anchor": "_find_tuist"
-        },
-        {
-          "level": 4,
-          "text": "`detect`",
-          "anchor": "detect"
-        },
-        {
-          "level": 4,
-          "text": "`read_version`",
-          "anchor": "read_version"
-        },
-        {
-          "level": 4,
-          "text": "`write_version`",
-          "anchor": "write_version"
-        },
-        {
-          "level": 4,
-          "text": "`version_file`",
-          "anchor": "version_file"
-        },
-        {
-          "level": 4,
-          "text": "`read_name`",
-          "anchor": "read_name"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir"
-        },
-        {
-          "level": 4,
-          "text": "`template_mappings`",
-          "anchor": "template_mappings"
-        },
-        {
-          "level": 3,
-          "text": "`_atomic_write`",
-          "anchor": "_atomic_write"
         }
       ]
     },
@@ -19309,175 +18017,6 @@
           "level": 3,
           "text": "`YankOutcome`",
           "anchor": "yankoutcome"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-targets-pgdesign.md",
-      "title": "rlsbl.targets.pgdesign",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.targets.pgdesign",
-          "anchor": "rlsbltargetspgdesign"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.targets.pgdesign`",
-          "anchor": "rlsbltargetspgdesign"
-        },
-        {
-          "level": 3,
-          "text": "`_validation_verdict`",
-          "anchor": "_validation_verdict"
-        },
-        {
-          "level": 3,
-          "text": "`machine_go_version`",
-          "anchor": "machine_go_version"
-        },
-        {
-          "level": 3,
-          "text": "`PgdesignTarget`",
-          "anchor": "pgdesigntarget"
-        },
-        {
-          "level": 4,
-          "text": "`name`",
-          "anchor": "name"
-        },
-        {
-          "level": 4,
-          "text": "`detect`",
-          "anchor": "detect"
-        },
-        {
-          "level": 4,
-          "text": "`_toml_path`",
-          "anchor": "_toml_path"
-        },
-        {
-          "level": 4,
-          "text": "`_require_toml_path`",
-          "anchor": "_require_toml_path"
-        },
-        {
-          "level": 4,
-          "text": "`read_name`",
-          "anchor": "read_name"
-        },
-        {
-          "level": 4,
-          "text": "`read_version`",
-          "anchor": "read_version"
-        },
-        {
-          "level": 4,
-          "text": "`write_version`",
-          "anchor": "write_version"
-        },
-        {
-          "level": 4,
-          "text": "`version_file`",
-          "anchor": "version_file"
-        },
-        {
-          "level": 4,
-          "text": "`build`",
-          "anchor": "build"
-        },
-        {
-          "level": 4,
-          "text": "`template_vars`",
-          "anchor": "template_vars"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir"
-        },
-        {
-          "level": 4,
-          "text": "`ensure_ci_inputs`",
-          "anchor": "ensure_ci_inputs"
-        },
-        {
-          "level": 4,
-          "text": "`template_mappings`",
-          "anchor": "template_mappings"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-targets-plain.md",
-      "title": "rlsbl.targets.plain",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.targets.plain",
-          "anchor": "rlsbltargetsplain"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.targets.plain`",
-          "anchor": "rlsbltargetsplain"
-        },
-        {
-          "level": 3,
-          "text": "`_foreign_manifests`",
-          "anchor": "_foreign_manifests"
-        },
-        {
-          "level": 3,
-          "text": "`PlainTarget`",
-          "anchor": "plaintarget"
-        },
-        {
-          "level": 4,
-          "text": "`name`",
-          "anchor": "name"
-        },
-        {
-          "level": 4,
-          "text": "`detect`",
-          "anchor": "detect"
-        },
-        {
-          "level": 4,
-          "text": "`read_version`",
-          "anchor": "read_version"
-        },
-        {
-          "level": 4,
-          "text": "`write_version`",
-          "anchor": "write_version"
-        },
-        {
-          "level": 4,
-          "text": "`version_file`",
-          "anchor": "version_file"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir"
-        },
-        {
-          "level": 4,
-          "text": "`template_mappings`",
-          "anchor": "template_mappings"
-        },
-        {
-          "level": 4,
-          "text": "`check_project_exists`",
-          "anchor": "check_project_exists"
-        },
-        {
-          "level": 4,
-          "text": "`template_vars`",
-          "anchor": "template_vars"
         }
       ]
     },
@@ -20160,135 +18699,6 @@
       ]
     },
     {
-      "path": "rlsbl-targets-swift.md",
-      "title": "rlsbl.targets.swift",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.targets.swift",
-          "anchor": "rlsbltargetsswift"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.targets.swift`",
-          "anchor": "rlsbltargetsswift"
-        },
-        {
-          "level": 3,
-          "text": "`SwiftTarget`",
-          "anchor": "swifttarget"
-        },
-        {
-          "level": 4,
-          "text": "`name`",
-          "anchor": "name"
-        },
-        {
-          "level": 4,
-          "text": "`read_name`",
-          "anchor": "read_name"
-        },
-        {
-          "level": 4,
-          "text": "`read_version`",
-          "anchor": "read_version"
-        },
-        {
-          "level": 4,
-          "text": "`write_version`",
-          "anchor": "write_version"
-        },
-        {
-          "level": 4,
-          "text": "`version_file`",
-          "anchor": "version_file"
-        },
-        {
-          "level": 4,
-          "text": "`tag_format`",
-          "anchor": "tag_format"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir"
-        },
-        {
-          "level": 4,
-          "text": "`template_vars`",
-          "anchor": "template_vars"
-        },
-        {
-          "level": 4,
-          "text": "`template_mappings`",
-          "anchor": "template_mappings"
-        },
-        {
-          "level": 4,
-          "text": "`check_project_exists`",
-          "anchor": "check_project_exists"
-        },
-        {
-          "level": 4,
-          "text": "`get_project_init_hint`",
-          "anchor": "get_project_init_hint"
-        },
-        {
-          "level": 4,
-          "text": "`dev_install_command`",
-          "anchor": "dev_install_command"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-targets-swift_apple.md",
-      "title": "rlsbl.targets.swift_apple",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.targets.swift_apple",
-          "anchor": "rlsbltargetsswift_apple"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.targets.swift_apple`",
-          "anchor": "rlsbltargetsswift_apple"
-        },
-        {
-          "level": 3,
-          "text": "`SwiftAppleTarget`",
-          "anchor": "swiftappletarget"
-        },
-        {
-          "level": 4,
-          "text": "`name`",
-          "anchor": "name"
-        },
-        {
-          "level": 4,
-          "text": "`detect`",
-          "anchor": "detect"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir"
-        },
-        {
-          "level": 4,
-          "text": "`get_project_init_hint`",
-          "anchor": "get_project_init_hint"
-        },
-        {
-          "level": 4,
-          "text": "`dev_install_command`",
-          "anchor": "dev_install_command"
-        }
-      ]
-    },
-    {
       "path": "rlsbl-targets-utils.md",
       "title": "rlsbl.targets.utils",
       "type": "doc",
@@ -20336,135 +18746,6 @@
       ]
     },
     {
-      "path": "rlsbl-targets-zig.md",
-      "title": "rlsbl.targets.zig",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.targets.zig",
-          "anchor": "rlsbltargetszig"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.targets.zig`",
-          "anchor": "rlsbltargetszig"
-        },
-        {
-          "level": 3,
-          "text": "`_zig_archive_fn`",
-          "anchor": "_zig_archive_fn"
-        },
-        {
-          "level": 3,
-          "text": "`ZigTarget`",
-          "anchor": "zigtarget"
-        },
-        {
-          "level": 4,
-          "text": "`name`",
-          "anchor": "name"
-        },
-        {
-          "level": 4,
-          "text": "`read_version`",
-          "anchor": "read_version"
-        },
-        {
-          "level": 4,
-          "text": "`write_version`",
-          "anchor": "write_version"
-        },
-        {
-          "level": 4,
-          "text": "`version_file`",
-          "anchor": "version_file"
-        },
-        {
-          "level": 4,
-          "text": "`template_dir`",
-          "anchor": "template_dir"
-        },
-        {
-          "level": 4,
-          "text": "`read_name`",
-          "anchor": "read_name"
-        },
-        {
-          "level": 4,
-          "text": "`_read_zon_field`",
-          "anchor": "_read_zon_field"
-        },
-        {
-          "level": 4,
-          "text": "`_is_library`",
-          "anchor": "_is_library"
-        },
-        {
-          "level": 4,
-          "text": "`template_vars`",
-          "anchor": "template_vars"
-        },
-        {
-          "level": 4,
-          "text": "`template_mappings`",
-          "anchor": "template_mappings"
-        },
-        {
-          "level": 4,
-          "text": "`shared_template_mappings`",
-          "anchor": "shared_template_mappings"
-        },
-        {
-          "level": 4,
-          "text": "`check_project_exists`",
-          "anchor": "check_project_exists"
-        },
-        {
-          "level": 4,
-          "text": "`get_project_init_hint`",
-          "anchor": "get_project_init_hint"
-        },
-        {
-          "level": 4,
-          "text": "`dev_install_command`",
-          "anchor": "dev_install_command"
-        }
-      ]
-    },
-    {
-      "path": "rlsbl-targets-zig_version.md",
-      "title": "rlsbl.targets.zig_version",
-      "type": "doc",
-      "headings": [
-        {
-          "level": 1,
-          "text": "rlsbl.targets.zig_version",
-          "anchor": "rlsbltargetszig_version"
-        },
-        {
-          "level": 2,
-          "text": "`rlsbl.targets.zig_version`",
-          "anchor": "rlsbltargetszig_version"
-        },
-        {
-          "level": 3,
-          "text": "`read_zon_version`",
-          "anchor": "read_zon_version"
-        },
-        {
-          "level": 3,
-          "text": "`read_zig_version`",
-          "anchor": "read_zig_version"
-        },
-        {
-          "level": 3,
-          "text": "`write_zig_version`",
-          "anchor": "write_zig_version"
-        }
-      ]
-    },
-    {
       "path": "rlsbl-targets.md",
       "title": "rlsbl.targets",
       "type": "doc",
@@ -20488,11 +18769,6 @@
           "level": 3,
           "text": "`targets_sharing_workspace_environment`",
           "anchor": "targets_sharing_workspace_environment"
-        },
-        {
-          "level": 3,
-          "text": "`targets_consumed_by_repository_url`",
-          "anchor": "targets_consumed_by_repository_url"
         },
         {
           "level": 3,
@@ -20553,6 +18829,11 @@
           "level": 3,
           "text": "`resolve_releasable_config_dir`",
           "anchor": "resolve_releasable_config_dir"
+        },
+        {
+          "level": 3,
+          "text": "`unsupported_target_error`",
+          "anchor": "unsupported_target_error"
         },
         {
           "level": 3,
@@ -20665,11 +18946,6 @@
           "level": 3,
           "text": "`_run_go_tests`",
           "anchor": "_run_go_tests"
-        },
-        {
-          "level": 3,
-          "text": "`_run_maven_tests`",
-          "anchor": "_run_maven_tests"
         },
         {
           "level": 3,
@@ -21036,18 +19312,13 @@
         },
         {
           "level": 3,
-          "text": "`dockerignore_entry`",
-          "anchor": "dockerignore_entry"
+          "text": "`private_go_stub_content`",
+          "anchor": "private_go_stub_content"
         },
         {
           "level": 3,
           "text": "`npmignore_block`",
           "anchor": "npmignore_block"
-        },
-        {
-          "level": 3,
-          "text": "`dockerignore_block`",
-          "anchor": "dockerignore_block"
         },
         {
           "level": 3,
@@ -21835,21 +20106,6 @@
           "anchor": "manifestscanerror"
         },
         {
-          "level": 4,
-          "text": "`acknowledged_by`",
-          "anchor": "acknowledged_by"
-        },
-        {
-          "level": 3,
-          "text": "`UnrecognizedGradleDependencyError`",
-          "anchor": "unrecognizedgradledependencyerror"
-        },
-        {
-          "level": 4,
-          "text": "`acknowledged_by`",
-          "anchor": "acknowledged_by-1"
-        },
-        {
           "level": 3,
           "text": "`_parse_pypi_dep_name`",
           "anchor": "_parse_pypi_dep_name"
@@ -21873,71 +20129,6 @@
           "level": 4,
           "text": "`scan`",
           "anchor": "scan-2"
-        },
-        {
-          "level": 3,
-          "text": "`DartScanner`",
-          "anchor": "dartscanner"
-        },
-        {
-          "level": 4,
-          "text": "`scan`",
-          "anchor": "scan-3"
-        },
-        {
-          "level": 3,
-          "text": "`MavenScanner`",
-          "anchor": "mavenscanner"
-        },
-        {
-          "level": 4,
-          "text": "`scan`",
-          "anchor": "scan-4"
-        },
-        {
-          "level": 4,
-          "text": "`_load_catalog`",
-          "anchor": "_load_catalog"
-        },
-        {
-          "level": 4,
-          "text": "`_parse_version_catalog`",
-          "anchor": "_parse_version_catalog"
-        },
-        {
-          "level": 4,
-          "text": "`_declares_no_workspace_edge`",
-          "anchor": "_declares_no_workspace_edge"
-        },
-        {
-          "level": 4,
-          "text": "`_blank_comments`",
-          "anchor": "_blank_comments"
-        },
-        {
-          "level": 4,
-          "text": "`_line_at`",
-          "anchor": "_line_at"
-        },
-        {
-          "level": 4,
-          "text": "`_resolve_catalog_alias`",
-          "anchor": "_resolve_catalog_alias"
-        },
-        {
-          "level": 4,
-          "text": "`_scan_gradle_kts`",
-          "anchor": "_scan_gradle_kts"
-        },
-        {
-          "level": 4,
-          "text": "`_scan_gradle_groovy`",
-          "anchor": "_scan_gradle_groovy"
-        },
-        {
-          "level": 4,
-          "text": "`_scan_pom`",
-          "anchor": "_scan_pom"
         },
         {
           "level": 3,
@@ -22853,11 +21044,6 @@
           "anchor": "auto-detection"
         },
         {
-          "level": 3,
-          "text": "Detection priority",
-          "anchor": "detection-priority"
-        },
-        {
           "level": 2,
           "text": "Detection files",
           "anchor": "detection-files"
@@ -23539,68 +21725,8 @@
         },
         {
           "level": 3,
-          "text": "deno",
-          "anchor": "deno"
-        },
-        {
-          "level": 3,
-          "text": "dart",
-          "anchor": "dart"
-        },
-        {
-          "level": 3,
-          "text": "flutter",
-          "anchor": "flutter"
-        },
-        {
-          "level": 3,
-          "text": "swift",
-          "anchor": "swift"
-        },
-        {
-          "level": 3,
-          "text": "swift-apple",
-          "anchor": "swift-apple"
-        },
-        {
-          "level": 3,
-          "text": "zig",
-          "anchor": "zig"
-        },
-        {
-          "level": 3,
-          "text": "docker",
-          "anchor": "docker"
-        },
-        {
-          "level": 3,
-          "text": "maven",
-          "anchor": "maven"
-        },
-        {
-          "level": 3,
           "text": "spec",
           "anchor": "spec"
-        },
-        {
-          "level": 3,
-          "text": "pgdesign",
-          "anchor": "pgdesign"
-        },
-        {
-          "level": 3,
-          "text": "native-ios",
-          "anchor": "native-ios"
-        },
-        {
-          "level": 3,
-          "text": "native-android",
-          "anchor": "native-android"
-        },
-        {
-          "level": 3,
-          "text": "plain",
-          "anchor": "plain"
         },
         {
           "level": 2,
@@ -24119,14 +22245,10 @@
       ]
     }
   ],
-  "last_gen": "2026-10-02T21:11:24.820606+00:00",
+  "last_gen": "2026-10-06T23:23:07.096283+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
-      {
-        "word": "pgdesign",
-        "aliases": []
-      },
       {
         "word": "prs",
         "aliases": []
