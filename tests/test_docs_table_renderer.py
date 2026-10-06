@@ -4,7 +4,7 @@ A custom directive script is executed by the site generator through a bare
 ``python3`` with the ``resolve(attrs, config, body)`` contract -- nothing is
 installed for it. A directive that imported a rendering library therefore broke
 the whole documentation build the moment that library was absent, which is why
-``stricttools/docs/directives/_matrix.py`` carries the Markdown table
+``.strictmetadata/docs/directives/_matrix.py`` carries the Markdown table
 renderer itself.
 
 Every test here makes ``selfdoc_core`` -- the library the renderer used to come
@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DIRECTIVES_DIR = REPO_ROOT / "stricttools" / "docs" / "directives"
+DIRECTIVES_DIR = REPO_ROOT / ".strictmetadata" / "docs" / "directives"
 
 # Every directive selfdoc.json registers, and whether its output is a table.
 TABLE_DIRECTIVES = [

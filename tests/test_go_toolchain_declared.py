@@ -104,7 +104,7 @@ class TestRegistration:
         assert CHECK_TARGETS[CHECK] == frozenset({"go"})
 
     def test_it_has_a_row_in_the_docs_check_reference(self):
-        text = open(os.path.join(REPO_ROOT, "stricttools", "docs", "checks.md"),
+        text = open(os.path.join(REPO_ROOT, ".strictmetadata", "docs", "checks.md"),
                     encoding="utf-8").read()
         assert f"| `{CHECK}` |" in text
 

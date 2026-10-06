@@ -1683,7 +1683,7 @@ class TestDocsScrubExamplesParse:
 
     DOCS = (
         Path(__file__).resolve().parent.parent
-        / "stricttools"
+        / ".strictmetadata"
         / "docs"
         / "release-workflow.md"
     )

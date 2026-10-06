@@ -64,7 +64,7 @@ release branch and `rlsbl release resume` completes the *same* version; a failed
 release never burns it.
 
 The step-by-step pipeline, including what each step does in monorepo and releasable
-mode, is in [stricttools/docs/release-workflow.md](stricttools/docs/release-workflow.md).
+mode, is in [.strictmetadata/docs/release-workflow.md](.strictmetadata/docs/release-workflow.md).
 
 Use `--dry-run` to preview without changes: mutating operations are recorded and printed as a
 would-do log rather than performed. A small set of commands declares itself `consequential`
@@ -116,7 +116,7 @@ Created files are committed automatically by default.
 - `.github/workflows/ci-custom.yml` -- runs alongside `ci.yml`
 - `.github/workflows/publish-custom.yml` -- runs alongside `publish.yml`
 
-See [stricttools/docs/ci-customization.md](stricttools/docs/ci-customization.md) for an example.
+See [.strictmetadata/docs/ci-customization.md](.strictmetadata/docs/ci-customization.md) for an example.
 
 **Runs config migrations** when `.rlsbl/config-schema.json` exists.
 
@@ -128,7 +128,7 @@ Checks are grouped by tag -- `--tag` runs one family, `--name` runs a single che
 
 :-: table-check-tags
 
-What each tag's checks actually verify, one row per check with its severity, is in [stricttools/docs/checks.md](stricttools/docs/checks.md), which also says which tags the release pipeline runs on its own.
+What each tag's checks actually verify, one row per check with its severity, is in [.strictmetadata/docs/checks.md](.strictmetadata/docs/checks.md), which also says which tags the release pipeline runs on its own.
 
 ```
 rlsbl check --all              # run all checks

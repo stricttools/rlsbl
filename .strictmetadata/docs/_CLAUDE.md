@@ -112,9 +112,9 @@ working tree:
 
 `.rlsbl/config.json` holds per-project settings. Key fields:
 
-- `pipelines` -- publish pipelines with mandatory `type` and `local` fields. See [stricttools/docs/pipelines.md](pipelines.md).
+- `pipelines` -- publish pipelines with mandatory `type` and `local` fields. See [.strictmetadata/docs/pipelines.md](pipelines.md).
 - `publish_mode` (enum, required) -- `"ci"` publishes via CI pipelines; `"none"` suppresses publishing to public registries. No default. (Replaces the former `private` boolean.)
 - `release_branches` -- branch names that trigger manual-release-push warnings.
-- `batch_limits` -- limits for changelog batch size checks. See [stricttools/docs/changelog.md](changelog.md).
+- `batch_limits` -- limits for changelog batch size checks. See [.strictmetadata/docs/changelog.md](changelog.md).
 
-For details on checks, CI customization, pre-push hook, validation cache, monorepo support, and asset uploads, see the corresponding pages in [stricttools/docs/](index.md).
+For details on checks, CI customization, pre-push hook, validation cache, monorepo support, and asset uploads, see the corresponding pages in [.strictmetadata/docs/](index.md).
