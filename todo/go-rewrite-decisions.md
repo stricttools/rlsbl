@@ -48,3 +48,6 @@ Recorded by the session that deleted the removed targets; each is an implementat
 - `monorepo graph` is kept and gains `--json` output (members, versions, targets, and edges in topological order).
 - `monorepo impact` and `monorepo outdated` are kept.
 - The monorepo snapshot is dropped: the command, the release step, snapshot-check, and the committed snapshot.json files; `monorepo graph --json` gives the same inventory on demand.
+- `claim-name` and `monorepo check-names` are kept.
+- `prs` is dropped.
+- The `pre-push-check` removal stub is deleted.
