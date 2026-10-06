@@ -3,7 +3,17 @@
   "env_file": "~/Projects/.env",
   "push_timeout": 120,
   "batch_limits": {
-    "exclusions": []
+    "exclusions": [
+      {
+        "reason": "**Only the go, npm, pypi, and spec release targets remain.** The dart, deno, docker, flutter, hex, maven, native-android, native-ios, pgdesign, plain, swift, swift-apple, and zig targets are removed, along with their scaffold templates, the deno, hex, maven, maven-central, and docker pipeline types, the `maven-central-metadata` and `mirror-required` checks and their options, and the Dart and JVM import analysis. Change a config that names one of them to a supported target, or delete its target and pipeline entries.",
+        "entries": [
+          {
+            "version": "unreleased",
+            "line": 20
+          }
+        ]
+      }
+    ]
   },
   "targets": [
     "npm",
