@@ -86,7 +86,6 @@ Pre-release versions (e.g. `1.0.0-beta.1`) are supported.
 
 ```
 rlsbl scaffold                    # create or update CI/CD for all detected registries
-rlsbl scaffold --target plain     # also cover a registry auto-detection cannot find
 rlsbl scaffold --no-auto-commit   # skip auto-commit of scaffolded files
 rlsbl scaffold --no-auto-tag      # skip the rlsbl GitHub topic tag on this run
 ```

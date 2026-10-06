@@ -30,7 +30,6 @@ Install rlsbl via `uv tool install rlsbl` (Python) or `npx rlsbl` (npm wrapper).
 - [Dependency validation](dep-validation.md) -- cross-project dependency checks
 - [Pipeline architecture](pipelines.md) -- publish pipeline types, asset uploads, configuration
 - [Layer enforcement](layers.md) -- architectural layer rules for monorepos
-- [Native mobile targets](native-targets.md) -- Android and iOS version bumping
 
 ## Reference
 

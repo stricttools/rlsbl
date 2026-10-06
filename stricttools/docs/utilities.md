@@ -142,7 +142,7 @@ A table showing the detection status of every supported release target in the cu
 
 | Column | Description |
 | --- | --- |
-| Target | Registry name (npm, pypi, go, deno, zig, swift, hex, etc.) |
+| Target | Registry name (npm, pypi, go, spec) |
 | Detected | Whether the target's manifest file was found in the project |
 | Version file | The file where the target stores its version |
 

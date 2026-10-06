@@ -86,36 +86,6 @@ Both rules are release validation, not check results: every release except `infr
 
 Both survive the release: at step 18 the file is archived as `.rlsbl/releases/v{version}.toml` (read-only), and every later changelog regeneration reads the description and context back out of that archive. The archive also gains the two release commit fields the flow writes there — see [the release commit](#the-release-commit). Those two are the flow's alone; writing either into `unreleased.toml` by hand aborts the release.
 
-### Per-target configuration sections
-
-Some targets require additional configuration in the release file via `[targets.<name>]` sections, providing target-specific metadata that cannot be inferred from the project's manifest. Currently, this applies only to the Flutter target, which needs a deployment mode declaration to distinguish OTA updates from full app store builds.
-
-**Flutter target** requires a `[targets.flutter]` section with a `mode` field. Valid modes:
-
-| Mode | Description |
-| --- | --- |
-| `ota` | Over-the-air update (code push without a full app store rebuild) |
-| `build` | Full build release (triggers app store build pipeline) |
-
-If a Flutter target is listed in `include` but has no corresponding `[targets.flutter]` section with a `mode` field, the release file validation fails with a hard error.
-
-Example with Flutter per-target config:
-
-```toml
-# .rlsbl/releases/unreleased.toml
-bump = "minor"
-description = "Add offline sync support"
-include = ["flutter"]
-exclude = []
-
-[targets.flutter]
-mode = "build"
-```
-
-`rlsbl release init` auto-generates the `[targets.flutter]` section with `mode = "build"` as the default when a Flutter target is detected. Change the mode before running `rlsbl release run` if an OTA release is intended.
-
-Target config sections for targets not listed in `include` are rejected as validation errors. Only fields documented for a target type are allowed — unknown fields cause a hard error.
-
 ## The pre-release channel
 
 Pre-releases are a first-class release channel, not a workaround: a version can ship to real consumers as `0.6.0-alpha.0` and be promoted through `beta` and `rc` to the stable `0.6.0` without the version number ever burning or the release flow changing shape. Every release step — validation, changelog finalization, tagging, the GitHub Release, publishing — runs exactly as it does for a stable release.
@@ -207,7 +177,7 @@ Steps 15 and 16 are the **candidate push and the CI gate**: everything above the
 | 9 | Run built-in tests (`uv run pytest` / `go test` / `npm test`) | Yes |
 | 10 | Run built-in lint (library projects only) | Yes |
 | 11 | Run `pre-release.sh` hook | Yes |
-| 12 | Write new version to all detected target files + `.rlsbl/version`, and re-sync the lockfiles that write stales (including a non-releasable workspace project whose `uv.lock` records a bumped sibling as an editable path source). A re-sync that fails stops the release before its candidate is pushed, naming the fix for the cause the tool printed (restore access to an unreachable registry, or release first the sibling whose required version was never published) and the command that continues it: `rlsbl release run` again, or `rlsbl release resume` when the release was resumed. A lockfile whose tool is not on PATH, or whose Gradle wrapper is not committed, stops the release before anything mutates, naming the tool to install and the same continuing command | Yes |
+| 12 | Write new version to all detected target files + `.rlsbl/version`, and re-sync the lockfiles that write stales (including a non-releasable workspace project whose `uv.lock` records a bumped sibling as an editable path source). A re-sync that fails stops the release before its candidate is pushed, naming the fix for the cause the tool printed (restore access to an unreachable registry, or release first the sibling whose required version was never published) and the command that continues it: `rlsbl release run` again, or `rlsbl release resume` when the release was resumed. A lockfile whose tool is not on PATH stops the release before anything mutates, naming the tool to install and the same continuing command | Yes |
 | 13 | Commit (message = tag string, e.g. `v1.2.3`) — **not** tagged | Yes |
 | 14 | Regenerate the monorepo snapshot, so the snapshot commit is part of what CI verifies | Yes |
 | 15 | Advance the branch to the version-bump commit (compare-and-swap), then **push it to the release branch UNTAGGED** — this is the release candidate | Yes |

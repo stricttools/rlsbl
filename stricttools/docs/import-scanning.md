@@ -1,10 +1,10 @@
 +++
-description = "Import scanning that validates dependencies and finds dead modules over the files git lists, with tree-sitter for Python, Go, and JS/TS and regex for Dart."
+description = "Import scanning that validates dependencies and finds dead modules over the files git lists, with tree-sitter for Python, Go, and JS/TS."
 +++
 
 # Import scanning
 
-rlsbl scans source code imports across 4 language ecosystems to detect unused dependencies, undeclared dependencies, dead modules, and circular dependencies. It uses 3 tree-sitter parsers for Python, Go, and JavaScript/TypeScript parsing, and regex for Dart. Import results are cached per check context to avoid redundant source tree walks across the 4 dependency checks that share scan data.
+rlsbl scans source code imports in Python, Go, and JavaScript/TypeScript to detect unused dependencies, undeclared dependencies, dead modules, and circular dependencies, using a tree-sitter parser for each. Import results are cached per check context to avoid redundant source tree walks across the 4 dependency checks that share scan data.
 
 ## Architecture
 
@@ -59,7 +59,7 @@ File discovery utility shared by both the workspace-level scanners and the file-
 Classifies a file as production vs test code by checking its path against known test directory names and file naming conventions. This classification determines whether an import counts toward runtime dependency usage or test-only usage, which directly affects the deps-runtime-test-only and deps-dev-in-lib checks. Classification is based on:
 
 - **Directory names**: `test`, `tests`, `__tests__`, `examples`, `example`
-- **File name patterns**: `test_*.py`, `*_test.py`, `*_test.go`, `*_test.dart`, `*.test.[jt]sx?`, `*.spec.[jt]sx?`, `conftest.py`
+- **File name patterns**: `test_*.py`, `*_test.py`, `*_test.go`, `*.test.[jt]sx?`, `*.spec.[jt]sx?`, `conftest.py`
 
 ### _NON_PRODUCTION_PATTERNS
 
@@ -72,7 +72,6 @@ Shared constant exposing the file classification patterns as a dict with 3 keys:
 | Python | tree-sitter-python | PythonImportScanner | `_collect_python_imports()` + `find_dead_modules()` | stdlib (`sys.stdlib_module_names`), relative imports |
 | Go | tree-sitter-go | GoImportScanner | `find_dead_go_packages()` via `scan_imports()` | self-module imports |
 | npm (JS/TS) | tree-sitter-javascript + tree-sitter-typescript | NpmImportScanner | `_build_npm_import_graph()` | Node.js builtins, relative imports |
-| Dart | regex | DartImportScanner | `_build_dart_import_graph()` | `dart:` imports, external `package:` imports |
 
 ## Go module path mapping
 
@@ -122,8 +121,6 @@ Dead-module analysis requires knowing which files serve as roots for BFS reachab
 | Python | `__init__.py` files (package entry points); all production modules cross-reference each other via import prefix matching |
 | Go | Internal packages only -- checks whether any non-test file outside the package directory imports the package path |
 | npm | `package.json` fields: `exports` (recursive path collection), `main`, `bin` (string or dict of paths) |
-| Dart | `lib/<package_name>.dart` (barrel file from `pubspec.yaml` name field) + all `bin/*.dart` scripts |
-| Flutter | Everything Dart derives, plus `lib/main.dart` -- the entry point Flutter itself defaults to. A Flutter app has neither a barrel nor a `bin/` script, so without it the analysis has no root to traverse from and reports nothing at all |
 
 ## Source modules
 

@@ -17,17 +17,13 @@ Seven of rlsbl's release targets implement an editable install command; every ot
 | pypi | `uv tool install -e .` | `uv sync --all-packages` |
 | npm | `npm link` | `npm install` |
 | go | `go install <install_paths>` (declared on the go pipeline in `.rlsbl/config.json`) | (not supported) |
-| deno | `deno install` | `deno cache .` |
-| hex | `mix deps.get` | `mix deps.get` |
-| swift | `swift build` | (not supported) |
-| zig | `zig build install` | (not supported) |
 
 ### Modes
 
 | `--target` value | Behavior |
 | --- | --- |
 | `global` | System-wide install via the target's global command |
-| `venv` | Project-local environment install (supported by pypi, npm, deno, and hex) |
+| `venv` | Project-local environment install (supported by pypi and npm) |
 
 `--target` is required and has no default: `rlsbl dev install` without it is a parse-time error naming the flag. The mode is always stated, never assumed.
 
@@ -39,8 +35,7 @@ Seven of rlsbl's release targets implement an editable install command; every ot
 | --- | --- | --- |
 | pypi | `uv tool uninstall {name}` | Resolves package name from `pyproject.toml` |
 | npm | `npm unlink` | Removes the global symlink |
-| deno | `deno uninstall {name}` | Removes the installed script |
-| go, hex, swift, zig | (skipped) | No uninstall template; prints a message |
+| go | (skipped) | No uninstall template; prints a message |
 
 ### Monorepo mode
 

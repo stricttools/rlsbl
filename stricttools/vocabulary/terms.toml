@@ -1,10 +1,6 @@
 format_version = 1
 
 [[accepted]]
-word = "pgdesign"
-meaning = "The pgdesign release target: a PostgreSQL schema-design project detected by its pgdesign.toml, whose version rlsbl bumps without a registry publish."
-
-[[accepted]]
 word = "prs"
 meaning = "The 'rlsbl prs' command, which lists the repository's open pull requests (PRs) before a release."
 

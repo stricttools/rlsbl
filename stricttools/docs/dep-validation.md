@@ -60,13 +60,12 @@ Detects source files that are unreachable from any entry point via BFS on the fi
 3. BFS from all entry points
 4. Report files in production code that are never reached
 
-**Exclusions (6 categories, common to all languages):**
+**Exclusions (common to all languages):**
 
 - Test files (matching 7 patterns from `_NON_PRODUCTION_PATTERNS`)
 - `.selfdoc` directories
 - `_build` directories
 - Browser asset directories (`static`, `public`, `assets` -- 3 directory names)
-- Generated files (`.g.dart` for Dart)
 
 **Per-language behavior:**
 
@@ -75,8 +74,6 @@ Detects source files that are unreachable from any entry point via BFS on the fi
 | Python | `find_dead_modules()` | `__init__.py` files + cross-reference via import prefix matching | All production `.py` files |
 | Go | `find_dead_go_packages()` | Packages imported by any file outside the package, including other packages' `_test.go` files (never the package's own tests, never `testdata/`); `package main` directories are entry points and never reported | Only `internal/` packages (Go enforces visibility elsewhere) |
 | npm | `find_dead_npm_modules()` | `package.json` exports/main/bin fields, resolved to source | All production `.js`/`.ts`/`.mjs`/`.cjs`/`.tsx` files |
-| Dart | `find_dead_dart_modules()` | `lib/<name>.dart` barrel file + `bin/*.dart` scripts | All production `.dart` files |
-| Flutter | `find_dead_dart_modules()` | The Dart entry points **plus `lib/main.dart`**, which a Flutter app has instead of a barrel or a `bin/` script | All production `.dart` files |
 
 #### Declarative dead-module exclusions
 
@@ -94,11 +91,11 @@ reason = "Config-only package consumed by an external tool"
 
 Each entry requires a non-empty string `path` and a non-empty string `reason`. A missing key, a non-string value, an empty value, or a non-table entry is a hard `ConfigError`. The mandatory `reason` forces every exclusion to carry a documented justification.
 
-**Path semantics are per-language.** For Python, npm, Dart, and JVM (Maven) the `path` names a single source file. For **Go the `path` names a package directory** (Go's dead unit is a package directory, not an individual file), e.g. `internal/toolconfig`.
+**Path semantics are per-language.** For Python and npm the `path` names a single source file. For **Go the `path` names a package directory** (Go's dead unit is a package directory, not an individual file), e.g. `internal/toolconfig`.
 
 **Listed units never become entry points (no laundering).** A suppressed unit is removed from the dead-candidate set so it is never reported, but it can never keep another module alive:
 
-- npm, Dart, and JVM use BFS from declared entry points. A suppressed non-entry file's outgoing edges are never traversed anyway, so the listed paths are simply subtracted from the reported dead set.
+- npm uses BFS from declared entry points. A suppressed non-entry file's outgoing edges are never traversed anyway, so the listed paths are simply subtracted from the reported dead set.
 - Python and Go use union-of-imports detection. Here the suppressed unit is removed from *both* the candidate set *and* the import-reference union, so its own imports cannot rescue an otherwise-dead module.
 
 **Stale entries hard-fail.** The `dead-modules-stale` check (severity: error) verifies that every `path` in `dead-modules.toml` still exists on disk. If a listed file or package directory has been moved or deleted, the check fails and names both the stale path and the file it was declared in, so exclusions cannot silently rot.
@@ -113,14 +110,13 @@ Detects circular dependencies by computing strongly connected components using T
 |----------|----------|-----------|
 | npm (JS/TS) | error (fail) | Circular imports cause runtime issues (undefined values, initialization order bugs) |
 | Python | warning | Python handles circular imports at runtime but they indicate design problems |
-| Dart | warning | Dart handles cycles but they indicate poor layering |
 | Go | excluded | The Go compiler rejects circular imports natively; rlsbl does not duplicate that check |
 
 ### library-lint
 
 Enforces quality constraints specific to library packages published for consumption by other projects. This check detects imports, I/O patterns, and platform-specific APIs that are inappropriate for reusable library code and would cause problems for downstream consumers:
 
-- Detects imports inappropriate for library code (e.g., `dart:io` in a pure Dart library)
+- Detects imports inappropriate for library code (e.g., `argparse` in a Python library)
 - Detects stdout/stderr writes in library code (libraries should not print directly)
 - Only applies to projects marked `library = true` in workspace.toml
 
@@ -146,7 +142,7 @@ Published libraries may still be consumed externally, so zero workspace importer
 
 ## Language support matrix
 
-The matrix below is the enumeration: every target a dependency validation check supports has a column, and every check with target-specific behavior has a row. Not all checks apply to every target -- for example, Go's compiler natively rejects circular imports, so rlsbl skips that check for Go projects. Flutter members are covered by the Dart scanners, which a Flutter app's sources are.
+The matrix below is the enumeration: every target a dependency validation check supports has a column, and every check with target-specific behavior has a row. Not all checks apply to every target -- for example, Go's compiler natively rejects circular imports, so rlsbl skips that check for Go projects.
 
 :-: table-feature-matrix
 

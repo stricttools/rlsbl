@@ -25,7 +25,7 @@ Project-level configuration file created by `rlsbl scaffold`. This JSON file con
 | push_timeout | int | Timeout in seconds for each `git push` during a release. Default: 300. Overridable per-invocation with `--push-timeout`. |
 | hook_timeout | int | Timeout in seconds for release hooks. Default: absent, meaning no timeout — hooks run to completion. |
 | ci_timeout | int | Timeout in seconds for the release CI gate — the in-process wait for CI to conclude on the pushed release candidate. Default: 3600. Run discovery is spent inside this budget and capped at half of it, so the completion wait always keeps at least half. Overridable per-invocation with `--ci-timeout`. |
-| build_timeout | int or object | Timeout in seconds for target build steps. An int applies to every target; an object is keyed by target name with an optional `default` entry. Falls back to each target's shipped default (120s for most, 300s for maven, 60s for pgdesign). |
+| build_timeout | int or object | Timeout in seconds for target build steps. An int applies to every target; an object is keyed by target name with an optional `default` entry. Falls back to the target's shipped default (120s). |
 | test | object | Per-target test settings: which tests a target selects (`pypi.markers`) and which command runs them (`go.command`). See [test](#test) below. |
 | external_checks | array | Config-declared freeform subprocess checks that run during `rlsbl check` and the release preflight. See [external_checks](#external_checks) below. |
 | checks | map | Per-check settings for the path-capable built-in tool checks (`lint`, `format`, `type-check`). Each block is required while its check's option is on and refused while it is off. See [checks](#checks) below. |
@@ -308,23 +308,20 @@ Each entry in `pipelines` is keyed by a user-chosen name and must have:
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `type` | string | Yes | One of the 9 built-in pipeline types (see below) |
+| `type` | string | Yes | One of the built-in pipeline types (see below) |
 | `local` | bool | Yes | Whether to publish from the developer machine. When `false`, CI handles publishing. |
 | `artifact` | string | Yes (type `go`); optional for `npm`/`pypi` | Selects the publish workflow variant. Go pipelines require `"binary"` or `"library"`. npm/pypi pipelines accept `"launcher"` for wrapper-package publishing. See [pipelines docs](pipelines.md#launcher-artifact-kind). |
 | `wraps` | string | When `artifact` is `"launcher"` | Name of the pipeline that produces the binary. Must reference a pipeline with `artifact: "binary"`. |
 | `binary_source` | string | When `artifact` is `"launcher"` | Where the launcher downloads binaries from. Only `"github-release"` is supported. |
 | `token_var` | string | No | Env var name for the publish token. Each type has a default (e.g. `NPM_TOKEN` for npm). |
-| `username_var` | string | No | Env var name for username auth (used by docker). |
-| `password_var` | string | No | Env var name for password auth (used by docker). |
 | `assets` | bool | No | Enable building and uploading target-specific artifacts to GitHub Releases. |
 | `max_asset_size_mb` | int | When `assets` or `custom_assets` is set | Maximum artifact size in MB. Releases fail if exceeded. |
 | `custom_assets` | array | No | List of custom build artifacts (see below). |
 
-**Built-in pipeline types:** `npm`, `pypi`, `go`, `deno`, `hex`, `maven`, `docker`, `cloudflare-pages`
+**Built-in pipeline types:** `npm`, `pypi`, `go`, `cloudflare-pages`
 
 Pipeline types use different auth patterns:
-- **Token-based** (npm, pypi, go, deno, hex, maven): authenticate via a single env var specified by `token_var`
-- **Credential-based** (docker): authenticate via `username_var` and `password_var`
+- **Token-based** (npm, pypi): authenticate via a single env var specified by `token_var`
 - **Other** (cloudflare-pages): type-specific auth configured per pipeline
 
 #### Per-pipeline-type reference
@@ -334,10 +331,6 @@ Pipeline types use different auth patterns:
 | `npm` | `NPM_TOKEN` | Token | Runs `npm publish` (or pnpm/yarn equivalent based on lockfile detection) |
 | `pypi` | `PYPI_TOKEN` (or `TWINE_PASSWORD`) | Token / OIDC | OIDC Trusted Publishing preferred; falls back to token-based upload via twine |
 | `go` | None | None | Notifies Go module proxy (`GOPROXY=proxy.golang.org`); no authentication required |
-| `deno` | `DENO_TOKEN` (or `JSR_TOKEN`) | Token | Runs `deno publish` to JSR |
-| `hex` | `HEX_API_KEY` | Token | Runs `mix hex.publish` to hex.pm |
-| `maven` | `MAVEN_TOKEN` (or `GITHUB_TOKEN`) | Token | Runs gradle or maven publish task to configured repository |
-| `docker` | N/A | Username + Password | Authenticates via `DOCKER_USERNAME` + `DOCKER_PASSWORD`, then runs `docker push` |
 | `cloudflare-pages` | None | Selfdoc CLI | Uses the selfdoc CLI for deploy; no token needed locally (CF credentials sourced from env) |
 
 #### custom_assets
@@ -359,12 +352,6 @@ Example config:
     "npm-publish": {
       "type": "npm",
       "local": false
-    },
-    "docker-push": {
-      "type": "docker",
-      "local": true,
-      "username_var": "DOCKER_USER",
-      "password_var": "DOCKER_PASS"
     },
     "binaries": {
       "type": "go",

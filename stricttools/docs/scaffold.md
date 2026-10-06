@@ -28,8 +28,6 @@ description = "How rlsbl scaffold generates CI workflows, git hooks, the scratch
 | `experiments/go.mod`, `screenshots/go.mod` | Go projects only: keeps the go command out of the scratch directories |
 | `.rlsbl/go.mod`, and a `go.mod` in each other private directory at the root that git tracks files in | Go projects only: keeps the private directory out of the module zip (see [Private paths](#private-paths)) |
 | `.npmignore` | npm projects: created once, carrying the private-path entries |
-| `.dockerignore` | Docker projects: created once, carrying `.git` and the private-path entries |
-| `.go-version` | pgdesign target only, beside `pgdesign.toml`: the Go its CI installs. Created from the Go on this machine when missing and never rewritten; change the version by editing the file |
 
 ## Scratch directories
 
@@ -63,13 +61,12 @@ A scratch directory that already holds files git TRACKS (other than the ones sca
 
 Pruning the directories from rlsbl's walks (below) keeps rlsbl's checks green and says nothing to the project's test runner. A `test_*.py` left in `experiments/` is still collected by a bare `pytest`, and a `.go` file there without its own module file is still built by `go test ./...` -- so a half-finished probe breaks a suite it has nothing to do with, which is the opposite of what a disposable scratch directory is for.
 
-There is no cross-ecosystem setting for this, so scaffold writes the one each ecosystem's runner honours. Which mechanism a target uses is declared on the target itself and appears in the [support matrix](targets.md) as `scratch_test_exclusion`:
+There is no cross-ecosystem setting for this, so scaffold writes the one each ecosystem's runner honors. Which mechanism a target uses is declared on the target itself and appears in the [support matrix](targets.md) as `scratch_test_exclusion`:
 
 | Ecosystem | What scaffold writes | Where |
 | --- | --- | --- |
 | Python | Both directory names added to `norecursedirs`, alongside pytest's own default patterns | `[tool.pytest.ini_options]` in `pyproject.toml` |
 | Go | A `go.mod` in each scratch directory, and the ignore exception that carries it into a clone | `experiments/go.mod`, `screenshots/go.mod` |
-| Deno | Both directory names added to the top-level `exclude` array | `deno.json` |
 | npm | Nothing | -- |
 
 Three points about that table:
@@ -78,9 +75,9 @@ Three points about that table:
 - **The Go route is a nested module, not a renamed directory.** `go test ./...` skips a directory that declares its own module, and also one whose name begins with `_` or `.`; the scratch directories keep their plain names, which the convention, every walk and every document here spell out, so the module file is what is left. It costs one more committed file per scratch directory, plus the `!go.mod` line in that directory's ignore file that lets it reach a fresh clone, and it makes a probe placed there a separate module: it cannot import the parent module without a `replace` directive of its own. Without the committed marker, a fresh clone plus one dropped `.go` file is a broken `go test ./...`, which is the case the whole mechanism exists for.
 - **npm is left out on purpose.** `npm test` runs the project's own test script, which names whichever runner the project chose -- jest, vitest, mocha, `node --test` -- each with its own configuration file, several of them executable JavaScript. rlsbl writes none of those files, and it will not start owning one to place a single setting, so it writes nothing and says so here. The same holds for any ecosystem whose entry reads `no-test-runner-recursion`: its runner collects only from a declared test source set, so a scratch directory is never reached in the first place.
 
-**Nested members are skipped the same way, one path each.** A member whose directory encloses other members (see [Nested members](monorepo.md#nested-members)) gets a path-exact exclusion per nested member, so its runner never collects their tests: `--ignore=<path>` in pytest's `[tool.pytest.ini_options] addopts`, and the path in Deno's `exclude`. A basename in `norecursedirs` would also skip an unrelated directory of the same name, which is why these are paths. pytest resolves `--ignore` against the directory it starts in, which is the member's own in rlsbl's runs and in CI; run a member's tests from there. The `nested-member-runner-exclusion` check fails while an exclusion is missing, including where scaffold could not write it. Go needs nothing (a nested Go module has its own `go.mod`), and npm is the same stated gap as above.
+**Nested members are skipped the same way, one path each.** A member whose directory encloses other members (see [Nested members](monorepo.md#nested-members)) gets a path-exact exclusion per nested member, so its runner never collects their tests: `--ignore=<path>` in pytest's `[tool.pytest.ini_options] addopts`. A basename in `norecursedirs` would also skip an unrelated directory of the same name, which is why these are paths. pytest resolves `--ignore` against the directory it starts in, which is the member's own in rlsbl's runs and in CI; run a member's tests from there. The `nested-member-runner-exclusion` check fails while an exclusion is missing, including where scaffold could not write it. Go needs nothing (a nested Go module has its own `go.mod`), and npm is the same stated gap as above.
 
-`pyproject.toml` and `deno.json` belong to the project, not to scaffold. Scaffold merges the one setting into them and byte-preserves everything else, including comments and key order; a second run is a no-op. They never enter the managed-files registry, so the orphan sweep can never delete them. Where the setting cannot be placed safely -- a `pytest.ini`, which outranks `pyproject.toml` as pytest's configuration file, or a `deno.jsonc`, whose comments a rewrite would lose -- scaffold writes nothing and prints the exact line to add by hand.
+`pyproject.toml` belongs to the project, not to scaffold. Scaffold merges the one setting into it and byte-preserves everything else, including comments and key order; a second run is a no-op. It never enters the managed-files registry, so the orphan sweep can never delete it. Where the setting cannot be placed safely -- a `pytest.ini`, which outranks `pyproject.toml` as pytest's configuration file -- scaffold writes nothing and prints the exact line to add by hand.
 
 ### Checks never look inside them
 
@@ -97,9 +94,8 @@ A registry keeps every upload permanently, so a release refuses an upload that c
 | Python (hatchling) | The private-path entries, merged into `exclude` (existing entries kept); `uv build` builds the wheel from this sdist | `[tool.hatch.build.targets.sdist]` in `pyproject.toml` |
 | npm | The private-path entries, in the file scaffold creates once and never touches again | `.npmignore` |
 | Go | A stub `go.mod` in `.rlsbl/` and in each other private directory at the module root that git tracks files in; Go leaves a directory holding its own `go.mod` out of the module zip | `<directory>/go.mod` |
-| Docker | `.git` and the private-path entries, in the file scaffold creates once and never touches again | `.dockerignore` |
 
-A Python project built with another backend gets a printed warning naming that backend's exclusion instead, since scaffold writes only hatchling's; its CI refuses the upload until the entries are added. `.npmignore` and `.dockerignore` are user-owned, so a project scaffolded before these entries existed adds them by hand when the refusal names them.
+A Python project built with another backend gets a printed warning naming that backend's exclusion instead, since scaffold writes only hatchling's; its CI refuses the upload until the entries are added. `.npmignore` is user-owned, so a project scaffolded before these entries existed adds them by hand when the refusal names them.
 
 Go cannot leave a single file out of a module zip, only a directory holding its own `go.mod`. A private file at the module root therefore moves or stops being committed: `CLAUDE.md` moves to `.claude/CLAUDE.md` (Claude Code reads it there) with a stub `go.mod` in `.claude/`, and an environment or local-only file leaves git. A `CLAUDE.md` that selfdoc generated (its first line is selfdoc's generated-file header) is not moved by hand, since selfdoc would keep generating it at the root: the refusal names upgrading selfdoc and running `selfdoc layout migrate`, which moves it to `.claude/CLAUDE.md` and commits, and then `rlsbl scaffold`, which writes the stub `go.mod` in `.claude/` once git tracks a file there.
 

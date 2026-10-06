@@ -6,7 +6,7 @@ description = "Pipeline architecture: the built-in pipeline types and their auth
 
 ## Overview
 
-Pipelines handle **publishing** — where and how a release is distributed. They are configured in `.rlsbl/config.json` under the `pipelines` key, which supports 9 built-in pipeline types across 3 authentication patterns (token, credential, and unauthenticated). Each pipeline entry has a user-chosen name and specifies its type, auth mechanism, and optional asset configuration.
+Pipelines handle **publishing** — where and how a release is distributed. They are configured in `.rlsbl/config.json` under the `pipelines` key, which supports the built-in pipeline types and their two authentication patterns (token and unauthenticated). Each pipeline entry has a user-chosen name and specifies its type, auth mechanism, and optional asset configuration.
 
 Pipelines are distinct from targets: targets determine which files get version-bumped (auto-detected from manifests), while pipelines determine where the release artifact is published (explicitly configured). A project can have an npm target for versioning but a cloudflare-pages pipeline for publishing, or multiple pipelines publishing to different registries.
 
@@ -53,34 +53,31 @@ Pipelines are configured in `.rlsbl/config.json` under the `pipelines` key. Each
 
 | Field | Type | Required | Description |
 | --- | --- | --- | --- |
-| `type` | string | Yes | One of the 9 built-in pipeline types (see table below) |
+| `type` | string | Yes | One of the built-in pipeline types (see table below) |
 | `local` | bool | Yes | Whether to publish from the developer machine. `false` means CI handles it. |
 | `target` | string or null | Yes | The release target this pipeline publishes for. Must name an entry in the config's `targets` list, or be `null` for a targetless publisher (e.g. a docs deploy). There is no name-based inference. |
 | `artifact` | string | Yes (type `go`) | `binary` or `library`. Selects the go publish workflow. No default. See [go](#go). |
 | `token_var` | string | No | Env var name for the publish token. Each type has a default. |
-| `username_var` | string | No | Env var for username auth (docker only). |
-| `password_var` | string | No | Env var for password auth (docker only). |
 | `assets` | bool | No | Enable building and uploading target-specific artifacts to GitHub Releases. |
 | `max_asset_size_mb` | int | When `assets` or `custom_assets` is set | Maximum artifact size in MB. Release fails if any artifact exceeds this. |
 | `custom_assets` | array | No | List of custom build artifacts. Each entry: `{name, build}`. |
 
 ## Pipeline types
 
-There are 9 built-in pipeline types covering all major package registries and deployment platforms. Each type implements ecosystem-specific authentication, build commands, and publish logic while sharing the common `BasePipeline` interface for custom assets and lifecycle hooks.
+The built-in pipeline types cover the npm, PyPI, and Go registries and Cloudflare Pages deployment. Each type implements ecosystem-specific authentication, build commands, and publish logic while sharing the common `BasePipeline` interface for custom assets and lifecycle hooks.
 
 :-: table-pipelines
 
 ## Class hierarchy
 
-Every pipeline implementation inherits from `BasePipeline`, which provides no-op defaults for publish and build steps plus the shared `build_custom_assets()` implementation. Two intermediate mixins add authentication patterns: `TokenPipeline` for single-token auth and `CredentialPipeline` for username/password pairs. Which pipeline uses which is the `Auth method` column of the table above.
+Every pipeline implementation inherits from `BasePipeline`, which provides no-op defaults for publish and build steps plus the shared `build_custom_assets()` implementation. An intermediate mixin adds an authentication pattern: `TokenPipeline` for single-token auth. Which pipeline uses it is the `Auth method` column of the table above.
 
 | Class | Auth pattern | Pipelines |
 | --- | --- | --- |
-| `BasePipeline` | None (direct subclass) | go (proxy notification), maven (flexible auth), maven-central (Central Portal credentials), cloudflare-pages (selfdoc CLI) |
-| `TokenPipeline(BasePipeline)` | Single env var token | npm, pypi, deno, hex |
-| `CredentialPipeline(BasePipeline)` | Username + password env vars | docker |
+| `BasePipeline` | None (direct subclass) | go (proxy notification), cloudflare-pages (selfdoc CLI) |
+| `TokenPipeline(BasePipeline)` | Single env var token | npm, pypi |
 
-`TokenPipeline` validates that the token env var is set before attempting publish and passes it to the ecosystem-specific publish command. `CredentialPipeline` validates both username and password env vars.
+`TokenPipeline` validates that the token env var is set before attempting publish and passes it to the ecosystem-specific publish command.
 
 ## Custom assets
 
@@ -125,7 +122,7 @@ A pipeline runs because it is configured, and it publishes for the target its
 `target` key links it to. Whether a target publishes at all is decided by that
 configuration — by `publish_mode`, and by whether a pipeline names the target —
 never by a property of the target itself. A target with no pipeline linked to it
-is a version-bump-only target (`plain` and `spec` are the usual cases): it gets
+is a version-bump-only target (`spec` is the usual case): it gets
 its version written and its tag created, and no publish step runs for it because
 none is configured.
 
@@ -261,51 +258,6 @@ PyPI publishing happens in CI; docs deploy happens locally in a post-release hoo
 - **Library tag handling:** The library publish workflow bakes the module path from `go.mod` at scaffold time (correct even for monorepo subdirectory modules, whose proxy-visible tags are the companion subdir tag `<subdir>/vX.Y.Z`) and derives the version from the release tag, handling plain (`v1.2.3`), releasable (`<name>@v1.2.3`), and subdir (`<subdir>/v1.2.3`) tag formats.
 - **Private modules:** A private Go module cannot be verified against the public proxy (`proxy.golang.org` refuses to serve private modules). Private Go libraries must set `publish_mode` `"none"` in `.rlsbl/config.json`, which suppresses the publish job entirely — no publish workflow is scaffolded.
 - **Quirks:** Pipelines with `local: true` **must** declare `install_paths` (a list of main-package dirs relative to the project root, e.g. `["./cmd/mytool"]`). Missing or invalid declarations are hard errors; each declared path is validated against `go list` (it must be a `package main` dir). There is no auto-detection fallback — detection only validates declarations.
-
-### deno
-
-- **Class:** `TokenPipeline`
-- **Default token env var:** `DENO_TOKEN` (fallback: `JSR_TOKEN`)
-- **Auth pattern:** Dual-token fallback, similar to pypi. Checks `DENO_TOKEN` first, then `JSR_TOKEN`.
-- **Publish command:** `deno publish`
-- **CI template:** Passes the token via environment variable to the publish step.
-- **Quirks:** Publishes to JSR (JavaScript Registry). The dual-token fallback accommodates projects that use either env var name.
-
-### hex
-
-- **Class:** `TokenPipeline`
-- **Default token env var:** `HEX_API_KEY`
-- **Auth pattern:** Single token passed via `HEX_API_KEY` env var.
-- **Publish command:** `mix hex.publish --yes`
-- **CI template:** Standard publish step with the token from GitHub secrets.
-- **Quirks:** Standard single-token pattern. The `--yes` flag is required to skip the interactive confirmation prompt.
-
-### maven
-
-- **Class:** `BasePipeline` (flexible auth)
-- **Default token env var:** `GITHUB_TOKEN` (configurable via `token_var` in pipeline config).
-- **Auth pattern:** Single token read from the configured `token_var` env var (defaults to `GITHUB_TOKEN`). Subclasses `BasePipeline` directly rather than `TokenPipeline` because it implements its own token resolution with a different default.
-- **Publish command:** Detects gradle vs maven build system. Runs `./gradlew publish` for Gradle projects or `mvn deploy` for Maven projects.
-- **CI template:** Generates appropriate publish steps based on detected build system and target registry.
-- **Quirks:** Build system detection is based on the presence of a `gradlew` script (Gradle) or `pom.xml` (Maven) in the project directory. Errors if neither is found. Does not check for `build.gradle` or `build.gradle.kts` directly.
-
-### maven-central
-
-- **Class:** `BasePipeline` (own credential resolution)
-- **Default credential env vars:** `ORG_GRADLE_PROJECT_mavenCentralUsername`, `ORG_GRADLE_PROJECT_mavenCentralPassword`, `ORG_GRADLE_PROJECT_signingInMemoryKey`, `ORG_GRADLE_PROJECT_signingInMemoryKeyPassword`
-- **Auth pattern:** Four env vars for Central Portal user tokens and GPG signing. All four must be set for local publish. Optional: `ORG_GRADLE_PROJECT_signingInMemoryKeyId` (for specific GPG subkey selection).
-- **Publish command:** Detects gradle vs maven build system. Runs `./gradlew publishAndReleaseToMavenCentral` for Gradle projects (delegates to the vanniktech/gradle-maven-publish-plugin) or `mvn deploy` for Maven projects with Central Portal configuration.
-- **CI template:** Uses `publish-central.yml.tpl` (separate from the maven pipeline's `publish.yml.tpl`). Passes credentials as GitHub secrets.
-- **Quirks:** Subclasses `BasePipeline` directly (not `TokenPipeline` or `CredentialPipeline`) because it requires four env vars rather than the standard one or two. Build system detection is identical to the `maven` pipeline (presence of `gradlew` or `pom.xml`). A `maven-central-metadata` quality check validates POM metadata (name, description, url, licenses, developers, scm), sources/javadoc jar generation, and signing configuration when a `maven-central` pipeline is configured.
-
-### docker
-
-- **Class:** `CredentialPipeline`
-- **Default credential env vars:** `DOCKER_USERNAME` + `DOCKER_PASSWORD`
-- **Auth pattern:** Username and password pair. Both must be set. Configured via `username_var` and `password_var` in the pipeline config.
-- **Publish command:** `docker build` with `--build-arg VERSION=<version>`, then `docker push` with the versioned tag, then `docker tag` to create a `latest` tag, then pushes `latest`. No explicit `docker login` step in local publish (credentials are validated but login is assumed to be pre-configured).
-- **CI template:** Login step followed by build and push steps.
-- **Quirks:** Requires `image` and `registry` fields in the pipeline config to construct the full image reference (`<registry>/<image>:<version>`). Both the versioned and `latest` tags are pushed.
 
 ### cloudflare-pages
 

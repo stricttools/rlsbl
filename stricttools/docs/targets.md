@@ -1,5 +1,5 @@
 +++
-description = "The rlsbl release targets including npm, PyPI, Go, Docker and Flutter, with auto-detection, the ReleaseTarget protocol, and per-axis support properties."
+description = "The rlsbl release targets npm, PyPI, Go, and spec, with auto-detection, the ReleaseTarget protocol, and per-axis support properties."
 +++
 
 # Release targets
@@ -27,7 +27,7 @@ A project can have a target for versioning without a corresponding pipeline (e.g
 
 When `rlsbl release run`, `rlsbl scaffold`, or `rlsbl targets` needs to know which targets apply, it calls `detect_targets(dir_path)` which scans the project directory for manifest files and applies content-based disambiguation when multiple targets could match. The detection logic follows two paths:
 
-1. **Explicit configuration** — If `.rlsbl/config.json` contains a `targets` array, that list is authoritative. Each entry is either a string (`"npm"`) or a dict with `name` and optional `path` (for subdirectory targets). Unknown target names are warned and skipped. In a monorepo, a releasable's `.rlsbl-monorepo/releasables/<name>/config.json` declares the targets of every member it holds: a string entry applies to each member in its own directory, while a `path` entry names one package, resolved from the releasable's root (the deepest directory holding all its members, which is the repository root when the root member belongs to it), and only the member whose territory holds that directory carries it. A `path` no member of the releasable contains is refused.
+1. **Explicit configuration** — If `.rlsbl/config.json` contains a `targets` array, that list is authoritative. Each entry is either a string (`"npm"`) or a dict with `name` and optional `path` (for subdirectory targets). A target name rlsbl does not register is a hard error naming the supported targets. In a monorepo, a releasable's `.rlsbl-monorepo/releasables/<name>/config.json` declares the targets of every member it holds: a string entry applies to each member in its own directory, while a `path` entry names one package, resolved from the releasable's root (the deepest directory holding all its members, which is the repository root when the root member belongs to it), and only the member whose territory holds that directory carries it. A `path` no member of the releasable contains is refused.
 
 2. **Auto-detection fallback** — If no `targets` array exists in config, every registered target's `detect()` method is called against the directory. Targets that return `True` are included.
 
@@ -36,21 +36,12 @@ The `auto_detectable` ClassVar on each target controls detection behavior. Which
 | Value | Meaning |
 | ----- | ------- |
 | `"yes"` | Standard file-based detection |
-| `"conditional"` | Detects only when specific conditions are met beyond file presence (`plain` requires a `VERSION` file AND no other manifest) |
+| `"conditional"` | Detects only when specific conditions are met beyond file presence |
 | `"no"` | Never auto-detected; must be declared in config |
-
-### Detection priority
-
-When multiple targets could match the same manifest file (e.g., a project with both `pubspec.yaml` and a `flutter:` section, or `build.gradle` matching both native-android and maven), targets use content-based checks to disambiguate and ensure exactly one target claims each project:
-
-- **dart** excludes projects where `pubspec.yaml` contains a `flutter:` key
-- **flutter** requires `pubspec.yaml` with a `flutter:` key
-- **plain** yields to any other target's manifest file
-- **native-android** vs **maven**: both use `build.gradle.kts`/`build.gradle`, but native-android checks for `com.android.application` plugin declaration
 
 ## Detection files
 
-Each target class declares a `detection_files` ClassVar listing the filenames whose presence triggers detection; the `Detection files` column of the table above is that declaration, rendered. These filenames are aggregated into the `PROJECT_MANIFESTS` set used by workspace-level checks to detect unregistered projects in a monorepo. A target whose column is blank either decides by file *content* (native-android shares the Gradle files with maven and inspects them; native-ios scans for an `.xcodeproj`) or never auto-detects at all (swift-apple is selected only by explicit declaration). Shared manifests are disambiguated by content and annotated in the rendered column — flutter and dart share `pubspec.yaml`, and `plain` yields to every other target's manifest.
+Each target class declares a `detection_files` ClassVar listing the filenames whose presence triggers detection; the `Detection files` column of the table above is that declaration, rendered. These filenames are aggregated into the `PROJECT_MANIFESTS` set used by workspace-level checks to detect unregistered projects in a monorepo.
 
 ## The ReleaseTarget protocol
 
@@ -159,94 +150,12 @@ Each target declares an `ecosystem` string: the human-readable name of the regis
 - Homebrew tap support via `homebrew` config
 - `dev_install`: `go install <install_paths>` from the go pipeline config (no venv concept); undeclared `install_paths` on a module that has main packages is a hard error from `rlsbl dev install`, which is the command that has a project directory and something to install from it. Nothing that merely enumerates targets — the support axes, the derived help counts — ever hands the target a project directory, so no other command can reach that refusal
 
-### deno
-
-- Handles both `deno.json` and `deno.jsonc` (prefers `.json` when both exist)
-- For `.jsonc` files, uses regex-based version replacement to preserve comments
-- For `.json` files, uses standard JSON rewrite preserving indent
-- `version_file()` resolves dynamically based on which config file exists
-
-
-### dart
-
-- Reads/writes `pubspec.yaml` using ruamel.yaml for comment preservation
-- Strips build number suffix (`+N`) when reading, handles it when writing
-- Build number strategy configurable via `build_number.enabled` and `build_number.strategy` in config
-- Excludes projects with `flutter:` key (those belong to the flutter target)
-
-### flutter
-
-- Extends `DartTarget` (inheritance, not duplication)
-- Detection: `pubspec.yaml` must contain a `flutter:` key
-- Inherits all dart version read/write logic including build number handling
-- No detection_files of its own (shares pubspec.yaml with dart)
-
-### swift
-
-- Detection: `Package.swift` presence
-- Version stored in `VERSION` file
-- `dev_install`: global via `swift build`, no venv concept
-
-### swift-apple
-
-- Extends `SwiftTarget` (inheritance)
-- Never auto-detected (`auto_detectable = "no"`) — must be declared in `.rlsbl/config.json` targets array
-- Provides macOS-only CI templates (uses `macos-latest` runners instead of `ubuntu-latest`)
-- No `dev_install` support
-
-### zig
-
-- Detection: `build.zig.zon` or `build.zig`
-- Version stored in `VERSION` file with automatic `build.zig.zon` synchronization
-- npm binary wrapper support for cross-compiled binaries, activated with `{"npm_wrapper": {"enabled": true}}`. Publishes bare per-platform names (`<bin>-linux-x64`, ...) plus a meta wrapper named `<bin>`; scoped names are banned and each name needs explicit `rlsbl check-name` approval. A stale `npm_wrapper.scope`/`npm_scope` key is a hard error.
-- Cross-compilation target map for 6 platforms (linux/darwin/win32, x64/arm64)
-
-### docker
-
-- Detection: `Dockerfile` presence
-- Version stored in `VERSION` file
-- Image name derived from config (`docker.image`) or directory name
-
-### maven
-
-- Detection: `build.gradle.kts`, `build.gradle`, or `pom.xml`
-- Supports three build systems: Maven (pom.xml), Gradle (build.gradle), Gradle Kotlin DSL (build.gradle.kts)
-
 ### spec
 
 - Detection: `version.json` file presence
 - Version: reads/writes `{"version": "X.Y.Z"}` in `version.json`
 - Its CI template is a stub, for users to add their own validation commands; there is no publish step
 - Use case: spec-only projects that need version tracking without any build or publish step — the tagged GitHub Release is the publication
-
-### pgdesign
-
-- Detection: `pgdesign.toml` file presence
-- Version: reads/writes the `version` field in `pgdesign.toml`
-- No publish mechanism — version bumping only (the tagged GitHub Release is the artifact)
-- Build: the release validates the schema with `pgdesign check --tag validation --json` in the target directory and fails on a check whose status is `fail`, naming its errors; warnings are printed and never block. The output must be strictcli's machine envelope (interface_version 2, which pgdesign 0.27.1 prints); anything else, or a validation tag that selects no check, fails the build
-- Use case: PostgreSQL schema design projects managed by the pgdesign tool
-
-### native-ios
-
-- Content-based detection: scans for `.xcodeproj/project.pbxproj` with MARKETING_VERSION
-- Also supports Tuist `Project.swift`
-- See [native-targets.md](native-targets.md) for details
-
-### native-android
-
-- Content-based detection: checks `build.gradle`/`build.gradle.kts` for `com.android.application` plugin
-- Manages both `versionName` (semver) and `versionCode` (integer, auto-incremented)
-- See [native-targets.md](native-targets.md) for details
-
-### plain
-
-- Detection: conditional — `VERSION` file must exist AND no other target manifest is present
-- Version: reads/writes plain text `VERSION` file (single line, e.g. `0.5.2`)
-- Supports nothing beyond version bumping and tagging — its row in the table above is blank on every optional axis, so scaffold generates no CI workflow, `rlsbl dev install` has nothing to run, and no pipeline links to it
-- The stand-off set: plain will not auto-detect when any other target's manifest is present. That set is derived from every registered target's `detection_files`, plus `Cargo.toml` and `selfdoc.json` — manifests left behind by retired targets that no current target claims
-- Use case: projects that need version tracking but don't fit any ecosystem (e.g., documentation-only repos, script collections, infrastructure projects)
-- Also bumps `pyproject.toml` version if that file exists with a `[project].version` field
 
 ## Check support matrix
 
