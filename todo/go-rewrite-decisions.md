@@ -45,3 +45,6 @@ Recorded by the session that deleted the removed targets; each is an implementat
 - The circular-deps check moves to strictcode as well.
 - The member layering system is dropped: layers.py, the `[layers]` workspace key, and the layers-violations check; www's `[layers]` section is removed in the same change so its rlsbl commands keep working.
 - `discover` is kept.
+- `monorepo graph` is kept and gains `--json` output (members, versions, targets, and edges in topological order).
+- `monorepo impact` and `monorepo outdated` are kept.
+- The monorepo snapshot is dropped: the command, the release step, snapshot-check, and the committed snapshot.json files; `monorepo graph --json` gives the same inventory on demand.
