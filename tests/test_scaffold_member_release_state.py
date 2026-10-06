@@ -27,10 +27,10 @@ FLAGS = {"auto-commit": False, "auto-tag": False, "skip-shared": False}
 def _member(mock_git_repo, monkeypatch):
     proj_dir = mock_git_repo / "app"
     proj_dir.mkdir()
-    _make_explicit_workspace(mock_git_repo, [{"name": "www"}], [
-        {"path": "app", "name": "app", "releasable": "www"},
+    _make_explicit_workspace(mock_git_repo, [{"name": "portal"}], [
+        {"path": "app", "name": "app", "releasable": "portal"},
     ])
-    _setup_releasable(mock_git_repo, "www", config={"publish_mode": "ci"})
+    _setup_releasable(mock_git_repo, "portal", config={"publish_mode": "ci"})
     monkeypatch.chdir(proj_dir)
     return proj_dir
 
@@ -59,7 +59,7 @@ def test_the_member_s_merge_bases_live_in_the_releasable_state_directory(
     _scaffold(proj_dir)
 
     expected = os.path.join(
-        get_releasable_dir(str(mock_git_repo), "www"), "bases", "app",
+        get_releasable_dir(str(mock_git_repo), "portal"), "bases", "app",
     )
     assert os.path.realpath(scaffold_bases_dir(str(proj_dir))) == os.path.realpath(expected)
     stored = sorted(

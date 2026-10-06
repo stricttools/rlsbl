@@ -20,9 +20,9 @@ from rlsbl.tag_glob import TagMode, TagScheme
 
 class TestTagScheme:
     def test_render_and_list_glob(self):
-        scheme = TagScheme.from_format("{name}@v{version}", "www")
-        assert scheme.render("1.2.3") == "www@v1.2.3"
-        assert scheme.list_glob() == "www@v*"
+        scheme = TagScheme.from_format("{name}@v{version}", "portal")
+        assert scheme.render("1.2.3") == "portal@v1.2.3"
+        assert scheme.list_glob() == "portal@v*"
 
     def test_a_nested_members_tag_is_not_the_parents(self):
         kernel = TagScheme.from_format("kernel/v{version}", "kernel")

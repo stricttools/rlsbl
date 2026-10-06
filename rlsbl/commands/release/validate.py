@@ -547,7 +547,7 @@ def _format_releasable_tag(releasable_tag_format, releasable_name, version):
 
     Supports ``{name}`` and ``{version}`` placeholders.  E.g.::
 
-        "{name}@v{version}" -> "www@v2.0.0"
+        "{name}@v{version}" -> "portal@v2.0.0"
         "v{version}"        -> "v2.0.0"
     """
     return releasable_tag_format.format(name=releasable_name, version=version)

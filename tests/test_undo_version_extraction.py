@@ -25,8 +25,8 @@ class TestVersionAndMsg:
         assert _version_and_msg(_uc(), "v1.2.3") == ("1.2.3", "v1.2.3")
 
     def test_releasable_final(self):
-        assert _version_and_msg(_uc(releasable_name="www"), "www@v1.2.3") == (
-            "1.2.3", "www: release v1.2.3",
+        assert _version_and_msg(_uc(releasable_name="portal"), "portal@v1.2.3") == (
+            "1.2.3", "portal: release v1.2.3",
         )
 
     def test_monorepo_final(self):
@@ -36,8 +36,8 @@ class TestVersionAndMsg:
 
     def test_releasable_prerelease(self):
         assert _version_and_msg(
-            _uc(releasable_name="www"), "www@v1.2.3-rc.1"
-        ) == ("1.2.3-rc.1", "www: release v1.2.3-rc.1")
+            _uc(releasable_name="portal"), "portal@v1.2.3-rc.1"
+        ) == ("1.2.3-rc.1", "portal: release v1.2.3-rc.1")
 
     @pytest.mark.parametrize("tag", ["v2.0.0", "app@v3.1.4"])
     def test_roundtrip_shape(self, tag):

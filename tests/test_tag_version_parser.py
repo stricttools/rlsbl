@@ -47,7 +47,7 @@ class TestFinalOnlyMode:
         "mylib@v1.2.3-rc.1",
         "v1.2.3-alpha",
         "v1.2.3-alpha.2",
-        "www@v1.2.3-beta.1",
+        "portal@v1.2.3-beta.1",
     ])
     def test_prerelease_rejected(self, tag):
         assert parse_version_tag(tag, mode=FINAL) is None
@@ -74,7 +74,7 @@ class TestPrereleaseInclusiveMode:
         ("v1.0.0-rc.1", "1.0.0-rc.1"),
         ("mylib@v1.2.3-rc.1", "1.2.3-rc.1"),
         ("v1.2.3-alpha.2", "1.2.3-alpha.2"),
-        ("www@v1.2.3-beta.1", "1.2.3-beta.1"),
+        ("portal@v1.2.3-beta.1", "1.2.3-beta.1"),
         # Prerelease without a numeric component: accepted (semver-valid).
         ("v1.2.3-alpha", "1.2.3-alpha"),
     ])

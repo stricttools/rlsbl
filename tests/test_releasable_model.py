@@ -100,8 +100,8 @@ class TestReleasableDataclass:
         assert r.effective_tag_format == DEFAULT_TAG_FORMAT
 
     def test_custom_tag_format(self):
-        r = Releasable(name="www", tag_format="v{version}")
-        assert r.name == "www"
+        r = Releasable(name="portal", tag_format="v{version}")
+        assert r.name == "portal"
         assert r.tag_format == "v{version}"
         assert r.declares_tag_format
         assert r.effective_tag_format == "v{version}"
@@ -128,7 +128,7 @@ class TestReleasableDataclass:
 
     def test_inequality_name(self):
         a = Releasable(name="core")
-        b = Releasable(name="www")
+        b = Releasable(name="portal")
         assert a != b
 
     def test_inequality_tag_format(self):
@@ -213,7 +213,7 @@ releasable = "core"
 name = "core"
 
 [[releasables]]
-name = "www"
+name = "portal"
 tag_format = "v{version}"
 
 [[projects]]
@@ -224,14 +224,14 @@ releasable = "core"
 [[projects]]
 path = "b"
 name = "b"
-releasable = "www"
+releasable = "portal"
 """)
         releasables = load_releasables(str(tmp_project))
         assert len(releasables) == 2
         names = {r.name for r in releasables}
-        assert names == {"core", "www"}
-        www = [r for r in releasables if r.name == "www"][0]
-        assert www.tag_format == "v{version}"
+        assert names == {"core", "portal"}
+        portal = [r for r in releasables if r.name == "portal"][0]
+        assert portal.tag_format == "v{version}"
 
     def test_project_with_false_releasable(self, tmp_project):
         """releasable = false is accepted and doesn't need to match a releasable name."""
@@ -513,7 +513,7 @@ class TestMembersOf:
     def test_explicit_single_member(self):
         projects = [
             WorkspaceProject({"name": "a", "path": "a", "releasable": "core"}),
-            WorkspaceProject({"name": "b", "path": "b", "releasable": "www"}),
+            WorkspaceProject({"name": "b", "path": "b", "releasable": "portal"}),
         ]
         result = members_of("core", projects)
         assert len(result) == 1
@@ -523,7 +523,7 @@ class TestMembersOf:
         projects = [
             WorkspaceProject({"name": "a", "path": "a", "releasable": "core"}),
             WorkspaceProject({"name": "b", "path": "b", "releasable": "core"}),
-            WorkspaceProject({"name": "c", "path": "c", "releasable": "www"}),
+            WorkspaceProject({"name": "c", "path": "c", "releasable": "portal"}),
         ]
         result = members_of("core", projects)
         assert len(result) == 2
@@ -562,14 +562,14 @@ class TestMembersOf:
     def test_only_explicit_field_matched(self):
         """Only projects with explicit releasable field are matched."""
         projects = [
-            WorkspaceProject({"name": "core", "path": "core", "releasable": "www"}),
+            WorkspaceProject({"name": "core", "path": "core", "releasable": "portal"}),
             WorkspaceProject({"name": "other", "path": "other"}),
         ]
-        # "core" releasable has no members -- the "core" project belongs to "www"
+        # "core" releasable has no members -- the "core" project belongs to "portal"
         assert members_of("core", projects) == []
         # "other" has no releasable field -- not a member of anything
         assert members_of("other", projects) == []
-        result = members_of("www", projects)
+        result = members_of("portal", projects)
         assert len(result) == 1
         assert result[0].name == "core"
 
@@ -675,12 +675,12 @@ releasable = "core"
         """Full round-trip: write releasables + projects, then load both."""
         rels = [
             Releasable(name="core"),
-            Releasable(name="www", tag_format="v{version}"),
+            Releasable(name="portal", tag_format="v{version}"),
         ]
         projects = [
             WorkspaceProject({"path": "a", "name": "a", "releasable": "core"}),
             WorkspaceProject({"path": "b", "name": "b", "releasable": "core"}),
-            WorkspaceProject({"path": "c", "name": "c", "releasable": "www"}),
+            WorkspaceProject({"path": "c", "name": "c", "releasable": "portal"}),
             WorkspaceProject({"path": "d", "name": "d", "releasable": False}),
             WorkspaceProject({"path": "tests", "name": "tests", "dev_only": True, "releasable": False}),
         ]
@@ -691,14 +691,14 @@ releasable = "core"
 
         assert len(loaded_releasables) == 2
         core = [r for r in loaded_releasables if r.name == "core"][0]
-        www = [r for r in loaded_releasables if r.name == "www"][0]
+        portal = [r for r in loaded_releasables if r.name == "portal"][0]
         assert not core.declares_tag_format
         assert core.effective_tag_format == DEFAULT_TAG_FORMAT
-        assert www.tag_format == "v{version}"
+        assert portal.tag_format == "v{version}"
 
         assert loaded_projects[0].releasable == "core"
         assert loaded_projects[1].releasable == "core"
-        assert loaded_projects[2].releasable == "www"
+        assert loaded_projects[2].releasable == "portal"
         assert loaded_projects[3].releasable is False
         assert loaded_projects[4].dev_node is True
 

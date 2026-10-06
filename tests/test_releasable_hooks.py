@@ -84,9 +84,9 @@ class TestGetReleasableHookPath:
     """Tests for releasable-level hook path resolution."""
 
     def test_returns_correct_path(self, tmp_path):
-        path = get_releasable_hook_path(str(tmp_path), "www", "pre-checks.sh")
+        path = get_releasable_hook_path(str(tmp_path), "portal", "pre-checks.sh")
         expected = os.path.join(
-            str(tmp_path), ".rlsbl-monorepo", "releasables", "www", "hooks", "pre-checks.sh"
+            str(tmp_path), ".rlsbl-monorepo", "releasables", "portal", "hooks", "pre-checks.sh"
         )
         assert path == expected
 
@@ -96,7 +96,7 @@ class TestGetReleasableHookPath:
             assert path.endswith(f"core/hooks/{hook}")
 
     def test_different_releasable_names(self, tmp_path):
-        for name in ("core", "www", "api"):
+        for name in ("core", "portal", "api"):
             path = get_releasable_hook_path(str(tmp_path), name, "pre-checks.sh")
             assert f"/releasables/{name}/hooks/" in path
 
@@ -173,13 +173,13 @@ class TestRunReleasableHooks:
 
     def test_pre_checks_releasable_first_then_packages(self, tmp_path):
         """pre-checks: releasable hook runs first, then per-package alphabetically."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
-            {"name": "beta", "path": "beta", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
+            {"name": "beta", "path": "beta", "releasable": "portal"},
         ])
 
         # Create releasable hook
-        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "www" / "hooks"
+        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "portal" / "hooks"
         _make_hook(rel_hook_dir, "pre-checks.sh", "#!/bin/bash\necho releasable-pre-checks\n")
 
         # Create per-package hooks
@@ -202,7 +202,7 @@ class TestRunReleasableHooks:
 
         with patch("rlsbl.commands.release.hooks.run_release_hook", side_effect=mock_run_release_hook):
             run_releasable_hooks(
-                "pre-checks", str(tmp_path), "www",
+                "pre-checks", str(tmp_path), "portal",
                 member_packages, {"RLSBL_VERSION": "1.0.0"}, None,
                 print,
             )
@@ -215,12 +215,12 @@ class TestRunReleasableHooks:
 
     def test_pre_release_packages_first_then_releasable(self, tmp_path):
         """pre-release: per-package hooks run first alphabetically, then releasable."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
-            {"name": "beta", "path": "beta", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
+            {"name": "beta", "path": "beta", "releasable": "portal"},
         ])
 
-        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "www" / "hooks"
+        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "portal" / "hooks"
         _make_hook(rel_hook_dir, "pre-release.sh")
 
         alpha_dir = tmp_path / "alpha"
@@ -242,7 +242,7 @@ class TestRunReleasableHooks:
 
         with patch("rlsbl.commands.release.hooks.run_release_hook", side_effect=mock_run_release_hook):
             run_releasable_hooks(
-                "pre-release", str(tmp_path), "www",
+                "pre-release", str(tmp_path), "portal",
                 member_packages, {"RLSBL_VERSION": "1.0.0"}, None,
                 print,
             )
@@ -255,11 +255,11 @@ class TestRunReleasableHooks:
 
     def test_post_release_releasable_first_then_packages(self, tmp_path):
         """post-release: releasable first, then per-package alphabetically."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
         ])
 
-        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "www" / "hooks"
+        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "portal" / "hooks"
         _make_hook(rel_hook_dir, "post-release.sh")
 
         alpha_dir = tmp_path / "alpha"
@@ -273,7 +273,7 @@ class TestRunReleasableHooks:
 
         with patch("rlsbl.commands.release.hooks.run_release_hook", side_effect=mock_run_release_hook):
             run_releasable_hooks(
-                "post-release", str(tmp_path), "www",
+                "post-release", str(tmp_path), "portal",
                 [("alpha", str(alpha_dir))], {"RLSBL_VERSION": "1.0.0"}, None,
                 print,
             )
@@ -285,8 +285,8 @@ class TestRunReleasableHooks:
 
     def test_missing_hooks_are_skipped(self, tmp_path):
         """When hooks don't exist at either level, nothing runs."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
         ])
         alpha_dir = tmp_path / "alpha"
         alpha_dir.mkdir(exist_ok=True)
@@ -298,7 +298,7 @@ class TestRunReleasableHooks:
 
         with patch("rlsbl.commands.release.hooks.run_release_hook", side_effect=mock_run_release_hook):
             run_releasable_hooks(
-                "pre-checks", str(tmp_path), "www",
+                "pre-checks", str(tmp_path), "portal",
                 [("alpha", str(alpha_dir))], {"RLSBL_VERSION": "1.0.0"}, None,
                 print,
             )
@@ -308,11 +308,11 @@ class TestRunReleasableHooks:
 
     def test_only_releasable_hook_runs(self, tmp_path):
         """When only releasable hook exists, only it runs."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
         ])
 
-        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "www" / "hooks"
+        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "portal" / "hooks"
         _make_hook(rel_hook_dir, "pre-checks.sh")
 
         alpha_dir = tmp_path / "alpha"
@@ -325,7 +325,7 @@ class TestRunReleasableHooks:
 
         with patch("rlsbl.commands.release.hooks.run_release_hook", side_effect=mock_run_release_hook):
             run_releasable_hooks(
-                "pre-checks", str(tmp_path), "www",
+                "pre-checks", str(tmp_path), "portal",
                 [("alpha", str(alpha_dir))], {"RLSBL_VERSION": "1.0.0"}, None,
                 print,
             )
@@ -334,9 +334,9 @@ class TestRunReleasableHooks:
 
     def test_only_package_hooks_run(self, tmp_path):
         """When only per-package hooks exist, only they run."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
-            {"name": "beta", "path": "beta", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
+            {"name": "beta", "path": "beta", "releasable": "portal"},
         ])
 
         alpha_dir = tmp_path / "alpha"
@@ -353,7 +353,7 @@ class TestRunReleasableHooks:
 
         with patch("rlsbl.commands.release.hooks.run_release_hook", side_effect=mock_run_release_hook):
             run_releasable_hooks(
-                "pre-checks", str(tmp_path), "www",
+                "pre-checks", str(tmp_path), "portal",
                 [("beta", str(beta_dir)), ("alpha", str(alpha_dir))],
                 {"RLSBL_VERSION": "1.0.0"}, None, print,
             )
@@ -371,11 +371,11 @@ class TestHookFailurePropagation:
 
     def test_releasable_hook_failure_blocks_release(self, tmp_path):
         """Failure in releasable pre-checks hook raises HookError."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
         ])
 
-        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "www" / "hooks"
+        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "portal" / "hooks"
         _make_hook(rel_hook_dir, "pre-checks.sh")
 
         alpha_dir = tmp_path / "alpha"
@@ -387,16 +387,16 @@ class TestHookFailurePropagation:
         with patch("rlsbl.commands.release.hooks.run_release_hook", side_effect=mock_run_release_hook):
             with pytest.raises(HookError, match="releasable pre-checks"):
                 run_releasable_hooks(
-                    "pre-checks", str(tmp_path), "www",
+                    "pre-checks", str(tmp_path), "portal",
                     [("alpha", str(alpha_dir))], {"RLSBL_VERSION": "1.0.0"}, None,
                     print,
                 )
 
     def test_package_hook_failure_blocks_release(self, tmp_path):
         """Failure in per-package hook raises HookError and stops further packages."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
-            {"name": "beta", "path": "beta", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
+            {"name": "beta", "path": "beta", "releasable": "portal"},
         ])
 
         alpha_dir = tmp_path / "alpha"
@@ -417,7 +417,7 @@ class TestHookFailurePropagation:
         with patch("rlsbl.commands.release.hooks.run_release_hook", side_effect=mock_run_release_hook):
             with pytest.raises(HookError, match="alpha"):
                 run_releasable_hooks(
-                    "pre-checks", str(tmp_path), "www",
+                    "pre-checks", str(tmp_path), "portal",
                     [("alpha", str(alpha_dir)), ("beta", str(beta_dir))],
                     {"RLSBL_VERSION": "1.0.0"}, None, print,
                 )
@@ -427,11 +427,11 @@ class TestHookFailurePropagation:
 
     def test_pre_release_package_failure_blocks_releasable_hook(self, tmp_path):
         """In pre-release order, if a package hook fails, the releasable hook does not run."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
         ])
 
-        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "www" / "hooks"
+        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "portal" / "hooks"
         _make_hook(rel_hook_dir, "pre-release.sh")
 
         alpha_dir = tmp_path / "alpha"
@@ -448,7 +448,7 @@ class TestHookFailurePropagation:
         with patch("rlsbl.commands.release.hooks.run_release_hook", side_effect=mock_run_release_hook):
             with pytest.raises(HookError, match="alpha"):
                 run_releasable_hooks(
-                    "pre-release", str(tmp_path), "www",
+                    "pre-release", str(tmp_path), "portal",
                     [("alpha", str(alpha_dir))], {"RLSBL_VERSION": "1.0.0"}, None,
                     print,
                 )
@@ -467,9 +467,9 @@ class TestPerPackageHookEnvVars:
 
     def test_package_hooks_get_rlsbl_package(self, tmp_path):
         """Each per-package hook receives RLSBL_PACKAGE set to the package name."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
-            {"name": "beta", "path": "beta", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
+            {"name": "beta", "path": "beta", "releasable": "portal"},
         ])
 
         alpha_dir = tmp_path / "alpha"
@@ -486,7 +486,7 @@ class TestPerPackageHookEnvVars:
 
         with patch("rlsbl.commands.release.hooks.run_release_hook", side_effect=mock_run_release_hook):
             run_releasable_hooks(
-                "pre-checks", str(tmp_path), "www",
+                "pre-checks", str(tmp_path), "portal",
                 [("alpha", str(alpha_dir)), ("beta", str(beta_dir))],
                 {"RLSBL_VERSION": "1.0.0"}, None, print,
             )
@@ -496,11 +496,11 @@ class TestPerPackageHookEnvVars:
 
     def test_releasable_hook_does_not_get_rlsbl_package(self, tmp_path):
         """Releasable-level hooks do not receive RLSBL_PACKAGE."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
         ])
 
-        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "www" / "hooks"
+        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "portal" / "hooks"
         _make_hook(rel_hook_dir, "pre-checks.sh")
 
         alpha_dir = tmp_path / "alpha"
@@ -515,7 +515,7 @@ class TestPerPackageHookEnvVars:
 
         with patch("rlsbl.commands.release.hooks.run_release_hook", side_effect=mock_run_release_hook):
             run_releasable_hooks(
-                "pre-checks", str(tmp_path), "www",
+                "pre-checks", str(tmp_path), "portal",
                 [("alpha", str(alpha_dir))], base_env, None, print,
             )
 
@@ -532,26 +532,26 @@ class TestIsReleasableHookCustomized:
 
     def test_nonexistent_hook_is_not_customized(self, tmp_path):
         """Missing releasable pre-release hook means not customized."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
         ])
-        assert not is_releasable_hook_customized(str(tmp_path), "www")
+        assert not is_releasable_hook_customized(str(tmp_path), "portal")
 
     def test_customized_hook_is_detected(self, tmp_path):
         """A releasable pre-release hook with custom content is detected."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
         ])
-        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "www" / "hooks"
+        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "portal" / "hooks"
         _make_hook(rel_hook_dir, "pre-release.sh", "#!/bin/bash\nset -euo pipefail\nnpm run build\n")
-        assert is_releasable_hook_customized(str(tmp_path), "www")
+        assert is_releasable_hook_customized(str(tmp_path), "portal")
 
     def test_scaffold_template_is_not_customized(self, tmp_path):
         """A releasable pre-release hook matching the scaffold template is not customized."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
         ])
-        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "www" / "hooks"
+        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "portal" / "hooks"
         # Use the scaffold template content
         template_content = (
             "#!/usr/bin/env bash\n"
@@ -564,7 +564,7 @@ class TestIsReleasableHookCustomized:
             "#   - Run integration tests not covered by the test suite\n"
         )
         _make_hook(rel_hook_dir, "pre-release.sh", template_content)
-        assert not is_releasable_hook_customized(str(tmp_path), "www")
+        assert not is_releasable_hook_customized(str(tmp_path), "portal")
 
 
 # ---------------------------------------------------------------------------
@@ -609,12 +609,12 @@ class TestPrivateHookStaleCheck:
     def test_releasable_level_stale_detected(self, tmp_path):
         """Legacy content in releasable-level hook is detected."""
         # Set up workspace with explicit releasable
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "root", "path": ".", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "root", "path": ".", "releasable": "portal"},
         ])
 
         # Add legacy content to releasable hook
-        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "www" / "hooks"
+        rel_hook_dir = tmp_path / WORKSPACE_DIR / "releasables" / "portal" / "hooks"
         (rel_hook_dir / "post-release.sh").write_text(
             "#!/bin/bash\n# Post-release hook for private repositories\n"
         )

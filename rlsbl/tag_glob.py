@@ -98,7 +98,7 @@ class TagScheme:
     """One project's tag namespace, and the one rule deciding what is in it.
 
     ``pattern`` is the tag format with the name filled in and the version left
-    as ``{version}`` (``kernel/v{version}``, ``www@v{version}``,
+    as ``{version}`` (``kernel/v{version}``, ``portal@v{version}``,
     ``v{version}``). A tag belongs to the scheme when, and only when, it is
     the pattern rendered at the version it carries: ``kernel/v*`` also LISTS
     ``kernel/vulkan/v0.1.0``, but no version renders ``kernel/v{version}`` as
@@ -164,7 +164,7 @@ def releasable_tag_glob(tag_format: str, releasable_name: str) -> str:
 
     Replaces ``{version}`` with ``*`` and fills in ``{name}`` with the literal
     releasable name so ``git tag -l`` matches all versions
-    (e.g. ``"{name}@v{version}"`` -> ``"www@v*"``).
+    (e.g. ``"{name}@v{version}"`` -> ``"portal@v*"``).
     """
     return tag_format.replace("{version}", "*").format(name=releasable_name)
 

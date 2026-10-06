@@ -96,18 +96,18 @@ class TestGetReleasableConfigDir:
     def test_returns_dir_for_releasable_member(self, mock_git_repo):
         proj_dir = mock_git_repo / "app"
         proj_dir.mkdir()
-        _make_explicit_workspace(mock_git_repo, [{"name": "www"}], [
-            {"path": "app", "name": "app", "releasable": "www"},
+        _make_explicit_workspace(mock_git_repo, [{"name": "portal"}], [
+            {"path": "app", "name": "app", "releasable": "portal"},
         ])
 
         result = _get_releasable_config_dir(proj_dir)
         assert result is not None
-        assert result.endswith("releasables/www")
+        assert result.endswith("releasables/portal")
 
     def test_returns_none_for_non_member(self, mock_git_repo):
         proj_dir = mock_git_repo / "infra"
         proj_dir.mkdir()
-        _make_explicit_workspace(mock_git_repo, [{"name": "www"}], [
+        _make_explicit_workspace(mock_git_repo, [{"name": "portal"}], [
             {"path": "infra", "name": "infra", "releasable": False},
         ])
 
@@ -131,12 +131,12 @@ class TestConfigJsonSkip:
         """Per-package config.json is removed when identical to releasable config."""
         proj_dir = mock_git_repo / "app"
         proj_dir.mkdir()
-        _make_explicit_workspace(mock_git_repo, [{"name": "www"}], [
-            {"path": "app", "name": "app", "releasable": "www"},
+        _make_explicit_workspace(mock_git_repo, [{"name": "portal"}], [
+            {"path": "app", "name": "app", "releasable": "portal"},
         ])
 
         config = {"publish_mode": "ci", "targets": ["pypi"]}
-        _setup_releasable(mock_git_repo, "www", config=config)
+        _setup_releasable(mock_git_repo, "portal", config=config)
         _write_pkg_config(proj_dir, config)
 
         warnings = []
@@ -152,13 +152,13 @@ class TestConfigJsonSkip:
         """Per-package config.json is kept when different from releasable config."""
         proj_dir = mock_git_repo / "app"
         proj_dir.mkdir()
-        _make_explicit_workspace(mock_git_repo, [{"name": "www"}], [
-            {"path": "app", "name": "app", "releasable": "www"},
+        _make_explicit_workspace(mock_git_repo, [{"name": "portal"}], [
+            {"path": "app", "name": "app", "releasable": "portal"},
         ])
 
         releasable_config = {"publish_mode": "ci", "targets": ["pypi"]}
         pkg_config = {"publish_mode": "ci", "targets": ["pypi"], "batch_limits": {"max_commits_per_entry": 10}}
-        _setup_releasable(mock_git_repo, "www", config=releasable_config)
+        _setup_releasable(mock_git_repo, "portal", config=releasable_config)
         _write_pkg_config(proj_dir, pkg_config)
 
         warnings = []
@@ -175,13 +175,13 @@ class TestConfigJsonSkip:
         when the releasable config already has the same fields."""
         proj_dir = mock_git_repo / "app"
         proj_dir.mkdir()
-        _make_explicit_workspace(mock_git_repo, [{"name": "www"}], [
-            {"path": "app", "name": "app", "releasable": "www"},
+        _make_explicit_workspace(mock_git_repo, [{"name": "portal"}], [
+            {"path": "app", "name": "app", "releasable": "portal"},
         ])
 
         # Scaffold writes: targets=["spec"], private (auto-detected, likely False)
         # Pre-create the releasable config with these same values
-        _setup_releasable(mock_git_repo, "www", config={
+        _setup_releasable(mock_git_repo, "portal", config={
             "targets": ["spec"],
             "publish_mode": "ci",
         })
@@ -205,12 +205,12 @@ class TestConfigJsonSkip:
         """When releasable has no config.json, per-package config is kept."""
         proj_dir = mock_git_repo / "app"
         proj_dir.mkdir()
-        _make_explicit_workspace(mock_git_repo, [{"name": "www"}], [
-            {"path": "app", "name": "app", "releasable": "www"},
+        _make_explicit_workspace(mock_git_repo, [{"name": "portal"}], [
+            {"path": "app", "name": "app", "releasable": "portal"},
         ])
 
         # Only set up the releasable dir without config.json
-        rel_dir = Path(get_releasable_dir(str(mock_git_repo), "www"))
+        rel_dir = Path(get_releasable_dir(str(mock_git_repo), "portal"))
         rel_dir.mkdir(parents=True, exist_ok=True)
 
         pkg_config = {"publish_mode": "ci"}
@@ -299,12 +299,12 @@ class TestSafermInvocation:
 
         proj_dir = mock_git_repo / "app"
         proj_dir.mkdir()
-        _make_explicit_workspace(mock_git_repo, [{"name": "www"}], [
-            {"path": "app", "name": "app", "releasable": "www"},
+        _make_explicit_workspace(mock_git_repo, [{"name": "portal"}], [
+            {"path": "app", "name": "app", "releasable": "portal"},
         ])
 
         config = {"publish_mode": "ci", "targets": ["pypi"]}
-        _setup_releasable(mock_git_repo, "www", config=config)
+        _setup_releasable(mock_git_repo, "portal", config=config)
         _write_pkg_config(proj_dir, config)
 
         saferm_calls = []

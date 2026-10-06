@@ -34,16 +34,16 @@ def _make_npm_project(base_path, subdir, version="0.1.0"):
 
 class TestSharedTagGlobResolver:
     def test_releasable_glob_from_tag_format(self, tmp_path):
-        rel = Releasable(name="www", tag_format="{name}@v{version}")
+        rel = Releasable(name="portal", tag_format="{name}@v{version}")
         glob = resolve_monorepo_tag_glob(None, str(tmp_path), releasable=rel)
-        assert glob == "www@v*"
+        assert glob == "portal@v*"
 
     def test_releasable_glob_custom_format(self, tmp_path):
         rel = Releasable(name="core", tag_format="v{version}")
         assert resolve_monorepo_tag_glob(None, str(tmp_path), releasable=rel) == "v*"
 
     def test_releasable_tag_glob_helper(self):
-        assert releasable_tag_glob("{name}@v{version}", "www") == "www@v*"
+        assert releasable_tag_glob("{name}@v{version}", "portal") == "portal@v*"
         assert releasable_tag_glob("v{version}", "core") == "v*"
 
     def test_target_glob_when_no_releasable(self, tmp_path):

@@ -120,23 +120,23 @@ class TestScaffoldReleasableDirs:
 
         Hook scripts are no longer scaffolded -- hooks are config-driven.
         """
-        _make_explicit_workspace(tmp_path, [{"name": "www"}], [
-            {"path": "app", "name": "app", "releasable": "www"},
+        _make_explicit_workspace(tmp_path, [{"name": "portal"}], [
+            {"path": "app", "name": "app", "releasable": "portal"},
         ])
         (tmp_path / "app").mkdir()
 
         files = scaffold_releasable_dirs(str(tmp_path))
 
-        rel_dir = get_releasable_dir(str(tmp_path), "www")
+        rel_dir = get_releasable_dir(str(tmp_path), "portal")
         assert os.path.isdir(rel_dir)
 
         # Version file
-        version_path = get_releasable_version_path(str(tmp_path), "www")
+        version_path = get_releasable_version_path(str(tmp_path), "portal")
         assert os.path.isfile(version_path)
         assert open(version_path).read() == "0.0.0\n"
 
         # Changes directory
-        changes_dir = get_releasable_changes_dir(str(tmp_path), "www")
+        changes_dir = get_releasable_changes_dir(str(tmp_path), "portal")
         assert os.path.isdir(changes_dir)
         unreleased = os.path.join(changes_dir, "unreleased.jsonl")
         assert os.path.isfile(unreleased)
@@ -155,10 +155,10 @@ class TestScaffoldReleasableDirs:
     def test_multiple_releasables(self, tmp_path):
         """Creates directories for all releasables in the workspace."""
         _make_explicit_workspace(tmp_path, [
-            {"name": "www"},
+            {"name": "portal"},
             {"name": "api"},
         ], [
-            {"path": "app", "name": "app", "releasable": "www"},
+            {"path": "app", "name": "app", "releasable": "portal"},
             {"path": "server", "name": "server", "releasable": "api"},
         ])
         (tmp_path / "app").mkdir()
@@ -166,7 +166,7 @@ class TestScaffoldReleasableDirs:
 
         scaffold_releasable_dirs(str(tmp_path))
 
-        for name in ("www", "api"):
+        for name in ("portal", "api"):
             rel_dir = get_releasable_dir(str(tmp_path), name)
             assert os.path.isdir(rel_dir)
             assert os.path.isfile(get_releasable_version_path(str(tmp_path), name))
@@ -176,13 +176,13 @@ class TestScaffoldReleasableDirs:
 
     def test_version_file_not_overwritten(self, tmp_path):
         """Existing version file is preserved (user-owned)."""
-        _make_explicit_workspace(tmp_path, [{"name": "www"}], [
-            {"path": "app", "name": "app", "releasable": "www"},
+        _make_explicit_workspace(tmp_path, [{"name": "portal"}], [
+            {"path": "app", "name": "app", "releasable": "portal"},
         ])
         (tmp_path / "app").mkdir()
 
         # Pre-create version file with custom content
-        version_path = get_releasable_version_path(str(tmp_path), "www")
+        version_path = get_releasable_version_path(str(tmp_path), "portal")
         os.makedirs(os.path.dirname(version_path), exist_ok=True)
         with open(version_path, "w") as f:
             f.write("1.5.0\n")
@@ -196,13 +196,13 @@ class TestScaffoldReleasableDirs:
 
     def test_unreleased_jsonl_not_overwritten(self, tmp_path):
         """Existing unreleased.jsonl is preserved (user-owned)."""
-        _make_explicit_workspace(tmp_path, [{"name": "www"}], [
-            {"path": "app", "name": "app", "releasable": "www"},
+        _make_explicit_workspace(tmp_path, [{"name": "portal"}], [
+            {"path": "app", "name": "app", "releasable": "portal"},
         ])
         (tmp_path / "app").mkdir()
 
         # Pre-create unreleased.jsonl with content
-        changes_dir = get_releasable_changes_dir(str(tmp_path), "www")
+        changes_dir = get_releasable_changes_dir(str(tmp_path), "portal")
         os.makedirs(changes_dir, exist_ok=True)
         unreleased = os.path.join(changes_dir, "unreleased.jsonl")
         with open(unreleased, "w") as f:
@@ -238,14 +238,14 @@ class TestScaffoldReleasableDirs:
 
     def test_no_hook_scripts_scaffolded(self, tmp_path):
         """Hook scripts are not scaffolded -- hooks are config-driven."""
-        _make_explicit_workspace(tmp_path, [{"name": "www"}], [
-            {"path": "app", "name": "app", "releasable": "www"},
+        _make_explicit_workspace(tmp_path, [{"name": "portal"}], [
+            {"path": "app", "name": "app", "releasable": "portal"},
         ])
         (tmp_path / "app").mkdir()
 
         files = scaffold_releasable_dirs(str(tmp_path))
 
-        rel_dir = get_releasable_dir(str(tmp_path), "www")
+        rel_dir = get_releasable_dir(str(tmp_path), "portal")
         hooks_dir = os.path.join(rel_dir, "hooks")
 
         # No hooks directory should be created
@@ -268,8 +268,8 @@ class TestReleasableMemberChangelogSkip:
         proj_dir = mock_git_repo / "app"
         proj_dir.mkdir()
 
-        _make_explicit_workspace(mock_git_repo, [{"name": "www"}], [
-            {"path": "app", "name": "app", "releasable": "www"},
+        _make_explicit_workspace(mock_git_repo, [{"name": "portal"}], [
+            {"path": "app", "name": "app", "releasable": "portal"},
         ])
 
         assert _is_releasable_member_project(proj_dir) is True
@@ -296,8 +296,8 @@ class TestReleasableMemberChangelogSkip:
         proj_dir = mock_git_repo / "infra"
         proj_dir.mkdir()
 
-        _make_explicit_workspace(mock_git_repo, [{"name": "www"}], [
-            {"path": "app", "name": "app", "releasable": "www"},
+        _make_explicit_workspace(mock_git_repo, [{"name": "portal"}], [
+            {"path": "app", "name": "app", "releasable": "portal"},
             {"path": "infra", "name": "infra", "releasable": False},
         ])
 
@@ -308,8 +308,8 @@ class TestReleasableMemberChangelogSkip:
         proj_dir = mock_git_repo / "app"
         proj_dir.mkdir()
 
-        _make_explicit_workspace(mock_git_repo, [{"name": "www"}], [
-            {"path": "app", "name": "app", "releasable": "www"},
+        _make_explicit_workspace(mock_git_repo, [{"name": "portal"}], [
+            {"path": "app", "name": "app", "releasable": "portal"},
         ])
 
         monkeypatch.chdir(proj_dir)
@@ -344,7 +344,7 @@ class TestMonorepoAddReleasable:
     def _setup_explicit_workspace(self, mock_git_repo):
         """Create a workspace with [[releasables]] defined."""
         _make_explicit_workspace(mock_git_repo, [
-            {"name": "www"},
+            {"name": "portal"},
             {"name": "api"},
         ], [])  # No projects yet
 
@@ -364,13 +364,13 @@ class TestMonorepoAddReleasable:
 
         with patch("rlsbl.effects.run", side_effect=_children_succeed):
             _cmd_add(["app"], {
-                "releasable": "www",
+                "releasable": "portal",
                 "auto-commit": False,
             }, project_root=mock_git_repo)
 
         projects = declared_members(load_workspace(str(mock_git_repo)))
         assert len(projects) == 1
-        assert projects[0].releasable == "www"
+        assert projects[0].releasable == "portal"
 
     def test_add_with_releasable_false(self, mock_git_repo):
         """--releasable false writes releasable = false to workspace.toml."""

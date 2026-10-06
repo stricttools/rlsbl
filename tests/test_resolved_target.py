@@ -302,7 +302,7 @@ def _make_standalone(tmp_path, config, files):
 
 
 class TestMemberContextResolvedTargets:
-    def test_www_like_assets_and_docs_deploy(self, tmp_path):
+    def test_site_like_assets_and_docs_deploy(self, tmp_path):
         """A 'spec' assets target plus a target-less docs deploy.
 
         The docs deploy (target: null) must appear only in deploy_pipelines,

@@ -70,7 +70,7 @@ class TestGetReleasableDir:
         assert result == expected
 
     def test_different_names(self, tmp_path):
-        for name in ("core", "www", "my-app", "test_infra"):
+        for name in ("core", "portal", "my-app", "test_infra"):
             result = get_releasable_dir(str(tmp_path), name)
             assert result.endswith(os.path.join(RELEASABLES_DIR, name))
 
@@ -98,8 +98,8 @@ class TestGetReleasableVersionPath:
         assert result == expected
 
     def test_consistent_with_dir(self, tmp_path):
-        dir_path = get_releasable_dir(str(tmp_path), "www")
-        version_path = get_releasable_version_path(str(tmp_path), "www")
+        dir_path = get_releasable_dir(str(tmp_path), "portal")
+        version_path = get_releasable_version_path(str(tmp_path), "portal")
         assert version_path == os.path.join(dir_path, "version")
 
 
@@ -125,10 +125,10 @@ class TestVersionReadWrite:
 
     def test_multiple_releasables(self, tmp_path):
         write_releasable_version(str(tmp_path), "core", "1.0.0")
-        write_releasable_version(str(tmp_path), "www", "2.0.0")
+        write_releasable_version(str(tmp_path), "portal", "2.0.0")
 
         assert read_releasable_version(str(tmp_path), "core") == "1.0.0"
-        assert read_releasable_version(str(tmp_path), "www") == "2.0.0"
+        assert read_releasable_version(str(tmp_path), "portal") == "2.0.0"
 
     def test_version_with_prerelease(self, tmp_path):
         write_releasable_version(str(tmp_path), "core", "1.0.0-rc.1")

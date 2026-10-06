@@ -75,11 +75,11 @@ def _make_pypi_project(base_path, subdir, version="0.1.0"):
 class TestFormatReleasableTag:
 
     def test_default_format(self):
-        tag = _format_releasable_tag("{name}@v{version}", "www", "2.0.0")
-        assert tag == "www@v2.0.0"
+        tag = _format_releasable_tag("{name}@v{version}", "portal", "2.0.0")
+        assert tag == "portal@v2.0.0"
 
     def test_simple_format(self):
-        tag = _format_releasable_tag("v{version}", "www", "1.0.0")
+        tag = _format_releasable_tag("v{version}", "portal", "1.0.0")
         assert tag == "v1.0.0"
 
     def test_custom_format(self):
@@ -90,11 +90,11 @@ class TestFormatReleasableTag:
 class TestReleasableTagGlob:
 
     def test_default_format(self):
-        glob = _releasable_tag_glob("{name}@v{version}", "www")
-        assert glob == "www@v*"
+        glob = _releasable_tag_glob("{name}@v{version}", "portal")
+        assert glob == "portal@v*"
 
     def test_simple_format(self):
-        glob = _releasable_tag_glob("v{version}", "www")
+        glob = _releasable_tag_glob("v{version}", "portal")
         assert glob == "v*"
 
     def test_custom_format(self):
@@ -130,13 +130,13 @@ class TestReleaseStateReleasable:
             new_version="2.0.0",
             current_version="1.0.0",
             bump_type="major",
-            tag="www@v2.0.0",
+            tag="portal@v2.0.0",
             branch="main",
-            releasable_name="www",
+            releasable_name="portal",
             member_package_paths=["packages/api", "packages/web"],
             releasable_tag_format="{name}@v{version}",
         )
-        assert state.releasable_name == "www"
+        assert state.releasable_name == "portal"
         assert state.member_package_paths == ["packages/api", "packages/web"]
         assert state.releasable_tag_format == "{name}@v{version}"
 
@@ -151,7 +151,7 @@ class TestBatchReleaseFileReleasables:
     def test_read_releasables_section(self, tmp_path):
         """Batch release file with [releasables.*] sections is parsed correctly."""
         toml_content = """\
-[releasables.www]
+[releasables.portal]
 bump = "minor"
 description = "New features"
 include = ["pypi"]
@@ -167,9 +167,9 @@ exclude = []
         path.write_text(toml_content)
 
         config = read_batch_release_file(str(path))
-        assert "www" in config.packages
+        assert "portal" in config.packages
         assert "core" in config.packages
-        assert config.packages["www"].bump == "minor"
+        assert config.packages["portal"].bump == "minor"
         assert config.packages["core"].bump == "patch"
 
     def test_a_packages_section_is_refused(self, tmp_path):
@@ -216,7 +216,7 @@ x = 1
     def test_releasable_section_validation(self, tmp_path):
         """Releasable sections validate the same fields as package sections."""
         toml_content = """\
-[releasables.www]
+[releasables.portal]
 bump = "invalid"
 description = "X"
 include = ["pypi"]
@@ -243,26 +243,26 @@ class TestReleasableReleaseOrder:
 
         ws_root = str(tmp_path)
 
-        # Set up workspace: core has no deps, www depends on core
+        # Set up workspace: core has no deps, portal depends on core
         projects = [
             WorkspaceProject({"name": "core-api", "path": "core-api", "releasable": "core"}),
             WorkspaceProject({"name": "core-lib", "path": "core-lib", "releasable": "core"}),
-            WorkspaceProject({"name": "www-app", "path": "www-app", "releasable": "www", "depends_on": ["core-api"]}),
-            WorkspaceProject({"name": "www-assets", "path": "www-assets", "releasable": "www"}),
+            WorkspaceProject({"name": "portal-app", "path": "portal-app", "releasable": "portal", "depends_on": ["core-api"]}),
+            WorkspaceProject({"name": "portal-assets", "path": "portal-assets", "releasable": "portal"}),
         ]
         releasables = [
             Releasable(name="core"),
-            Releasable(name="www"),
+            Releasable(name="portal"),
         ]
 
         # Write workspace so WorkspaceGraph can load
         make_workspace(ws_root, projects)
 
         graph = WorkspaceGraph(ws_root, projects)
-        batch_names = {"core", "www"}
+        batch_names = {"core", "portal"}
 
         order = _releasable_release_order(batch_names, releasables, projects, graph)
-        assert order.index("core") < order.index("www")
+        assert order.index("core") < order.index("portal")
 
 
 # ---------------------------------------------------------------------------
@@ -286,13 +286,13 @@ class TestComputeReleaseVersionReleasable:
         with patch("rlsbl.workspace.read_releasable_version", return_value="1.0.0"):
             _cur, _new, _bump, tag = compute_release_version(
                 mock_target, "/some/path", "minor",
-                "www-app", "www-app", lambda msg: None,
+                "portal-app", "portal-app", lambda msg: None,
                 workspace_root="/ws",
-                releasable_name="www",
+                releasable_name="portal",
                 releasable_tag_fmt="{name}@v{version}",
             )
 
-        assert tag == "www@v1.1.0"
+        assert tag == "portal@v1.1.0"
         # target.monorepo_tag_format should NOT have been called
         mock_target.monorepo_tag_format.assert_not_called()
 
@@ -331,7 +331,7 @@ class TestValidateChangelogStateReleasable:
         from rlsbl.commands.release.validate import validate_changelog_state
 
         ws_root = str(tmp_path)
-        releasable_name = "www"
+        releasable_name = "portal"
 
         # Create releasable changes dir with unreleased.jsonl
         changes_dir = get_releasable_changes_dir(ws_root, releasable_name)
@@ -342,8 +342,8 @@ class TestValidateChangelogStateReleasable:
         # validate_changelog_state now just resolves the changes dir path
         # (changelog validation moved to preflight-changelog checks)
         result = validate_changelog_state(
-            "/some/project", MagicMock(), "www-app", "www-app",
-            {}, releasable_name="www",
+            "/some/project", MagicMock(), "portal-app", "portal-app",
+            {}, releasable_name="portal",
             releasable_tag_fmt="{name}@v{version}",
             workspace_root=ws_root,
         )
@@ -359,10 +359,10 @@ class TestValidateChangelogStateReleasable:
 
         ws_root = str(tmp_path)
 
-        with pytest.raises(ReleaseValidationError, match="not set up.*www"):
+        with pytest.raises(ReleaseValidationError, match="not set up.*portal"):
             validate_changelog_state(
-                "/some/project", MagicMock(), "www-app", "www-app",
-                {}, releasable_name="www",
+                "/some/project", MagicMock(), "portal-app", "portal-app",
+                {}, releasable_name="portal",
                 releasable_tag_fmt="{name}@v{version}",
                 workspace_root=ws_root,
             )
@@ -517,22 +517,22 @@ class TestBatchReleaseInitReleasable:
         # Write workspace with releasables
         _write_workspace(tmp_path, """\
 [[releasables]]
-name = "www"
+name = "portal"
 
 [[projects]]
 path = "api"
 name = "api"
-releasable = "www"
+releasable = "portal"
 
 [[projects]]
 path = "web"
 name = "web"
-releasable = "www"
+releasable = "portal"
 """)
 
         projects = [
-            WorkspaceProject({"name": "api", "path": "api", "releasable": "www"}),
-            WorkspaceProject({"name": "web", "path": "web", "releasable": "www"}),
+            WorkspaceProject({"name": "api", "path": "api", "releasable": "portal"}),
+            WorkspaceProject({"name": "web", "path": "web", "releasable": "portal"}),
         ]
 
         batch_path = os.path.join(ws_root, ".rlsbl-monorepo", "releases", "unreleased.toml")
@@ -541,5 +541,5 @@ releasable = "www"
             _scaffold_releasable_sections(ws_root, projects, batch_path, None)
 
         content = open(batch_path).read()
-        assert "[releasables.www]" in content
+        assert "[releasables.portal]" in content
         assert "[packages." not in content

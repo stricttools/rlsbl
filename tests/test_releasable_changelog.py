@@ -94,7 +94,7 @@ class TestGetReleasableChangesDir:
         assert result == expected
 
     def test_different_names(self, tmp_path):
-        for name in ["core", "www", "my-rel", "rel_underscore"]:
+        for name in ["core", "portal", "my-rel", "rel_underscore"]:
             result = get_releasable_changes_dir(str(tmp_path), name)
             assert name in result
             assert result.endswith("changes")
@@ -122,7 +122,7 @@ class TestResolveReleasableForProject:
 
     def test_explicit_membership(self):
         proj = WorkspaceProject({"name": "a", "path": "a", "releasable": "core"})
-        rels = [Releasable(name="core"), Releasable(name="www")]
+        rels = [Releasable(name="core"), Releasable(name="portal")]
         result = resolve_releasable_for_project(proj, rels)
         assert result is not None
         assert result.name == "core"
@@ -293,13 +293,13 @@ class TestGetChangelogContextExplicitMode:
         monkeypatch.chdir(tmp_path)
 
         _write_workspace_explicit(tmp_path,
-            releasables=[{"name": "www", "tag_format": "v{version}"}],
+            releasables=[{"name": "portal", "tag_format": "v{version}"}],
             projects=[
-                {"path": "a", "name": "a", "releasable": "www"},
+                {"path": "a", "name": "a", "releasable": "portal"},
             ],
         )
         (tmp_path / "a").mkdir()
-        _setup_releasable_changes(tmp_path, "www")
+        _setup_releasable_changes(tmp_path, "portal")
 
         from pathlib import Path
         from rlsbl.check_context import WorkspaceCheckContext

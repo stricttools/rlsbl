@@ -81,8 +81,8 @@ def _setup_releasable_repo(tmp_path, monkeypatch, *, batch_limit=3):
     _run_git(repo, "commit", "-q", "-m", "initial")
 
     # Create workspace with one releasable and one member project
-    _make_explicit_workspace(repo, [{"name": "www"}], [
-        {"path": "app", "name": "app", "releasable": "www"},
+    _make_explicit_workspace(repo, [{"name": "portal"}], [
+        {"path": "app", "name": "app", "releasable": "portal"},
     ])
 
     # Create the project directory
@@ -95,7 +95,7 @@ def _setup_releasable_repo(tmp_path, monkeypatch, *, batch_limit=3):
     (pkg_rlsbl / "config.json").write_text(json.dumps({"publish_mode": "ci"}) + "\n")
 
     # Releasable-level config with batch_limits
-    rel_dir = get_releasable_dir(str(repo), "www")
+    rel_dir = get_releasable_dir(str(repo), "portal")
     os.makedirs(rel_dir, exist_ok=True)
     rel_config = {
         "publish_mode": "ci",
@@ -110,7 +110,7 @@ def _setup_releasable_repo(tmp_path, monkeypatch, *, batch_limit=3):
         f.write("\n")
 
     # Create releasable-level changes directory with empty unreleased.jsonl
-    changes_dir = get_releasable_changes_dir(str(repo), "www")
+    changes_dir = get_releasable_changes_dir(str(repo), "portal")
     os.makedirs(changes_dir, exist_ok=True)
     with open(os.path.join(changes_dir, "unreleased.jsonl"), "w") as f:
         f.write("")
@@ -120,7 +120,7 @@ def _setup_releasable_repo(tmp_path, monkeypatch, *, batch_limit=3):
     _run_git(repo, "commit", "-q", "-m", "add workspace")
 
     # Tag so there is an unreleased range
-    _run_git(repo, "tag", "www-v0.1.0")
+    _run_git(repo, "tag", "portal-v0.1.0")
 
     return repo, proj_dir
 
@@ -171,7 +171,7 @@ class TestReleasableBatchLimitsInheritance:
 
         cmd_add(flags, project_root=proj_dir)
 
-        changes_dir = get_releasable_changes_dir(str(repo), "www")
+        changes_dir = get_releasable_changes_dir(str(repo), "portal")
         entries = read_unreleased(changes_dir)
         assert len(entries) == 1
         assert len(entries[0].commits) == 5
@@ -200,7 +200,7 @@ class TestReleasableExclusionWrites:
         cmd_add(flags, project_root=proj_dir)
 
         # Verify exclusion is in releasable-level config.json
-        rel_dir = get_releasable_dir(str(repo), "www")
+        rel_dir = get_releasable_dir(str(repo), "portal")
         rel_config_path = os.path.join(rel_dir, "config.json")
         rel_config = json.loads(open(rel_config_path).read())
         exclusions = rel_config["batch_limits"]["exclusions"]
@@ -231,7 +231,7 @@ class TestReleasableExclusionWrites:
         }
         cmd_add(flags, project_root=proj_dir)
 
-        changes_dir = get_releasable_changes_dir(str(repo), "www")
+        changes_dir = get_releasable_changes_dir(str(repo), "portal")
         entries = read_unreleased(changes_dir)
         assert len(entries) == 1
         assert len(entries[0].commits) == 5
@@ -260,7 +260,7 @@ class TestExclusionMessageNamesWrittenFile:
         out = capsys.readouterr().out
         assert (
             "Auto-created batch exclusion for line 1 in "
-            ".rlsbl-monorepo/releasables/www/config.json"
+            ".rlsbl-monorepo/releasables/portal/config.json"
         ) in out
         assert ".rlsbl/config.json" not in out
 
@@ -273,7 +273,7 @@ class TestExclusionMessageNamesWrittenFile:
         out = capsys.readouterr().out
         assert (
             "Would auto-create batch exclusion for line 1 in "
-            ".rlsbl-monorepo/releasables/www/config.json"
+            ".rlsbl-monorepo/releasables/portal/config.json"
         ) in out
         assert ".rlsbl/config.json" not in out
 
@@ -343,7 +343,7 @@ class TestStandaloneExclusionRegression:
         assert exclusions[0]["reason"] == "Big standalone batch"
 
 
-REL_LABEL = ".rlsbl-monorepo/releasables/www/config.json"
+REL_LABEL = ".rlsbl-monorepo/releasables/portal/config.json"
 PKG_LABEL = ".rlsbl/config.json"
 
 
@@ -398,7 +398,7 @@ class TestBatchLimitMessagesNameTheSourceFile:
         from rlsbl.errors import ConfigError
 
         repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=3)
-        rel_config = os.path.join(get_releasable_dir(str(repo), "www"), "config.json")
+        rel_config = os.path.join(get_releasable_dir(str(repo), "portal"), "config.json")
         with open(rel_config, "w") as f:
             json.dump({"batch_limits": {"max_commits_per_entry": "five"}}, f)
         shas = [_make_commit(proj_dir, "file0.txt", "change 0")]
@@ -424,7 +424,7 @@ class TestBatchLimitMessagesNameTheSourceFile:
         from rlsbl.errors import ConfigError
 
         repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=3)
-        rel_config = os.path.join(get_releasable_dir(str(repo), "www"), "config.json")
+        rel_config = os.path.join(get_releasable_dir(str(repo), "portal"), "config.json")
         with open(rel_config, "w") as f:
             json.dump({"batch_limits": "not-a-dict"}, f)
         shas = [_make_commit(proj_dir, "file0.txt", "change 0")]
@@ -454,7 +454,7 @@ class TestBatchLimitMessagesNameTheSourceFile:
         from rlsbl.errors import ConfigError
 
         repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=3)
-        rel_dir = get_releasable_dir(str(repo), "www")
+        rel_dir = get_releasable_dir(str(repo), "portal")
         with open(os.path.join(rel_dir, "config.json"), "w") as f:
             json.dump({"batch_limits": {"exclusions": [
                 {"reason": "stale", "commits": ["0" * 40]},
@@ -477,7 +477,7 @@ class TestBatchLimitMessagesNameTheSourceFile:
         shas = [_make_commit(proj_dir, f"file{i}.txt", f"change {i}") for i in range(5)]
         cmd_add(_batch_flags(shas, allow_batch=True), project_root=proj_dir)
         # Drop the auto-created exclusion so the check fails and prints its hint.
-        rel_config = os.path.join(get_releasable_dir(str(repo), "www"), "config.json")
+        rel_config = os.path.join(get_releasable_dir(str(repo), "portal"), "config.json")
         data = json.loads(open(rel_config).read())
         data["batch_limits"]["exclusions"] = []
         with open(rel_config, "w") as f:
@@ -524,7 +524,7 @@ class TestAllowBatchWithoutReleasableConfig:
 
     def test_creates_releasable_config(self, tmp_path, monkeypatch, capsys):
         repo, proj_dir = _setup_releasable_repo(tmp_path, monkeypatch, batch_limit=3)
-        rel_config = os.path.join(get_releasable_dir(str(repo), "www"), "config.json")
+        rel_config = os.path.join(get_releasable_dir(str(repo), "portal"), "config.json")
         os.remove(rel_config)
         _write_json(proj_dir / ".rlsbl" / "config.json", {
             "publish_mode": "ci",
@@ -679,14 +679,14 @@ class TestMemberExclusionsRefused:
             "publish_mode": "ci",
             "batch_limits": {"max_commits_per_entry": 4},
         })
-        rel_config = os.path.join(get_releasable_dir(str(repo), "www"), "config.json")
+        rel_config = os.path.join(get_releasable_dir(str(repo), "portal"), "config.json")
         data = json.loads(open(rel_config).read())
         data["batch_limits"]["exclusions"].append(exclusion)
         with open(rel_config, "w") as f:
             json.dump(data, f)
 
         cmd_add(_batch_flags(shas, allow_batch=False), project_root=proj_dir)
-        entries = read_unreleased(get_releasable_changes_dir(str(repo), "www"))
+        entries = read_unreleased(get_releasable_changes_dir(str(repo), "portal"))
         assert len(entries) == 1
 
     def test_an_empty_member_list_is_refused_too(self, tmp_path, monkeypatch):
@@ -700,7 +700,7 @@ class TestMemberExclusionsRefused:
         with pytest.raises(ConfigError):
             read_project_config(
                 str(proj_dir),
-                releasable_config_dir=get_releasable_dir(str(repo), "www"),
+                releasable_config_dir=get_releasable_dir(str(repo), "portal"),
             )
 
     def test_standalone_exclusions_stay_allowed(self, tmp_path):

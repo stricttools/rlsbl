@@ -164,46 +164,46 @@ class TestIsReleasableHookCustomizedWithConfig:
 
     def test_releasable_config_with_pre_release_is_customized(self, tmp_path):
         """Releasable config with hooks.pre_release entries -> customized=True."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
         ])
         config = {"hooks": {"pre_release": ["npm test"]}}
-        assert is_releasable_hook_customized(str(tmp_path), "www", config=config) is True
+        assert is_releasable_hook_customized(str(tmp_path), "portal", config=config) is True
 
     def test_releasable_config_with_empty_pre_release_not_customized(self, tmp_path):
         """Releasable config with empty hooks.pre_release -> customized=False."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
         ])
         config = {"hooks": {"pre_release": []}}
-        assert is_releasable_hook_customized(str(tmp_path), "www", config=config) is False
+        assert is_releasable_hook_customized(str(tmp_path), "portal", config=config) is False
 
     def test_releasable_no_config_falls_back_to_script(self, tmp_path):
         """No config passed -> falls back to script hash check."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
         ])
-        _make_releasable_hook(tmp_path, "www", "pre-release.sh",
+        _make_releasable_hook(tmp_path, "portal", "pre-release.sh",
                               "#!/bin/bash\nnpm run build\n")
-        assert is_releasable_hook_customized(str(tmp_path), "www") is True
+        assert is_releasable_hook_customized(str(tmp_path), "portal") is True
 
     def test_releasable_no_config_template_script_not_customized(self, tmp_path):
         """No config + template script -> not customized."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
         ])
-        _make_releasable_hook(tmp_path, "www", "pre-release.sh", _V1_TEMPLATE)
-        assert is_releasable_hook_customized(str(tmp_path), "www") is False
+        _make_releasable_hook(tmp_path, "portal", "pre-release.sh", _V1_TEMPLATE)
+        assert is_releasable_hook_customized(str(tmp_path), "portal") is False
 
     def test_releasable_config_no_hooks_section_customized_script(self, tmp_path):
         """Config without hooks section + customized script -> customized=True (backward compat)."""
-        _make_releasable_workspace(tmp_path, "www", [
-            {"name": "alpha", "path": "alpha", "releasable": "www"},
+        _make_releasable_workspace(tmp_path, "portal", [
+            {"name": "alpha", "path": "alpha", "releasable": "portal"},
         ])
-        _make_releasable_hook(tmp_path, "www", "pre-release.sh",
+        _make_releasable_hook(tmp_path, "portal", "pre-release.sh",
                               "#!/bin/bash\nnpm run build\n")
         config = {"publish_mode": "ci"}
-        assert is_releasable_hook_customized(str(tmp_path), "www", config=config) is True
+        assert is_releasable_hook_customized(str(tmp_path), "portal", config=config) is True
 
 
 # ---------------------------------------------------------------------------

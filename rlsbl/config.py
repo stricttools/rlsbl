@@ -151,7 +151,7 @@ def read_project_config(project_root, releasable_config_dir=None):
     """Read project config with optional releasable-level inheritance.
 
     When ``releasable_config_dir`` is provided (path to a releasable's
-    state directory, e.g. ``.rlsbl-monorepo/releasables/www/``), config
+    state directory, e.g. ``.rlsbl-monorepo/releasables/portal/``), config
     is loaded with 2-level precedence:
 
     1. Per-package config.json (highest)

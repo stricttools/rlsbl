@@ -310,7 +310,7 @@ class TestTheRemedyIsNamedWhereTheOperatorHitsIt:
         )
 
         message = _empty_candidate_window_message(
-            version="0.5.0", tag="www@v0.5.0", branch="main",
+            version="0.5.0", tag="portal@v0.5.0", branch="main",
             candidate_sha="a" * 40, base_sha="b" * 40,
             patterns=["core/**"], changed={"docs/x.md"}, pushing=True,
         )

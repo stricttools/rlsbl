@@ -586,7 +586,7 @@ class TestEmptyReleaseRecordLeftAlone:
         r = _init_repo(tmp_path / "ws")
         monkeypatch.chdir(r)
         _commit(r, "one")
-        _git(r, "tag", "www@v0.4.0")
+        _git(r, "tag", "portal@v0.4.0")
         releases = str(
             r / ".rlsbl-monorepo" / "releasables" / "lib" / "releases"
         )
@@ -793,8 +793,8 @@ class TestPathDerivations:
 
     def test_releasable_layout(self):
         assert release_record.releases_dir_for_changes_dir(
-            os.path.join("ws", ".rlsbl-monorepo", "releasables", "www", "changes")
-        ) == os.path.join("ws", ".rlsbl-monorepo", "releasables", "www", "releases")
+            os.path.join("ws", ".rlsbl-monorepo", "releasables", "portal", "changes")
+        ) == os.path.join("ws", ".rlsbl-monorepo", "releasables", "portal", "releases")
 
     def test_trailing_separator_is_tolerated(self):
         assert release_record.releases_dir_for_changes_dir(

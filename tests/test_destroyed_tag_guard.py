@@ -398,24 +398,24 @@ class TestDestroyedTagGuardUnit:
         """Releasable mode resolves the changes dir under
         .rlsbl-monorepo/releasables/<name>/changes/."""
         ws = tmp_path / "monorepo"
-        changes = ws / ".rlsbl-monorepo" / "releasables" / "www" / "changes"
+        changes = ws / ".rlsbl-monorepo" / "releasables" / "portal" / "changes"
         _write_finalized_jsonl(changes, "2.0.0")
 
         with pytest.raises(ReleaseValidationError) as exc:
             _abort_on_destroyed_tag(
-                str(ws / "packages" / "www"), "2.0.0", "www@v2.0.0",
-                releasable_name="www", workspace_root=str(ws), **_absent(ws),
+                str(ws / "packages" / "portal"), "2.0.0", "portal@v2.0.0",
+                releasable_name="portal", workspace_root=str(ws), **_absent(ws),
             )
         msg = str(exc.value)
-        assert "www@v2.0.0" in msg
+        assert "portal@v2.0.0" in msg
         assert "2.0.0" in msg
 
     def test_releasable_no_finalized_file_passes(self, tmp_path):
         ws = tmp_path / "monorepo"
-        changes = ws / ".rlsbl-monorepo" / "releasables" / "www" / "changes"
+        changes = ws / ".rlsbl-monorepo" / "releasables" / "portal" / "changes"
         changes.mkdir(parents=True)
         (changes / "unreleased.jsonl").write_text("")
         _abort_on_destroyed_tag(
-            str(ws / "packages" / "www"), "2.0.0", "www@v2.0.0",
-            releasable_name="www", workspace_root=str(ws), **_absent(ws),
+            str(ws / "packages" / "portal"), "2.0.0", "portal@v2.0.0",
+            releasable_name="portal", workspace_root=str(ws), **_absent(ws),
         )

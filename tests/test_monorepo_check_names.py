@@ -97,21 +97,21 @@ class TestPrefix:
         capsys.readouterr()
 
         mock_check.side_effect = [
-            {"name": "www-core", "registry": "npm", "status": "available",
+            {"name": "portal-core", "registry": "npm", "status": "available",
              "variants": []},
-            {"name": "www-api", "registry": "npm", "status": "available",
+            {"name": "portal-api", "registry": "npm", "status": "available",
              "variants": []},
         ]
 
-        _cmd_check_names([], {"target": "npm", "prefix": "www-"}, project_root=".")
+        _cmd_check_names([], {"target": "npm", "prefix": "portal-"}, project_root=".")
 
         # Verify names were prefixed
-        mock_check.assert_any_call("www-core", "npm")
-        mock_check.assert_any_call("www-api", "npm")
+        mock_check.assert_any_call("portal-core", "npm")
+        mock_check.assert_any_call("portal-api", "npm")
 
         captured = capsys.readouterr()
-        assert "www-core" in captured.out
-        assert "www-api" in captured.out
+        assert "portal-core" in captured.out
+        assert "portal-api" in captured.out
 
 
 class TestSuffix:
@@ -183,13 +183,13 @@ class TestRegistryName:
              "variants": []},
         ]
 
-        _cmd_check_names([], {"target": "npm", "prefix": "www-", "suffix": "-js"}, project_root=".")
+        _cmd_check_names([], {"target": "npm", "prefix": "portal-", "suffix": "-js"}, project_root=".")
 
         # registry_name wins verbatim -- prefix/suffix are NOT applied.
         mock_check.assert_called_once_with("my-core-pkg", "npm")
         captured = capsys.readouterr()
         assert "my-core-pkg" in captured.out
-        assert "www-" not in captured.out
+        assert "portal-" not in captured.out
 
     @patch("rlsbl.commands.monorepo.commands.time.sleep")
     @patch("rlsbl.commands.check._check_single_name")
@@ -202,14 +202,14 @@ class TestRegistryName:
         mock_check.side_effect = [
             {"name": "custom-core", "registry": "npm", "status": "available",
              "variants": []},
-            {"name": "www-api", "registry": "npm", "status": "available",
+            {"name": "portal-api", "registry": "npm", "status": "available",
              "variants": []},
         ]
 
-        _cmd_check_names([], {"target": "npm", "prefix": "www-"}, project_root=".")
+        _cmd_check_names([], {"target": "npm", "prefix": "portal-"}, project_root=".")
 
         mock_check.assert_any_call("custom-core", "npm")
-        mock_check.assert_any_call("www-api", "npm")
+        mock_check.assert_any_call("portal-api", "npm")
 
 
 class TestDelay:
