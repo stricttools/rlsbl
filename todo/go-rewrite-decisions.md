@@ -40,3 +40,6 @@ Recorded by the session that deleted the removed targets; each is an implementat
 - Local asset upload (`assets`, `custom_assets`) is dropped: the generated publish workflow already builds and attaches release archives in CI.
 - The Cloudflare Pages pipeline is dropped: selfdoc deploys documentation sites itself.
 - The lint, format, and type-check tool options, the dependency-declaration checks (deps-*), and the dead-modules check move out of rlsbl to strictcode.
+- The checks moving to strictcode are ported into strictcode in Go during this campaign (with their tests and the recent false-positive fixes), then deleted from rlsbl.
+- The strictspec certificate check moves to strictcode as well.
+- The circular-deps check moves to strictcode as well.
