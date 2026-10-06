@@ -51,3 +51,5 @@ Recorded by the session that deleted the removed targets; each is an implementat
 - `claim-name` and `monorepo check-names` are kept.
 - `prs` is dropped.
 - The `pre-push-check` removal stub is deleted.
+- `monorepo cleanup` is kept as the repair for releasable-residue findings (including the residue `monorepo absorb` leaves), not as a one-off migration.
+- `release yank` and `release scrub` are kept.
