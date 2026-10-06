@@ -53,3 +53,7 @@ Recorded by the session that deleted the removed targets; each is an implementat
 - The `pre-push-check` removal stub is deleted.
 - `monorepo cleanup` is kept as the repair for releasable-residue findings (including the residue `monorepo absorb` leaves), not as a one-off migration.
 - `release yank` and `release scrub` are kept.
+
+## Lifecycle and license
+
+- Lifecycle, license, and disclosure get first-class support through one record and one library, built in Go during the rlsbl rewrite: a strictspec-owned record per repository under `.strictmetadata/` holds dated periods of each releasable's lifecycle (active, on-hold, retired), license, and identities with the tag namespaces they owned, plus the repository's disclosure (confidential or public). One Go library evaluates a closed set of rule types fixed in code (rules while a value holds, rules over what was created during a period, permanent rules once triggered) and is linked by rlsbl, selfdoc, and safegit at their enforcement points. A dead identity's tags are accounted for by the identity's record, never scrubbed and never refused. Names of confidential subjects go into a machine-local index outside every repository, which safegit refuses at commit and selfdoc and rlsbl refuse in what they publish. The lifecycle, renamed-from, release-history-closed, and tag-ownership facts move out of rlsbl's transition record into this record, and the transition record goes back to recording repository surgery only. Stable subject IDs are not introduced.
