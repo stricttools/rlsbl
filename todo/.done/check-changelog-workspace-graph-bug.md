@@ -8,7 +8,7 @@ Running `rlsbl check --tag changelog` from any package directory in a monorepo (
 WorkspaceGraph.__init__() missing 1 required positional argument: 'projects'
 ```
 
-This affects all 50 packages in the WWW monorepo. Discovered on rlsbl v0.41.7.
+This affects all 50 packages in a private workspace. Discovered on rlsbl v0.41.7.
 
 ## Impact
 
@@ -19,7 +19,7 @@ This affects all 50 packages in the WWW monorepo. Discovered on rlsbl v0.41.7.
 ## Reproduction
 
 ```bash
-cd ~/Projects/WWW/cli  # or any package dir in a monorepo
+cd ~/Projects/<workspace>/cli  # or any package dir in a monorepo
 rlsbl check --tag changelog
 # → WorkspaceGraph.__init__() missing 1 required positional argument: 'projects'
 ```
@@ -30,4 +30,4 @@ A recent refactor of `WorkspaceGraph` added a required `projects` parameter to `
 
 ## Blocking
 
-The WWW monorepo has 52 unreleased commits across 50 packages since v0.1.0. Changelog entries are ready to be added but release is blocked until this bug is fixed.
+That workspace has 52 unreleased commits across 50 packages since v0.1.0. Changelog entries are ready to be added but release is blocked until this bug is fixed.

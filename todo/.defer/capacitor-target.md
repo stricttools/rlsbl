@@ -8,7 +8,7 @@ Capacitor is a cross-platform mobile framework (by the Ionic team) that wraps we
 
 Capacitor has a complex version model with independent platform files that can diverge. Three locations hold version information (`package.json`, `build.gradle`, `pbxproj`/`Project.swift`) and they must be bumped atomically. This is fundamentally different from single-source frameworks like Flutter where `pubspec.yaml` drives everything.
 
-Implementing this properly should depend on mobileinfra-version (now public on PyPI), which already has the full cross-platform read/write API for Capacitor version files (build.gradle, package.json, pbxproj, Project.swift parsing).
+Implementing this properly should depend on a version-file library from a private project, which already has the full cross-platform read/write API for Capacitor version files (build.gradle, package.json, pbxproj, Project.swift parsing).
 
 ## Problems from the original mobile-targets todo
 

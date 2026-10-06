@@ -2,7 +2,7 @@
 
 ## Problem
 
-The release flow (`rlsbl monorepo release run`) and the check system (`rlsbl check`) validate the same things but through different code paths. The core functions are shared (`lint_library()`, `run_project_tests()`), but the **wrapper code** that calls them diverges — different parameter threading, different target selection logic, different changelog validation. This means `rlsbl check` can pass while `rlsbl monorepo release run` fails on the same project, which is what happened 5 times in a row on the www monorepo's auth releasable.
+The release flow (`rlsbl monorepo release run`) and the check system (`rlsbl check`) validate the same things but through different code paths. The core functions are shared (`lint_library()`, `run_project_tests()`), but the **wrapper code** that calls them diverges — different parameter threading, different target selection logic, different changelog validation. This means `rlsbl check` can pass while `rlsbl monorepo release run` fails on the same project, which is what happened 5 times in a row on a private workspace's auth releasable.
 
 ## Evidence: 5 consecutive release failures that checks didn't catch
 

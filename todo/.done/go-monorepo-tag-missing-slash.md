@@ -19,7 +19,7 @@ The format string doesn't add a `/` separator between path and version. It relie
 
 `monorepo_tag_format("auth-gateway", "0.1.0", path="auth-gateway")` should return `auth-gateway/v0.1.0`.
 
-The Go module proxy requires the slash — `go get github.com/smm-h/www/auth-sdk-go@v0.1.0` looks for tag `auth-sdk-go/v0.1.0`.
+The Go module proxy requires the slash — `go get example.com/portal/auth-sdk-go@v0.1.0` looks for tag `auth-sdk-go/v0.1.0`.
 
 ## Fix
 

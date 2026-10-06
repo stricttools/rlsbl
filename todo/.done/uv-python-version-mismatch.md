@@ -80,7 +80,7 @@ Also applies to all other `uv sync` call sites that run from workspace member di
 
 ### Part 2: Add rlsbl check for unbuildable workspace members
 
-`--all-packages` has one fragility: if ANY workspace member has a broken build config, the entire sync fails. This is a real scenario — the WWW workspace has a broken `www-scaleway-tem` member (missing `[tool.hatch.build.targets.wheel] packages` directive).
+`--all-packages` has one fragility: if ANY workspace member has a broken build config, the entire sync fails. This is a real scenario — a private workspace has a broken member (missing `[tool.hatch.build.targets.wheel] packages` directive).
 
 Add a new rlsbl check (likely under the `workspace` tag) that validates all uv workspace members can build wheels. This catches broken configs early via `rlsbl check`, not at release time.
 

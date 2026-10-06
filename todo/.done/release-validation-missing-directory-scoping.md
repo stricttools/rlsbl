@@ -14,7 +14,7 @@ Same happens with `rlsbl monorepo release` — it validates with the unscoped pa
 
 ## Impact
 
-**Blocks all releases** in monorepos that have commits touching files outside any given package's directory. In the WWW monorepo (50 packages), no package can be released because the release validation sees all 57 unreleased commits and expects each package to cover all of them.
+**Blocks all releases** in monorepos that have commits touching files outside any given package's directory. In a private workspace (50 packages), no package can be released because the release validation sees all 57 unreleased commits and expects each package to cover all of them.
 
 ## Root cause
 
@@ -23,7 +23,7 @@ The 0.43.0 directory scoping fix was applied to the `check` command codepath but
 ## Reproduction
 
 ```bash
-cd ~/Projects/WWW/cloudflare
+cd ~/Projects/<workspace>/<package>
 rlsbl check --tag changelog          # PASS
 rlsbl release run --dry-run --yes --allow-dirty --no-watch  # FAIL
 ```

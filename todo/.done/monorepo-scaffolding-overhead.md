@@ -8,7 +8,7 @@ This creates three concrete problems: blast radius on cross-cutting changes, mai
 
 ## Evidence
 
-All examples are from the www monorepo (44 packages in the "www" releasable, 5 in "auth").
+All examples are from a private workspace (44 packages in its main releasable, 5 in "auth").
 
 ### Identical per-package config files
 
@@ -58,11 +58,11 @@ set -euo pipefail
 echo "Post-release: v$RLSBL_VERSION"
 ```
 
-Each has a corresponding merge base file in `.rlsbl/bases/` (525 base files total) for three-way merge tracking. None of the 52 packages in www has customized any hook.
+Each has a corresponding merge base file in `.rlsbl/bases/` (525 base files total) for three-way merge tracking. None of the 52 packages in that workspace has customized any hook.
 
 ### Scaffold churn
 
-23 scaffold-related commits in www since 2026-05-01. Six are bare `rlsbl scaffold` commits that touch only rlsbl-managed files. Each re-scaffold regenerates CI workflows, lint configs, and base files across all packages.
+23 scaffold-related commits in that workspace since 2026-05-01. Six are bare `rlsbl scaffold` commits that touch only rlsbl-managed files. Each re-scaffold regenerates CI workflows, lint configs, and base files across all packages.
 
 ### Per-package CI workflows
 
@@ -79,7 +79,7 @@ Each has a corresponding merge base file in `.rlsbl/bases/` (525 base files tota
 Per-package config.json files that are identical to the releasable default would not need to exist. A releasable could define default config, and per-package files would only contain overrides:
 
 ```
-.rlsbl-monorepo/releasables/www/config.json   # defaults for all 44 packages
+.rlsbl-monorepo/releasables/portal/config.json   # defaults for all 44 packages
 cloudflare/.rlsbl/config.json                   # only if cloudflare overrides something
 ```
 
@@ -90,7 +90,7 @@ Packages with no `.rlsbl/config.json` inherit everything from the releasable. Pa
 If no package in a releasable customizes hooks, hooks could live at the releasable level only:
 
 ```
-.rlsbl-monorepo/releasables/www/hooks/pre-release.sh
+.rlsbl-monorepo/releasables/portal/hooks/pre-release.sh
 ```
 
 Per-package hooks would only exist for packages that genuinely need different behavior. This would eliminate 156 identical scripts and 525 merge base files.
@@ -107,7 +107,7 @@ Instead of 52 per-package CI workflow source files, a releasable could define a 
 
 ### 5. Scaffold-aware cleanup of pre-releasable artifacts
 
-When a monorepo migrates to the releasable model, scaffold could offer to clean up per-package `.rlsbl/changes/`, `.rlsbl/releases/`, and per-package CHANGELOG.md files that are now superseded by releasable-level equivalents. Currently this cleanup is manual (the www evolution plan dedicates an entire phase to it).
+When a monorepo migrates to the releasable model, scaffold could offer to clean up per-package `.rlsbl/changes/`, `.rlsbl/releases/`, and per-package CHANGELOG.md files that are now superseded by releasable-level equivalents. Currently this cleanup is manual (that workspace's evolution plan dedicates an entire phase to it).
 
 ## Relationship to existing todos
 

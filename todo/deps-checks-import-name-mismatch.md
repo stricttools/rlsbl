@@ -4,10 +4,10 @@
 
 The `deps-undeclared` and `deps-unused` checks match declared package names against import names found in source files. When a package installs under a different import name than its package name, the checks produce false positives.
 
-Examples from the www monorepo (125 "unused" deps, almost all false positives):
+Examples from a private workspace (125 "unused" deps, almost all false positives):
 - Package `cloudflare` installs module `cf` → "cli declares dependency on cloudflare but no source file imports it"
-- Package `core` installs module `www_core` → "cli declares dependency on core but no source file imports it"
-- Package `namecheap` installs module `www_namecheap` → same pattern
+- Package `core` installs module `portal_core` → "cli declares dependency on core but no source file imports it"
+- Package `registrar` installs module `portal_registrar` → same pattern
 
 This also causes false positives in `dead-workspace-packages` ("library 'core' is not imported by any workspace package") and `dead-modules`.
 
@@ -26,7 +26,7 @@ Alternatively, support an `import_name` field in workspace.toml project entries 
 
 ## Also: ruff line-counting bug
 
-`rlsbl check --name ruff-lint` reports the count of output LINES from `ruff check --quiet`, not the count of errors. Ruff's quiet output includes multi-line context for each error. The www monorepo had 255 actual errors but rlsbl reported 2648. After fixing all 255, the check may still report a nonzero count.
+`rlsbl check --name ruff-lint` reports the count of output LINES from `ruff check --quiet`, not the count of errors. Ruff's quiet output includes multi-line context for each error. That workspace had 255 actual errors but rlsbl reported 2648. After fixing all 255, the check may still report a nonzero count.
 
 ## Affected files
 

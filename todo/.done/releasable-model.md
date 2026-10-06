@@ -6,10 +6,10 @@ Per-package versioning is waste for product monorepos. Of the 8 monorepos rlsbl 
 
 - N copies of version fields, N changelogs, N tags for packages that share a lifecycle
 - Linear scaling of release ceremony with package count (a 45-package monorepo turns a 15-minute release into hours)
-- No monorepo-level identity or version -- there is no way to say "WWW is at v2.0"
+- No monorepo-level identity or version -- there is no way to say "the workspace is at v2.0"
 - Convention-only lockstep ("always put all packages at the same bump") with no enforcement
 
-The root cause is that "package" and "releasable unit" are conflated. They are the same thing in strictcli (3 packages, independent consumers), but not in WWW (50 packages, one product) or F (43 packages, one app).
+The root cause is that "package" and "releasable unit" are conflated. They are the same thing in strictcli (3 packages, independent consumers), but not in a private workspace (50 packages, one product) or F (43 packages, one app).
 
 ## Decisions
 

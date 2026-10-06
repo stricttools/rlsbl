@@ -204,20 +204,20 @@ Effort: medium.
 
 - The legacy `dev_node = true` member key is in live use in these repos
   (planning-time measurement; re-grep before editing): strictcli, orxtra
-  (two members), WWW, gamehome (two members), mobileinfra, incantino.
-- Pre-edit EVERY use in strictcli, orxtra, WWW, and gamehome, replacing
+  (two members), a private workspace, gamehome (two members), a private project, incantino.
+- Pre-edit EVERY use in strictcli, orxtra, the private workspace, and gamehome, replacing
   each with the two-key form (`dev_only = true` plus `releasable = false`
   where absent; a bare rename is not equivalent where the second key is
   missing). Note: of these four, only strictcli's workspace loads today —
-  orxtra and gamehome are load-refused on their retired watch keys and WWW
+  orxtra and gamehome are load-refused on their retired watch keys and the private workspace
   on its missing root member; the edits are plain file edits regardless.
-- mobileinfra and incantino are deliberately excluded: they run the pinned
+- A private project and incantino are deliberately excluded: they run the pinned
   pre-campaign rlsbl (which predates the `dev_only` spelling — verify that
   claim against the pinned version's source at execution), and their
   implicit-mode conversions (their own filed todos) own the transition.
   rlsbl-sandbox, the third implicit-mode repo, carries no `dev_node` key
   and needs nothing here; its conversion todo stands.
-- Verify: strictcli's workspace loads under current rlsbl; for orxtra, WWW,
+- Verify: strictcli's workspace loads under current rlsbl; for orxtra, the private workspace,
   and gamehome the loader's refusal output mentions only their known other
   causes and never the alias; grep confirms no `dev_node` remains in the
   four.
@@ -699,7 +699,7 @@ Effort: large.
   backfill half now runs the promoted engine — no separate backfill step.
 - a private project: its untracked files inspected and committed first, then the
   dev-node root edit via the script.
-- WWW: the dev-node root edit; its two member-path tags get shipped-as
+- The private workspace: the dev-node root edit; its two member-path tags get shipped-as
   fields on the versions they shipped (the widened definition covers
   member-path spellings).
 - gamehome: deferred to its release hold. Its todos carry the decision and
@@ -741,7 +741,7 @@ Effort: large.
   natural release.
 - The three implicit-mode workspace conversions (their own filed todos, on
   the pinned pre-campaign release, on their own schedule): rlsbl-sandbox,
-  incantino, mobileinfra.
+  incantino, a private project.
 - gamehome's migration (blocked on its release hold; its todos carry the
   decision and the hand-steps).
 - The fleet health runner (another project's filed todo).

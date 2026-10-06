@@ -8,7 +8,7 @@ Example: incantino has sub-projects ios (v0.3.1), core (v1.0.0), tooling (v0.5.0
 
 ## Affected projects
 
-Any rlsbl monorepo with a root selfdoc.json: incantino, F, strictcli, WWW, shopkeep, gamehome.
+Any rlsbl monorepo with a root selfdoc.json: incantino, F, strictcli, a private workspace, shopkeep, gamehome.
 
 ## Investigation findings
 

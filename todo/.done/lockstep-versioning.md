@@ -38,4 +38,4 @@ A `lockstep = true` flag in `workspace.toml` that enforces all packages share on
 
 ## Context
 
-Discovered in the WWW monorepo (45 Python packages, 2 dev_node, all private, 1 external consumer being extracted to its own repo). A release session that should have taken 15 minutes took hours fighting per-package changelog coverage, bootstrap loops (new commits need entries which create new commits), and batch coordination. The monorepo infrastructure (layers, dependency validation, import scanning) is valuable — the per-package versioning is not.
+Discovered in a private workspace (45 Python packages, 2 dev_node, all private, 1 external consumer being extracted to its own repo). A release session that should have taken 15 minutes took hours fighting per-package changelog coverage, bootstrap loops (new commits need entries which create new commits), and batch coordination. The monorepo infrastructure (layers, dependency validation, import scanning) is valuable — the per-package versioning is not.

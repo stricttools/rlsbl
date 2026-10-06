@@ -6,7 +6,7 @@
 
 ## Evidence
 
-The www monorepo has 51 projects. The generated `ci-router.yml` had 51 `uses: ./.github/workflows/*-ci.yml` entries. CI failed on every push with the workflow file error. Fixed manually by extracting the 51st project (park) to standalone triggers, bringing the router to exactly 50.
+A private workspace has 51 projects. The generated `ci-router.yml` had 51 `uses: ./.github/workflows/*-ci.yml` entries. CI failed on every push with the workflow file error. Fixed manually by extracting the 51st project to standalone triggers, bringing the router to exactly 50.
 
 ## Proposed fix
 

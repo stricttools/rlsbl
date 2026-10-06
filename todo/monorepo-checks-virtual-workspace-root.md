@@ -15,7 +15,7 @@ that produce false reds (or misleading output) in any monorepo shaped like this.
 `check_changelog_orphans` calls `check_no_orphans` without passing `tag_glob` /
 `project` the way the range and coverage checks do. Result: orphan detection uses the
 default `v*` glob for EVERY releasable, so in a monorepo with per-releasable tag
-formats (e.g., `auth-v*`, `www-v*`) the unreleased range is computed against the wrong
+formats (e.g., `auth-v*`, `portal-v*`) the unreleased range is computed against the wrong
 last tag and entries get falsely flagged (or real orphans are missed).
 
 **Proposed fix:** thread the same `tag_glob`/`project` parameters into

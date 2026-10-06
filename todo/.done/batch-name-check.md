@@ -56,9 +56,9 @@ Output:
 
 ```
 Project    Checked Name    Status
-core       www-core        available
-api        www-api         TAKEN
-utils      www-utils       available
+core       portal-core        available
+api        portal-api         TAKEN
+utils      portal-utils       available
 ```
 
 ## Affected Files

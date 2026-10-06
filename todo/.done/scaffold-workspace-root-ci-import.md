@@ -2,13 +2,13 @@
 
 ## Problem
 
-`rlsbl scaffold` at a monorepo workspace root generates a `.github/workflows/ci.yml` with an import check like `uv run python -c "import www_workspace"`. The import name is derived from the root `pyproject.toml` `name` field (e.g., `www-workspace` → `import www_workspace`).
+`rlsbl scaffold` at a monorepo workspace root generates a `.github/workflows/ci.yml` with an import check like `uv run python -c "import portal_workspace"`. The import name is derived from the root `pyproject.toml` `name` field (e.g., `portal-workspace` → `import portal_workspace`).
 
 Workspace roots are not importable Python packages — they have no source directory matching the import name. The generated CI workflow always fails with `ModuleNotFoundError`.
 
 ## How it happens
 
-The CI template is the same for per-package and workspace root scaffolds. Per-package, the import check is correct (e.g., `import www_core` for the `core` package). At the workspace root, the template applies the same pattern but there is no corresponding Python module.
+The CI template is the same for per-package and workspace root scaffolds. Per-package, the import check is correct (e.g., `import portal_core` for the `core` package). At the workspace root, the template applies the same pattern but there is no corresponding Python module.
 
 ## Impact
 
