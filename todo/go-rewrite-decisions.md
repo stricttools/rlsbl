@@ -32,3 +32,5 @@ Recorded by the session that deleted the removed targets; each is an implementat
 - The subtree mirror is dropped: the `monorepo mirror` command, mirror publication, the release mirror step, and its checks.
 - Deploy is dropped: deploy.py, its config key, and its release step.
 - Fork-upstream support is kept: `upstream adopt-tags` and the upstream filters in changelog coverage.
+- The prerelease channel is dropped: the preid option and its branches in version computation, tagging, and publishing.
+- Blog-on-release is dropped: the release file field and its release steps.
