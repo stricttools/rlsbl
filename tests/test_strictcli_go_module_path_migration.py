@@ -133,7 +133,7 @@ def test_the_former_module_path_names_the_migration_and_applying_it_clears(
     assert rewrite in message
     assert f"`go mod edit -droprequire={NEW}`" in message
     assert f"`go get {NEW}@latest`" in message
-    assert not (consumer / ".strictcli").exists()
+    assert not (consumer / ".strictmetadata").exists()
 
     # The named fix, in order: rewrite the module path, drop the carried-over
     # requirement, go get, go mod tidy.
@@ -147,7 +147,7 @@ def test_the_former_module_path_names_the_migration_and_applying_it_clears(
     assert OLD not in (consumer / "go.mod").read_text()
 
     _run_strictcli_schema_dump({}, lambda m: None, project_dir=str(consumer))
-    schema = json.loads((consumer / ".strictcli" / "schema.json").read_text())
+    schema = json.loads((consumer / ".strictmetadata" / ".cli-schema" / "schema.json").read_text())
     assert schema["schema_version"] == 2
 
 
@@ -184,4 +184,4 @@ def test_the_new_module_path_names_only_the_upgrade(consumer, monkeypatch):
     _go(consumer, "get", f"{NEW}@latest")
     _go(consumer, "mod", "tidy")
     _run_strictcli_schema_dump({}, lambda m: None, project_dir=str(consumer))
-    assert (consumer / ".strictcli" / "schema.json").exists()
+    assert (consumer / ".strictmetadata" / ".cli-schema" / "schema.json").exists()

@@ -41,9 +41,10 @@ What is deliberately NOT rewritten
   schema dump.**  READMEs, CI workflows and generated code are outside this
   command's scope, on purpose: it renames a module, it does not sweep a
   repository for a string.  The one exception is
-  ``.strictcli/schema.json``, whose ``project_id`` IS the module path for a
-  strictcli-based Go app: that single line is rewritten, because after the
-  rename the program's ``help --json`` names the new module, and a committed
+  ``.strictmetadata/.cli-schema/schema.json``, whose ``project_id`` IS the
+  module path for a strictcli-based Go app: that single line is rewritten,
+  because after the rename the program's ``help --json`` names the new
+  module, and a committed
   document still naming the old one would describe a program that no longer
   exists until the next release rewrites it.
 * **``vendor/``, ``.git/``, and the project's scratch directories.**  A
@@ -77,6 +78,7 @@ from ...module_paths import (
     rewrite_module_prefix,
 )
 from ...preview_apply import Preview, Reconciler, VerdictItem, reconcile
+from ...strictcli_detect import SCHEMA_DUMP_PARTS
 from .abort import already_written
 
 #: Path components that take a file out of the walk.  A vendored tree is a
@@ -104,8 +106,8 @@ _TOKEN_AFTER = r"(?![A-Za-z0-9._\-])"
 #: is the main module path from the program's build information -- so a rename
 #: that skips this file leaves a committed document claiming the old identity,
 #: which the program itself no longer reports.
-_SCHEMA_DUMP_DIR = ".strictcli"
-_SCHEMA_DUMP_NAME = "schema.json"
+_SCHEMA_DUMP_PARTS = SCHEMA_DUMP_PARTS
+_SCHEMA_DUMP_NAME = SCHEMA_DUMP_PARTS[-1]
 
 #: The top-level ``project_id`` member of a canonically-encoded strictcli
 #: schema dump: two spaces of indent (depth 1), the key, and a JSON string
@@ -281,10 +283,7 @@ def find_schema_dumps(root):
         excluded_dir_names=_WALK_EXCLUDED_DIRS,
     )
     return sorted(
-        p for p in found
-        if os.path.basename(p) == _SCHEMA_DUMP_NAME
-        and os.path.basename(os.path.dirname(p)) == _SCHEMA_DUMP_DIR
-        and not _excluded(p, root)
+        p for p in found if _is_schema_dump(p) and not _excluded(p, root)
     )
 
 
@@ -414,10 +413,8 @@ def _read(path):
 
 def _is_schema_dump(path):
     """True when *path* is a committed strictcli schema dump."""
-    return (
-        os.path.basename(path) == _SCHEMA_DUMP_NAME
-        and os.path.basename(os.path.dirname(path)) == _SCHEMA_DUMP_DIR
-    )
+    tail = tuple(os.path.normpath(path).split(os.sep)[-len(_SCHEMA_DUMP_PARTS):])
+    return tail == _SCHEMA_DUMP_PARTS
 
 
 def observe_file(path, root, old, new, nested=()):

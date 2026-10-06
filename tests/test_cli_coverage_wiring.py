@@ -868,7 +868,8 @@ class TestTransitionWiring:
 
 
 class TestTheCommittedCoverageManifest:
-    """``.strictcli/test-coverage.json`` is committed, and it goes stale silently.
+    """``.strictmetadata/.cli-test-coverage/manifest.json`` is committed, and it
+    goes stale silently.
 
     The framework's check unions the manifest with the local shard files and
     never subtracts, so a command that is REMOVED stays recorded as covered
@@ -883,13 +884,14 @@ class TestTheCommittedCoverageManifest:
 
         manifest_path = (
             pathlib.Path(__file__).resolve().parents[1]
-            / ".strictcli" / "test-coverage.json"
+            / ".strictmetadata" / ".cli-test-coverage" / "manifest.json"
         )
         recorded = set(json.loads(manifest_path.read_text(encoding="utf-8")))
         live = rlsbl.app._collect_all_command_paths()
         assert sorted(recorded - live) == [], (
-            "stale entries in .strictcli/test-coverage.json: these commands no "
-            "longer exist. Delete the manifest and the local shards under "
-            ".strictcli/coverage/, re-run the suite, and re-run "
+            "stale entries in .strictmetadata/.cli-test-coverage/manifest.json: "
+            "these commands no longer exist. Delete the manifest and the local "
+            "shards under .strictmetadata/.cli-test-coverage/shards/, re-run "
+            "the suite, and re-run "
             "`rlsbl check --name cli-test-coverage` to rewrite it."
         )

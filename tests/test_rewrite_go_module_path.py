@@ -552,7 +552,7 @@ class TestTheStrictcliSchemaDump:
     """The committed strictcli schema dump moves with the module.
 
     A strictcli-based Go app commits its schema dump at
-    ``.strictcli/schema.json``, and that document's ``project_id`` IS the Go
+    ``.strictmetadata/.cli-schema/schema.json``, and that document's ``project_id`` IS the Go
     module path.  Left behind by a rename, the next dump refuses ("existing
     schema belongs to project A, not B") and the release that runs the dump
     stops with no remedy on offer.  rlsbl already writes this file during a
@@ -560,7 +560,7 @@ class TestTheStrictcliSchemaDump:
     identity line too.
     """
 
-    SCHEMA_REL = os.path.join(".strictcli", "schema.json")
+    SCHEMA_REL = os.path.join(".strictmetadata", ".cli-schema", "schema.json")
 
     def _dump(self, root, project_id, *, name="foo"):
         return _write(root, self.SCHEMA_REL, (
@@ -614,10 +614,28 @@ class TestTheStrictcliSchemaDump:
         assert self.SCHEMA_REL not in preview.keys
         assert path.read_text() == before
 
+    def test_a_dump_at_the_former_location_is_not_read(self, repo):
+        """``.strictcli/schema.json`` is the location strictcli schema dumps
+        used before ``.strictmetadata/.cli-schema/``; nothing reads it."""
+        path = _write(repo, os.path.join(".strictcli", "schema.json"), (
+            "{\n"
+            '  "schema_version": 2,\n'
+            f'  "project_id": "{OLD}",\n'
+            '  "name": "foo",\n'
+            '  "version": "0.1.0"\n'
+            "}\n"
+        ))
+        before = path.read_text()
+        preview = observe(repo, OLD, NEW)
+        assert os.path.join(".strictcli", "schema.json") not in preview.keys
+        for item in preview.items:
+            apply_item(item, OLD, NEW)
+        assert path.read_text() == before
+
     def test_a_nested_module_s_dump_is_swept_too(self, repo):
         """The sweep is the whole tree, not just the root dump."""
         self._dump(repo, OLD)
-        _write(repo, os.path.join("tools", "gen", ".strictcli", "schema.json"), (
+        _write(repo, os.path.join("tools", "gen", ".strictmetadata", ".cli-schema", "schema.json"), (
             "{\n"
             '  "schema_version": 2,\n'
             f'  "project_id": "{OLD}/tools/gen",\n'
@@ -626,12 +644,12 @@ class TestTheStrictcliSchemaDump:
             "}\n"
         ))
         preview = observe(repo, OLD, NEW)
-        nested = os.path.join("tools", "gen", ".strictcli", "schema.json")
+        nested = os.path.join("tools", "gen", ".strictmetadata", ".cli-schema", "schema.json")
         assert nested in preview.keys
         for item in preview.items:
             apply_item(item, OLD, NEW)
         assert f'"project_id": "{NEW}/tools/gen"' in (
-            repo / "tools" / "gen" / ".strictcli" / "schema.json"
+            repo / "tools" / "gen" / ".strictmetadata" / ".cli-schema" / "schema.json"
         ).read_text()
 
     def test_the_dry_run_shows_the_dump_and_writes_nothing(self, repo, capsys):

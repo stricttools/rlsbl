@@ -344,7 +344,7 @@ class TestSchemaDumpBranching:
 
         assert len(captured_cmds) == 1
         assert captured_cmds[0] == ["go", "run", ".", "help", "--json"]
-        assert (tmp_path / ".strictcli" / "schema.json").read_text() == _HELP_DOCUMENT
+        assert (tmp_path / ".strictmetadata" / ".cli-schema" / "schema.json").read_text() == _HELP_DOCUMENT
 
     def test_schema_dump_invokes_uv_run(self, tmp_path, monkeypatch):
         """Schema dump calls 'uv run' subprocess for Python projects (no regression)."""

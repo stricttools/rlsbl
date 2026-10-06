@@ -20,6 +20,17 @@ _STRICTCLI_GO_MODULES = (
 )
 
 
+#: Where a strictcli program's committed help document (the stdout of
+#: ``<app> help --json``) sits, relative to the directory of the module it
+#: describes, as path components. The release writes it there, and every rlsbl
+#: reader of the document finds it there; the earlier ``.strictcli/schema.json``
+#: is not read.
+SCHEMA_DUMP_PARTS = (".strictmetadata", ".cli-schema", "schema.json")
+
+#: :data:`SCHEMA_DUMP_PARTS` in slash form, as messages name it.
+SCHEMA_DUMP_REL = "/".join(SCHEMA_DUMP_PARTS)
+
+
 class StrictcliDetectError(RlsblError):
     """The project requires strictcli but its entry point cannot be
     determined -- callers must treat this as a hard error, never as

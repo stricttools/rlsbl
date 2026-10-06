@@ -1,7 +1,7 @@
 """The release's schema-version stamp must preserve every other byte.
 
 `rlsbl release run` writes a strictcli consumer's help document
-(`<app> help --json`) to `.strictcli/schema.json` with the new version in it. The patch used to be
+(`<app> help --json`) to `.strictmetadata/.cli-schema/schema.json` with the new version in it. The patch used to be
 `json.dumps(json.load(f), indent=2)`, which re-encodes the WHOLE document with
 Python's own defaults -- and strictcli writes that file in its own canonical
 encoding (schema v2, contract 25.8): raw UTF-8 with `ensure_ascii=False`, no
@@ -23,7 +23,7 @@ from rlsbl.commands.release.validate import (
     _stamp_schema_version,
 )
 
-_PATH = ".strictcli/schema.json"
+_PATH = ".strictmetadata/.cli-schema/schema.json"
 
 
 # A schema fragment in strictcli's canonical v2 encoding, carrying every shape

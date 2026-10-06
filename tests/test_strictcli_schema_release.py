@@ -154,7 +154,7 @@ class TestStrictcliSchemaDumpFunction:
         assert fake_effects.run.call_args[0][0] == [
             "uv", "run", "myapp", "help", "--json",
         ]
-        assert not (tmp_path / ".strictcli").exists()
+        assert not (tmp_path / ".strictmetadata").exists()
 
     def test_dry_run_silent_when_not_strictcli(self, tmp_path):
         """In dry-run mode with no strictcli, nothing runs and nothing prints."""
@@ -182,7 +182,7 @@ class TestStrictcliSchemaDumpFunction:
         _run_strictcli_schema_dump({}, lambda m: None, project_dir=str(tmp_path))
 
         assert asked == [["uv", "run", "myapp", "help", "--json"]]
-        schema = tmp_path / ".strictcli" / "schema.json"
+        schema = tmp_path / ".strictmetadata" / ".cli-schema" / "schema.json"
         assert schema.read_text(encoding="utf-8") == _CANONICAL_SCHEMA
 
     def test_version_stamped_into_the_written_document(self, tmp_path, monkeypatch):
@@ -194,7 +194,7 @@ class TestStrictcliSchemaDumpFunction:
             {}, lambda m: None, project_dir=str(tmp_path), version="2.0.0",
         )
 
-        written = (tmp_path / ".strictcli" / "schema.json").read_text(encoding="utf-8")
+        written = (tmp_path / ".strictmetadata" / ".cli-schema" / "schema.json").read_text(encoding="utf-8")
         assert written == _CANONICAL_SCHEMA.replace('"1.0.0"', '"2.0.0"')
 
     def test_an_existing_schema_file_is_replaced_and_keeps_its_mode(
@@ -202,8 +202,8 @@ class TestStrictcliSchemaDumpFunction:
     ):
         _python_project(tmp_path)
         _install_stub(tmp_path, monkeypatch, "current")
-        schema = tmp_path / ".strictcli" / "schema.json"
-        schema.parent.mkdir()
+        schema = tmp_path / ".strictmetadata" / ".cli-schema" / "schema.json"
+        schema.parent.mkdir(parents=True)
         schema.write_text('{\n  "stale": true\n}\n')
         schema.chmod(0o644)
 
@@ -233,7 +233,7 @@ class TestStrictcliSchemaDumpFunction:
         assert "0.43.0" in message
         assert "upgrade" in message
         assert asked == [["uv", "run", "myapp", "help", "--json"]]
-        assert not (tmp_path / ".strictcli").exists()
+        assert not (tmp_path / ".strictmetadata").exists()
 
     @pytest.mark.parametrize("lang,entry,version_named", [
         ("go", ".", "v0.36.0"),
@@ -268,7 +268,7 @@ class TestStrictcliSchemaDumpFunction:
             {}, lambda m: None, project_dir=str(tmp_path), version="2.0.0",
         )
         data = json.loads(
-            (tmp_path / ".strictcli" / "schema.json").read_text(encoding="utf-8")
+            (tmp_path / ".strictmetadata" / ".cli-schema" / "schema.json").read_text(encoding="utf-8")
         )
         assert data["version"] == "2.0.0"
 
@@ -299,7 +299,7 @@ class TestStrictcliSchemaDumpFunction:
         )
         with pytest.raises(ReleaseValidationError, match="not a strictcli help document"):
             _run_strictcli_schema_dump({}, lambda m: None, project_dir=str(tmp_path))
-        assert not (tmp_path / ".strictcli").exists()
+        assert not (tmp_path / ".strictmetadata").exists()
 
     def test_timeout_raises_error(self, tmp_path):
         """When the dump command times out, ReleaseValidationError is raised."""
@@ -324,7 +324,7 @@ class TestStrictcliSchemaDumpFunction:
             _run_strictcli_schema_dump(
                 {}, lambda msg: None, project_dir=str(tmp_path), version="2.0.0",
             )
-        assert not (tmp_path / ".strictcli").exists()
+        assert not (tmp_path / ".strictmetadata").exists()
 
 
 class TestStrictcliSchemaOrdering:

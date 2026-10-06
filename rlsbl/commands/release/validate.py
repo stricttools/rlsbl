@@ -1697,7 +1697,7 @@ def _schema_dump_command(entry_point: str, lang: str) -> list[str]:
 
     ``<app> help --json`` prints the help document on stdout (the ``--json``
     envelope goes to stderr) and writes no file; the release writes stdout to
-    ``.strictcli/schema.json`` itself. One branch per strictcli
+    ``.strictmetadata/.cli-schema/schema.json`` itself. One branch per strictcli
     implementation. TypeScript apps are npm packages whose ``bin`` entry names
     a built JS file, so the command runs that file directly with node -- there
     is no install step to depend on, exactly as ``go run`` needs no built
@@ -1785,11 +1785,11 @@ _NO_HELP_COMMAND = "error: unknown command 'help'"
 
 
 def _run_strictcli_schema_dump(flags, log, project_dir=".", version=None):
-    """Regenerate .strictcli/schema.json from ``<app> help --json``.
+    """Regenerate .strictmetadata/.cli-schema/schema.json from ``<app> help --json``.
 
     Detects strictcli usage via pyproject.toml, go.mod, or package.json, runs
     the entry point's ``help --json``, and writes its stdout -- the help
-    document, byte for byte -- to ``.strictcli/schema.json``. The generated
+    document, byte for byte -- to ``.strictmetadata/.cli-schema/schema.json``. The generated
     file is picked up by the hook-generated file mechanism (pre/post hook
     dirty snapshots).
 
@@ -1803,7 +1803,7 @@ def _run_strictcli_schema_dump(flags, log, project_dir=".", version=None):
     the retired ``--dump-schema``.
     """
     from . import effects as _effects, subprocess as _subprocess
-    from ...strictcli_detect import StrictcliDetectError
+    from ...strictcli_detect import SCHEMA_DUMP_PARTS, StrictcliDetectError
 
     try:
         result = detect_strictcli(project_dir)
@@ -1841,7 +1841,7 @@ def _run_strictcli_schema_dump(flags, log, project_dir=".", version=None):
         # A preview recorded the run; there is no document to write.
         return
 
-    schema_path = os.path.join(project_dir, ".strictcli", "schema.json")
+    schema_path = os.path.join(project_dir, *SCHEMA_DUMP_PARTS)
     stderr = (completed.stderr or "").strip()
     if completed.returncode != 0:
         if _NO_HELP_COMMAND in stderr:

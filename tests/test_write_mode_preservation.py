@@ -30,7 +30,7 @@ def _umask_default():
 
 
 class TestSchemaDumpWrite:
-    """`.strictcli/schema.json` is committed and read by every consumer.
+    """`.strictmetadata/.cli-schema/schema.json` is committed and read by every consumer.
 
     The release rewrites it from the program's `help --json` output.
     """
@@ -38,8 +38,8 @@ class TestSchemaDumpWrite:
     _DOCUMENT = '{\n  "schema_version": 2,\n  "version": "0.1.0",\n  "name": "x"\n}\n'
 
     def _schema(self, tmp_path, mode=0o644):
-        d = tmp_path / ".strictcli"
-        d.mkdir()
+        d = tmp_path / ".strictmetadata" / ".cli-schema"
+        d.mkdir(parents=True)
         path = d / "schema.json"
         path.write_text(self._DOCUMENT)
         os.chmod(path, mode)

@@ -452,7 +452,7 @@ class TestRemoveCliSurface:
         assert remove.dry_run_supported is True
 
     def test_it_is_recorded_in_the_committed_coverage_manifest(self):
-        """A new command must join `.strictcli/test-coverage.json`.
+        """A new command must join the committed coverage manifest.
 
         The manifest is committed and unioned with the local shards, so a
         command covered only by this session's shard files reads as uncovered
@@ -461,7 +461,7 @@ class TestRemoveCliSurface:
         import pathlib
 
         manifest = pathlib.Path(rlsbl.__file__).resolve().parents[1] \
-            / ".strictcli" / "test-coverage.json"
+            / ".strictmetadata" / ".cli-test-coverage" / "manifest.json"
         assert "changelog.remove" in set(
             json.loads(manifest.read_text(encoding="utf-8"))
         )

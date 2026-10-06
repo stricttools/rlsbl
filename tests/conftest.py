@@ -67,7 +67,7 @@ _ROOT_LITTER_ALLOWED = frozenset({
     ".mypy_cache",
     ".pytest_cache",
     ".ruff_cache",
-    ".strictcli",
+    ".strictmetadata",
 })
 
 
