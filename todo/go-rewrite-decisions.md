@@ -43,3 +43,5 @@ Recorded by the session that deleted the removed targets; each is an implementat
 - The checks moving to strictcode are ported into strictcode in Go during this campaign (with their tests and the recent false-positive fixes), then deleted from rlsbl.
 - The strictspec certificate check moves to strictcode as well.
 - The circular-deps check moves to strictcode as well.
+- The member layering system is dropped: layers.py, the `[layers]` workspace key, and the layers-violations check; www's `[layers]` section is removed in the same change so its rlsbl commands keep working.
+- `discover` is kept.
