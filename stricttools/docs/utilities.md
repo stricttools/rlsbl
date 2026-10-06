@@ -50,7 +50,7 @@ rlsbl commit -m <message> -- <file1> [file2 ...]
 | Scenario | Example |
 | --- | --- |
 | selfdoc regenerated docs | `rlsbl commit -m "selfdoc: regenerate" -- README.md CLAUDE.md` |
-| Strictcli schema dump | `rlsbl commit -m "schema: update" -- .strictcli/schema.json` |
+| Strictcli schema dump | `rlsbl commit -m "schema: update" -- .strictmetadata/.cli-schema/schema.json` |
 | Validation cache | `rlsbl commit -m "cache: update .validated" -- .rlsbl/changes/.validated` |
 
 ### When NOT to use

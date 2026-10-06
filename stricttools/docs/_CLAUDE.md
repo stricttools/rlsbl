@@ -91,7 +91,7 @@ in the release checkout (a detached checkout of the committed branch tip), never
 working tree:
 
 1. Pre-checks hook (`.rlsbl/hooks/pre-checks.sh`)
-2. Strictcli schema dump (`<app> help --json` written to `.strictcli/schema.json`, for projects using strictcli)
+2. Strictcli schema dump (`<app> help --json` written to `.strictmetadata/.cli-schema/schema.json`, for projects using strictcli)
 3. Selfdoc gen (`selfdoc gen --no-auto-commit`, regenerates docs from source)
 4. Selfdoc check (verifies generated docs are up-to-date)
 5. Built-in tests (`uv run pytest`, `go test`, `npm test`) -- skipped if pre-release hook is customized
