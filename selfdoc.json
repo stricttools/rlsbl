@@ -16,8 +16,8 @@
       "language": "python"
     }
   ],
-  "docs": "stricttools/docs/",
-  "output": "stricttools/.docs-cache/build/",
+  "docs": ".strictmetadata/docs/",
+  "output": ".strictmetadata/.docs-cache/build/",
   "versions": [
     {
       "version": "0.131.0"
@@ -38,17 +38,27 @@
     ]
   },
   "root_files": [
-    "stricttools/docs/_CLAUDE.md",
-    "stricttools/docs/_README.md"
+    {
+      "template": ".strictmetadata/docs/_CLAUDE.md",
+      "outputs": [
+        ".claude/CLAUDE.md"
+      ]
+    },
+    {
+      "template": ".strictmetadata/docs/_README.md",
+      "outputs": [
+        "README.md"
+      ]
+    }
   ],
   "directives": {
-    "table-feature-matrix": "stricttools/docs/directives/feature_matrix.py",
-    "table-pipelines": "stricttools/docs/directives/pipeline_table.py",
-    "table-targets": "stricttools/docs/directives/target_table.py",
-    "table-target-axes": "stricttools/docs/directives/target_axes.py",
-    "check-count": "stricttools/docs/directives/check_count.py",
-    "table-check-tags": "stricttools/docs/directives/check_tags.py",
-    "target-count": "stricttools/docs/directives/target_count.py"
+    "table-feature-matrix": ".strictmetadata/docs/directives/feature_matrix.py",
+    "table-pipelines": ".strictmetadata/docs/directives/pipeline_table.py",
+    "table-targets": ".strictmetadata/docs/directives/target_table.py",
+    "table-target-axes": ".strictmetadata/docs/directives/target_axes.py",
+    "check-count": ".strictmetadata/docs/directives/check_count.py",
+    "table-check-tags": ".strictmetadata/docs/directives/check_tags.py",
+    "target-count": ".strictmetadata/docs/directives/target_count.py"
   },
   "topology": {
     "slug": "rlsbl",
