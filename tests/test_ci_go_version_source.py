@@ -6,14 +6,10 @@ declared once per repository, never typed into a workflow. A literal
 toolchain silently: a test that needs the newer toolchain then skips on CI
 forever, and nobody sees it.
 
-The declared source is:
-
-* ``go.mod`` for a Go module. ``actions/setup-go`` reads go.mod's ``toolchain``
-  line first and falls back to the ``go`` directive, so the module declares the
-  development Go in ``toolchain`` while ``go`` stays the consumers' floor
-  (``toolchain`` only affects the main module).
-* ``.go-version`` for a project that is not a Go module but installs Go to run
-  a tool (the pgdesign target installs the pgdesign CLI with ``go install``).
+The declared source is ``go.mod``. ``actions/setup-go`` reads go.mod's
+``toolchain`` line first and falls back to the ``go`` directive, so the module
+declares the development Go in ``toolchain`` while ``go`` stays the consumers'
+floor (``toolchain`` only affects the main module).
 
 A comment that restates a version in the workflow is a second copy of the fact
 and goes stale the same way, so none is rendered.
@@ -24,10 +20,7 @@ import os
 import re
 
 import pytest
-from ruamel.yaml import YAML
 
-from rlsbl.commands.init_cmd import process_template
-from rlsbl.targets.pgdesign import PgdesignTarget
 
 TEMPLATES_ROOT = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "rlsbl", "templates"
@@ -86,7 +79,6 @@ class TestEveryGoInstallReadsAVersionFile:
             "go/ci.yml.tpl",
             "go/publish.yml.tpl",
             "go/publish-library.yml.tpl",
-            "pgdesign/ci.yml.tpl",
         }
 
     @pytest.mark.parametrize(
@@ -122,18 +114,3 @@ class TestDeclaredSourcePerTarget:
         """setup-go falls back to the floor without a toolchain line; say so."""
         text = open(os.path.join(TEMPLATES_ROOT, "go", "ci.yml.tpl"), encoding="utf-8").read()
         assert "toolchain" in text
-
-    def test_pgdesign_ci_reads_dot_go_version(self):
-        tpl_path = os.path.join(PgdesignTarget().template_dir(), "ci.yml.tpl")
-        content, unreplaced = process_template(
-            open(tpl_path, encoding="utf-8").read(), {},
-        )
-        assert unreplaced == []
-        doc = YAML(typ="safe").load(content)
-        setup_go = [
-            step for step in doc["jobs"]["test"]["steps"]
-            if step.get("uses", "").startswith("actions/setup-go@")
-        ]
-        assert [step["with"] for step in setup_go] == [
-            {"go-version-file": ".go-version"}
-        ]

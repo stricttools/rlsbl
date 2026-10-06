@@ -321,7 +321,6 @@ class TestEntryContentKey:
         ("user_facing", False),
         ("description", "Something else"),
         ("type", "feature"),
-        ("release_type", "ota"),
     ])
     def test_every_field_that_carries_meaning_separates_two_entries(
         self, field, value,

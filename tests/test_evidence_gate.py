@@ -79,7 +79,7 @@ class TestRegistryProbeSource:
         anyway -- the assertion below held while testing nothing.
         """
         target = MagicMock()
-        target.name = "plain"
+        target.name = "spec"
         target.supports_publication_probe = False
 
         source = RegistryProbeSource()
@@ -87,7 +87,7 @@ class TestRegistryProbeSource:
         assert len(evidence) == 1
         assert evidence[0].kind == EvidenceKind.INCONCLUSIVE
         assert evidence[0].message == (
-            "target 'plain' does not support publication probing"
+            "target 'spec' does not support publication probing"
         )
         target.publication_probe.assert_not_called()
 
@@ -139,14 +139,14 @@ class TestRunEvidenceGate:
     def test_blocked_when_all_inconclusive(self):
         """A lone non-prober leaves the gate with no authoritative evidence."""
         target = MagicMock()
-        target.name = "plain"
+        target.name = "spec"
         target.supports_publication_probe = False
 
         result = run_evidence_gate([target], "/fake", "1.0.0")
         assert result.verdict == Verdict.BLOCKED
         assert "no authoritative" in result.reason
         assert result.evidence[0].message == (
-            "target 'plain' does not support publication probing"
+            "target 'spec' does not support publication probing"
         )
         target.publication_probe.assert_not_called()
 
@@ -164,7 +164,7 @@ class TestRunEvidenceGate:
         )
 
         plain = MagicMock()
-        plain.name = "plain"
+        plain.name = "spec"
         plain.supports_publication_probe = False
 
         result = run_evidence_gate([npm, plain], "/fake", "1.0.0")

@@ -51,8 +51,8 @@ class ReleaseTarget(Protocol):
         One member of the closed vocabulary in :mod:`rlsbl.scratch_dirs`:
         ``"no-test-runner-recursion"`` -- the runner collects only from a
         declared test source set, so it never reaches one;
-        ``"pytest-norecursedirs"``, ``"go-nested-module"`` and
-        ``"deno-config-exclude"`` -- the setting or file scaffold writes; or
+        ``"pytest-norecursedirs"`` and ``"go-nested-module"`` -- the setting or
+        file scaffold writes; or
         ``"runner-chosen-by-project"`` -- the project's manifest names the
         runner, whose configuration file rlsbl does not own and does not write.
         """
@@ -130,7 +130,7 @@ class ReleaseTarget(Protocol):
         ...
 
     ecosystem: str
-    """Ecosystem identifier (e.g. 'node', 'python', 'go', 'jvm')."""
+    """Ecosystem identifier (e.g. 'node', 'python', 'go')."""
 
     publisher_binds_to_repository: bool
     """Whether this registry's publishing authorization names the REPOSITORY.
@@ -142,13 +142,6 @@ class ReleaseTarget(Protocol):
 
     publisher_setup_url: str
     """Where a repository-bound publisher is registered. Empty when none is."""
-
-    consumed_by_repository_url: bool
-    """Whether consumers resolve this target by repository URL and git tag.
-
-    True where the ecosystem has no registry (SPM), so a monorepo member is
-    unconsumable without a standalone mirror to point consumers at.
-    """
 
     mirror_identity_files: tuple[str, ...]
     """Manifests naming the repository the package lives in.
@@ -171,7 +164,7 @@ class ReleaseTarget(Protocol):
     lint_language: str | None
     """Which library-lint language this target's sources are written in.
 
-    The lint taxonomy (``python``, ``go``, ``npm``, ``maven``) is deliberately
+    The lint taxonomy (``python``, ``go``, ``npm``) is deliberately
     separate from the target taxonomy; this is the single bridge between them.
     None means the target does not participate in library boundary lint.
     """
@@ -252,7 +245,7 @@ class ReleaseTarget(Protocol):
         """Filename that holds the version (e.g. 'package.json'), or None if inherited.
 
         When dir_path is provided, implementations may resolve the filename
-        dynamically (e.g. Deno choosing between deno.json and deno.jsonc).
+        dynamically.
         """
         ...
 
@@ -307,7 +300,7 @@ class ReleaseTarget(Protocol):
     def format_version(self, version: str) -> str:
         """Translate a semver version into this ecosystem's version format.
 
-        The default is the identity, which is correct for npm, Go, Deno and
+        The default is the identity, which is correct for npm, Go, and
         most others. PyPI overrides it for PEP 440.
         """
         return version
@@ -439,8 +432,7 @@ class ReleaseTarget(Protocol):
             "venv": spec for the local/venv-install mode, where dependencies
                 are fetched into the project's own environment without exposing
                 a global CLI (e.g. `uv sync`, `npm install`). None for targets
-                that have no separate local-environment concept (e.g. Go,
-                Zig, Swift).
+                that have no separate local-environment concept (e.g. Go).
 
         Each spec dict has the shape:
             {

@@ -9,7 +9,7 @@ import contextlib
 import os
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import tomlkit
 
@@ -20,8 +20,6 @@ from . import effects
 VALID_BUMP_TYPES = ("patch", "minor", "major", "infra", "prerelease")
 
 VALID_PREIDS = ("alpha", "beta", "rc", "stable")
-
-VALID_TARGET_MODES = ("ota", "build")
 
 # The release commit: the fields the release flow itself writes into the ARCHIVED
 # release file (v{X.Y.Z}.toml) at the archive step, recording which commit and
@@ -201,7 +199,6 @@ class ReleaseConfig:
     bump: str  # "patch", "minor", "major", "infra", "prerelease"
     include: list[str]  # target names to release
     exclude: list[str]  # target names to skip
-    targets: dict[str, dict] = field(default_factory=dict)  # per-target config
     description: str = ""  # short description of this release
     context: str = ""  # optional context explaining why these changes were made
     preid: str = ""  # pre-release identifier: "alpha", "beta", "rc", or "stable"
@@ -379,43 +376,6 @@ def _validate_release_config(data: dict, prefix: str = "") -> ReleaseConfig:
             f"targets appear in both include and exclude: {sorted(overlap)}"
         )
 
-    # --- targets section ---
-    targets_raw = data.get("targets", {})
-    targets = {}
-    if targets_raw:
-        if not isinstance(targets_raw, dict):
-            raise err("targets must be a table of per-target configurations")
-        include_set = set(include)
-        for name, cfg in targets_raw.items():
-            if name not in include_set:
-                raise err(
-                    f"target config for {name!r} but it is not in include"
-                )
-            if not isinstance(cfg, dict):
-                raise err(f"target config for {name!r} must be a table")
-            # Validate known fields
-            for key, value in cfg.items():
-                if key == "mode":
-                    if value not in VALID_TARGET_MODES:
-                        raise err(
-                            f"invalid mode for target {name!r}: {value!r} "
-                            f"(must be one of {VALID_TARGET_MODES})"
-                        )
-                else:
-                    raise err(
-                        f"unknown field {key!r} in target config for {name!r}"
-                    )
-            targets[name] = dict(cfg)
-
-    # Flutter target requires a mode field in its per-target config
-    for name in include:
-        if name == "flutter":
-            if name not in targets or "mode" not in targets[name]:
-                raise err(
-                    f"Flutter target {name!r} requires a [targets.{name}] section "
-                    f"with mode = \"ota\" or mode = \"build\""
-                )
-
     # --- description (required) ---
     if "description" not in data:
         raise err("missing required field: description")
@@ -458,7 +418,6 @@ def _validate_release_config(data: dict, prefix: str = "") -> ReleaseConfig:
         bump=bump,
         include=list(include),
         exclude=list(exclude),
-        targets=targets,
         description=description.strip(),
         context=context.strip(),
         preid=preid,
@@ -483,12 +442,11 @@ def _strictspec_validate_release_document(raw: bytes) -> None:
 
     strictspec owns the DOCUMENT SHAPE: the ``format_version`` gate, field
     types, the ``bump``/``preid``/``mode`` enums, required fields, unknown-key
-    rejection, include/exclude disjointness, the ``[targets.<name>]`` ⊆
-    ``include`` reference, and the preid/bump couplings. Raises
+    rejection, include/exclude disjointness, and the preid/bump couplings. Raises
     ``ReleaseFileError`` (rlsbl's native error style) when any diagnostic fires.
 
     Consumer-native refinements that strictspec cannot express (whitespace-only
-    ``description``, the Flutter required-``mode`` gate) stay in
+    ``description``) stay in
     :func:`_bind_release_config`. There is no dual validation: any property
     strictspec owns is not re-checked natively on this path.
     """
@@ -509,17 +467,6 @@ def _bind_release_config(data: dict) -> ReleaseConfig:
     bump = data["bump"]
     include = list(data["include"])
     exclude = list(data["exclude"])
-    targets = {name: dict(cfg) for name, cfg in data.get("targets", {}).items()}
-
-    # Native refinement: the Flutter target requires a mode field (an
-    # array-contains-literal gate strictspec does not express).
-    for name in include:
-        if name == "flutter" and (name not in targets or "mode" not in targets[name]):
-            raise ReleaseFileError(
-                f"Flutter target {name!r} requires a [targets.{name}] section "
-                f'with mode = "ota" or mode = "build"'
-            )
-
     description = data["description"]
     # Native refinement: whitespace-only description (non_empty passes "   ").
     if not description.strip():
@@ -575,7 +522,6 @@ def _bind_release_config(data: dict) -> ReleaseConfig:
         bump=bump,
         include=include,
         exclude=exclude,
-        targets=targets,
         description=description.strip(),
         context=context.strip(),
         preid=preid,
@@ -849,9 +795,9 @@ def write_release_commit(path: str, *, candidate_sha: str, tree_hashes: dict) ->
         if f_name in doc:
             del doc[f_name]
     # No explanatory comment block: tomlkit appends comments after the last
-    # element, which in a file carrying a [targets.<name>] section reads as a
-    # comment ON that section. The release commit's meaning is stated where it belongs
-    # -- the schema field descriptions and docs/release-workflow.md.
+    # element, where it would read as a comment ON that element. The release
+    # commit's meaning is stated where it belongs -- the schema field
+    # descriptions and docs/release-workflow.md.
     doc.add("candidate_sha", candidate_sha)
     doc.add("tree_hashes", _release_commit_tree_table(tree_hashes))
     effects.atomic_write_text(path, tomlkit.dumps(doc))
@@ -1094,7 +1040,7 @@ def read_batch_release_file(path: str) -> BatchReleaseConfig:
     Sections are ``[releasables.<name>]``, one per releasable being released.
 
     Each section has the same fields as a single ReleaseConfig (bump, include,
-    exclude, optional targets, description, context).
+    exclude, description, context).
 
     Raises FileNotFoundError if the file doesn't exist.
     Raises ReleaseFileError, naming *path*, for schema/validation failures.

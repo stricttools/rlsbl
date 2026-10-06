@@ -258,33 +258,20 @@ class TestMergedPublishCombinations:
 
     TEMPLATE_VARS = {"engines": {"node": ">=20"}, "repoName": "user/repo", "name": "test", "version": "1.0.0"}
 
-    def test_npm_deno_merged(self):
-        """Merged publish contains both an npm job and a deno job."""
-        result = _generate_merged_publish(["npm", "deno"], self.TEMPLATE_VARS)
+    def test_npm_pypi_merged(self):
+        """Merged publish contains both an npm job and a pypi job."""
+        result = _generate_merged_publish(["npm", "pypi"], self.TEMPLATE_VARS)
 
         # Both jobs present as top-level job keys under jobs:
         assert "\n  npm:" in result
-        assert "\n  deno:" in result
+        assert "\n  pypi:" in result
 
         # npm-specific content
         assert "npm publish" in result
         assert "NPM_TOKEN" in result
 
-        # deno-specific content
-        assert "deno publish" in result
-
-    def test_pypi_deno_merged(self):
-        """Merged publish contains both a pypi job and a deno job."""
-        result = _generate_merged_publish(["pypi", "deno"], self.TEMPLATE_VARS)
-
-        assert "\n  pypi:" in result
-        assert "\n  deno:" in result
-
         # pypi-specific content
         assert "uv build" in result
-
-        # deno-specific content
-        assert "deno publish" in result
 
     def test_single_target_merged(self):
         """Merged publish with a single target produces one job."""
@@ -296,7 +283,6 @@ class TestMergedPublishCombinations:
         # No other registry jobs
         assert "\n  pypi:" not in result
         assert "\n  go:" not in result
-        assert "\n  deno:" not in result
 
     def test_go_npm_wrapper_jobs_preserved(self):
         """Go template with npmPublishJobs content preserves both goreleaser and npm-publish jobs.
@@ -404,7 +390,7 @@ class TestMergedPublishCombinations:
 
     def test_on_block_preserves_release_trigger(self):
         """Merged on: block preserves release trigger with sub-keys."""
-        result = _generate_merged_publish(["pypi", "deno"], self.TEMPLATE_VARS)
+        result = _generate_merged_publish(["pypi", "npm"], self.TEMPLATE_VARS)
         assert "release:" in result
         assert "types: [published]" in result
         assert "workflow_dispatch:" in result
@@ -415,37 +401,6 @@ class TestMergedPublishCombinations:
         assert "\non:\n" in result
         assert "  release:" in result
         assert "  workflow_dispatch:" in result
-
-    def test_dotted_placeholder_sheltering(self):
-        """Unresolved dotted placeholders like {{zig.projectName}} survive YAML round-trip.
-
-        Regression: the sheltering regex used \\w+ which doesn't match dots,
-        so {{zig.projectName}} passed raw into the YAML parser, which treated
-        the braces as flow mapping syntax and corrupted the output.
-        """
-        from ruamel.yaml import YAML
-
-        # zig.projectName is intentionally left unresolved (not in vars)
-        # while zig.minRequiredZig is resolved so we can test mixed behavior.
-        zig_vars = {
-            **self.TEMPLATE_VARS,
-            "zig.minRequiredZig": "0.13.0",
-            "npmPublishJobs": "",
-        }
-        result = _generate_merged_publish(["zig"], zig_vars)
-
-        # The output must be valid YAML (the whole point of sheltering)
-        data = YAML(typ="safe").load(result)
-        assert isinstance(data, dict)
-        assert "jobs" in data
-
-        # The unresolved dotted placeholder must survive as {{zig.projectName}}
-        assert "{{zig.projectName}}" in result
-
-        # The resolved placeholder must NOT appear as a raw placeholder
-        assert "{{zig.minRequiredZig}}" not in result
-        assert "0.13.0" in result
-
 
 class TestMergedPublishWorkingDirectory:
     """Unit tests for working-directory injection in _generate_merged_publish."""
@@ -724,18 +679,3 @@ class TestTargetFlagOnMultiTargetRepo:
         assert ("pypi-publish" in content or "uv build" in content), (
             "the pypi publish job vanished from the merged publish workflow"
         )
-
-    def test_target_registers_a_new_target(self, dual_registry_project):
-        """--target still declares a target that detection alone would not find."""
-        self._scaffold()
-        with open(os.path.join(".rlsbl", "config.json")) as f:
-            assert "plain" not in json.load(f).get("targets", [])
-
-        self._scaffold(target="plain")
-
-        with open(os.path.join(".rlsbl", "config.json")) as f:
-            targets = json.load(f)["targets"]
-        assert "plain" in targets
-        assert "npm" in targets and "pypi" in targets
-        # And the pre-existing targets' files are still there.
-        assert os.path.exists(os.path.join(".github", "workflows", "ci-pypi.yml"))

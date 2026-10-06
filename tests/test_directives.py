@@ -44,11 +44,7 @@ def _pipeline_table_resolve(attrs, config, body):
 # Feature matrix directive tests
 # ---------------------------------------------------------------------------
 
-ALL_TARGETS = sorted([
-    "dart", "deno", "docker", "flutter",
-    "go", "hex", "maven", "npm", "pgdesign", "plain",
-    "pypi", "spec", "swift", "swift-apple", "zig",
-])
+ALL_TARGETS = sorted(["go", "npm", "pypi", "spec"])
 
 
 class TestFeatureMatrixResolve:
@@ -103,10 +99,7 @@ class TestTargetTableResolve:
 # Pipeline table directive tests
 # ---------------------------------------------------------------------------
 
-EXPECTED_PIPELINE_TYPES = sorted([
-    "cloudflare-pages", "deno", "docker", "go",
-    "hex", "maven", "maven-central", "npm", "pypi",
-])
+EXPECTED_PIPELINE_TYPES = sorted(["cloudflare-pages", "go", "npm", "pypi"])
 
 
 class TestPipelineTableResolve:
@@ -128,6 +121,6 @@ class TestPipelineTableResolve:
     def test_contains_auth_methods(self):
         """Output contains at least one auth method value."""
         result = _pipeline_table_resolve({}, None, None)
-        assert "token" in result or "credential" in result or "none" in result, (
+        assert "token" in result or "none" in result, (
             "Expected at least one auth method in output"
         )

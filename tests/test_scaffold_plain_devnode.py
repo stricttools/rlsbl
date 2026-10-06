@@ -1,29 +1,12 @@
-"""Regression tests for plain-target scaffold root resolution.
+"""Scaffold root resolution for dev-node members, and a bare scaffold.
 
-Bug 1: when running `rlsbl scaffold --target plain` in a monorepo sub-project,
-`detect_registries()` returns empty (PlainTarget.detect() always returns
-False), so cmd_scaffold falls through to `find_project_root()` which walks
-up and finds the monorepo root. The scaffold_root is then the monorepo root
-instead of cwd, causing `_is_non_releasable_project()` to fail (it can't
-resolve the project from the wrong root). This means changelog infrastructure
-(unreleased.jsonl, CHANGELOG.md) gets created for non-releasable projects
-that should not have it.
-
-Fix 1: when --target is explicitly passed, always use Path.cwd() as
-scaffold_root.
-
-Bug 2: bare `rlsbl scaffold` (no --target) fails for already-scaffolded
-plain-target projects because detect_registries() returns empty (PlainTarget
-never auto-detects) and the code errors with "no package.json, pyproject.toml,
-or go.mod found" even though .rlsbl/config.json has targets: ["plain"].
-
-Fix 2: when cwd has .rlsbl/config.json, use cwd as scaffold_root and read
-targets from config when detect_registries() is empty.
+When `--target` is passed, scaffold uses the current directory as its root,
+so a dev-node member is judged non-releasable from its own directory. A bare
+`rlsbl scaffold` with no `.rlsbl/config.json` and no manifest still errors.
 """
 
 import json
 
-import pathlib
 
 
 from rlsbl.commands.init_cmd import run_cmd, _is_non_releasable_project
@@ -31,11 +14,11 @@ from rlsbl.context import create_context
 from conftest import make_workspace
 
 
-class TestScaffoldPlainDevNode:
-    """Scaffolding a plain-target dev_node project must skip changelog files."""
+class TestScaffoldDevNodeRoot:
+    """A dev_node member is judged from its own directory."""
 
     def _setup_monorepo_with_dev_node(self, mock_git_repo, subdir="infra"):
-        """Create a monorepo with a plain dev_node sub-project.
+        """Create a monorepo with a dev_node sub-project.
 
         Returns the sub-project directory path.
         """
@@ -70,100 +53,10 @@ class TestScaffoldPlainDevNode:
 
         assert _is_non_releasable_project(mock_git_repo) is True
 
-    def test_scaffold_plain_dev_node_no_changelog(self, mock_git_repo, monkeypatch):
-        """Scaffolding a plain dev_node project must NOT create changelog files."""
-        proj_dir = self._setup_monorepo_with_dev_node(mock_git_repo)
-        monkeypatch.chdir(proj_dir)
+class TestBareScaffold:
+    """Bare `rlsbl scaffold` (no --target)."""
 
-        # Create context with project_root = sub-project dir (the fix)
-        ctx = create_context(proj_dir)
-
-        # Run scaffold for the plain target
-        run_cmd("plain", [], {
-            "auto-commit": False,
-            "auto-tag": False,
-            "skip-shared": False,
-        }, ctx=ctx)
-
-        # Dev node projects must NOT have changelog infrastructure
-        changelog = proj_dir / "CHANGELOG.md"
-        unreleased = proj_dir / ".rlsbl" / "changes" / "unreleased.jsonl"
-
-        assert not changelog.exists(), (
-            "CHANGELOG.md should not be created for dev_node projects"
-        )
-        assert not unreleased.exists(), (
-            "unreleased.jsonl should not be created for dev_node projects"
-        )
-
-    def test_scaffold_plain_non_dev_node_has_changelog(self, mock_git_repo, monkeypatch):
-        """Scaffolding a plain NON-dev_node project creates changelog files normally."""
-        proj_dir = mock_git_repo / "lib"
-        proj_dir.mkdir()
-
-        # Set up workspace without dev_node flag
-        make_workspace(mock_git_repo, [
-            {"path": "lib", "name": "lib"},
-        ])
-
-        monkeypatch.chdir(proj_dir)
-        ctx = create_context(proj_dir)
-
-        run_cmd("plain", [], {
-            "auto-commit": False,
-            "auto-tag": False,
-            "skip-shared": False,
-        }, ctx=ctx)
-
-        # A releasable member's changelog lives under its releasable, not the
-        # package -- so that is where scaffolding puts it.
-        from rlsbl.workspace import get_releasable_changes_dir, get_releasable_dir
-
-        rel_dir = pathlib.Path(get_releasable_dir(str(mock_git_repo), "lib"))
-        unreleased = pathlib.Path(
-            get_releasable_changes_dir(str(mock_git_repo), "lib"),
-            "unreleased.jsonl",
-        )
-        assert unreleased.exists(), (
-            "unreleased.jsonl should be created for non-dev_node projects"
-        )
-        assert rel_dir.is_dir(), (
-            "the releasable's state directory should be created"
-        )
-
-
-class TestBareScaffoldPlainTarget:
-    """Bare `rlsbl scaffold` (no --target) for already-scaffolded plain projects."""
-
-    def test_bare_scaffold_reads_target_from_config(self, mock_git_repo, monkeypatch):
-        """Already-scaffolded plain-target project re-scaffolds without --target.
-
-        When .rlsbl/config.json exists with targets: ["plain"], bare scaffold
-        should use cwd as scaffold_root and read the target from config instead
-        of erroring with 'no package.json found'.
-        """
-        # Set up a plain-target project that was previously scaffolded
-        rlsbl_dir = mock_git_repo / ".rlsbl"
-        rlsbl_dir.mkdir()
-        (rlsbl_dir / "config.json").write_text(
-            json.dumps({"targets": ["plain"], "publish_mode": "ci"})
-        )
-        (mock_git_repo / "VERSION").write_text("0.1.0\n")
-        monkeypatch.chdir(mock_git_repo)
-
-        # Run bare scaffold (no --target flag) via app.test
-        from rlsbl import app
-        app.test(["scaffold", "--no-auto-tag"])
-
-        # Verify .rlsbl/version was written (proves scaffold ran to completion)
-        from rlsbl import __version__
-        version_marker = rlsbl_dir / "version"
-        assert version_marker.exists(), (
-            ".rlsbl/version should be created by scaffold"
-        )
-        assert version_marker.read_text().strip() == __version__
-
-    def test_bare_scaffold_plain_without_config_still_errors(self, tmp_project):
+    def test_bare_scaffold_without_config_or_manifest_errors(self, tmp_project):
         """Without .rlsbl/config.json and no manifest files, scaffold errors."""
         import subprocess
         result = subprocess.run(

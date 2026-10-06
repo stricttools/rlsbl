@@ -650,16 +650,14 @@ class TestMalformedManifest:
         projects = [
             {"path": "packages/a", "name": "a"},
             {"path": "packages/b", "name": "b"},
-            {"path": "packages/c", "name": "c"},
         ]
         root, projects = _make_workspace(tmp_path, projects, {
             "a": ("pyproject.toml", "this is not valid toml [[["),
             "b": ("package.json", "{not valid json"),
-            "c": ("pubspec.yaml", "name: c\n  bad: [indent\n"),
         })
         graph = WorkspaceGraph(root, projects)
         capsys.readouterr()
-        assert {e.project for e in graph.scan_errors} == {"a", "b", "c"}
+        assert {e.project for e in graph.scan_errors} == {"a", "b"}
 
 
 class TestDeduplication:

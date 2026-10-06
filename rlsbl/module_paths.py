@@ -10,7 +10,7 @@ The rule, stated once
 
 A path is inside a module prefix when it IS the prefix, or when it continues
 past the prefix at a **separator boundary**.  The separator is the ecosystem's
-own: ``/`` for Go import paths, ``.`` for Python and JVM dotted names.
+own: ``/`` for Go import paths, ``.`` for Python dotted names.
 
 The boundary is the whole rule.  A bare ``path.startswith(prefix)`` also
 matches a DIFFERENT module whose name merely begins with the same letters --
@@ -27,7 +27,7 @@ turns dotted names into never-matching ones (or the reverse).
 #: Separator between components of a Go import path.
 GO_SEP = "/"
 
-#: Separator between components of a Python / Java / Kotlin dotted name.
+#: Separator between components of a Python dotted name.
 DOT_SEP = "."
 
 
@@ -72,7 +72,7 @@ def go_import_under_module(import_path: str, module_path: str) -> bool:
 
 
 def dotted_under_module(name: str, prefix: str) -> bool:
-    """True when a dotted *name* (Python, Java, Kotlin) is inside *prefix*."""
+    """True when a dotted *name* (Python) is inside *prefix*."""
     return under_module_prefix(name, prefix, sep=DOT_SEP)
 
 

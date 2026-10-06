@@ -1,4 +1,4 @@
-"""Tests for concrete pipeline type implementations (npm, pypi, go, deno, hex, maven, docker, cloudflare-pages)."""
+"""Tests for concrete pipeline type implementations (npm, pypi, go, cloudflare-pages)."""
 
 import subprocess
 
@@ -8,10 +8,6 @@ from rlsbl.pipelines import PIPELINE_TYPES, Pipeline
 from rlsbl.pipelines.npm import NpmPipeline
 from rlsbl.pipelines.pypi import PypiPipeline
 from rlsbl.pipelines.go import GoPipeline
-from rlsbl.pipelines.deno import DenoPipeline
-from rlsbl.pipelines.hex import HexPipeline
-from rlsbl.pipelines.maven import MavenPipeline, MavenCentralPipeline
-from rlsbl.pipelines.docker import DockerPipeline
 from rlsbl.pipelines.cloudflare_pages import CloudflarePagesPipeline
 
 
@@ -21,19 +17,14 @@ from rlsbl.pipelines.cloudflare_pages import CloudflarePagesPipeline
 
 
 class TestPipelineRegistry:
-    def test_all_9_types_registered(self):
-        expected = {"npm", "pypi", "go", "deno", "hex", "maven", "maven-central", "docker", "cloudflare-pages"}
+    def test_all_types_registered(self):
+        expected = {"npm", "pypi", "go", "cloudflare-pages"}
         assert set(PIPELINE_TYPES.keys()) == expected
 
     def test_registry_maps_to_classes(self):
         assert PIPELINE_TYPES["npm"] is NpmPipeline
         assert PIPELINE_TYPES["pypi"] is PypiPipeline
         assert PIPELINE_TYPES["go"] is GoPipeline
-        assert PIPELINE_TYPES["deno"] is DenoPipeline
-        assert PIPELINE_TYPES["hex"] is HexPipeline
-        assert PIPELINE_TYPES["maven"] is MavenPipeline
-        assert PIPELINE_TYPES["maven-central"] is MavenCentralPipeline
-        assert PIPELINE_TYPES["docker"] is DockerPipeline
         assert PIPELINE_TYPES["cloudflare-pages"] is CloudflarePagesPipeline
 
 
@@ -44,9 +35,7 @@ class TestPipelineRegistry:
 
 class TestProtocolConformance:
     @pytest.mark.parametrize("cls", [
-        NpmPipeline, PypiPipeline, GoPipeline,
-        DenoPipeline, HexPipeline, MavenPipeline, MavenCentralPipeline,
-        DockerPipeline, CloudflarePagesPipeline,
+        NpmPipeline, PypiPipeline, GoPipeline, CloudflarePagesPipeline,
     ])
     def test_satisfies_pipeline_protocol(self, cls):
         p = cls(name="test", pipeline_type="test", local=False, config={})
@@ -63,11 +52,6 @@ _ALL_PIPELINES = [
     ("npm", "npm", NpmPipeline),
     ("pypi", "pypi", PypiPipeline),
     ("go", "go", GoPipeline),
-    ("deno", "deno", DenoPipeline),
-    ("hex", "hex", HexPipeline),
-    ("maven", "maven", MavenPipeline),
-    ("maven-central", "maven-central", MavenCentralPipeline),
-    ("docker", "docker", DockerPipeline),
     ("cf", "cloudflare-pages", CloudflarePagesPipeline),
 ]
 
@@ -96,9 +80,7 @@ class TestPublishLocalFalseSkips:
 # Pipelines with a single token_var attribute and matching required_env_vars
 _TOKEN_PIPELINES = [
     ("npm", "npm", NpmPipeline, "NPM_TOKEN"),
-    ("hex", "hex", HexPipeline, "HEX_API_KEY"),
     ("pypi", "pypi", PypiPipeline, "PYPI_TOKEN"),
-    ("deno", "deno", DenoPipeline, "DENO_TOKEN"),
 ]
 
 
@@ -123,7 +105,7 @@ class TestRequiredEnvVarsLocalTrue:
 
 
 # ---------------------------------------------------------------------------
-# Token-based pipelines: npm, hex
+# Token-based pipelines: npm
 # ---------------------------------------------------------------------------
 
 
@@ -160,22 +142,8 @@ class TestNpmPipeline:
         assert p.required_env_vars() == ["MY_NPM_TOKEN"]
 
 
-class TestHexPipeline:
-    def test_publish_with_token_calls_command(self, monkeypatch):
-        calls = []
-        monkeypatch.setenv("HEX_API_KEY", "hexkey")
-        monkeypatch.setattr(
-            "rlsbl.pipelines.hex.run",
-            lambda cmd, args, **kw: calls.append((cmd, args)),
-        )
-        p = HexPipeline(name="hex", pipeline_type="hex", local=True, config={})
-        p.publish(".", "1.0.0", None)
-        assert len(calls) == 1
-        assert calls[0] == ("mix", ["hex.publish", "--yes"])
-
-
 # ---------------------------------------------------------------------------
-# Dual-token pipelines: pypi, deno
+# Dual-token pipelines: pypi
 # ---------------------------------------------------------------------------
 
 
@@ -240,96 +208,6 @@ class TestPypiPipeline:
         assert exc_info.value.code == 1
 
 
-class TestDenoPipeline:
-    def test_publish_with_deno_token(self, monkeypatch):
-        calls = []
-        monkeypatch.setenv("DENO_TOKEN", "deno123")
-        monkeypatch.delenv("JSR_TOKEN", raising=False)
-        monkeypatch.setattr(
-            "rlsbl.pipelines.deno.run",
-            lambda cmd, args, **kw: calls.append((cmd, args)),
-        )
-        p = DenoPipeline(name="deno", pipeline_type="deno", local=True, config={})
-        p.publish(".", "1.0.0", None)
-        assert len(calls) == 1
-        assert calls[0] == ("deno", ["publish"])
-
-    def test_publish_with_jsr_token_fallback(self, monkeypatch):
-        calls = []
-        monkeypatch.delenv("DENO_TOKEN", raising=False)
-        monkeypatch.setenv("JSR_TOKEN", "jsr456")
-        monkeypatch.setattr(
-            "rlsbl.pipelines.deno.run",
-            lambda cmd, args, **kw: calls.append((cmd, args)),
-        )
-        p = DenoPipeline(name="deno", pipeline_type="deno", local=True, config={})
-        p.publish(".", "1.0.0", None)
-        assert len(calls) == 1
-
-    def test_publish_neither_token_exits(self, monkeypatch):
-        monkeypatch.delenv("DENO_TOKEN", raising=False)
-        monkeypatch.delenv("JSR_TOKEN", raising=False)
-        p = DenoPipeline(name="deno", pipeline_type="deno", local=True, config={})
-        with pytest.raises(SystemExit) as exc_info:
-            p.publish(".", "1.0.0", None)
-        assert exc_info.value.code == 1
-
-
-# ---------------------------------------------------------------------------
-# Credential pipeline: docker
-# ---------------------------------------------------------------------------
-
-
-class TestDockerPipeline:
-    def test_default_credential_vars(self):
-        p = DockerPipeline(name="docker", pipeline_type="docker", local=True, config={})
-        assert p.username_var == "DOCKER_USERNAME"
-        assert p.password_var == "DOCKER_PASSWORD"
-
-    def test_required_env_vars_local_true(self):
-        p = DockerPipeline(name="docker", pipeline_type="docker", local=True, config={})
-        assert p.required_env_vars() == ["DOCKER_USERNAME", "DOCKER_PASSWORD"]
-
-    def test_publish_missing_image_raises(self, monkeypatch):
-        monkeypatch.setenv("DOCKER_USERNAME", "user")
-        monkeypatch.setenv("DOCKER_PASSWORD", "pass")
-        p = DockerPipeline(name="docker", pipeline_type="docker", local=True,
-                           config={"registry": "ghcr.io"})
-        with pytest.raises(RuntimeError, match="image.*registry"):
-            p.publish(".", "1.0.0", None)
-
-    def test_publish_missing_registry_raises(self, monkeypatch):
-        monkeypatch.setenv("DOCKER_USERNAME", "user")
-        monkeypatch.setenv("DOCKER_PASSWORD", "pass")
-        p = DockerPipeline(name="docker", pipeline_type="docker", local=True,
-                           config={"image": "myapp"})
-        with pytest.raises(RuntimeError, match="image.*registry"):
-            p.publish(".", "1.0.0", None)
-
-    def test_publish_with_credentials_calls_docker(self, monkeypatch):
-        calls = []
-        monkeypatch.setenv("DOCKER_USERNAME", "user")
-        monkeypatch.setenv("DOCKER_PASSWORD", "pass")
-        monkeypatch.setattr(
-            "rlsbl.pipelines.docker.require_tool",
-            lambda name, fatal=True: "/usr/bin/docker",
-        )
-        monkeypatch.setattr(
-            "rlsbl.pipelines.docker.run",
-            lambda cmd, args, **kw: calls.append((cmd, args)),
-        )
-        p = DockerPipeline(name="docker", pipeline_type="docker", local=True,
-                           config={"image": "myapp", "registry": "ghcr.io/org"})
-        p.publish(".", "2.0.0", None)
-        assert len(calls) == 4
-        # build, push versioned, tag latest, push latest
-        assert calls[0][0] == "docker"
-        assert "build" in calls[0][1]
-        assert calls[1] == ("docker", ["push", "ghcr.io/org/myapp:2.0.0"])
-        assert calls[2] == ("docker", ["tag", "ghcr.io/org/myapp:2.0.0", "ghcr.io/org/myapp:latest"])
-        assert calls[3] == ("docker", ["push", "ghcr.io/org/myapp:latest"])
-
-
 # ---------------------------------------------------------------------------
 # Standalone: go
 # ---------------------------------------------------------------------------
@@ -378,66 +256,6 @@ class TestGoPipeline:
         assert len(calls) == 1
         assert calls[0] == ("go", ["list", "-m", "github.com/test/mymod@v1.0.0"])
         assert installs == [["go", "install", "."]]
-
-
-# ---------------------------------------------------------------------------
-# Standalone: maven
-# ---------------------------------------------------------------------------
-
-
-class TestMavenPipeline:
-    def test_required_env_vars_local_true(self):
-        p = MavenPipeline(name="maven", pipeline_type="maven", local=True, config={})
-        assert p.required_env_vars() == ["GITHUB_TOKEN"]
-
-    def test_required_env_vars_custom_token_var(self):
-        p = MavenPipeline(name="maven", pipeline_type="maven", local=True,
-                          config={"token_var": "MAVEN_TOKEN"})
-        assert p.required_env_vars() == ["MAVEN_TOKEN"]
-
-    def test_publish_missing_token_exits(self, monkeypatch):
-        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
-        p = MavenPipeline(name="maven", pipeline_type="maven", local=True, config={})
-        with pytest.raises(SystemExit) as exc_info:
-            p.publish(".", "1.0.0", None)
-        assert exc_info.value.code == 1
-
-    def test_publish_with_gradlew(self, tmp_path, monkeypatch):
-        calls = []
-        monkeypatch.setenv("GITHUB_TOKEN", "ghtoken")
-        # Create gradlew
-        gradlew = tmp_path / "gradlew"
-        gradlew.write_text("#!/bin/sh\n")
-        gradlew.chmod(0o755)
-        monkeypatch.setattr(
-            "rlsbl.pipelines.maven.run",
-            lambda cmd, args, **kw: calls.append((cmd, args)),
-        )
-        p = MavenPipeline(name="maven", pipeline_type="maven", local=True, config={})
-        p.publish(str(tmp_path), "1.0.0", None)
-        assert len(calls) == 1
-        assert calls[0] == ("./gradlew", ["publish"])
-
-    def test_publish_with_pom(self, tmp_path, monkeypatch):
-        calls = []
-        monkeypatch.setenv("GITHUB_TOKEN", "ghtoken")
-        # Create pom.xml (no gradlew)
-        pom = tmp_path / "pom.xml"
-        pom.write_text("<project></project>")
-        monkeypatch.setattr(
-            "rlsbl.pipelines.maven.run",
-            lambda cmd, args, **kw: calls.append((cmd, args)),
-        )
-        p = MavenPipeline(name="maven", pipeline_type="maven", local=True, config={})
-        p.publish(str(tmp_path), "1.0.0", None)
-        assert len(calls) == 1
-        assert calls[0] == ("mvn", ["deploy"])
-
-    def test_publish_no_build_file_raises(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("GITHUB_TOKEN", "ghtoken")
-        p = MavenPipeline(name="maven", pipeline_type="maven", local=True, config={})
-        with pytest.raises(RuntimeError, match="no gradlew or pom.xml"):
-            p.publish(str(tmp_path), "1.0.0", None)
 
 
 # ---------------------------------------------------------------------------

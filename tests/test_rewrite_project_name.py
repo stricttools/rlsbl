@@ -68,8 +68,8 @@ def _config(targets):
                 "type": "go", "target": "go", "local": True,
                 "install_paths": ["./cmd/widget"], "artifact": "binary",
             }
-        elif name == "deno":
-            entries.append("deno")
+        elif name == "spec":
+            entries.append({"name": "spec", "path": "widget/"})
         else:
             entries.append({"name": name, "path": f"{name}/"})
             pipelines[name] = {"type": name, "target": name, "local": False}
@@ -111,9 +111,9 @@ def _write_project(root, *, version, module, targets):
             'widget = "widget:main"\n'
         ))
         _write(root, "pypi/widget/__init__.py", "def main():\n    pass\n")
-    if "deno" in targets:
-        _write(root, "deno.json", json.dumps(
-            {"name": "widget", "version": version}, indent=2,
+    if "spec" in targets:
+        _write(root, "widget/version.json", json.dumps(
+            {"version": version}, indent=2,
         ) + "\n")
 
 
@@ -515,13 +515,14 @@ class TestRefusals:
         self, tmp_path, monkeypatch,
     ):
         root = build_released(
-            tmp_path / "widget", targets=("go", "npm", "pypi", "deno"),
+            tmp_path / "widget", targets=("go", "npm", "pypi", "spec"),
         )
         result = rename(root, monkeypatch)
-        _refused(result, "deno", 'deno.json "name"')
-        deno = root / "deno.json"
-        deno.write_text(deno.read_text().replace('"widget"', '"gadget"'))
-        _commit_all(root, "rename the deno manifest by hand")
+        _refused(result, "spec", "the project directory name")
+        os.rename(root / "widget", root / "gadget")
+        config = root / ".rlsbl" / "config.json"
+        config.write_text(config.read_text().replace('"widget/"', '"gadget/"'))
+        _commit_all(root, "rename the spec directory by hand")
         result = rename(root, monkeypatch)
         assert result.exit_code == 0, result.stderr + result.stdout
 

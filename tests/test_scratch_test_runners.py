@@ -3,13 +3,11 @@
 ``rlsbl scaffold`` creates ``experiments/`` and ``screenshots/`` at every
 project's root.  A half-finished probe left in one of them must not be able to
 break a suite it has nothing to do with, so scaffold also writes the one
-setting the project's own test runner honours: ``norecursedirs`` for pytest, a
-nested module file for ``go test ./...``, and ``exclude`` in the Deno
-configuration file.  Which mechanism a target uses is declared on the target
+setting the project's own test runner honors: ``norecursedirs`` for pytest and
+a nested module file for ``go test ./...``.  Which mechanism a target uses is declared on the target
 itself, so the answer is in the support matrix rather than in a hand-kept list.
 """
 
-import json
 import shutil
 import subprocess
 import sys
@@ -19,7 +17,6 @@ import pytest
 import tomlkit
 
 from rlsbl.scratch_dirs import (
-    DENO_CONFIG_EXCLUDE,
     GO_NESTED_MODULE,
     NO_TEST_RUNNER_RECURSION,
     PYTEST_DEFAULT_NORECURSEDIRS,
@@ -40,9 +37,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 _PYPROJECT = '[project]\nname = "mylib"\nversion = "0.1.0"\n'
 
 _GO_MOD = "module example.com/mylib\n\ngo 1.21\n"
-
-_DENO_JSON = '{\n  "name": "@scope/mylib",\n  "version": "0.1.0"\n}\n'
-
 
 def _child_pytest(cwd):
     """Run a real pytest against *cwd*, with this repo's own plugins off.
@@ -95,16 +89,13 @@ class TestMechanismIsDeclaredPerTarget:
     def test_go_declares_the_nested_module(self):
         assert TARGETS["go"].scratch_test_exclusion == GO_NESTED_MODULE
 
-    def test_deno_declares_the_config_exclude(self):
-        assert TARGETS["deno"].scratch_test_exclusion == DENO_CONFIG_EXCLUDE
-
     def test_npm_declares_that_the_project_chooses_the_runner(self):
         """npm's `test` script names a runner rlsbl neither picks nor configures."""
         assert TARGETS["npm"].scratch_test_exclusion == RUNNER_CHOSEN_BY_PROJECT
 
     def test_an_ecosystem_whose_runner_never_recurses_says_so(self):
-        """Maven compiles only its declared test source set, so nothing is needed."""
-        assert TARGETS["maven"].scratch_test_exclusion == NO_TEST_RUNNER_RECURSION
+        """spec has no test runner that recurses, so nothing is needed."""
+        assert TARGETS["spec"].scratch_test_exclusion == NO_TEST_RUNNER_RECURSION
 
     def test_mechanisms_are_resolved_from_target_names(self):
         assert scratch_mechanisms({"pypi"}) == frozenset({PYTEST_NORECURSEDIRS})
@@ -374,92 +365,6 @@ class TestGoNestedModule:
 
         after = subprocess.run(
             ["go", "test", "./..."], cwd=str(tmp_path), capture_output=True, text=True,
-        )
-        assert after.returncode == 0, after.stdout + after.stderr
-
-
-class TestDenoConfigExclude:
-    """A Deno project's configuration file excludes both directories."""
-
-    def test_scaffold_writes_the_exclude_entries(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        (tmp_path / "deno.json").write_text(_DENO_JSON)
-
-        created, _skipped, warnings = apply_scratch_test_exclusions({"deno": "."})
-
-        assert warnings == []
-        assert "deno.json" in {t for t, _ in created}
-        data = json.loads((tmp_path / "deno.json").read_text())
-        for name in SCRATCH_DIR_NAMES:
-            assert name in data["exclude"]
-
-    def test_rescaffolding_changes_nothing(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        (tmp_path / "deno.json").write_text(_DENO_JSON)
-
-        apply_scratch_test_exclusions({"deno": "."})
-        first = (tmp_path / "deno.json").read_text()
-        created, skipped, _warnings = apply_scratch_test_exclusions({"deno": "."})
-
-        assert (tmp_path / "deno.json").read_text() == first
-        assert created == []
-        assert "deno.json" in {t for t, _ in skipped}
-
-    def test_existing_user_excludes_are_preserved(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        (tmp_path / "deno.json").write_text(
-            '{\n  "name": "@scope/mylib",\n  "version": "0.1.0",\n'
-            '  "exclude": ["vendor"],\n  "tasks": {"dev": "deno run main.ts"}\n}\n'
-        )
-
-        apply_scratch_test_exclusions({"deno": "."})
-
-        data = json.loads((tmp_path / "deno.json").read_text())
-        assert data["exclude"][0] == "vendor"
-        assert data["tasks"] == {"dev": "deno run main.ts"}
-        for name in SCRATCH_DIR_NAMES:
-            assert name in data["exclude"]
-
-    def test_a_jsonc_config_is_reported_rather_than_rewritten(
-        self, tmp_path, monkeypatch,
-    ):
-        """Rewriting JSON with comments would lose them, so the operator is told."""
-        monkeypatch.chdir(tmp_path)
-        original = '{\n  // the package name\n  "name": "@scope/mylib"\n}\n'
-        (tmp_path / "deno.jsonc").write_text(original)
-
-        _created, _skipped, warnings = apply_scratch_test_exclusions({"deno": "."})
-
-        assert any("deno.jsonc" in w and "exclude" in w for w in warnings)
-        assert (tmp_path / "deno.jsonc").read_text() == original
-
-    @pytest.mark.skipif(
-        shutil.which("deno") is None, reason="deno toolchain not available"
-    )
-    def test_a_real_deno_test_run_skips_a_planted_file(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        (tmp_path / "deno.json").write_text(_DENO_JSON)
-        src = tmp_path / "src"
-        src.mkdir()
-        (src / "mod.ts").write_text("export function a(): number { return 1; }\n")
-        (src / "mod_test.ts").write_text(
-            'import { a } from "./mod.ts";\n'
-            'Deno.test("a", () => { if (a() !== 1) throw new Error("no"); });\n'
-        )
-        (tmp_path / "experiments").mkdir()
-        (tmp_path / "experiments" / "probe_test.ts").write_text(
-            "this half-finished probe ( does not parse !!!\n"
-        )
-
-        before = subprocess.run(
-            ["deno", "test"], cwd=str(tmp_path), capture_output=True, text=True,
-        )
-        assert before.returncode != 0, before.stdout
-
-        apply_scratch_test_exclusions({"deno": "."})
-
-        after = subprocess.run(
-            ["deno", "test"], cwd=str(tmp_path), capture_output=True, text=True,
         )
         assert after.returncode == 0, after.stdout + after.stderr
 

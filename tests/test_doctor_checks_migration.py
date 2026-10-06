@@ -70,7 +70,6 @@ EXPECTED_CHECKS = [
     "ruff-lint",
     "dead-workspace-packages",
     "subtree-remote-reachable",
-    "mirror-required",
     "workspace-unbuildable",
     "circular-deps",
     # Project checks
@@ -90,7 +89,6 @@ EXPECTED_CHECKS = [
     "prepush-manual-warning",
     "test-suite",
     "test-suite-workspace",
-    "maven-central-metadata",
     # Scaffold checks
     "scaffold-gitignore-stale",
     # Root config conflict
@@ -125,7 +123,7 @@ EXPECTED_CHECKS = [
     "nested-member-runner-exclusion",
     # a member's npm package and Go module zip carry no nested member's files
     "nested-member-upload-contents",
-    # no npm package, Go module zip, or Docker build context carries a private path
+    # no npm package or Go module zip carries a private path
     "upload-private-paths",
     # a nested member declares no uv workspace source of its own
     "nested-member-uv-sources",
@@ -740,21 +738,6 @@ class TestWorkspaceStaleEntriesCheck:
         result = app._check_defs["workspace-stale-entries"].impl(ctx)
         assert result.status == "fail"
         assert len(result.problems) == 1
-
-    def test_dart_project_not_stale(self, mock_git_repo):
-        """Dart project with pubspec.yaml is NOT flagged as stale."""
-        proj_dir = mock_git_repo / "flutter_app"
-        proj_dir.mkdir()
-        (proj_dir / "pubspec.yaml").write_text("name: flutter_app\nversion: 1.0.0\n")
-        ctx = WorkspaceCheckContext(
-            project_root=mock_git_repo,
-            workspace_root=mock_git_repo,
-            config={},
-            projects=[{"path": "flutter_app", "name": "flutter_app"}],
-            graph=None,
-        )
-        result = app._check_defs["workspace-stale-entries"].impl(ctx)
-        assert result.status == "pass"
 
     def test_rlsbl_config_not_stale(self, mock_git_repo):
         """Project with .rlsbl/config.json but no traditional manifest is NOT stale."""

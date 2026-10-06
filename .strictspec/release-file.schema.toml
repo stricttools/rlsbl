@@ -2,8 +2,8 @@
 # while it is editable, .rlsbl/releases/v{X.Y.Z}.toml once archived).
 # Source of truth: rlsbl/release_file.py (ReleaseConfig, _validate_release_config).
 # This validates the raw DOCUMENT SHAPE at read time; rlsbl keeps a small set of
-# consumer-native refinements (whitespace-only description, the flutter
-# required-mode gate) as native checks -- see rlsbl/release_file.py.
+# consumer-native refinements (whitespace-only description) as native checks --
+# see rlsbl/release_file.py.
 #
 # AUTHORITY. The archived release file is the authoritative record of WHICH
 # COMMIT AND TREE a version shipped from: the `candidate_sha` and `tree_hashes`
@@ -74,14 +74,6 @@ description = "Target names to skip. Disjoint from include."
 [types.ReleaseConfig.fields.exclude.item]
 type = "string"
 
-[types.ReleaseConfig.fields.targets]
-type = "map"
-required = false
-key_pattern = "^[a-z][a-z0-9-]*$"
-description = "Per-target configuration, keyed by target name. Each key must appear in include."
-[types.ReleaseConfig.fields.targets.value]
-type = "TargetConfig"
-
 [types.ReleaseConfig.fields.description]
 type = "string"
 required = true
@@ -145,14 +137,6 @@ non_empty = true
 # rlsbl treats preid = "" / whitespace as UNSET, so a present-but-empty preid
 # must not trip forbidden-when. Enforced natively in _bind_release_config.
 
-# Every key of targets must appear in include.
-[[types.ReleaseConfig.constraints]]
-form = "intra-document-references"
-reference = "targets"
-resolves_into = "include"
-resolves_by = "map-key"
-description = "A [targets.<name>] section is only valid when <name> is in include."
-
 # include and exclude must be element-disjoint.
 [[types.ReleaseConfig.constraints]]
 form = "collections-disjoint"
@@ -198,12 +182,3 @@ description = "A never-released version shipped under nothing."
 type = "string"
 regex = "^[0-9a-f]{7,40}$"
 description = "A git object hash, commit or tree, abbreviated (>= 7) or full (40). The release flow records whatever `git rev-parse` answered, which is the full form; the shorter bound exists so a record made from an abbreviation is readable rather than rejected. Resolution against the object database is rlsbl-native, not a shape check."
-
-# TargetConfig -- per-target overrides (only mode is recognized today).
-[types.TargetConfig]
-type = "record"
-[types.TargetConfig.fields.mode]
-type = "enum"
-required = false
-values = ["ota", "build"]
-description = "Flutter delivery mode (VALID_TARGET_MODES). The flutter required-mode gate is native."

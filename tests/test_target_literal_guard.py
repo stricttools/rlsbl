@@ -35,16 +35,15 @@ Known blind spots, all shared with the sweep:
   from ``argv`` are invisible.
 - **Non-Python surfaces.** Config schemas, YAML workflow templates and the
   scaffold templates are not scanned at all.
-- **Coincidental collisions.** ``"flutter"`` as a *pubspec.yaml key* reads
-  exactly like the target name and is reported as a finding in the dart and
-  flutter targets; both are inside the exempt package, but the same collision
-  is possible for any short target name elsewhere. Several other taxonomies
-  share spellings with target names and are equally invisible to the sweep:
+- **Coincidental collisions.** A string that is not a target name but is
+  spelled like one reads exactly like the target name, and the collision is
+  possible for any short target name. Several other taxonomies share
+  spellings with target names and are equally invisible to the sweep:
 
   | Taxonomy | Where it collides |
   | --- | --- |
   | PIPELINE types (``npm``, ``go``, ``pypi``, ...) | ``rlsbl/pipelines/``, ``rlsbl/config.py``, ``rlsbl/commands/release/validate.py`` |
-  | LINT LANGUAGES (``python``, ``go``, ``npm``, ``maven``) | ``rlsbl/go_introspect.py`` |
+  | LINT LANGUAGES (``python``, ``go``, ``npm``) | ``rlsbl/go_introspect.py`` |
   | strictcli implementation LANGUAGES (``python``, ``go``, ``typescript``) | ``rlsbl/commands/release/validate.py`` |
   | LAUNCHER entry types (``npm``, ``pypi``) | ``rlsbl/checks/project.py`` |
 
@@ -94,9 +93,6 @@ LEGACY_BASELINE: dict[str, dict[tuple[str, tuple[str, ...]], int]] = {
         ("compare", ('npm',)): 6,
         ("dispatch_key", ('go', 'npm', 'pypi')): 1,
     },
-    "rlsbl/commands/monorepo/batch_release_init.py": {
-        ("compare", ('flutter',)): 1,
-    },
     "rlsbl/commands/release/phase_a.py": {
         # A real target-name conditional, NOT a collision: the ecosystem
         # keyword tagger picks between ensure_npm_keyword and
@@ -112,9 +108,6 @@ LEGACY_BASELINE: dict[str, dict[tuple[str, tuple[str, ...]], int]] = {
         # Spelling collision: an npm PIPELINE type declaring ``provenance``.
         ("compare", ('npm',)): 1,
     },
-    "rlsbl/commands/release_init.py": {
-        ("compare", ('flutter',)): 1,
-    },
     "rlsbl/config.py": {
         ("compare", ('go',)): 1,
         ("compare", ('npm',)): 2,
@@ -124,16 +117,13 @@ LEGACY_BASELINE: dict[str, dict[tuple[str, tuple[str, ...]], int]] = {
         ("compare", ('go',)): 2,
     },
     "rlsbl/pipelines/__init__.py": {
-        ("dispatch_key", ('deno', 'docker', 'go', 'hex', 'maven', 'npm', 'pypi')): 1,
+        ("dispatch_key", ('go', 'npm', 'pypi')): 1,
     },
     "rlsbl/pipelines/introspect.py": {
-        ("dispatch_key", ('deno', 'docker', 'go', 'hex', 'maven', 'npm', 'pypi')): 1,
+        ("dispatch_key", ('go', 'npm', 'pypi')): 1,
     },
     "rlsbl/publish_gate.py": {
-        ("dispatch_key", ('deno', 'docker', 'go', 'hex', 'maven', 'npm', 'pypi', 'spec', 'swift', 'swift-apple', 'zig')): 1,
-    },
-    "rlsbl/release_file.py": {
-        ("compare", ('flutter',)): 2,
+        ("dispatch_key", ('go', 'npm', 'pypi', 'spec')): 1,
     },
 }
 

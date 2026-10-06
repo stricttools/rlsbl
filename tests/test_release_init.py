@@ -92,34 +92,6 @@ class TestReleaseInitMultipleTargets:
         assert list(data["include"]) == ["pypi", "npm", "go"]
 
 
-class TestReleaseInitFlutterTargets:
-    """Flutter target -> [targets] section with mode = 'build'."""
-
-    def test_flutter(self, tmp_path, monkeypatch):
-        entries = [TargetEntry(name="flutter", path=str(tmp_path))]
-        _run_release_init(tmp_path, entries, monkeypatch)
-
-        release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
-        data = _read_scaffolded_toml(str(release_path))
-        assert list(data["include"]) == ["flutter"]
-        assert data["targets"]["flutter"]["mode"] == "build"
-
-    def test_mixed_flutter_and_regular(self, tmp_path, monkeypatch):
-        entries = [
-            TargetEntry(name="pypi", path=str(tmp_path)),
-            TargetEntry(name="flutter", path=str(tmp_path)),
-        ]
-        _run_release_init(tmp_path, entries, monkeypatch)
-
-        release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
-        data = _read_scaffolded_toml(str(release_path))
-        assert list(data["include"]) == ["pypi", "flutter"]
-        assert list(data["exclude"]) == []
-        assert data["targets"]["flutter"]["mode"] == "build"
-        # pypi should NOT have a targets section
-        assert "pypi" not in data["targets"]
-
-
 class TestReleaseInitAlreadyExists:
     """File already exists -> error."""
 
@@ -273,21 +245,6 @@ class TestReleaseInitRoundTrip:
         release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
         with pytest.raises(ReleaseFileError, match="bump"):
             read_release_file(str(release_path))
-
-    def test_roundtrip_with_flutter(self, tmp_path, monkeypatch):
-        entries = [
-            TargetEntry(name="flutter", path=str(tmp_path)),
-        ]
-        _run_release_init(tmp_path, entries, monkeypatch)
-
-        release_path = tmp_path / ".rlsbl" / "releases" / "unreleased.toml"
-        data = _read_scaffolded_toml(str(release_path))
-        assert data["bump"] == ""
-        assert list(data["include"]) == ["flutter"]
-        assert list(data["exclude"]) == []
-        assert "flutter" in data["targets"]
-        assert data["targets"]["flutter"]["mode"] == "build"
-
 
 class TestReleaseInitDescriptionContext:
     """Scaffolded file includes description and context fields."""

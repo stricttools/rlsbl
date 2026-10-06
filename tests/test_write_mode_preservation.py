@@ -126,22 +126,6 @@ class TestReleasableVersionWrite:
         assert _mode(get_releasable_version_path(str(tmp_path), "alpha")) == _umask_default()
 
 
-class TestNativeIosWrite:
-    """The iOS target rewrites a consumer's own project files."""
-
-    def test_rewriting_a_project_file_keeps_its_mode(self, tmp_path):
-        from rlsbl.targets.native_ios import _atomic_write
-
-        path = tmp_path / "project.pbxproj"
-        path.write_text("MARKETING_VERSION = 0.1.0;\n")
-        os.chmod(path, 0o644)
-
-        _atomic_write(str(path), "MARKETING_VERSION = 0.2.0;\n")
-
-        assert _mode(str(path)) == 0o644
-        assert path.read_text() == "MARKETING_VERSION = 0.2.0;\n"
-
-
 class TestSelfdocBump:
     """`selfdoc.json` is committed; the bump only ever REWRITES it.
 
@@ -203,7 +187,6 @@ class TestReleaseStateIsDeliberately0600:
     "rlsbl/commands/release/validate.py",
     "rlsbl/config.py",
     "rlsbl/workspace.py",
-    "rlsbl/targets/native_ios.py",
 ])
 def test_no_rewriter_module_pins_0600(module_path):
     """The family stays closed: only the release-state writers pin 0o600."""

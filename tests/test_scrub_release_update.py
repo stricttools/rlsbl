@@ -72,7 +72,7 @@ class Recorder:
 def _release_record(tmp_path, version, *, release_commit=RELEASE_COMMIT):
     releases = tmp_path / ".rlsbl" / "releases"
     write_archived_release_file(
-        str(releases), version, bump="patch", include=["plain"],
+        str(releases), version, bump="patch", include=["spec"],
         description="A release.", candidate_sha=release_commit,
         tree_hashes={".": TREE},
     )

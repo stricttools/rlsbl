@@ -207,19 +207,3 @@ class TestMigratedCallSitesHonourTheBoundary:
 
         graph = _build_python_import_graph(str(tmp_path))
         assert graph[os.path.join("pkg", "app.py")] == {os.path.join("pkg", "mod.py")}
-
-    def test_jvm_import_scanner(self, tmp_path):
-        from rlsbl.import_scanners import JavaImportScanner
-
-        src = tmp_path / "Main.java"
-        src.write_text("import com.example.foobar.Thing;\n")
-        results = JavaImportScanner().scan(
-            str(tmp_path), {"foo"}, package_map={"com.example.foo": "foo"},
-        )
-        assert results == []
-
-        src.write_text("import com.example.foo.Thing;\n")
-        results = JavaImportScanner().scan(
-            str(tmp_path), {"foo"}, package_map={"com.example.foo": "foo"},
-        )
-        assert [r.package_name for r in results] == ["foo"]

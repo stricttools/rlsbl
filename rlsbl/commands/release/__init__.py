@@ -18,7 +18,7 @@ from ...changelog import (
 from ...changelog.generate import read_archive_metadata
 from ...errors import ConfigError, PostReleaseError, RlsblError  # noqa: F401  (ConfigError re-exported for execute.py)
 from ...git_util import validate_subtree_remote_ssh_host
-from ...config import read_deploy_config, read_json_config, should_tag, update_last_build_release
+from ...config import read_deploy_config, read_json_config, should_tag
 from ...pipelines import load_pipelines
 from ...deploy import deploy_target
 from ...lock import acquire_lock, release_lock
@@ -73,7 +73,7 @@ from .validate import (
     _abort_on_cross_repo_sources, _abort_on_version_skew,
     _run_strictcli_schema_dump, validate_blog_body,
     ReleaseValidationError, HookError, _SCHEMA_DUMP_TIMEOUT,
-    validate_release_targets, validate_ota_mode, validate_config_integrity,
+    validate_release_targets, validate_config_integrity,
     validate_no_authored_release_commit,
     validate_pipeline_config, validate_gh_cli, validate_gh_push_access,
     validate_no_stash,
@@ -822,7 +822,6 @@ def _run_cmd_inner(release_config, flags, *, ctx):
 
     # Target validation is deferred until after releasable context is resolved
     # so that member_dirs can be passed for releasable target union.
-    validate_ota_mode(release_config, project_root, config)
     validate_config_integrity(config, project_dir=str(project_root))
 
     # Pipeline config validation is deferred until after releasable context
@@ -1536,17 +1535,3 @@ def _run_cmd_inner(release_config, flags, *, ctx):
     finally:
         if not skip_lock:
             release_lock()
-
-    # Track build releases for Flutter OTA validation
-    flutter_targets = [t for t in release_config.include if t.startswith("flutter-")]
-    if flutter_targets:
-        mode = release_config.targets.get(flutter_targets[0], {}).get("mode")
-        if mode == "build":
-            # Recorded in the working tree's config, uncommitted, as it always
-            # was: the release checkout is reset by the next release.
-            from ... import release_checkout as _release_checkout
-            update_last_build_release(
-                _release_checkout.live_path(project_dir), new_version,
-            )
-
-

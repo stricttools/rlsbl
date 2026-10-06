@@ -37,7 +37,6 @@ class TestReadReleaseFileValid:
         assert cfg.bump == "patch"
         assert cfg.include == ["pypi"]
         assert cfg.exclude == ["npm"]
-        assert cfg.targets == {}
 
     def test_empty_include_and_exclude(self, tmp_path):
         f = tmp_path / "release.toml"
@@ -46,26 +45,6 @@ class TestReadReleaseFileValid:
         assert cfg.bump == "minor"
         assert cfg.include == []
         assert cfg.exclude == []
-        assert cfg.targets == {}
-
-    def test_with_targets_section(self, tmp_path):
-        f = tmp_path / "release.toml"
-        f.write_text(
-            'format_version = 1\nbump = "minor"\n'
-            'include = ["flutter"]\n'
-            'exclude = ["npm"]\n'
-            'description = "test release"\n'
-            "\n"
-            "[targets.flutter]\n"
-            'mode = "ota"\n'
-        )
-        cfg = read_release_file(str(f))
-        assert cfg.bump == "minor"
-        assert cfg.include == ["flutter"]
-        assert cfg.exclude == ["npm"]
-        assert cfg.targets == {
-            "flutter": {"mode": "ota"},
-        }
 
     def test_returns_dataclass(self, tmp_path):
         f = tmp_path / "release.toml"
@@ -179,22 +158,7 @@ class TestReadReleaseFileErrors:
         with pytest.raises(ReleaseFileError, match="share no element"):
             read_release_file(str(f))
 
-    def test_target_config_for_excluded_target(self, tmp_path):
-        f = tmp_path / "release.toml"
-        f.write_text(
-            'format_version = 1\nbump = "patch"\n'
-            'include = ["pypi"]\n'
-            'exclude = ["npm"]\n'
-            'description = "x"\n'
-            "\n"
-            "[targets.npm]\n"
-            'mode = "ota"\n'
-        )
-        with pytest.raises(ReleaseFileError, match="does not resolve"):
-            read_release_file(str(f))
-
-    def test_target_config_for_unlisted_target(self, tmp_path):
-        """A target in [targets] that isn't in include at all."""
+    def test_a_targets_section_is_an_unknown_key(self, tmp_path):
         f = tmp_path / "release.toml"
         f.write_text(
             'format_version = 1\nbump = "patch"\n'
@@ -202,36 +166,10 @@ class TestReadReleaseFileErrors:
             'exclude = []\n'
             'description = "x"\n'
             "\n"
-            "[targets.flutter]\n"
-            'mode = "ota"\n'
-        )
-        with pytest.raises(ReleaseFileError, match="does not resolve"):
-            read_release_file(str(f))
-
-    def test_invalid_target_mode(self, tmp_path):
-        f = tmp_path / "release.toml"
-        f.write_text(
-            'format_version = 1\nbump = "patch"\n'
-            'include = ["flutter"]\n'
-            'exclude = []\n'
-            "\n"
-            "[targets.flutter]\n"
-            'mode = "deploy"\n'
-        )
-        with pytest.raises(ReleaseFileError, match="not one of"):
-            read_release_file(str(f))
-
-    def test_unknown_target_field(self, tmp_path):
-        f = tmp_path / "release.toml"
-        f.write_text(
-            'format_version = 1\nbump = "patch"\n'
-            'include = ["flutter"]\n'
-            'exclude = []\n'
-            "\n"
-            "[targets.flutter]\n"
+            "[targets.pypi]\n"
             'flavor = "production"\n'
         )
-        with pytest.raises(ReleaseFileError, match="Unknown key"):
+        with pytest.raises(ReleaseFileError, match="Unknown key targets"):
             read_release_file(str(f))
 
     def test_description_not_string(self, tmp_path):
@@ -552,15 +490,6 @@ class TestStrictspecReleaseFileGate:
         with pytest.raises(ReleaseFileError, match="not one of"):
             read_release_file(p)
 
-    def test_invalid_target_mode_enum_caught(self, tmp_path):
-        p = self._write(
-            tmp_path,
-            'format_version = 1\nbump = "patch"\ninclude = ["flutter"]\n'
-            'exclude = []\ndescription = "x"\n[targets.flutter]\nmode = "sideload"\n',
-        )
-        with pytest.raises(ReleaseFileError, match="not one of"):
-            read_release_file(p)
-
     def test_include_exclude_disjoint_caught(self, tmp_path):
         p = self._write(
             tmp_path,
@@ -577,16 +506,6 @@ class TestStrictspecReleaseFileGate:
             'description = "x"\nbogus = 1\n',
         )
         with pytest.raises(ReleaseFileError, match="Unknown key"):
-            read_release_file(p)
-
-    def test_flutter_mode_gate_stays_native(self, tmp_path):
-        # 'flutter' in include with no [targets.flutter].mode -> native refinement.
-        p = self._write(
-            tmp_path,
-            'format_version = 1\nbump = "patch"\ninclude = ["flutter"]\n'
-            'exclude = []\ndescription = "x"\n',
-        )
-        with pytest.raises(ReleaseFileError, match="Flutter target"):
             read_release_file(p)
 
     def test_whitespace_only_description_stays_native(self, tmp_path):

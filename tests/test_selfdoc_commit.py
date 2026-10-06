@@ -39,7 +39,6 @@ def _make_release_config():
 # module stacks additional patches on top of this base set.
 _BASE_PATCHES = {
     "validate_release_targets": "pypi",
-    "validate_ota_mode": None,
     "validate_config_integrity": None,
     "validate_pipeline_config": None,
     "validate_gh_cli": None,

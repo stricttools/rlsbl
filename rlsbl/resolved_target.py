@@ -10,7 +10,7 @@ A :class:`ResolvedTarget` is one publishable (target, pipeline) pair:
 - A target served by N pipelines produces N ResolvedTargets -- the release flow
   publishes once per pipeline, so per-pair records let it iterate directly
   without re-deriving the target for each pipeline.
-- A pipeline-less target (e.g. ``plain`` / ``spec``, which version-bump but do
+- A pipeline-less target (e.g. ``spec``, which version-bumps but does
   not publish through a pipeline) produces a single ResolvedTarget with
   ``pipeline=None``.
 
@@ -40,7 +40,7 @@ class ResolvedTarget:
             ``MemberContext.target_paths[name]`` -- carried here so consumers
             need not re-resolve it).
         pipeline: the linked pipeline object, or ``None`` for a pipeline-less
-            target (version-bump-only targets like ``plain`` / ``spec``).
+            target (version-bump-only targets like ``spec``).
         publish_mode: the member's effective ``publish_mode`` string, carried
             verbatim from config (``"ci"`` / ``"none"``) -- never collapsed to a
             private boolean.

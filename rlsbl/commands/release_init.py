@@ -110,16 +110,6 @@ def run_cmd(project_root):
     doc.add("include", target_names)
     doc.add("exclude", [])
 
-    # Add per-target config sections for Flutter target
-    flutter_targets = [n for n in target_names if n == "flutter"]
-    if flutter_targets:
-        targets_table = tomlkit.table(is_super_table=True)
-        for ft in flutter_targets:
-            t = tomlkit.table()
-            t.add("mode", "build")
-            targets_table.add(ft, t)
-        doc.add("targets", targets_table)
-
     releases_dir = os.path.dirname(release_path)
     effects.makedirs(releases_dir, exist_ok=True)
 

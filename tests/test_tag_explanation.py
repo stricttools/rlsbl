@@ -29,11 +29,11 @@ TREE = "f" * 40
 def releases(tmp_path):
     d = tmp_path / ".rlsbl" / "releases"
     write_archived_release_file(
-        str(d), "1.0.0", bump="minor", include=["plain"], description="d",
+        str(d), "1.0.0", bump="minor", include=["spec"], description="d",
         candidate_sha=SHA, tree_hashes={".": TREE},
     )
     write_archived_release_file(
-        str(d), "0.12.0", bump="minor", include=["plain"], description="d",
+        str(d), "0.12.0", bump="minor", include=["spec"], description="d",
         candidate_sha=SHA, tree_hashes={".": TREE},
         shipped_as="strictcli@v0.12.0",
     )
@@ -61,7 +61,7 @@ class TestTheSources:
     def test_a_member_path_spelling_is_read_the_same_way(self, tmp_path):
         d = tmp_path / "releases"
         write_archived_release_file(
-            str(d), "0.1.0", bump="minor", include=["plain"], description="d",
+            str(d), "0.1.0", bump="minor", include=["spec"], description="d",
             candidate_sha=SHA, tree_hashes={".": TREE},
             shipped_as="auth-gateway/v0.1.0",
         )
@@ -123,7 +123,7 @@ def test_precedence_puts_the_current_scheme_first(tmp_path):
     """A tag the current scheme names is that version's, whatever else says."""
     d = tmp_path / "releases"
     write_archived_release_file(
-        str(d), "0.1.0", bump="minor", include=["plain"], description="d",
+        str(d), "0.1.0", bump="minor", include=["spec"], description="d",
         candidate_sha=SHA, tree_hashes={".": TREE}, shipped_as="v2.0.0",
     )
     path = get_transition_record_path(str(tmp_path))

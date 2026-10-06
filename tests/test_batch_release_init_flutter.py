@@ -1,4 +1,4 @@
-"""Tests for batch release-init Flutter support, TOML comments/context, and shared validation."""
+"""Tests for batch release-init sections, TOML comments/context, and shared validation."""
 
 import json
 
@@ -18,53 +18,16 @@ from rlsbl.release_file import (
 )
 
 
-SAMPLE_FLUTTER_PUBSPEC = """\
-name: my_flutter_app
-description: A Flutter application.
-version: 1.0.0+1
-
-environment:
-  sdk: ^3.0.0
-
-flutter:
-  uses-material-design: true
-"""
-
-
 # ---------------------------------------------------------------------------
-# Task 1: Flutter target config sections in batch release-init
+# Batch release-init writes no per-target sections
 # ---------------------------------------------------------------------------
 
 
-class TestBatchReleaseInitFlutter:
-    """Batch release-init scaffolds Flutter target config sections."""
+class TestBatchReleaseInitSections:
+    """Batch release-init writes no per-target config section."""
 
-    def test_flutter_target_section(self, mock_git_repo):
-        """Flutter project gets [releasables.<name>.targets.flutter] with mode=build."""
-        make_workspace(mock_git_repo, [
-            {"path": "app", "name": "app"},
-        ])
-
-        app_dir = mock_git_repo / "app"
-        app_dir.mkdir()
-        (app_dir / "pubspec.yaml").write_text(SAMPLE_FLUTTER_PUBSPEC)
-
-        run_git(mock_git_repo, "add", ".")
-        run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
-
-        _cmd_batch_release_init(project_root=mock_git_repo)
-
-        batch_path = get_batch_release_file_path(str(mock_git_repo))
-        data = tomlkit.loads(open(batch_path).read())
-
-        assert "app" in data["releasables"]
-        pkg = data["releasables"]["app"]
-        assert "targets" in pkg
-        assert "flutter" in pkg["targets"]
-        assert pkg["targets"]["flutter"]["mode"] == "build"
-
-    def test_non_flutter_project_no_targets(self, mock_git_repo):
-        """Non-Flutter projects do not get a targets section."""
+    def test_a_project_gets_no_targets_section(self, mock_git_repo):
+        """A releasable's section carries no targets table."""
         make_workspace(mock_git_repo, [
             {"path": "lib", "name": "lib"},
         ])
@@ -84,67 +47,6 @@ class TestBatchReleaseInitFlutter:
         data = tomlkit.loads(open(batch_path).read())
 
         assert "targets" not in data["releasables"]["lib"]
-
-    def test_mixed_flutter_and_non_flutter(self, mock_git_repo):
-        """Mixed workspace: Flutter project gets targets, npm project does not."""
-        make_workspace(mock_git_repo, [
-            {"path": "app", "name": "app"},
-            {"path": "lib", "name": "lib"},
-        ])
-
-        app_dir = mock_git_repo / "app"
-        app_dir.mkdir()
-        (app_dir / "pubspec.yaml").write_text(SAMPLE_FLUTTER_PUBSPEC)
-
-        lib_dir = mock_git_repo / "lib"
-        lib_dir.mkdir()
-        (lib_dir / "package.json").write_text(
-            json.dumps({"name": "lib", "version": "1.0.0"}) + "\n"
-        )
-
-        run_git(mock_git_repo, "add", ".")
-        run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
-
-        _cmd_batch_release_init(project_root=mock_git_repo)
-
-        batch_path = get_batch_release_file_path(str(mock_git_repo))
-        data = tomlkit.loads(open(batch_path).read())
-
-        # Flutter project has targets
-        assert "targets" in data["releasables"]["app"]
-        assert "flutter" in data["releasables"]["app"]["targets"]
-
-        # npm project does not
-        assert "targets" not in data["releasables"]["lib"]
-
-    def test_scaffolded_flutter_validates(self, mock_git_repo):
-        """Scaffolded Flutter batch file passes read_batch_release_file when bump/description are filled."""
-        make_workspace(mock_git_repo, [
-            {"path": "app", "name": "app"},
-        ])
-
-        app_dir = mock_git_repo / "app"
-        app_dir.mkdir()
-        (app_dir / "pubspec.yaml").write_text(SAMPLE_FLUTTER_PUBSPEC)
-
-        run_git(mock_git_repo, "add", ".")
-        run_git(mock_git_repo, "commit", "-q", "-m", "add workspace")
-
-        _cmd_batch_release_init(project_root=mock_git_repo)
-
-        batch_path = get_batch_release_file_path(str(mock_git_repo))
-
-        # Edit the scaffolded file to set required fields
-        data = tomlkit.loads(open(batch_path).read())
-        data["releasables"]["app"]["bump"] = "patch"
-        data["releasables"]["app"]["description"] = "test release"
-        with open(batch_path, "w") as f:
-            tomlkit.dump(data, f)
-
-        # Should parse without error
-        config = read_batch_release_file(batch_path)
-        assert config.packages["app"].targets["flutter"]["mode"] == "build"
-
 
 # ---------------------------------------------------------------------------
 # Task 2: TOML comments and context field
@@ -334,28 +236,6 @@ class TestSharedValidation:
         with pytest.raises(ReleaseFileError, match=r"\[releasables\.bar\].*invalid bump"):
             _validate_release_config(data, prefix="[releasables.bar] ")
 
-    def test_flutter_mode_required_no_prefix(self):
-        """Flutter mode validation works without prefix."""
-        data = {
-            "bump": "patch",
-            "include": ["flutter"],
-            "exclude": [],
-            "description": "test",
-        }
-        with pytest.raises(ReleaseFileError, match="requires.*mode"):
-            _validate_release_config(data)
-
-    def test_flutter_mode_required_with_prefix(self):
-        """Flutter mode validation works with prefix."""
-        data = {
-            "bump": "patch",
-            "include": ["flutter"],
-            "exclude": [],
-            "description": "test",
-        }
-        with pytest.raises(ReleaseFileError, match=r"\[releasables\.app\].*requires.*mode"):
-            _validate_release_config(data, prefix="[releasables.app] ")
-
     def test_include_exclude_overlap_no_prefix(self):
         data = {
             "bump": "patch",
@@ -426,39 +306,7 @@ class TestSharedValidation:
 
 
 class TestSharedValidationViaPublicAPIs:
-    """Verify read_release_file and read_batch_release_file both use shared validation.
-
-    These tests check that both paths handle Flutter validation identically.
-    """
-
-    def test_batch_flutter_requires_mode(self, tmp_path):
-        """Batch path rejects Flutter target without mode."""
-        f = tmp_path / "batch.toml"
-        f.write_text(
-            '[releasables.myapp]\n'
-            'bump = "patch"\n'
-            'description = "test"\n'
-            'include = ["flutter"]\n'
-            'exclude = []\n'
-        )
-        with pytest.raises(ReleaseFileError, match="requires.*mode"):
-            read_batch_release_file(str(f))
-
-    def test_batch_flutter_valid(self, tmp_path):
-        """Batch path accepts Flutter target with valid mode config."""
-        f = tmp_path / "batch.toml"
-        f.write_text(
-            '[releasables.myapp]\n'
-            'bump = "minor"\n'
-            'description = "test release"\n'
-            'include = ["flutter"]\n'
-            'exclude = []\n'
-            '\n'
-            '[releasables.myapp.targets.flutter]\n'
-            'mode = "build"\n'
-        )
-        config = read_batch_release_file(str(f))
-        assert config.packages["myapp"].targets["flutter"]["mode"] == "build"
+    """Verify read_release_file and read_batch_release_file both use shared validation."""
 
     def test_single_and_batch_same_valid_result(self, tmp_path):
         """Same config parsed via single and batch paths produces identical ReleaseConfig."""
@@ -490,6 +338,5 @@ class TestSharedValidationViaPublicAPIs:
         assert single_cfg.bump == pkg_cfg.bump
         assert single_cfg.include == pkg_cfg.include
         assert single_cfg.exclude == pkg_cfg.exclude
-        assert single_cfg.targets == pkg_cfg.targets
         assert single_cfg.description == pkg_cfg.description
         assert single_cfg.context == pkg_cfg.context

@@ -409,7 +409,7 @@ def _build_dep_import_cache(ctx):
         return cached
 
     from ..dep_validation import _get_imported_workspace_packages
-    from ..import_scanners import build_jvm_package_map, build_namespace_map
+    from ..import_scanners import build_namespace_map
     from ..utils import read_go_module_path
 
     root = str(ctx.workspace_root)
@@ -433,9 +433,6 @@ def _build_dep_import_cache(ctx):
         if imp_name:
             import_names[proj["name"]] = imp_name
 
-    # Build JVM package prefix map for Java/Kotlin import detection
-    jvm_package_map = build_jvm_package_map(ctx.projects, root)
-
     cache = {}
     for proj in ctx.projects:
         project_dir = os.path.join(root, proj["path"])
@@ -446,7 +443,6 @@ def _build_dep_import_cache(ctx):
             module_path_map=module_path_map or None,
             namespace_map=namespace_map or None,
             import_names=import_names or None,
-            jvm_package_map=jvm_package_map or None,
         )
     ctx._dep_import_cache = cache
     return cache

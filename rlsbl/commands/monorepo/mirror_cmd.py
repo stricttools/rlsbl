@@ -395,7 +395,7 @@ def is_publish_workflow(path):
     """Whether *path* is a publish workflow under ``.github/workflows/``.
 
     Named, not sniffed: a workflow file whose NAME says publish. That is every
-    spelling rlsbl itself renders (``publish.yml``, ``docker-publish.yml``) and
+    spelling rlsbl itself renders (``publish.yml``) and
     the spellings a hand-written one uses. Reading a workflow's body to decide
     whether it publishes would be a heuristic; a name is a fact.
     """

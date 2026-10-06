@@ -10,7 +10,7 @@ app = "rlsbl"
 #          at all is trivially pure.
 # impure  = the check starts a program that is NOT on that list. Every impure
 #          check today runs a tool that writes -- ruff rewrites files, `uv
-#          sync` materializes an environment, the test suites and gradle build.
+#          sync` materializes an environment, the test suites build.
 #          "Sometimes shells out to a writing tool" means impure.
 #
 # This replaced "the check spawns no subprocess at all". That older rule forced
@@ -152,11 +152,10 @@ depends_on = []
 # publish job dies with ENEEDAUTH after the release has already tagged, pushed
 # and created the GitHub Release. WHICH secrets those are is each pipeline's own
 # declaration (ci_secret_names), never a pipeline type tested by name -- npm
-# declares NPM_TOKEN, maven-central declares its Central Portal credentials and
-# GPG signing key, hex declares HEX_API_KEY, and a pypi pipeline declares none
-# because it authenticates through OIDC trusted publishing. Presence only -- a
-# secret's value is not
-# retrievable through the API, and rlsbl never puts a credential on a pipe.
+# declares NPM_TOKEN, and a pypi pipeline declares none because it
+# authenticates through OIDC trusted publishing. Presence only -- a secret's
+# value is not retrievable through the API, and rlsbl never puts a credential
+# on a pipe.
 [checks.ci-publish-secrets]
 description = "Every Actions secret the configured CI publish pipelines authenticate with exists on the repository (requires network)."
 subject = "release"
@@ -473,21 +472,6 @@ needs_network = true
 depends_on = []
 scope = "workspace"
 
-# mirror-required: a member whose ecosystem has no registry is consumed by
-# repository URL, so inside a monorepo it is unconsumable until its releasable
-# declares a mirror. Structural and offline -- it reads workspace.toml and the
-# members' declared targets, nothing else.
-[checks.mirror-required]
-description = "Every member consumed by repository URL belongs to a releasable that declares a subtree_remote mirror."
-subject = "workspace"
-tags = ["workspace"]
-severity = "error"
-fast = true
-pure = true
-needs_network = false
-depends_on = []
-scope = "workspace"
-
 # workspace-unbuildable: a member whose manifest `uv sync` cannot resolve is
 # also a member whose manifest the dependency scanners cannot read, and the CI
 # router's paths filters are derived from what those scanners find. A manifest
@@ -577,7 +561,7 @@ depends_on = []
 scope = "workspace"
 
 [checks.dead-modules]
-description = "Every source module, Go internal package, and npm or Dart source file has an inbound import."
+description = "Every source module, Go internal package, and npm source file has an inbound import."
 subject = "code"
 tags = ["quality"]
 severity = "warn"
@@ -887,20 +871,6 @@ depends_on = ["prepush-changelog-coverage"]
 scope = "workspace:non_dev_only"
 
 # ---------------------------------------------------------------------------
-# Maven-specific checks
-# ---------------------------------------------------------------------------
-
-[checks.maven-central-metadata]
-description = "Maven Central's publishing requirements are met: POM metadata, a sources jar, and a javadoc jar."
-subject = "release"
-tags = ["quality", "maven", "preflight"]
-severity = "error"
-fast = false
-pure = false
-needs_network = false
-depends_on = []
-
-# ---------------------------------------------------------------------------
 # Scaffold checks
 # ---------------------------------------------------------------------------
 
@@ -1110,7 +1080,7 @@ depends_on = []
 
 # nested-member-runner-exclusion: a member's test runner must not collect the
 # members nested inside it. Scaffold writes one path-exact exclusion per nested
-# member (pytest addopts --ignore, deno exclude); this refuses one that is
+# member (pytest addopts --ignore); this refuses one that is
 # missing. Pure (reads the workspace and the runners' config files). In
 # "preflight" so a parent never releases on a suite that ran a nested member's
 # tests, or skipped its own.
@@ -1149,14 +1119,13 @@ scope = "workspace"
 # instructions (CLAUDE.md, AGENTS.md, .claude/), scratch output (experiments/,
 # screenshots/), or environment files (.env*); rlsbl.private_paths holds the
 # rule. A registry keeps every upload permanently. The npm package is listed by
-# `npm pack --dry-run --ignore-scripts --offline`, the Go module zip derived
-# from the tracked files by Go's own rule, and the Docker build context from
-# the tracked files less .dockerignore, all offline. A Python upload can only
+# `npm pack --dry-run --ignore-scripts --offline` and the Go module zip derived
+# from the tracked files by Go's own rule, both offline. A Python upload can only
 # be listed by building it, which needs the network, so the pypi CI template
 # builds and checks it on the candidate commit instead. Impure (starts npm). In
 # "preflight" so a release refuses before it mutates anything.
 [checks.upload-private-paths]
-description = "No npm package, Go module zip, or Docker build context carries a private path."
+description = "No npm package or Go module zip carries a private path."
 subject = "project"
 tags = ["project", "preflight"]
 severity = "error"

@@ -35,29 +35,16 @@ from rlsbl.targets.base import (
 # deletion. The derived answers must reproduce these exactly, with the single
 # documented exception of read_metadata (see below).
 DECLARED_BEFORE_DELETION = {
-    "dart": {"ci_templates", "read_metadata", "read_name"},
-    "deno": {"ci_templates", "dev_install", "read_name"},
-    "docker": {"ci_templates", "read_name"},
-    "flutter": {"ci_templates", "read_metadata", "read_name"},
     "go": {"ci_templates", "dev_install", "publication_probe", "read_name"},
-    "hex": {"ci_templates", "dev_install", "read_name"},
-    "maven": {"ci_templates", "read_metadata", "read_name"},
-    "native-android": {"ci_templates", "read_name"},
-    "native-ios": {"ci_templates", "read_name"},
     "npm": {
         "ci_templates", "dev_install", "publication_probe",
         "read_metadata", "read_name",
     },
-    "pgdesign": {"ci_templates", "read_name"},
-    "plain": set(),
     "pypi": {
         "ci_templates", "dev_install", "publication_probe",
         "read_metadata", "read_name",
     },
     "spec": {"ci_templates", "read_name"},
-    "swift": {"ci_templates", "dev_install", "read_name"},
-    "swift-apple": {"ci_templates", "read_name"},
-    "zig": {"ci_templates", "dev_install", "read_name"},
 }
 
 # The one definition of the axis -> property map. tests/test_targets.py used to
@@ -154,7 +141,7 @@ class TestEachDerivationIsHonestForItsAxis:
 
     @pytest.mark.parametrize("name", sorted(TARGETS))
     def test_dev_install_is_derived_from_the_specs_not_the_override(self, name):
-        """swift-apple inherits the method but resolves to no specs.
+        """A target may override the method yet resolve to no specs.
 
         Asked of ``NOT_A_PROJECT_DIR``, which is the directory the property
         itself asks about: the answer is the target's, never the cwd's.
@@ -164,13 +151,6 @@ class TestEachDerivationIsHonestForItsAxis:
         expected = any(specs.get(mode) is not None for mode in ("global", "venv"))
         assert target.supports_dev_install is expected
 
-    def test_swift_apple_inherits_the_method_and_still_answers_no(self):
-        assert (
-            type(TARGETS["swift-apple"]).dev_install_command
-            is not BaseTarget.dev_install_command
-        )
-        assert not TARGETS["swift-apple"].supports_dev_install
-
     @pytest.mark.parametrize("name", sorted(TARGETS))
     def test_ci_templates_is_derived_from_the_shipped_template(self, name):
         target = TARGETS[name]
@@ -179,13 +159,6 @@ class TestEachDerivationIsHonestForItsAxis:
             os.path.join(directory, CI_TEMPLATE_FILENAME)
         )
         assert target.provides_ci_templates is expected
-
-    def test_plain_ships_templates_but_no_ci_template(self):
-        """The one target with a template directory and no CI workflow."""
-        plain = TARGETS["plain"]
-        assert plain.template_dir() is not None
-        assert not plain.provides_ci_templates
-
 
 class TestProbeDecidingSitesConsultTheDerivation:
     """The four sites that decide whether to run a publication probe.
@@ -248,17 +221,17 @@ class TestProbeDecidingSitesConsultTheDerivation:
     def test_the_pipeline_site_actually_skips_a_probe_for_a_non_prober(self):
         """A non-prober's registry is never contacted.
 
-        The spy goes on ``BaseTarget.publication_probe`` rather than on zig's
+        The spy goes on ``BaseTarget.publication_probe`` rather than on spec's
         class, on purpose: the support answer is derived by comparing the two,
-        so patching only the subclass would make zig look like a prober and
+        so patching only the subclass would make spec look like a prober and
         the test would be asserting nothing.
         """
         from unittest.mock import patch
 
-        assert not TARGETS["zig"].supports_publication_probe
+        assert not TARGETS["spec"].supports_publication_probe
         with patch.object(BaseTarget, "publication_probe") as probe:
-            assert not TARGETS["zig"].supports_publication_probe
-            proceed = self._pipeline("zig").probe_before_publish(".", "1.0.0", None)
+            assert not TARGETS["spec"].supports_publication_probe
+            proceed = self._pipeline("spec").probe_before_publish(".", "1.0.0", None)
         assert proceed is True
         probe.assert_not_called()
 
@@ -301,7 +274,7 @@ class TestProbeDecidingSitesConsultTheDerivation:
             )
 
         missing, checked = _probe_publication(
-            [_resolved("zig")], "1.0.0", None, log=lambda *_a, **_k: None,
+            [_resolved("spec")], "1.0.0", None, log=lambda *_a, **_k: None,
             delays=[0],
         )
         assert checked == []

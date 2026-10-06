@@ -1,11 +1,10 @@
-"""Tests for rlsbl.import_scanners -- Python, Dart, npm, and Go import scanners."""
+"""Tests for rlsbl.import_scanners -- Python, npm, and Go import scanners."""
 
 import os
 
 import pytest
 
 from rlsbl.import_scanners import (
-    DartImportScanner,
     GoImportScanner,
     ImportInfo,
     NpmImportScanner,
@@ -113,154 +112,6 @@ class TestPythonImportScanner:
         results = scanner.scan(str(tmp_path), {"alpha"})
         assert len(results) == 1
         assert results[0].package_name == "alpha"
-
-
-class TestDartImportScanner:
-    """DartImportScanner detects package imports in .dart files."""
-
-    def test_package_import_detected(self, tmp_path):
-        """import 'package:models/model.dart' detects 'models'."""
-        lib_dir = tmp_path / "lib"
-        lib_dir.mkdir()
-        (lib_dir / "main.dart").write_text(
-            "import 'package:models/model.dart';\n"
-        )
-        scanner = DartImportScanner()
-        results = scanner.scan(str(tmp_path), {"models"})
-        assert len(results) == 1
-        assert results[0].package_name == "models"
-        assert results[0].line_number == 1
-        assert results[0].is_test_context is False
-
-    def test_dart_sdk_import_excluded(self, tmp_path):
-        """import 'dart:core' is excluded (SDK import, not a package)."""
-        lib_dir = tmp_path / "lib"
-        lib_dir.mkdir()
-        (lib_dir / "main.dart").write_text(
-            "import 'dart:core';\nimport 'package:models/model.dart';\n"
-        )
-        scanner = DartImportScanner()
-        results = scanner.scan(str(tmp_path), {"models", "core"})
-        names = {r.package_name for r in results}
-        # dart:core is SDK, not package -- only models matches
-        assert names == {"models"}
-
-    def test_relative_import_excluded(self, tmp_path):
-        """Relative imports (no package: prefix) are excluded."""
-        lib_dir = tmp_path / "lib"
-        lib_dir.mkdir()
-        (lib_dir / "main.dart").write_text(
-            "import 'utils.dart';\nimport '../other.dart';\nimport 'package:foo/bar.dart';\n"
-        )
-        scanner = DartImportScanner()
-        results = scanner.scan(str(tmp_path), {"foo", "utils", "other"})
-        names = {r.package_name for r in results}
-        assert names == {"foo"}
-
-    def test_export_statement_detected(self, tmp_path):
-        """export 'package:foo/bar.dart' detects 'foo'."""
-        lib_dir = tmp_path / "lib"
-        lib_dir.mkdir()
-        (lib_dir / "main.dart").write_text(
-            "export 'package:foo/bar.dart';\n"
-        )
-        scanner = DartImportScanner()
-        results = scanner.scan(str(tmp_path), {"foo"})
-        assert len(results) == 1
-        assert results[0].package_name == "foo"
-
-    def test_test_context_true_for_test_dir(self, tmp_path):
-        """Files in test/ directory have is_test_context=True."""
-        test_dir = tmp_path / "test"
-        test_dir.mkdir()
-        (test_dir / "widget_test.dart").write_text(
-            "import 'package:models/model.dart';\n"
-        )
-        scanner = DartImportScanner()
-        results = scanner.scan(str(tmp_path), {"models"})
-        assert len(results) == 1
-        assert results[0].is_test_context is True
-
-    def test_lib_context_is_not_test(self, tmp_path):
-        """Files in lib/ directory have is_test_context=False."""
-        lib_dir = tmp_path / "lib"
-        lib_dir.mkdir()
-        (lib_dir / "widget.dart").write_text(
-            "import 'package:models/model.dart';\n"
-        )
-        scanner = DartImportScanner()
-        results = scanner.scan(str(tmp_path), {"models"})
-        assert len(results) == 1
-        assert results[0].is_test_context is False
-
-    def test_non_workspace_import_excluded(self, tmp_path):
-        """Imports of packages not in workspace_names are excluded."""
-        lib_dir = tmp_path / "lib"
-        lib_dir.mkdir()
-        (lib_dir / "main.dart").write_text(
-            "import 'package:http/http.dart';\n"
-            "import 'package:models/model.dart';\n"
-        )
-        scanner = DartImportScanner()
-        results = scanner.scan(str(tmp_path), {"models"})
-        assert len(results) == 1
-        assert results[0].package_name == "models"
-
-    def test_generated_file_check_error(self, tmp_path):
-        """build.yaml exists but no .g.dart files raises RuntimeError."""
-        (tmp_path / "build.yaml").write_text("targets:\n  $default:\n")
-        lib_dir = tmp_path / "lib"
-        lib_dir.mkdir()
-        (lib_dir / "main.dart").write_text(
-            "import 'package:models/model.dart';\n"
-        )
-        scanner = DartImportScanner()
-        with pytest.raises(RuntimeError, match="no .g.dart files found"):
-            scanner.scan(str(tmp_path), {"models"})
-
-    def test_generated_file_check_passes_with_g_dart(self, tmp_path):
-        """build.yaml exists with .g.dart files does not raise."""
-        (tmp_path / "build.yaml").write_text("targets:\n  $default:\n")
-        lib_dir = tmp_path / "lib"
-        lib_dir.mkdir()
-        (lib_dir / "main.dart").write_text(
-            "import 'package:models/model.dart';\n"
-        )
-        (lib_dir / "main.g.dart").write_text("// generated\n")
-        scanner = DartImportScanner()
-        # Should not raise
-        results = scanner.scan(str(tmp_path), {"models"})
-        assert len(results) == 1
-
-    def test_no_build_yaml_no_check(self, tmp_path):
-        """Without build.yaml, no generated file check is performed."""
-        lib_dir = tmp_path / "lib"
-        lib_dir.mkdir()
-        (lib_dir / "main.dart").write_text(
-            "import 'package:foo/bar.dart';\n"
-        )
-        scanner = DartImportScanner()
-        # Should not raise even with no .g.dart files
-        results = scanner.scan(str(tmp_path), {"foo"})
-        assert len(results) == 1
-
-    def test_double_quoted_imports(self, tmp_path):
-        """Dart imports with double quotes are also detected."""
-        lib_dir = tmp_path / "lib"
-        lib_dir.mkdir()
-        (lib_dir / "main.dart").write_text(
-            'import "package:models/model.dart";\n'
-        )
-        scanner = DartImportScanner()
-        results = scanner.scan(str(tmp_path), {"models"})
-        assert len(results) == 1
-        assert results[0].package_name == "models"
-
-    def test_empty_project_returns_empty(self, tmp_path):
-        """A project with no .dart files returns an empty list."""
-        scanner = DartImportScanner()
-        results = scanner.scan(str(tmp_path), {"models"})
-        assert results == []
 
 
 class TestNpmImportScanner:
@@ -743,11 +594,6 @@ class TestIsTestContext:
     def test_underscore_test_py_file(self, tmp_path):
         """foo_test.py -- test context."""
         filepath = os.path.join(tmp_path, "foo_test.py")
-        assert _is_test_context(filepath, str(tmp_path)) is True
-
-    def test_widget_test_dart_file(self, tmp_path):
-        """widget_test.dart -- test context."""
-        filepath = os.path.join(tmp_path, "widget_test.dart")
         assert _is_test_context(filepath, str(tmp_path)) is True
 
     # -- Negative tests (should NOT be test context) --

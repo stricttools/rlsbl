@@ -4,7 +4,7 @@ pytest collects from wherever it starts, so a Python parent (``sdk``) running
 its own suite also collected a nested member's tests (``sdk/python/tests``)
 and failed on that member's dependencies. Scaffold writes a path-exact
 ``--ignore=<path>`` for each nested member into the parent's pytest
-``addopts`` (and each path into Deno's ``exclude``), and the
+``addopts``, and the
 ``nested-member-runner-exclusion`` check fails while one is missing. pytest
 resolves ``--ignore`` against the directory it starts in, which is the
 member's own directory in rlsbl's runs and in CI.
@@ -91,30 +91,6 @@ def test_a_workspace_without_nesting_passes(tmp_path):
     (root / "a" / "pyproject.toml").write_text('[project]\nname = "a"\nversion = "0.1.0"\n')
     make_workspace(root, [{"path": "a", "name": "a"}])
     assert _check(root).status in ("pass", "skip")
-
-
-def test_deno_gets_the_nested_member_in_its_exclude(tmp_path, monkeypatch):
-    import json
-
-    from rlsbl.nested_exclusions import (
-        apply_nested_member_exclusions,
-        missing_exclusions,
-    )
-    from rlsbl.scratch_dirs import DENO_CONFIG_EXCLUDE
-
-    app = tmp_path / "app"
-    (app / "sub").mkdir(parents=True)
-    (app / "deno.json").write_text('{\n  "name": "app"\n}\n')
-    assert missing_exclusions(DENO_CONFIG_EXCLUDE, str(app), ["sub"]) == (
-        str(app / "deno.json"), ["sub"],
-    )
-    monkeypatch.chdir(app)
-    created, _skipped, warnings = apply_nested_member_exclusions(
-        {"deno": "."}, [str(app / "sub")],
-    )
-    assert warnings == []
-    assert json.loads((app / "deno.json").read_text())["exclude"] == ["sub"]
-    assert missing_exclusions(DENO_CONFIG_EXCLUDE, str(app), ["sub"]) is None
 
 
 def _root_python_ws(tmp_path):

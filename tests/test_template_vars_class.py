@@ -52,9 +52,9 @@ class TestTemplateVars:
         assert tv["registryUrl"] == tv["npm.registryUrl"]
 
     def test_bool_values_preserved(self):
-        tv = TemplateVars("zig", {"isLibrary": True})
+        tv = TemplateVars("spec", {"isLibrary": True})
         assert tv["isLibrary"] is True
-        assert tv["zig.isLibrary"] is True
+        assert tv["spec.isLibrary"] is True
 
     def test_update_does_not_auto_namespace(self):
         """dict.update() after construction stays bare-only."""

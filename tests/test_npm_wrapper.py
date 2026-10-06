@@ -263,7 +263,7 @@ class TestBuildNpmPublishJobs:
         assert "needs: [gate, goreleaser]" in result
 
     def test_custom_depends_on(self):
-        """Custom depends_on overrides the job dependency (e.g. Zig)."""
+        """Custom depends_on overrides the job dependency."""
         artifacts = self._make_go_artifacts()
         result = build_npm_publish_jobs(
             "mycli", artifacts, depends_on="build-and-upload"

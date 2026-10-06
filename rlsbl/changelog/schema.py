@@ -29,7 +29,6 @@ from dataclasses import dataclass, field
 from ..errors import ChangelogError
 
 
-VALID_RELEASE_TYPES = ("ota", "build")
 VALID_TYPES = ("feature", "fix", "breaking")
 
 # The current on-disk format for one JSONL changelog line. Every line rlsbl
@@ -58,7 +57,6 @@ class ChangelogEntry:
     user_facing: bool = False
     description: str | None = None
     type: str | None = None
-    release_type: str | None = None  # "ota" or "build" for Flutter targets
     id: str | None = None  # stable ULID-style identifier; optional on read for historical compat
     packages: list[str] | None = None  # optional: affected member packages in a releasable
 
@@ -98,11 +96,6 @@ def _native_message(diag, entry: ChangelogEntry) -> str:
         field_name = m.group(1) if m else "?"
         if field_name == "type":
             return f"invalid type: {entry.type!r} (must be one of {VALID_TYPES})"
-        if field_name == "release_type":
-            return (
-                f"invalid release_type: {entry.release_type!r} "
-                f"(must be one of {VALID_RELEASE_TYPES})"
-            )
         return diag.message
     if code == "STRICTSPEC_KEY_UNKNOWN":
         m = _RE_UNKNOWN.search(diag.message)
@@ -212,7 +205,6 @@ def parse_entry(line: str, *, enforce_format_version: bool = False) -> Changelog
         user_facing=data["user_facing"],
         description=data.get("description"),
         type=data.get("type"),
-        release_type=data.get("release_type"),
         id=data.get("id"),
         packages=data.get("packages"),
     )
@@ -235,8 +227,6 @@ def serialize_entry(entry: ChangelogEntry) -> str:
         data["description"] = entry.description
     if entry.type is not None:
         data["type"] = entry.type
-    if entry.release_type is not None:
-        data["release_type"] = entry.release_type
     if entry.packages is not None:
         data["packages"] = entry.packages
     return json.dumps(data, separators=(",", ":"))
@@ -259,7 +249,6 @@ def entry_content_key(entry: ChangelogEntry) -> tuple:
         bool(entry.user_facing),
         entry.description,
         entry.type,
-        entry.release_type,
     )
 
 

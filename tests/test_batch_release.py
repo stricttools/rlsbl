@@ -128,21 +128,6 @@ class TestReadBatchReleaseFile:
         assert len(config.packages) == 1
         assert config.packages["mylib"].bump == "patch"
 
-    def test_with_targets(self, tmp_path):
-        """Per-target configuration is preserved."""
-        batch_file = tmp_path / "unreleased.toml"
-        batch_file.write_text(
-            '[releasables.myapp]\n'
-            'bump = "minor"\ndescription = "test release"\n'
-            'include = ["flutter"]\n'
-            'exclude = []\n'
-            '\n'
-            '[releasables.myapp.targets.flutter]\n'
-            'mode = "ota"\n'
-        )
-        config = read_batch_release_file(str(batch_file))
-        assert config.packages["myapp"].targets == {"flutter": {"mode": "ota"}}
-
     def test_missing_releasables_section(self, tmp_path):
         """Missing [releasables] section raises ReleaseFileError."""
         batch_file = tmp_path / "unreleased.toml"

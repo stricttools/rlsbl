@@ -144,33 +144,13 @@ class BaseTarget:
     lint_language: ClassVar[str | None] = None
     """Which library-lint language this target's sources are written in.
 
-    The lint taxonomy (``python``, ``go``, ``npm``, ``maven`` -- see
+    The lint taxonomy (``python``, ``go``, ``npm`` -- see
     ``rlsbl.lint.languages``) is deliberately separate from the target
     taxonomy: ``pypi`` publishes ``python``, and one language can back several
     targets. This property is the single bridge between the two, replacing the
     hand-listed target sets the library-lint check used to carry.
 
     None means the target does not participate in library boundary lint.
-    """
-
-    consumed_by_repository_url: ClassVar[bool] = False
-    """Whether consumers resolve this target by REPOSITORY URL and git tag.
-
-    True for the ecosystems that have no package registry at all: an SPM
-    consumer writes the package's git URL and a version requirement, and the
-    resolver reads plain ``vX.Y.Z`` tags off that repository. There is nothing
-    else to publish to, so a member of this kind inside a monorepo is
-    unconsumable as it stands -- the monorepo's tags carry a package prefix the
-    resolver does not understand, and the repository root is not the package.
-    A standalone MIRROR is what makes it consumable, which is why a monorepo
-    member with such a target requires its releasable to declare one (the
-    ``mirror-required`` check).
-
-    False for a registry-published ecosystem: an npm or PyPI consumer names a
-    package, and where its source lives changes nothing about resolving it.
-
-    Declared rather than introspected: it is a fact about how the ecosystem
-    distributes, not something the target's methods reveal.
     """
 
     mirror_identity_files: ClassVar[tuple[str, ...]] = ()
@@ -260,10 +240,8 @@ class BaseTarget:
         their filenames and inherit this method rather than restating the
         same ``os.path.exists`` call.
 
-        Targets whose presence depends on file CONTENT -- Flutter and Dart
-        sharing ``pubspec.yaml``, an Android application versus a Gradle
-        library sharing ``build.gradle`` -- override this and inspect the
-        file. A target that declares no detection files never auto-detects.
+        Targets whose presence depends on file CONTENT override this and
+        inspect the file. A target that declares no detection files never auto-detects.
         """
         return any(
             os.path.exists(os.path.join(dir_path, filename))
@@ -346,8 +324,8 @@ class BaseTarget:
         """Read project metadata (license, description) from the manifest file.
 
         The default is empty, and that is the right answer for every ecosystem
-        whose manifest carries no license or description (Go modules, Swift
-        packages, deno.json, Dockerfiles, ...). Those targets do NOT override
+        whose manifest carries no license or description (Go modules, ...).
+        Those targets do NOT override
         this to return an empty dict of their own: not overriding it is what
         makes ``supports_read_metadata`` answer honestly.
         """
@@ -722,8 +700,8 @@ class BaseTarget:
         """Format a semver version for this target's ecosystem.
 
         The default implementation returns the version unchanged (identity).
-        This is correct for npm, Go, Deno, plain, and most targets
-        where semver is used directly.
+        This is correct for npm, Go, and most targets where semver is used
+        directly.
 
         Targets with different version conventions (e.g. PyPI's PEP 440)
         override this to translate from semver to the ecosystem format.
@@ -1037,7 +1015,7 @@ class BaseTarget:
         """Run this target's built-in test suite.
 
         Targets whose ecosystem has a standard test command (``uv run
-        pytest``, ``go test``, ``npm test``, the Gradle/Maven test task)
+        pytest``, ``go test``, ``npm test``)
         override this. The default answers SKIPPED naming the target.
 
         That default is the whole point of the method. The name chain this

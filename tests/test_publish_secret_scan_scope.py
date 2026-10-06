@@ -11,11 +11,9 @@ The pypi template was already correct and is the model: build first, then
 * npm / yarn / pnpm -- pack the publishable tarball into a scratch directory
   outside the checkout, scan that directory, then publish from the tree.
 * go -- scan goreleaser's ``dist/`` after the build, before the assets upload.
-* maven -- assemble the jars, scan the build output, then publish.
-* deno / docker / hex / zig -- these publish straight from source (or upload
-  raw compiled binaries) with no packed archive to scan before the publish
-  call, so the scan step and its now-dead gitleaks install are gone rather
-  than left scanning the tree.
+* the go library and launcher templates publish with no packed archive to
+  scan before the publish call, so the scan step and its now-dead gitleaks
+  install are gone rather than left scanning the tree.
 
 Assertions are render-level and ordering-sensitive: the scan must name an
 artifact path, must come after the step that produces the artifact, and must
@@ -50,8 +48,6 @@ _RENDER_VARS = {
     "npm.provenance": "",
     "pypi.hasPytest": "1",
     "pypi.minRequiredPython": "",
-    "zig.minRequiredZig": "0.14.0",
-    "zig.projectName": "demo",
 }
 
 
@@ -109,25 +105,11 @@ ARTIFACT_SCAN_TEMPLATES = {
         "dist/",
         "gh release upload",
     ),
-    "maven/publish.yml.tpl": (
-        "./gradlew assemble",
-        "build/libs",
-        "- run: ./gradlew publish",
-    ),
-    "maven/publish-central.yml.tpl": (
-        "./gradlew assemble",
-        "build/libs",
-        "- run: ./gradlew publishAndReleaseToMavenCentral",
-    ),
 }
 
 # Publish templates that must carry no secret scan at all: nothing is built
 # before the publish call, so the only thing left to scan would be the tree.
 NO_SCAN_TEMPLATES = [
-    "deno/publish.yml.tpl",
-    "docker/publish.yml.tpl",
-    "hex/publish.yml.tpl",
-    "zig/publish.yml.tpl",
     "go/publish-library.yml.tpl",
     "npm/publish-launcher.yml.tpl",
     "pypi/publish-launcher.yml.tpl",

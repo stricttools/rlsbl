@@ -47,7 +47,7 @@ class TestNormalization:
 
     def test_the_default_is_lowercasing(self):
         """A registry with no folding rules of its own lowercases."""
-        assert TARGETS["zig"].normalize_package_name("Foo-Bar") == "foo-bar"
+        assert TARGETS["spec"].normalize_package_name("Foo-Bar") == "foo-bar"
 
 
 class TestVersionQueries:
@@ -85,9 +85,9 @@ class TestVersionQueries:
 
     def test_a_registered_target_without_a_version_api_is_a_named_error(self):
         """Not None, and not "not_found" -- those would read as unpublished."""
-        result = query_registry_version("x", "zig")
+        result = query_registry_version("x", "spec")
         assert result["status"] == "error"
-        assert "Unknown registry: zig" in result["message"]
+        assert "Unknown registry: spec" in result["message"]
 
 
 class TestClaimSelection:
@@ -103,8 +103,8 @@ class TestClaimSelection:
         assert derived == {"npm", "pypi"}
 
     def test_a_non_claimable_target_refuses_naming_itself(self):
-        with pytest.raises(NotImplementedError, match="'zig'"):
-            TARGETS["zig"].claim_placeholder("x", "/tmp-unused")
+        with pytest.raises(NotImplementedError, match="'spec'"):
+            TARGETS["spec"].claim_placeholder("x", "/tmp-unused")
 
     @pytest.mark.parametrize("name", sorted(TARGETS))
     def test_token_env_vars_are_declared_exactly_for_claimable_targets(self, name):

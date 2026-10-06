@@ -88,17 +88,10 @@ def publish_concurrency_block() -> dict:
 # Check runs on a commit are named after these jobs (matrix jobs append
 # " (...)"), which is what the gate's name filter matches against.
 CI_CHECK_JOB_NAMES = {
-    "deno": ("test",),
-    "docker": ("build",),
     "go": ("test",),
-    "hex": ("test",),
-    "maven": ("test",),
     "npm": ("test",),
     "pypi": ("test",),
     "spec": ("validate",),
-    "swift": ("test",),
-    "swift-apple": ("test",),
-    "zig": ("test",),
 }
 _DEFAULT_CI_CHECK_JOB_NAMES = ("test",)
 

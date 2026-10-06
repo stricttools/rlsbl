@@ -1,4 +1,4 @@
-"""Release target discovery and registry that maps ecosystem identifiers (npm, pypi, go, deno, zig, swift, hex, docker, maven, plain) to their corresponding target classes for version bumps and scaffolding."""
+"""Release target discovery and registry that maps each ecosystem identifier to its target class for version bumps and scaffolding."""
 
 import os
 import sys
@@ -7,20 +7,7 @@ from typing import NamedTuple
 from .npm import NpmTarget
 from .pypi import PypiTarget
 from .go import GoTarget
-from .swift import SwiftTarget
-from .swift_apple import SwiftAppleTarget
 from .spec import SpecTarget
-from .hex import HexTarget
-from .deno import DenoTarget
-from .dart import DartTarget
-from .docker import DockerTarget
-from .flutter import FlutterTarget
-from .maven import MavenTarget
-from .native_android import NativeAndroidTarget
-from .native_ios import NativeIosTarget
-from .zig import ZigTarget
-from .pgdesign import PgdesignTarget
-from .plain import PlainTarget
 from .protocol import ReleaseTarget
 from .base import BaseTarget
 from ..config import read_json_config, read_project_config
@@ -37,20 +24,7 @@ TARGETS = {
     "npm": NpmTarget(),
     "pypi": PypiTarget(),
     "go": GoTarget(),
-    "swift": SwiftTarget(),
-    "swift-apple": SwiftAppleTarget(),
     "spec": SpecTarget(),
-    "hex": HexTarget(),
-    "deno": DenoTarget(),
-    "dart": DartTarget(),
-    "docker": DockerTarget(),
-    "flutter": FlutterTarget(),
-    "maven": MavenTarget(),
-    "native-android": NativeAndroidTarget(),
-    "native-ios": NativeIosTarget(),
-    "zig": ZigTarget(),
-    "pgdesign": PgdesignTarget(),
-    "plain": PlainTarget(),
 }
 
 
@@ -60,19 +34,6 @@ def targets_sharing_workspace_environment():
         name
         for name, target in TARGETS.items()
         if target.shares_workspace_environment
-    )
-
-
-def targets_consumed_by_repository_url():
-    """Targets whose consumers resolve a package by repository URL and tag.
-
-    The mirror requirement's scope: a monorepo member declaring one of these
-    is unconsumable until its releasable is bound to a standalone mirror.
-    """
-    return frozenset(
-        name
-        for name, target in TARGETS.items()
-        if target.consumed_by_repository_url
     )
 
 
@@ -237,6 +198,20 @@ def resolve_releasable_config_dir(proj, workspace_root):
     return None
 
 
+def unsupported_target_error(name, where):
+    """The refusal for a configured target name rlsbl does not register.
+
+    A configured target that is not in :data:`TARGETS` is never skipped: the
+    project would silently release without it. The error names every
+    supported target, so the caller can correct the config.
+    """
+    return ConfigError(
+        f"{where} names target '{name}', which rlsbl does not support. "
+        f"Supported targets: {', '.join(sorted(TARGETS))}. Remove '{name}' "
+        f"from the \"targets\" list, or name one of the supported targets."
+    )
+
+
 def _parse_target_entry(entry, base_dir):
     """Parse a target config entry (string or dict) into a TargetEntry."""
     if isinstance(entry, str):
@@ -387,28 +362,24 @@ def detect_targets(dir_path=".", releasable_config_dir=None):
                         continue
                     if not layout.is_owner(te, dir_path, rel_config_path):
                         continue
-                    if te.name in TARGETS:
-                        if not os.path.isdir(te.path):
-                            print(f"Warning: target '{te.name}' path '{te.path}' does not exist",
-                                  file=sys.stderr)
-                        result.append(te)
-                    else:
-                        print(f"Warning: unknown target '{te.name}' in config, skipping",
+                    if te.name not in TARGETS:
+                        raise unsupported_target_error(te.name, rel_config_path)
+                    if not os.path.isdir(te.path):
+                        print(f"Warning: target '{te.name}' path '{te.path}' does not exist",
                               file=sys.stderr)
+                    result.append(te)
                     continue
                 try:
                     te = _parse_target_entry(entry, dir_path)
                 except (ConfigError, TypeError) as e:
                     print(f"Warning: {e}, skipping", file=sys.stderr)
                     continue
-                if te.name in TARGETS:
-                    if te.path != dir_path and not os.path.isdir(te.path):
-                        print(f"Warning: target '{te.name}' path '{te.path}' does not exist",
-                              file=sys.stderr)
-                    result.append(te)
-                else:
-                    print(f"Warning: unknown target '{te.name}' in config, skipping",
+                if te.name not in TARGETS:
+                    raise unsupported_target_error(te.name, rel_config_path)
+                if te.path != dir_path and not os.path.isdir(te.path):
+                    print(f"Warning: target '{te.name}' path '{te.path}' does not exist",
                           file=sys.stderr)
+                result.append(te)
             return result
 
     config = read_project_config(dir_path, releasable_config_dir=releasable_config_dir)
@@ -423,14 +394,14 @@ def detect_targets(dir_path=".", releasable_config_dir=None):
             except (ConfigError, TypeError) as e:
                 print(f"Warning: {e}, skipping", file=sys.stderr)
                 continue
-            if te.name in TARGETS:
-                if te.path != dir_path and not os.path.isdir(te.path):
-                    print(f"Warning: target '{te.name}' path '{te.path}' does not exist",
-                          file=sys.stderr)
-                result.append(te)
-            else:
-                print(f"Warning: unknown target '{te.name}' in config, skipping",
+            if te.name not in TARGETS:
+                raise unsupported_target_error(
+                    te.name, os.path.join(dir_path, ".rlsbl", "config.json"),
+                )
+            if te.path != dir_path and not os.path.isdir(te.path):
+                print(f"Warning: target '{te.name}' path '{te.path}' does not exist",
                       file=sys.stderr)
+            result.append(te)
         return result
 
     # No targets key in the merged config -- apply two-tier rule
@@ -495,6 +466,8 @@ def read_releasable_targets(rel_config_path):
     names = []
     for entry in rel_targets:
         if isinstance(entry, str):
+            if entry not in TARGETS:
+                raise unsupported_target_error(entry, rel_config_path)
             names.append(entry)
             continue
         if isinstance(entry, dict):
@@ -503,6 +476,8 @@ def read_releasable_targets(rel_config_path):
                 raise ConfigError(
                     f"target entry missing 'name' in {rel_config_path}: {entry}"
                 )
+            if name not in TARGETS:
+                raise unsupported_target_error(name, rel_config_path)
             names.append(name)
             continue
         raise ConfigError(

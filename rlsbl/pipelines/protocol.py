@@ -8,7 +8,7 @@ class Pipeline(Protocol):
     """Protocol defining a release pipeline.
 
     Pipelines handle publishing, asset building, and CI template generation
-    for a specific publish mechanism (e.g. pypi, npm, docker, cloudflare-pages).
+    for a specific publish mechanism (e.g. pypi, npm, cloudflare-pages).
     """
 
     name: str

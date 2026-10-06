@@ -204,17 +204,3 @@ class TestWorkspaceRootUnconditionalInclusion:
         # go.sum has no guard, so it IS included if present
         expected = os.path.normpath(str(ws_root / "go.sum"))
         assert expected in files
-
-
-class TestGradleLockfileWrapperCheck:
-    """The gradle lockfile is re-locked by the project's wrapper, not by PATH."""
-
-    @patch("shutil.which", return_value=None)
-    def test_gradlew_present_is_owed_despite_no_gradle_on_path(self, _which, tmp_path):
-        (tmp_path / "gradle.lockfile").write_text("# lockfile\n")
-        gradlew = tmp_path / "gradlew"
-        gradlew.write_text("#!/bin/sh\n")
-        gradlew.chmod(0o755)
-        assert [s["cmd"] for s in _owed(tmp_path)] == [
-            ["./gradlew", "dependencies", "--write-locks"]
-        ]

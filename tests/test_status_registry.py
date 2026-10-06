@@ -191,24 +191,22 @@ class TestStatusRegistryNoVersionApi:
     set of targets that CAN answer is derived from the registry.
     """
 
-    def _make_zig_project(self, base, version="0.1.0"):
-        with open(os.path.join(str(base), "build.zig"), "w") as f:
-            f.write("// zig build script\n")
-        with open(os.path.join(str(base), "VERSION"), "w") as f:
-            f.write(f"{version}\n")
-        subprocess.run(["git", "add", "build.zig", "VERSION"], cwd=str(base), check=True)
+    def _make_spec_project(self, base, version="0.1.0"):
+        with open(os.path.join(str(base), "version.json"), "w") as f:
+            f.write(f'{{"version": "{version}"}}\n')
+        subprocess.run(["git", "add", "version.json"], cwd=str(base), check=True)
         subprocess.run(
-            ["git", "commit", "-q", "-m", "add zig project"], cwd=str(base), check=True,
+            ["git", "commit", "-q", "-m", "add spec project"], cwd=str(base), check=True,
         )
 
     def test_the_registry_is_not_queried_at_all(self, mock_git_repo, capsys):
-        self._make_zig_project(mock_git_repo)
+        self._make_spec_project(mock_git_repo)
 
         with patch("rlsbl.registry.query_registry_version") as mock_query:
             capsys.readouterr()
             from rlsbl.commands.status import run_cmd
             data = run_cmd(
-                "zig", [], {"registry": True, "json": True},
+                "spec", [], {"registry": True, "json": True},
                 ctx=make_ctx(".", config={"publish_mode": "ci"}),
             )
             mock_query.assert_not_called()
@@ -217,17 +215,17 @@ class TestStatusRegistryNoVersionApi:
         assert data["drift"] == "NO_REGISTRY_API"
 
     def test_text_output_says_so(self, mock_git_repo, capsys):
-        self._make_zig_project(mock_git_repo)
+        self._make_spec_project(mock_git_repo)
 
         capsys.readouterr()
         from rlsbl.commands.status import run_cmd
         run_cmd(
-            "zig", [], {"registry": True},
+            "spec", [], {"registry": True},
             ctx=make_ctx(".", config={"publish_mode": "ci"}),
         )
         out = capsys.readouterr().out
 
-        assert "no version API for zig" in out
+        assert "no version API for spec" in out
         assert "query failed" not in out
 
     def test_a_target_with_a_version_api_still_queries(self, mock_git_repo, capsys):

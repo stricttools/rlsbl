@@ -3,7 +3,7 @@
 # One document = one JSONL line.
 #
 # SCOPE: strictspec owns the raw DOCUMENT SHAPE (the per-line format_version
-# gate, field types, the type/release_type enums, required fields, unknown-key
+# gate, field types, the type enum, required fields, unknown-key
 # rejection, and the user_facing conditional-required couplings). rlsbl keeps
 # everything strictspec cannot see as native checks: hash resolution, tag
 # ranges, commit coverage vs git, batch limits, and cross-file rules. The
@@ -51,12 +51,6 @@ type = "enum"
 required = false
 values = ["feature", "fix", "breaking"]
 description = "Entry type. REQUIRED WHEN user_facing == true (see constraint)."
-
-[types.ChangelogEntry.fields.release_type]
-type = "enum"
-required = false
-values = ["ota", "build"]
-description = "Flutter target release channel. Optional, unconstrained by user_facing."
 
 [types.ChangelogEntry.fields.id]
 type = "string"

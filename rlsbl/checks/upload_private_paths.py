@@ -4,7 +4,7 @@ Checks: upload-private-paths.
 
 Every target that can list its published upload offline
 (:meth:`~rlsbl.targets.base.BaseTarget.offline_upload_listing`: the npm
-package, the Go module zip, the Docker build context) is listed and matched
+package, the Go module zip) is listed and matched
 against :mod:`rlsbl.private_paths`. A Python upload has to be built, which
 needs the network, so the pypi CI template builds and checks it on the
 candidate commit instead; this check answers nothing for it.
@@ -83,7 +83,7 @@ def register_upload_private_path_checks(app):
 
     @app.error_check("upload-private-paths")
     def check_upload_private_paths(ctx, reporter):
-        """No npm package, Go module zip, or Docker build context carries a private path."""
+        """No npm package or Go module zip carries a private path."""
         try:
             problems = upload_private_path_problems(ctx)
         except (ConfigError, ValueError, OSError) as exc:
@@ -91,8 +91,7 @@ def register_upload_private_path_checks(app):
             return reporter.found("an upload's contents could not be listed")
         if not problems:
             return reporter.passed(
-                "no npm package, Go module zip, or Docker build context carries "
-                "a private path"
+                "no npm package or Go module zip carries a private path"
             )
         for problem in problems:
             reporter.error(problem)

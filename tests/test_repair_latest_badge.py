@@ -99,7 +99,7 @@ def _reconcile(tmp_path, monkeypatch, *, version, latest):
     releases = root / ".rlsbl" / "releases"
     for v, sha in shas.items():
         write_archived_release_file(
-            str(releases), v, bump="patch", include=["plain"],
+            str(releases), v, bump="patch", include=["spec"],
             description="d", candidate_sha=sha, tree_hashes={".": TREE},
         )
     gh = _Gh(latest)
@@ -153,7 +153,7 @@ class TestTheScrubsReleaseRewrite:
         monkeypatch.chdir(root)
         write_archived_release_file(
             str(root / ".rlsbl" / "releases"), "1.1.0", bump="patch",
-            include=["plain"], description="d", candidate_sha=shas["1.1.0"],
+            include=["spec"], description="d", candidate_sha=shas["1.1.0"],
             tree_hashes={".": TREE},
         )
         (root / "CHANGELOG.md").write_text("# Changelog\n", encoding="utf-8")

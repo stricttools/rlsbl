@@ -318,7 +318,7 @@ class TestFreshnessCheck:
         write_matrix(str(tmp_path))
         path = Path(matrix_path(str(tmp_path)))
         doc = json.loads(path.read_text(encoding="utf-8"))
-        doc["targets"]["plain"]["provides_ci_templates"] = True
+        doc["targets"]["spec"]["provides_ci_templates"] = False
         path.write_text(json.dumps(doc, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
         outcome = _project_check("target-matrix-fresh")(_ctx(tmp_path))

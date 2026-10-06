@@ -66,19 +66,12 @@ class TestTemplatesHaveConcurrency:
             for p in _ci_templates()
         }
         expected = {
-            "deno/ci.yml.tpl",
-            "docker/ci.yml.tpl",
             "go/ci.yml.tpl",
-            "hex/ci.yml.tpl",
-            "maven/ci.yml.tpl",
             "npm/ci.yml.tpl",
             "npm/ci-pnpm.yml.tpl",
             "npm/ci-yarn.yml.tpl",
             "pypi/ci.yml.tpl",
             "spec/ci.yml.tpl",
-            "swift/ci.yml.tpl",
-            "swift-apple/ci.yml.tpl",
-            "zig/ci.yml.tpl",
         }
         # New CI templates are allowed (they are covered by the tests below);
         # missing ones mean the enumeration or a template was deleted.

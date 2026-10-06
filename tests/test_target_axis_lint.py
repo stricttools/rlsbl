@@ -2,9 +2,9 @@
 
 Two taxonomies meet here and must stay distinct:
 
-- the **language** taxonomy (``python``, ``go``, ``npm``, ``maven``) that the
+- the **language** taxonomy (``python``, ``go``, ``npm``) that the
   linter dispatches on, now declared once in ``rlsbl.lint.languages.LANGUAGES``;
-- the **target** taxonomy (``pypi``, ``go``, ``npm``, ``maven``, ...) that the
+- the **target** taxonomy (``pypi``, ``go``, ``npm``, ...) that the
   release flow dispatches on, whose participation in library lint is now a
   single property, ``ReleaseTarget.lint_language``.
 
@@ -60,9 +60,6 @@ class TestLanguageTableIsTheAuthority:
             tuple(load_language_config(".", "python").forbidden_imports)
             == LANGUAGES_BY_NAME["python"].default_forbidden_imports
         )
-        # maven's linter shells out, so it declares no forbidden imports.
-        assert load_language_config(".", "maven").forbidden_imports == []
-
 
 
 class TestNoSilentFallthrough:
@@ -89,8 +86,8 @@ class TestTargetSideBridge:
         assert derived == frozenset(
             n for n, t in TARGETS.items() if t.lint_language is not None
         )
-        # The four in scope before the migration are still the four in scope.
-        assert derived == {"pypi", "go", "npm", "maven"}
+        # The three in scope before the migration are still in scope.
+        assert derived == {"pypi", "go", "npm"}
 
     @pytest.mark.parametrize("name", sorted(TARGETS))
     def test_every_declared_lint_language_exists_in_the_table(self, name):
@@ -107,8 +104,7 @@ class TestTargetSideBridge:
         assert "pypi" not in LANGUAGES_BY_NAME
 
     def test_a_target_out_of_scope_declares_no_language(self):
-        assert TARGETS["zig"].lint_language is None
-        assert TARGETS["plain"].lint_language is None
+        assert TARGETS["spec"].lint_language is None
 
 
 class TestLintLibraryStillRuns:

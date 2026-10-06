@@ -1093,7 +1093,6 @@ class TestReleaseEnvFile:
         monkeypatch.delenv("CLOUDFLARE_ACCOUNT_ID", raising=False)
 
         with patch(f"{MOD_RELEASE}.validate_release_targets", return_value="npm"), \
-             patch(f"{MOD_RELEASE}.validate_ota_mode"), \
              patch(f"{MOD_RELEASE}.validate_config_integrity"), \
              patch(f"{MOD_RELEASE}.validate_pipeline_config"), \
              patch(f"{MOD_RELEASE}.validate_gh_cli"), \
@@ -1117,19 +1116,6 @@ class TestReleaseEnvFile:
         assert os.environ.get("CLOUDFLARE_ACCOUNT_ID") == "test123"
 
 
-class TestReleaseFlutterBuildTracking:
-    """Covers lines 398-402: flutter build release tracking."""
-
-    @patch(f"{MOD_RELEASE}._run_cmd_inner")
-    def test_flutter_build_not_tracked_when_no_flutter(self, mock_inner):
-        """No flutter targets = no tracking call (just verifying the flow)."""
-        from rlsbl.commands.release import run_cmd
-
-        mock_inner.return_value = None
-        release_config = MagicMock()
-        release_config.include = ["npm"]
-        release_config.targets = {}
-        run_cmd(release_config, {}, ctx=_ctx())
         # No error means it completed
 
 

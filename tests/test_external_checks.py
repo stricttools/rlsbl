@@ -551,7 +551,7 @@ class TestExternalCheckIntegration:
         rlsbl_dir.mkdir(exist_ok=True)
         config = {
             "publish_mode": "ci",
-            "targets": ["plain"],
+            "targets": ["spec"],
             "external_checks": [_freeform(
                 name="ext-test-pass", command="echo 'all good'",
             )],
@@ -582,7 +582,7 @@ class TestExternalCheckIntegration:
         rlsbl_dir.mkdir(exist_ok=True)
         config = {
             "publish_mode": "ci",
-            "targets": ["plain"],
+            "targets": ["spec"],
             "external_checks": [_freeform(name="ext-test-fail", command="false")],
         }
         (rlsbl_dir / "config.json").write_text(json.dumps(config))
@@ -612,7 +612,7 @@ class TestExternalCheckIntegration:
         rlsbl_dir.mkdir(exist_ok=True)
         config = {
             "publish_mode": "ci",
-            "targets": ["plain"],
+            "targets": ["spec"],
             "external_checks": [
                 _freeform(name="ext-dep-target", command="echo target"),
                 _freeform(
@@ -660,7 +660,7 @@ class TestRunExternalPreflightChecks:
         builtin_marker = tmp_path / "builtin-ran"
         config = {
             "publish_mode": "ci",
-            "targets": ["plain"],
+            "targets": ["spec"],
             "external_checks": [_freeform(
                 name="ext-marker-check", command=f"touch {ext_marker}",
             )],
@@ -870,7 +870,7 @@ class TestPartitionWiring:
         ext_marker = tmp_path / "ext-ran"
         config = {
             "publish_mode": "ci",
-            "targets": ["plain"],
+            "targets": ["spec"],
             "external_checks": [_freeform(
                 name="ext-pure-test", command=f"touch {ext_marker}",
             )],

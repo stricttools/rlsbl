@@ -1680,7 +1680,7 @@ class TestDeadModules:
 
         TargetEntry = namedtuple("TargetEntry", ["name", "path"])
         ctx = make_ctx(repo)
-        with patch("rlsbl.targets.detect_targets", return_value=[TargetEntry("swift", str(repo))]):
+        with patch("rlsbl.targets.detect_targets", return_value=[TargetEntry("spec", str(repo))]):
             result = app._check_defs["dead-modules"].impl(ctx)
         assert result.status == "skip"
 
@@ -1878,26 +1878,6 @@ class TestScaffoldUnreplacedVars:
         result = app._check_defs["scaffold-unreplaced-vars"].impl(ctx)
         assert result.status == "fail"
         assert "unreplaced" in result.message
-
-    def test_docker_meta_lines_excluded(self, tmp_path, monkeypatch):
-        """Lines 231-232: docker metadata lines are skipped."""
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        monkeypatch.chdir(repo)
-        _init_repo(repo)
-        _setup_scaffold(repo)
-
-        wf_dir = repo / ".github" / "workflows"
-        wf_dir.mkdir(parents=True)
-        (wf_dir / "build.yml").write_text(
-            "tags: type=semver,pattern={{version}}\n"
-        )
-        run_git(repo, "add", ".github")
-        run_git(repo, "commit", "-q", "-m", "add workflow")
-
-        ctx = make_ctx(repo)
-        result = app._check_defs["scaffold-unreplaced-vars"].impl(ctx)
-        assert result.status == "pass"
 
     def test_github_actions_syntax_excluded(self, tmp_path, monkeypatch):
         """${{ ... }} should not be flagged."""
@@ -2166,10 +2146,10 @@ class TestWorkspaceCiSynced:
         ]
         ctx = _make_ws_ctx(repo, projects)
 
-        # Mock detect_targets to return plain for this project
+        # Mock detect_targets to return spec for this project
         with patch(
             "rlsbl.targets.detect_targets",
-            return_value=[TargetEntry("plain", str(proj_dir))],
+            return_value=[TargetEntry("spec", str(proj_dir))],
         ):
             result = app._check_defs["workspace-ci-synced"].impl(ctx)
 
@@ -2750,29 +2730,8 @@ class TestLibraryLintFindWorkspaceException:
         assert result.status == "skip"
 
 
-class TestCircularDepsGo:
-    """circular-deps check for dart target (quality.py lines 173-176)."""
-
-    def test_dart_cycles_warn(self, tmp_path, monkeypatch):
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        monkeypatch.chdir(repo)
-        _init_repo(repo)
-        _setup_scaffold(repo)
-
-        TargetEntry = namedtuple("TargetEntry", ["name", "path"])
-        ctx = make_ctx(repo)
-        with (
-            patch("rlsbl.targets.detect_targets", return_value=[TargetEntry("dart", str(repo))]),
-            patch("rlsbl.dep_validation.find_circular_dart_deps", return_value=[["x", "y"]]),
-        ):
-            result = app._check_defs["circular-deps"].impl(ctx)
-        assert result.status == "warn"
-        assert "cycle" in result.message.lower()
-
-
 class TestDeadModulesMultiTarget:
-    """dead-modules with multiple target types (go, npm, dart)."""
+    """dead-modules with multiple target types (go, npm)."""
 
     def test_go_dead_packages(self, tmp_path, monkeypatch):
         repo = tmp_path / "repo"
@@ -2805,23 +2764,6 @@ class TestDeadModulesMultiTarget:
         ):
             result = app._check_defs["dead-modules"].impl(ctx)
         assert result.status == "warn"
-
-    def test_dart_dead_modules(self, tmp_path, monkeypatch):
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        monkeypatch.chdir(repo)
-        _init_repo(repo)
-        _setup_scaffold(repo)
-
-        TargetEntry = namedtuple("TargetEntry", ["name", "path"])
-        ctx = make_ctx(repo)
-        with (
-            patch("rlsbl.targets.detect_targets", return_value=[TargetEntry("dart", str(repo))]),
-            patch("rlsbl.dep_validation.find_dead_dart_modules", return_value=["lib/dead.dart"]),
-        ):
-            result = app._check_defs["dead-modules"].impl(ctx)
-        assert result.status == "warn"
-
 
 class TestDevOnlyBoundaryEdgeCases:
     """dev-only-boundary edge cases."""

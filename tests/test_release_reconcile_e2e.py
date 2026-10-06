@@ -148,7 +148,7 @@ def _setup_released_repo_with_release_record(env):
     _git(repo, "tag", "-a", "v1.0.0", "-m", "release v1.0.0")
     write_archived_release_file(
         str(repo / ".rlsbl" / "releases"), "1.0.0", bump="minor",
-        include=["plain"], description="The first release.",
+        include=["spec"], description="The first release.",
         candidate_sha=released,
         tree_hashes={".": _git(repo, "rev-parse", "HEAD^{tree}")},
     )

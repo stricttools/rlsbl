@@ -1,4 +1,4 @@
-"""rlsbl: Release orchestration and project scaffolding for npm, PyPI, Go, Deno, Zig, Swift, Hex, Docker, Maven, and more, automating version bumps, changelogs, tags, GitHub Releases, and CI/CD."""
+"""rlsbl: Release orchestration and project scaffolding for npm, PyPI, and Go, automating version bumps, changelogs, tags, GitHub Releases, and CI/CD."""
 
 import contextvars
 import os
@@ -75,8 +75,8 @@ def detect_registries():
     """Detect all registries/targets applicable in the current directory.
 
     Returns a list of name strings, e.g. ["npm"], ["pypi"], or ["npm", "pypi"].
-    Delegates to detect_targets() so all registered targets (including docker,
-    deno, hex, maven, etc.) are auto-detected when no config exists.
+    Delegates to detect_targets() so every registered target is auto-detected
+    when no config exists.
     """
     from .targets import detect_targets
     return [entry.name for entry in detect_targets(".")]
@@ -925,7 +925,7 @@ def cmd_release_resume(ctx, watch, push_timeout, ci_timeout, check_timeout, hook
 
 @release_group.command(
     name="init",
-    help="Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.",
+    help="Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch) and an include list of all detected targets.",
     effect="mutating",
     dry_run_supported=False,
     dry_run_unsupported_reason=(
@@ -1115,7 +1115,7 @@ def cmd_status(ctx, target, registry):
 # ---------------------------------------------------------------------------
 
 @app.command(name="scaffold", help="Generate or update CI/CD workflows, git hooks, changelog, and license files. Safe to run repeatedly -- three-way merges template changes with your customizations. Existing files with no stored merge base are healed from their last scaffold commit before merging.", effect="mutating")
-@strictcli.flag(name="target", type=str, presence="optional", help="Declare an additional registry this project publishes to (for targets auto-detection cannot find, e.g. plain). Added to the project's target set; scaffold always covers every target, never just this one.")
+@strictcli.flag(name="target", type=str, presence="optional", help="Declare an additional registry this project publishes to. Added to the project's target set; scaffold always covers every target, never just this one.")
 @strictcli.flag(name="publish-mode", type=str, presence="optional", choices=[
     strictcli.Choice("ci", help="publish via the scaffolded CI pipelines"),
     strictcli.Choice("none", help="suppress publishing to public registries"),
@@ -1137,14 +1137,14 @@ def cmd_scaffold(ctx, target, publish_mode, auto_commit, skip_shared, auto_tag):
     # package.json, go.mod, etc.), use cwd -- the user is in a sub-project
     # and wants to scaffold in place. This prevents walking up to a monorepo
     # root when inside a sub-project.
-    # When --target is explicitly passed (e.g., --target plain), always use
-    # cwd -- the user is declaring what to scaffold and where. Without this,
-    # plain-target projects (whose detect() always returns False) would walk
-    # up to the monorepo root, causing _is_non_releasable_project() to fail.
+    # When --target is explicitly passed, always use cwd -- the user is
+    # declaring what to scaffold and where. Without this, a project whose
+    # manifests detect no target would walk up to the monorepo root, causing
+    # _is_non_releasable_project() to fail.
     from .utils import find_project_root
     cwd_has_project = bool(detect_registries())
-    # Already-scaffolded projects (e.g. plain targets whose detect() returns
-    # False) are recognised by the presence of .rlsbl/config.json in cwd.
+    # Already-scaffolded projects whose manifests detect no target are
+    # recognized by the presence of .rlsbl/config.json in cwd.
     cwd_has_rlsbl_config = (Path.cwd() / ".rlsbl" / "config.json").is_file()
     scaffold_root = None
     if target:
@@ -1189,8 +1189,8 @@ def cmd_scaffold(ctx, target, publish_mode, auto_commit, skip_shared, auto_tag):
 
     regs = detect_registries()
     if not regs and ctx and ctx.config.get("targets"):
-        # Plain targets (and others whose detect() returns False) won't
-        # appear in detect_registries(), but the config records them.
+        # Targets whose detect() returns False won't appear in
+        # detect_registries(), but the config records them.
         regs = [t.get("name") if isinstance(t, dict) else t
                 for t in ctx.config["targets"]]
     # --target DECLARES a target; it never narrows the run. Scaffold's outputs

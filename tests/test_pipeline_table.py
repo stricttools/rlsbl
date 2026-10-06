@@ -1,7 +1,7 @@
 """Tests for pipeline table data generation in rlsbl.pipelines.introspect."""
 
 from rlsbl.pipelines import PIPELINE_TYPES
-from rlsbl.pipelines.base import TokenPipeline, CredentialPipeline
+from rlsbl.pipelines.base import TokenPipeline
 from rlsbl.pipelines.introspect import (
     generate_pipeline_table_data,
 )
@@ -20,9 +20,9 @@ class TestHeaders:
 
 
 class TestRows:
-    def test_returns_9_rows(self):
+    def test_returns_one_row_per_pipeline_type(self):
         _, rows = generate_pipeline_table_data()
-        assert len(rows) == 9
+        assert len(rows) == len(PIPELINE_TYPES)
 
     def test_rows_match_header_length(self):
         headers, rows = generate_pipeline_table_data()
@@ -53,22 +53,12 @@ class TestAuthMethod:
                     f"{type_name} should have auth method 'token'"
                 )
 
-    def test_credential_pipelines(self):
-        """Pipeline types that extend CredentialPipeline show 'credential'."""
-        _, rows = generate_pipeline_table_data()
-        by_name = {row[0]: row for row in rows}
-        for type_name, cls in PIPELINE_TYPES.items():
-            if issubclass(cls, CredentialPipeline):
-                assert by_name[type_name][1] == "credential", (
-                    f"{type_name} should have auth method 'credential'"
-                )
-
     def test_no_auth_pipelines(self):
-        """Pipeline types that extend neither Token nor Credential show 'none'."""
+        """Pipeline types that do not extend TokenPipeline show 'none'."""
         _, rows = generate_pipeline_table_data()
         by_name = {row[0]: row for row in rows}
         for type_name, cls in PIPELINE_TYPES.items():
-            if not issubclass(cls, (TokenPipeline, CredentialPipeline)):
+            if not issubclass(cls, TokenPipeline):
                 assert by_name[type_name][1] == "none", (
                     f"{type_name} should have auth method 'none'"
                 )
@@ -84,12 +74,6 @@ class TestEnvVars:
         _, rows = generate_pipeline_table_data()
         by_name = {row[0]: row for row in rows}
         assert by_name["pypi"][2] == "PYPI_TOKEN"
-
-    def test_docker_credential_vars(self):
-        _, rows = generate_pipeline_table_data()
-        by_name = {row[0]: row for row in rows}
-        assert "DOCKER_USERNAME" in by_name["docker"][2]
-        assert "DOCKER_PASSWORD" in by_name["docker"][2]
 
     def test_go_no_env_vars(self):
         """Go pipeline has no default env vars (uses GITHUB_TOKEN from CI)."""

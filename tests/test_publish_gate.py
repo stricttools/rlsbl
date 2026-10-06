@@ -70,8 +70,6 @@ RENDER_VARS = {
     "publishGate": gate_job_template_snippet("^(test)( \\(.*\\))?$"),
     "registryUrl": "https://registry.npmjs.org",
     "modulePath": "github.com/owner/repo",
-    "zig.projectName": "myproj",
-    "zig.minRequiredZig": "0.13.0",
     # Launcher publish templates bake in the wrapped producer's asset naming
     # so their 404 probe checks the exact URL the shim downloads.
     "assetProject": "mytool",
@@ -106,17 +104,11 @@ class TestPublishTemplatesEnumerated:
             for p in _publish_templates()
         }
         expected = {
-            "deno/publish.yml.tpl",
-            "docker/publish.yml.tpl",
             "go/publish.yml.tpl",
-            "hex/publish.yml.tpl",
-            "maven/publish.yml.tpl",
-            "maven/publish-central.yml.tpl",
             "npm/publish.yml.tpl",
             "npm/publish-pnpm.yml.tpl",
             "npm/publish-yarn.yml.tpl",
             "pypi/publish.yml.tpl",
-            "zig/publish.yml.tpl",
         }
         assert expected <= rels
 
@@ -226,8 +218,8 @@ class TestGateJob:
 
     def test_ci_check_regex_union(self):
         assert (
-            ci_check_regex_for_targets(["docker", "pypi"])
-            == r"^(build|test)( \(.*\))?$"
+            ci_check_regex_for_targets(["spec", "pypi"])
+            == r"^(test|validate)( \(.*\))?$"
         )
 
     def test_ci_check_regex_unknown_target_defaults_to_test(self):
@@ -285,12 +277,12 @@ class TestMergedPublishGate:
 
     def test_gate_regex_is_union_of_target_ci_jobs(self):
         result = _generate_merged_publish(
-            ["docker", "pypi"],
+            ["spec", "pypi"],
             template_vars={},
         )
         doc = _yaml_load(result)
         gate = doc["jobs"][GATE_JOB_KEY]
-        assert gate["env"]["CI_CHECK_REGEX"] == r"^(build|test)( \(.*\))?$"
+        assert gate["env"]["CI_CHECK_REGEX"] == r"^(test|validate)( \(.*\))?$"
 
     def test_merged_has_per_ref_concurrency(self):
         result = _generate_merged_publish(

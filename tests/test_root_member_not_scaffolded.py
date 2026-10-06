@@ -27,7 +27,7 @@ def _workspace_root(tmp_path):
     return root
 
 
-@pytest.mark.parametrize("target", ["go", "plain", "docker", "swift", "zig"])
+@pytest.mark.parametrize("target", ["go"])
 def test_a_missing_version_file_at_the_root_names_a_hand_edit(tmp_path, target):
     root = _workspace_root(tmp_path)
 

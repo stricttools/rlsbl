@@ -65,12 +65,10 @@ class TestBatchModeSkipsValidation:
     @patch("rlsbl.commands.release.validate_gh_cli")
     @patch("rlsbl.commands.release.validate_pipeline_config")
     @patch("rlsbl.commands.release.validate_config_integrity")
-    @patch("rlsbl.commands.release.validate_ota_mode")
     @patch("rlsbl.commands.release.validate_release_targets")
     def test_batch_mode_skips_env_validation(
         self,
         mock_validate_targets,
-        mock_validate_ota,
         mock_validate_config,
         mock_validate_pipeline,
         mock_validate_gh,
@@ -98,12 +96,10 @@ class TestBatchModeSkipsValidation:
     @patch("rlsbl.commands.release.validate_gh_cli")
     @patch("rlsbl.commands.release.validate_pipeline_config")
     @patch("rlsbl.commands.release.validate_config_integrity")
-    @patch("rlsbl.commands.release.validate_ota_mode")
     @patch("rlsbl.commands.release.validate_release_targets")
     def test_non_batch_mode_calls_env_validation(
         self,
         mock_validate_targets,
-        mock_validate_ota,
         mock_validate_config,
         mock_validate_pipeline,
         mock_validate_gh,

@@ -70,7 +70,6 @@ _STUBS = {
     "validate_release_targets": "npm",
     "validate_pipeline_config": None,
     "validate_config_integrity": None,
-    "validate_ota_mode": None,
     "validate_gh_cli": None,
     "validate_gh_push_access": None,
     "validate_branch_and_remote": "main",

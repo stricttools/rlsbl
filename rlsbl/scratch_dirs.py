@@ -37,9 +37,7 @@ declares; the vocabulary and the writers live in the second half of this
 module.
 """
 
-import json
 import os
-import re
 
 from . import effects
 
@@ -71,8 +69,8 @@ SCRATCH_GO_MODULE_FILENAME = "go.mod"
 # --------------------------------------------------------------------------
 
 #: The ecosystem's test runner collects only from directories the project
-#: declares (a Maven test source set, a Swift package target, a ``test/``
-#: convention), so a file in a scratch directory is never reached.
+#: declares (a ``test/`` convention, say), so a file in a scratch directory is
+#: never reached.
 NO_TEST_RUNNER_RECURSION = "no-test-runner-recursion"
 
 #: pytest recurses from its rootdir, and prunes the directory basename patterns
@@ -82,10 +80,6 @@ PYTEST_NORECURSEDIRS = "pytest-norecursedirs"
 #: The go command never descends into a directory that declares its own module,
 #: so each scratch directory carries a scaffolded ``go.mod``.
 GO_NESTED_MODULE = "go-nested-module"
-
-#: ``deno test`` skips every path named by the top-level ``exclude`` array in
-#: the project's Deno configuration file.
-DENO_CONFIG_EXCLUDE = "deno-config-exclude"
 
 #: The project's own manifest names the test runner (an npm ``test`` script
 #: runs whichever of jest, vitest, mocha or ``node --test`` the project chose),
@@ -100,7 +94,6 @@ SCRATCH_TEST_EXCLUSION_MECHANISMS = (
     NO_TEST_RUNNER_RECURSION,
     PYTEST_NORECURSEDIRS,
     GO_NESTED_MODULE,
-    DENO_CONFIG_EXCLUDE,
     RUNNER_CHOSEN_BY_PROJECT,
 )
 
@@ -244,7 +237,7 @@ def apply_scratch_test_exclusions(target_paths, *, dry_run=False):
     ``(path, status)`` pairs for the files written and for the files already
     carrying the setting, plus warning strings.
 
-    The files touched here (``pyproject.toml``, ``deno.json``) are the
+    The file touched here (``pyproject.toml``) is the
     project's, not scaffold's: they are merged into rather than rendered, they
     never enter the managed-files registry, and everything around the one
     setting is byte-preserved. :data:`GO_NESTED_MODULE` is absent from this
@@ -350,60 +343,9 @@ def _apply_pytest_norecursedirs(target_dir, created, skipped, warnings, dry_run)
     created.append((pyproject_rel, "updated (pytest norecursedirs)"))
 
 
-def _apply_deno_exclude(target_dir, created, skipped, warnings, dry_run):
-    """Merge the scratch directories into ``exclude`` in the Deno config."""
-    json_rel = _rel(target_dir, "deno.json")
-    jsonc_rel = _rel(target_dir, "deno.jsonc")
-    listing = ", ".join(f'"{name}"' for name in SCRATCH_DIR_NAMES)
-    if not os.path.isfile(json_rel):
-        if os.path.isfile(jsonc_rel):
-            warnings.append(
-                f"{jsonc_rel} carries comments that a rewrite would lose, so "
-                f"rlsbl wrote no exclude entries. Add {listing} to the "
-                f'top-level "exclude" array in {jsonc_rel} yourself.'
-            )
-        else:
-            warnings.append(
-                f"no {json_rel} to write deno's exclude entries into, so a test "
-                f"file left in {' or '.join(SCRATCH_DIR_NAMES)} would be collected."
-            )
-        return
-
-    with open(json_rel, "r", encoding="utf-8") as handle:
-        original = handle.read()
-    data = json.loads(original)
-    exclude = data.get("exclude")
-    if exclude is None:
-        exclude = []
-        data["exclude"] = exclude
-    elif not isinstance(exclude, list):
-        warnings.append(
-            f'the "exclude" key in {json_rel} is not an array, so rlsbl left it '
-            f"alone. Make it an array containing {listing}."
-        )
-        return
-
-    missing = [name for name in SCRATCH_DIR_NAMES if name not in exclude]
-    if not missing:
-        skipped.append((json_rel, "unchanged (deno exclude)"))
-        return
-    exclude.extend(missing)
-
-    # Indent and trailing newline are read off the file, matching how the deno
-    # target rewrites a version, so the diff is the exclude entries alone.
-    indent_match = re.search(r'^( +|\t+)"', original, re.MULTILINE)
-    indent = indent_match.group(1) if indent_match else "  "
-    trailing = "\n" if original.endswith("\n") else ""
-    updated = json.dumps(data, indent=indent, ensure_ascii=False) + trailing
-    if not dry_run:
-        effects.atomic_write_text(json_rel, updated)
-    created.append((json_rel, "updated (deno exclude)"))
-
-
 #: One handler per mechanism that merges a setting into a project-owned file.
 _MECHANISM_HANDLERS = {
     PYTEST_NORECURSEDIRS: _apply_pytest_norecursedirs,
-    DENO_CONFIG_EXCLUDE: _apply_deno_exclude,
 }
 
 

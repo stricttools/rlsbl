@@ -50,7 +50,7 @@ class TestLintConfigFiltering:
         }
 
     def test_non_lint_targets_get_nothing(self):
-        ctx = _ctx(targets=["cargo", "docker"])
+        ctx = _ctx(targets=["cargo", "spec"])
         mappings = BaseTarget().shared_template_mappings(ctx)
         assert _lint_targets(mappings) == set()
 

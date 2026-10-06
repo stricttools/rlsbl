@@ -29,9 +29,9 @@ class TestHeaders:
 
 
 class TestRows:
-    def test_returns_17_rows(self):
+    def test_returns_one_row_per_target(self):
         _, rows = generate_target_table_data()
-        assert len(rows) == 17
+        assert len(rows) == len(TARGETS)
 
     def test_rows_match_header_length(self):
         headers, rows = generate_target_table_data()
@@ -71,20 +71,6 @@ class TestCapabilityCheckmarks:
 
 
 class TestSpecificTargets:
-    def test_maven_version_file_is_dash(self):
-        _, rows = generate_target_table_data()
-        by_name = _rows_by_name(rows)
-        headers = EXPECTED_HEADERS
-        vf_idx = headers.index("Version file")
-        assert by_name["maven"][vf_idx] == "---"
-
-    def test_plain_detection_files(self):
-        _, rows = generate_target_table_data()
-        by_name = _rows_by_name(rows)
-        headers = EXPECTED_HEADERS
-        df_idx = headers.index("Detection files")
-        assert by_name["plain"][df_idx] == "VERSION (conditional)"
-
     def test_spec_tag_format(self):
         _, rows = generate_target_table_data()
         by_name = _rows_by_name(rows)
@@ -102,22 +88,6 @@ class TestSpecificTargets:
         # Go uses path-based format: "{path}/v{version}"
         assert "{path}" in value
         assert "v{version}" in value
-
-    def test_flutter_detection_files(self):
-        """Flutter target shows pubspec.yaml (flutter) as detection method."""
-        _, rows = generate_target_table_data()
-        by_name = _rows_by_name(rows)
-        headers = EXPECTED_HEADERS
-        df_idx = headers.index("Detection files")
-        assert by_name["flutter"][df_idx] == "pubspec.yaml (flutter)"
-
-    def test_flutter_monorepo_tag_format(self):
-        """Flutter target uses standard {name}@v{version} monorepo tag format."""
-        _, rows = generate_target_table_data()
-        by_name = _rows_by_name(rows)
-        headers = EXPECTED_HEADERS
-        mono_idx = headers.index("Monorepo tag format")
-        assert by_name["flutter"][mono_idx] == "{name}@v{version}"
 
     def test_dev_install_formatting(self):
         """Targets with both global and venv show both; targets with only global show just global."""
@@ -140,5 +110,4 @@ class TestSpecificTargets:
         by_name = _rows_by_name(rows)
         headers = EXPECTED_HEADERS
         dev_idx = headers.index("dev_install")
-        assert by_name["docker"][dev_idx] == ""
-        assert by_name["plain"][dev_idx] == ""
+        assert by_name["spec"][dev_idx] == ""

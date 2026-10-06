@@ -1,7 +1,7 @@
 """Pipeline introspection -- generates raw table data for all registered pipeline types showing auth method, env vars, and ecosystem."""
 
 from . import PIPELINE_TYPES
-from .base import TokenPipeline, CredentialPipeline
+from .base import TokenPipeline
 
 HEADERS = ["Type", "Auth method", "Required env vars", "Ecosystem"]
 
@@ -10,11 +10,6 @@ _ECOSYSTEMS: dict[str, str] = {
     "npm": "npm registry",
     "pypi": "Python Package Index",
     "go": "Go module proxy",
-    "deno": "JSR (Deno)",
-    "hex": "hex.pm (Elixir)",
-    "maven": "Maven Central / Gradle",
-    "maven-central": "Maven Central (Central Portal)",
-    "docker": "Container registry",
     "cloudflare-pages": "Cloudflare Pages",
 }
 
@@ -23,8 +18,6 @@ def _auth_method(cls: type) -> str:
     """Determine the auth method from the pipeline class hierarchy."""
     if issubclass(cls, TokenPipeline):
         return "token"
-    if issubclass(cls, CredentialPipeline):
-        return "credential"
     return "none"
 
 
@@ -33,11 +26,6 @@ def _default_env_vars(cls: type) -> str:
     if issubclass(cls, TokenPipeline):
         var = getattr(cls, "_default_token_var", "")
         return var if var else ""
-    if issubclass(cls, CredentialPipeline):
-        uvar = getattr(cls, "_default_username_var", "")
-        pvar = getattr(cls, "_default_password_var", "")
-        parts = [v for v in (uvar, pvar) if v]
-        return ", ".join(parts) if parts else ""
     return ""
 
 

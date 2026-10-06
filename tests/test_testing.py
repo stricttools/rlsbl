@@ -729,31 +729,6 @@ class TestNpmTarget:
 
 
 # ---------------------------------------------------------------------------
-# maven target
-# ---------------------------------------------------------------------------
-
-class TestMavenTarget:
-    """Tests for run_project_tests with maven target."""
-
-    def test_maven_no_build_file_fails(self, tmp_project):
-        """maven target with neither gradlew nor pom.xml -> hard fail
-        (a maven target was declared, so a missing manifest is broken, not n/a)."""
-        with patch("rlsbl.effects.run") as mock_run:
-            result = run_project_tests("maven", project_dir=str(tmp_project))
-
-            assert not result.passed
-            mock_run.assert_not_called()
-
-    def test_maven_mvn_missing_tool_fails(self, tmp_project):
-        """mvn not installed (FileNotFoundError) -> hard fail, not an exception."""
-        (tmp_project / "pom.xml").write_text("<project></project>\n")
-        with patch("rlsbl.effects.run", side_effect=FileNotFoundError("mvn")):
-            result = run_project_tests("maven", project_dir=str(tmp_project))
-
-            assert not result.passed
-
-
-# ---------------------------------------------------------------------------
 # Unknown target
 # ---------------------------------------------------------------------------
 
@@ -779,15 +754,15 @@ class TestUnknownTarget:
             mock_run.assert_not_called()
 
     def test_a_registered_target_without_a_runner_skips(self, tmp_project):
-        """zig is a real target; it just has no built-in test command."""
+        """spec is a real target; it just has no built-in test command."""
         from rlsbl.targets.outcomes import SuiteRunStatus
 
         with patch("rlsbl.effects.run") as mock_run:
-            result = run_project_tests("zig", project_dir=str(tmp_project))
+            result = run_project_tests("spec", project_dir=str(tmp_project))
 
             assert result.status is SuiteRunStatus.SKIPPED
             assert not result.passed
-            assert "zig" in result.message
+            assert "spec" in result.message
             mock_run.assert_not_called()
 
 
@@ -1181,29 +1156,6 @@ class TestTimeoutHint:
 
         assert not result.passed
         assert CHECK_TIMEOUT_HINT in capsys.readouterr().err
-
-    def test_maven_gradlew_timeout_prints_hint(self, tmp_project, capsys):
-        """maven (gradlew path) timeout message includes the remediation hint."""
-        gradlew = tmp_project / "gradlew"
-        gradlew.write_text("#!/bin/sh\n")
-        with patch("rlsbl.effects.run", side_effect=self._timeout):
-            result = run_project_tests("maven", project_dir=str(tmp_project))
-
-        assert not result.passed
-        err = capsys.readouterr().err
-        assert "timed out" in err
-        assert CHECK_TIMEOUT_HINT in err
-
-    def test_maven_mvn_timeout_prints_hint(self, tmp_project, capsys):
-        """maven (mvn/pom.xml path) timeout message includes the remediation hint."""
-        (tmp_project / "pom.xml").write_text("<project></project>\n")
-        with patch("rlsbl.effects.run", side_effect=self._timeout):
-            result = run_project_tests("maven", project_dir=str(tmp_project))
-
-        assert not result.passed
-        err = capsys.readouterr().err
-        assert "timed out" in err
-        assert CHECK_TIMEOUT_HINT in err
 
     def test_npm_timeout_prints_hint(self, tmp_project, capsys):
         """npm timeout message includes the remediation hint."""

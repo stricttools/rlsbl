@@ -165,7 +165,7 @@ values = "warn > off"
 default = "warn"
 scope = "none"
 requires = []
-description = "Every source module, Go internal package, and npm or Dart source file has an inbound import."
+description = "Every source module, Go internal package, and npm source file has an inbound import."
 
 [[option]]
 name = "dead-modules-stale"
@@ -447,15 +447,6 @@ requires = []
 description = "No stale release lock file is left in .rlsbl/ or .rlsbl-monorepo/."
 
 [[option]]
-name = "maven-central-metadata"
-subject = "release"
-values = "error > warn > off"
-default = "error"
-scope = "none"
-requires = []
-description = "Maven Central's publishing requirements are met: POM metadata, a sources jar, and a javadoc jar."
-
-[[option]]
 name = "member-pytest-config"
 subject = "tests"
 values = "error > warn > off"
@@ -463,15 +454,6 @@ default = "error"
 scope = "none"
 requires = []
 description = "When an enclosing member or the workspace root has a conftest.py, every member with a tests/ directory under it pins its own pytest rootdir."
-
-[[option]]
-name = "mirror-required"
-subject = "workspace"
-values = "error > warn > off"
-default = "error"
-scope = "none"
-requires = []
-description = "Every member consumed by repository URL belongs to a releasable that declares a subtree_remote mirror."
 
 [[option]]
 name = "mixed-tag-schemes"
@@ -831,7 +813,7 @@ values = "error > warn > off"
 default = "error"
 scope = "none"
 requires = []
-description = "No npm package, Go module zip, or Docker build context carries a private path."
+description = "No npm package or Go module zip carries a private path."
 
 [[option]]
 name = "version-consistency"

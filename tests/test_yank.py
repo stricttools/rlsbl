@@ -35,7 +35,7 @@ class TestPublicationProbeResult:
 
     def test_unprobeable(self):
         r = PublicationProbeResult(
-            PublicationStatus.UNPROBEABLE, "plain", "1.0.0", "no API"
+            PublicationStatus.UNPROBEABLE, "spec", "1.0.0", "no API"
         )
         assert r.status == PublicationStatus.UNPROBEABLE
 
@@ -46,12 +46,6 @@ class TestPublicationProbeOnTargets:
     def test_base_target_returns_unprobeable(self):
         from rlsbl.targets.base import BaseTarget
         t = BaseTarget()
-        result = t.publication_probe("/fake", "1.0.0")
-        assert result.status == PublicationStatus.UNPROBEABLE
-
-    def test_plain_target_returns_unprobeable(self):
-        from rlsbl.targets.plain import PlainTarget
-        t = PlainTarget()
         result = t.publication_probe("/fake", "1.0.0")
         assert result.status == PublicationStatus.UNPROBEABLE
 
@@ -276,17 +270,17 @@ class TestYankCommand:
         from rlsbl.targets import TargetEntry
 
         target = MagicMock()
-        target.name = "plain"
+        target.name = "spec"
         target.supports_publication_probe = False
         target.tag_format.return_value = "v1.0.0"
 
-        mock_member.return_value = MagicMock(targets=[TargetEntry("plain", ".")])
+        mock_member.return_value = MagicMock(targets=[TargetEntry("spec", ".")])
 
         mock_gh.side_effect = [
             "",         # release view
         ]
 
-        with patch(f"rlsbl.commands.yank.TARGETS", {"plain": target}), \
+        with patch(f"rlsbl.commands.yank.TARGETS", {"spec": target}), \
              patch("sys.stderr", new_callable=StringIO) as err:
             with pytest.raises(SystemExit) as exc:
                 run_cmd(["1.0.0"], {}, project_root=".")

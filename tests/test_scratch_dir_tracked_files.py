@@ -32,7 +32,9 @@ def _commit(repo, rel, text="x\n"):
 
 
 def _scaffold(repo):
-    run_cmd("plain", [], dict(FLAGS), ctx=create_context(repo))
+    if not (repo / "version.json").exists():
+        (repo / "version.json").write_text('{"version": "0.1.0"}\n')
+    run_cmd("spec", [], dict(FLAGS), ctx=create_context(repo))
 
 
 @pytest.fixture

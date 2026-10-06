@@ -1052,8 +1052,7 @@ def resolve_departure(workspace_root, releasable_name, target_path, *,
         )
         raise ExtractError(
             "the workspace dependency graph is incomplete: a manifest could "
-            "not be read, or declared a dependency in a form no scanner "
-            "recognizes, so the edges into and out of the extracted "
+            "not be read, so the edges into and out of the extracted "
             "releasable cannot be established -- a conversion that cannot see "
             "an edge would leave it dangling.\n"
             f"{listed}\n"

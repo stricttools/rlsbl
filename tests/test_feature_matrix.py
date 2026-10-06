@@ -219,7 +219,7 @@ class TestGenerateFeatureMatrixData:
         """Columns with no 'yes' among interesting rows are excluded.
 
         Pinned against a REGISTERED target that no target-specific check
-        supports -- ``zig``, whose every interesting cell is ``no``. The
+        supports -- ``spec``, whose every interesting cell is ``no``. The
         earlier form of this test named ``cargo``, which is not a registered
         target at all, so no rendering could ever have put it in the headers
         and the assertion could not fail.
@@ -231,9 +231,9 @@ class TestGenerateFeatureMatrixData:
             if any(v in ("yes", "no", "n/a") for v in row.values())
         ]
 
-        assert "zig" in MATRIX_COLUMNS
-        assert not any(row.get("zig") == "yes" for row in interesting)
-        assert "zig" not in headers
+        assert "spec" in MATRIX_COLUMNS
+        assert not any(row.get("spec") == "yes" for row in interesting)
+        assert "spec" not in headers
 
         # Every registered column left out is left out for the same reason,
         # and every column kept earned it with a "yes".
@@ -241,11 +241,10 @@ class TestGenerateFeatureMatrixData:
             supported = any(row.get(col) == "yes" for row in interesting)
             assert (col in headers) is supported, col
 
-        # pypi, go, npm, dart should all appear
+        # pypi, go, npm should all appear
         assert "pypi" in headers
         assert "go" in headers
         assert "npm" in headers
-        assert "dart" in headers
 
     def test_na_cells_in_data(self):
         """n/a cells must appear as 'n/a' in the data."""

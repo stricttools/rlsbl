@@ -303,7 +303,7 @@ def _make_standalone(tmp_path, config, files):
 
 class TestMemberContextResolvedTargets:
     def test_www_like_assets_and_docs_deploy(self, tmp_path):
-        """A 'plain' assets target plus a target-less docs deploy.
+        """A 'spec' assets target plus a target-less docs deploy.
 
         The docs deploy (target: null) must appear only in deploy_pipelines,
         never as a ResolvedTarget. The assets target has no linked pipeline,
@@ -311,7 +311,7 @@ class TestMemberContextResolvedTargets:
         """
         config = {
             "publish_mode": "ci",
-            "targets": ["plain"],
+            "targets": ["spec"],
             "pipelines": {
                 "docs-deploy": {
                     "type": "cloudflare-pages", "local": True, "target": None,
@@ -321,7 +321,7 @@ class TestMemberContextResolvedTargets:
         proj = _make_standalone(tmp_path, config, {"README.md": "x\n"})
         ctx = resolve_member_context(str(proj))
 
-        assert [rt.name for rt in ctx.resolved_targets] == ["plain"]
+        assert [rt.name for rt in ctx.resolved_targets] == ["spec"]
         assert ctx.resolved_targets[0].pipeline is None
         assert ctx.resolved_targets[0].publish_mode == "ci"
         assert [p.name for p in ctx.deploy_pipelines] == ["docs-deploy"]
@@ -354,7 +354,7 @@ class TestMemberContextResolvedTargets:
     def test_resolved_targets_is_cached(self, tmp_path):
         config = {
             "publish_mode": "ci",
-            "targets": ["plain"],
+            "targets": ["spec"],
         }
         proj = _make_standalone(tmp_path, config, {"README.md": "x\n"})
         ctx = resolve_member_context(str(proj))

@@ -31,7 +31,6 @@ def register_quality_checks(app):
             return reporter.passed("no library projects configured")
 
         ws_root = str(ctx.workspace_root)
-        timeout = get_check_timeout(ctx.config)
         total_errors = 0
         total_warnings = 0
         for proj in ctx.projects:
@@ -43,7 +42,6 @@ def register_quality_checks(app):
             results = lint_library(
                 proj_path,
                 allowed_imports=proj.get("lint_allow"),
-                check_timeout=timeout,
                 releasable_lint_dir=releasable_lint_dir,
             )
             for r in results:
@@ -206,7 +204,7 @@ def register_quality_checks(app):
 
     @app.warn_check("dead-modules")
     def check_dead_modules(ctx, reporter):
-        """Unreferenced Python modules, Go internal packages, npm or Dart source files."""
+        """Unreferenced Python modules, Go internal packages, or npm source files."""
         from ..targets import (
             TARGETS,
             detect_targets,
@@ -243,10 +241,9 @@ def register_quality_checks(app):
         # Each target runs its own detector and supplies its own explanation.
         # The Python and Go detectors are union-of-imports and take `suppress`
         # directly, so a listed file's own imports cannot keep another module
-        # alive (no laundering); the npm/Dart/JVM detectors are
-        # BFS-from-entry-points, where a non-entry suppressed file's edges are
-        # never traversed, so subtracting the listed paths is provably
-        # sufficient. Both shapes are the target's business, not this check's.
+        # alive (no laundering); the npm detector is BFS-from-entry-points,
+        # where a non-entry suppressed file's edges are never traversed, so
+        # subtracting the listed paths is provably sufficient. Both shapes are the target's business, not this check's.
         all_dead: list[str] = []
         details: list[str] = []
 
@@ -353,7 +350,6 @@ def register_quality_checks(app):
         ]
 
         template_re = _re.compile(r"(?<!\$)\{\{\w+(?:\.\w+)*\}\}")
-        docker_meta_re = _re.compile(r"type=semver,pattern=")
 
         errors = []
         for pattern in scan_patterns:
@@ -367,8 +363,6 @@ def register_quality_checks(app):
 
                 matches = []
                 for line in lines:
-                    if docker_meta_re.search(line):
-                        continue
                     matches.extend(template_re.findall(line))
                 if matches:
                     unique = sorted(set(matches))
@@ -431,28 +425,3 @@ def register_quality_checks(app):
             return reporter.passed(f"{target_name} tests passed")
         reporter.error(f"{target_name} tests failed")
         return reporter.found(f"{target_name} tests failed")
-
-    @app.error_check("maven-central-metadata")
-    def check_maven_central_metadata(ctx, reporter):
-        """Validate Maven Central publishing requirements."""
-        from ..targets import detect_targets, resolve_releasable_config_dir_for_ctx
-        from ..maven_central import validate_maven_central_metadata
-
-        rel_dir = resolve_releasable_config_dir_for_ctx(ctx)
-        target_entries = detect_targets(str(ctx.project_root), releasable_config_dir=rel_dir)
-        skip = check_scope_skip_reason(
-            "maven-central-metadata", {name for name, _path in target_entries},
-        )
-        if skip is not None:
-            return reporter.skipped(skip)
-
-        pipelines = ctx.config.get("pipelines", {})
-        if not any(p.get("type") == "maven-central" for p in pipelines.values()):
-            return reporter.skipped("no maven-central pipeline configured")
-
-        errors = validate_maven_central_metadata(str(ctx.project_root))
-        if errors:
-            for err in errors:
-                reporter.error(err)
-            return reporter.found(f"{len(errors)} Maven Central requirement(s) not met")
-        return reporter.passed("Maven Central metadata requirements satisfied")

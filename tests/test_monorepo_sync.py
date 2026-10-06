@@ -569,45 +569,6 @@ class TestSyncRefusesAnUnreadableManifest:
         assert router.read_text() == before
 
 
-class TestSwiftSubtreeWarning:
-    """`monorepo sync` says nothing about a Swift member's mirror binding.
-
-    The requirement is the `mirror-required` check's -- a hard error asked of
-    the target registry -- not an advisory warning printed by sync, which an
-    agent reads past.
-    """
-
-    def test_sync_does_not_warn_swift_without_subtree_remote(self, mock_git_repo, capsys):
-        """Sync stays silent; the check is what refuses."""
-        _cmd_init({"root-dev-node": True}, project_root=".")
-        # Create a Swift project (Package.swift triggers swift target detection)
-        proj_dir = os.path.join(str(mock_git_repo), "swiftpkg")
-        os.makedirs(proj_dir, exist_ok=True)
-        with open(os.path.join(proj_dir, "Package.swift"), "w") as f:
-            f.write("// swift-tools-version:5.9\n")
-        # Also need a version file for detect_targets
-        with open(os.path.join(proj_dir, "VERSION"), "w") as f:
-            f.write("0.1.0\n")
-        # Create a minimal CI workflow so sync has something to process
-        wf_dir = os.path.join(proj_dir, ".github", "workflows")
-        os.makedirs(wf_dir, exist_ok=True)
-        with open(os.path.join(wf_dir, "ci.yml"), "w") as f:
-            f.write(CI_WORKFLOW)
-        _mark_scaffolded(proj_dir, targets=("swift",))
-        _cmd_add(["swiftpkg"], {"releasable": "false"}, project_root=".")
-        subprocess.run(["git", "add", "."], cwd=str(mock_git_repo), check=True)
-        subprocess.run(
-            ["git", "commit", "-q", "-m", "setup swift project"],
-            cwd=str(mock_git_repo), check=True,
-        )
-        capsys.readouterr()
-        with patch("rlsbl.utils.find_commit_tool", return_value="git"):
-            _cmd_sync({}, project_root=".")
-        captured = capsys.readouterr()
-        assert "subtree_remote" not in captured.err
-        assert "SPM" not in captured.err
-
-
 class TestAutoCommit:
     def test_sync_commits_changes(self, mock_git_repo, capsys):
         _init_workspace_with_projects(mock_git_repo, [

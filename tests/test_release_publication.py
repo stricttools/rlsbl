@@ -159,7 +159,7 @@ class TestTheReleaseCommitComesFromTheReleaseRecord:
 
         releases = str(tmp_path / "releases")
         write_archived_release_file(
-            releases, "1.0.0", bump="minor", include=["plain"],
+            releases, "1.0.0", bump="minor", include=["spec"],
             description="d", candidate_sha=SHA, tree_hashes={".": "c" * 40},
         )
         assert release_commit_from_record(releases, "1.0.0") == SHA
@@ -169,7 +169,7 @@ class TestTheReleaseCommitComesFromTheReleaseRecord:
 
         releases = str(tmp_path / "releases")
         write_archived_release_file(
-            releases, "1.0.0", bump="minor", include=["plain"],
+            releases, "1.0.0", bump="minor", include=["spec"],
             description="d", candidate_sha=None, tree_hashes=None,
             unrecoverable=True,
         )
@@ -196,7 +196,7 @@ class TestTheReleaseCommitComesFromTheReleaseRecord:
         tree = git(repo, "rev-parse", f"{sha}^{{tree}}")
         releases = str(repo / ".rlsbl" / "releases")
         write_archived_release_file(
-            releases, "1.0.0", bump="minor", include=["plain"],
+            releases, "1.0.0", bump="minor", include=["spec"],
             description="d", candidate_sha=sha, tree_hashes={".": tree},
         )
         second = commit_file(repo, "b.txt", "b\n", "two")

@@ -97,7 +97,7 @@ class TestTheScrubsReleaseRewrite:
         monkeypatch.chdir(tmp_path)
         write_archived_release_file(
             str(tmp_path / ".rlsbl" / "releases"), "1.0.0", bump="patch",
-            include=["plain"], description="d", candidate_sha=SHA,
+            include=["spec"], description="d", candidate_sha=SHA,
             tree_hashes={".": TREE},
         )
         gh = _Gh()
@@ -131,7 +131,7 @@ class TestTheReconcile:
         monkeypatch.chdir(tmp_path)
         releases = tmp_path / ".rlsbl" / "releases"
         write_archived_release_file(
-            str(releases), "1.0.0", bump="patch", include=["plain"],
+            str(releases), "1.0.0", bump="patch", include=["spec"],
             description="d", candidate_sha=SHA, tree_hashes={".": TREE},
         )
         refs = {"refs/tags/v1.0.0": SHA, "refs/tags/v1.0.0^{}": SHA}

@@ -166,13 +166,6 @@ TARGET_AXES: tuple[TargetAxis, ...] = (
         _prop("publisher_setup_url"),
     ),
     TargetAxis(
-        "consumed_by_repository_url",
-        "Whether consumers resolve this target by repository URL and git tag "
-        "rather than from a registry, so a monorepo member of this kind "
-        "requires a standalone mirror to be consumable at all.",
-        _prop("consumed_by_repository_url"),
-    ),
-    TargetAxis(
         "mirror_identity_files",
         "Manifests naming the repository the package lives in, which the "
         "mirror's scaffold commit rewrites to the mirror's own identity.",
@@ -513,8 +506,7 @@ def assert_every_target_answers_every_axis(registry=None, axes=TARGET_AXES) -> N
 
 # Support columns and the property each one asks. The table used to read a
 # hand-declared ``capabilities`` frozenset, which had drifted from the code:
-# several targets implemented read_metadata without declaring it, and the
-# swift-apple row's dev-install cell was blank for the opposite reason.
+# several targets implemented read_metadata without declaring it.
 SUPPORT_COLUMNS: tuple[tuple[str, str], ...] = (
     ("read_name", "supports_read_name"),
     ("read_metadata", "supports_read_metadata"),
@@ -527,14 +519,6 @@ HEADERS = [
     *(column for column, _prop_name in SUPPORT_COLUMNS),
     "dev_install",
 ]
-
-# Targets whose detection is decided by file content rather than by a
-# filename, with the phrasing the table shows for them.
-_DETECTION_OVERRIDES = {
-    "plain": "VERSION (conditional)",
-    "flutter": "pubspec.yaml (flutter)",
-}
-
 
 def _format_dev_install(specs) -> str:
     """Format the dev_install_command answer into a compact string."""
@@ -564,10 +548,8 @@ def generate_target_table_data(answers=None) -> tuple[list[str], list[list[str]]
     for target_name in sorted(answers):
         row_answers = answers[target_name]
 
-        detection = _DETECTION_OVERRIDES.get(target_name)
-        if detection is None:
-            files = row_answers["detection_files"]
-            detection = ", ".join(files) if files else "---"
+        files = row_answers["detection_files"]
+        detection = ", ".join(files) if files else "---"
 
         version_file = row_answers["version_file"] or "---"
         tag_format = row_answers["tag_format"] or "---"

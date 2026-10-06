@@ -158,41 +158,6 @@ def validate_no_authored_release_commit(release_config):
     )
 
 
-def validate_ota_mode(release_config, project_root, config):
-    """Validate Flutter OTA mode: check for native changes since last build release.
-
-    Raises ReleaseValidationError if OTA is requested but native files changed.
-    """
-    flutter_targets = [
-        t for t in release_config.include if t.startswith("flutter-")
-    ]
-    if not flutter_targets:
-        return
-
-    flutter_cfg = release_config.targets
-    ota_targets = [
-        t for t in flutter_targets
-        if flutter_cfg.get(t, {}).get("mode") == "ota"
-    ]
-    if not ota_targets:
-        return
-
-    from ...targets.native_changes import detect_native_changes
-
-    _ota_root = str(project_root)
-    last_build = config.get("last_build_release")
-    if last_build:
-        since_ref = f"v{last_build}"
-        native_files = detect_native_changes(_ota_root, since_ref)
-        if native_files:
-            detail = "\n".join(f"  {nf}" for nf in native_files)
-            raise ReleaseValidationError(
-                f"OTA release requested but native files changed "
-                f"since last build release ({last_build}):\n{detail}\n"
-                'Use mode = "build" for a full release instead.'
-            )
-
-
 def validate_config_integrity(config, project_dir=None):
     """Validate ``publish_mode`` and that suppressed repos have no local pipelines.
 

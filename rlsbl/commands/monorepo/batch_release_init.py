@@ -144,16 +144,6 @@ def _build_pkg_section(workspace_root, target_names):
     pkg_table.add("include", target_names)
     pkg_table.add("exclude", [])
 
-    # Add per-target config sections for Flutter target
-    flutter_targets = [n for n in target_names if n == "flutter"]
-    if flutter_targets:
-        targets_table = tomlkit.table(is_super_table=True)
-        for ft in flutter_targets:
-            t = tomlkit.table()
-            t.add("mode", "build")
-            targets_table.add(ft, t)
-        pkg_table.add("targets", targets_table)
-
     return pkg_table
 
 

@@ -63,20 +63,18 @@ def _runner_exclusion_fix(proj, target, config_rel, missing):
     workspace root, so the root member's entries are written by hand.
     """
     from ..ownership import is_root_path
-    from ..scratch_dirs import DENO_CONFIG_EXCLUDE, PYTEST_NORECURSEDIRS
+    from ..scratch_dirs import PYTEST_NORECURSEDIRS
 
     if not is_root_path(proj["path"]):
         return (
             f"Run `rlsbl scaffold` in {proj['path']} to write them (a file "
-            f"rlsbl cannot write into, such as a pytest.ini or a deno.jsonc, "
-            f"takes them by hand)."
+            f"rlsbl cannot write into, such as a pytest.ini, takes them by "
+            f"hand)."
         )
     if target.scratch_test_exclusion == PYTEST_NORECURSEDIRS:
         where = "addopts under [tool.pytest.ini_options]"
         if not config_rel.endswith("pyproject.toml"):
             where = "addopts under [pytest]"
-    elif target.scratch_test_exclusion == DENO_CONFIG_EXCLUDE:
-        where = "the top-level exclude list"
     else:
         where = "the runner's exclusions"
     return (

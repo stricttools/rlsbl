@@ -4,21 +4,12 @@ from .protocol import Pipeline
 from .npm import NpmPipeline
 from .pypi import PypiPipeline
 from .go import GoPipeline
-from .deno import DenoPipeline
-from .hex import HexPipeline
-from .maven import MavenPipeline, MavenCentralPipeline
-from .docker import DockerPipeline
 from .cloudflare_pages import CloudflarePagesPipeline
 
 PIPELINE_TYPES: dict[str, type] = {
     "npm": NpmPipeline,
     "pypi": PypiPipeline,
     "go": GoPipeline,
-    "deno": DenoPipeline,
-    "hex": HexPipeline,
-    "maven": MavenPipeline,
-    "maven-central": MavenCentralPipeline,
-    "docker": DockerPipeline,
     "cloudflare-pages": CloudflarePagesPipeline,
 }
 

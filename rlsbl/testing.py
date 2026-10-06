@@ -455,46 +455,6 @@ def _run_go_tests(
     return result.returncode == 0
 
 
-def _run_maven_tests(*, project_dir: str | None, check_timeout: int = 120) -> bool:
-    """Run Maven/Gradle tests.
-
-    Prefers ./gradlew test if gradlew exists, otherwise falls back to mvn test
-    if pom.xml exists.
-    """
-    effective_dir = project_dir or "."
-    gradlew = os.path.join(effective_dir, "gradlew")
-    if os.path.exists(gradlew):
-        cmd = ["./gradlew", "test"]
-        try:
-            result = effects.run(cmd, cwd=project_dir, timeout=check_timeout)
-        except subprocess.TimeoutExpired:
-            print(f"Error: command timed out after {check_timeout}s: {cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
-            return False
-        except FileNotFoundError:
-            print("Error: gradle (./gradlew) is not runnable; cannot run gradle tests.", file=sys.stderr)
-            return False
-        return result.returncode == 0
-
-    pom_path = os.path.join(effective_dir, "pom.xml")
-    if os.path.exists(pom_path):
-        cmd = ["mvn", "test"]
-        try:
-            result = effects.run(cmd, cwd=project_dir, timeout=check_timeout)
-        except subprocess.TimeoutExpired:
-            print(f"Error: command timed out after {check_timeout}s: {cmd} {CHECK_TIMEOUT_HINT}", file=sys.stderr)
-            return False
-        except FileNotFoundError:
-            print("Error: mvn (Maven) is not installed; cannot run maven tests.", file=sys.stderr)
-            return False
-        return result.returncode == 0
-
-    print(
-        "Error: no gradlew or pom.xml found; cannot run maven/gradle tests.",
-        file=sys.stderr,
-    )
-    return False
-
-
 def _run_npm_tests(*, project_dir: str | None, check_timeout: int = 120) -> bool:
     """Run npm tests if a test script is defined in package.json."""
     pkg_path = os.path.join(project_dir, "package.json") if project_dir else "package.json"

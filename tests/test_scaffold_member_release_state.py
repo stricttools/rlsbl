@@ -36,7 +36,9 @@ def _member(mock_git_repo, monkeypatch):
 
 
 def _scaffold(proj_dir):
-    run_cmd("plain", [], dict(FLAGS), ctx=create_context(proj_dir))
+    if not (proj_dir / "version.json").exists():
+        (proj_dir / "version.json").write_text('{"version": "0.1.0"}\n')
+    run_cmd("spec", [], dict(FLAGS), ctx=create_context(proj_dir))
 
 
 def test_a_member_scaffold_leaves_no_release_state_in_the_member(

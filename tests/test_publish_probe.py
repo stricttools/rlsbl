@@ -262,41 +262,10 @@ class TestCITemplateProbes(unittest.TestCase):
         content = self._read_template("pypi", "publish.yml.tpl")
         self.assertIn("skip-existing: true", content)
 
-    def test_hex_publish_has_probe(self):
-        content = self._read_template("hex", "publish.yml.tpl")
-        self.assertIn("Check if already published", content)
-        self.assertIn("check-hex", content)
-
-    def test_deno_publish_has_probe(self):
-        content = self._read_template("deno", "publish.yml.tpl")
-        self.assertIn("Check if already published", content)
-        self.assertIn("check-deno", content)
-
     def test_go_publish_has_probe(self):
         content = self._read_template("go", "publish.yml.tpl")
         self.assertIn("Check if already published", content)
         self.assertIn("check-go", content)
-
-    def test_docker_publish_has_probe(self):
-        content = self._read_template("docker", "publish.yml.tpl")
-        self.assertIn("Check if already published", content)
-        self.assertIn("check-docker", content)
-
-    def test_maven_central_publish_has_probe(self):
-        content = self._read_template("maven", "publish-central.yml.tpl")
-        self.assertIn("Check if already published", content)
-        self.assertIn("check-maven-central", content)
-
-    def test_zig_publish_has_probe(self):
-        content = self._read_template("zig", "publish.yml.tpl")
-        self.assertIn("Check if already published", content)
-        self.assertIn("check-zig", content)
-
-    def test_maven_gp_inherently_idempotent(self):
-        """Maven (GitHub Packages) template is inherently idempotent (overwrites)."""
-        content = self._read_template("maven", "publish.yml.tpl")
-        self.assertIn("inherently idempotent", content)
-
 
 class TestNpmWrapperPerPackageProbes(unittest.TestCase):
     """Tests for npm wrapper per-package probes in publish jobs."""
@@ -424,7 +393,7 @@ class TestRecoveryDispatch(unittest.TestCase):
             "rlsbl", "templates",
         )
         templates = sorted(glob.glob(os.path.join(tpl_dir, "*/publish*.yml.tpl")))
-        self.assertEqual(len(templates), 14)
+        self.assertEqual(len(templates), 8)
 
         for tpl_path in templates:
             with open(tpl_path) as f:
@@ -434,7 +403,7 @@ class TestRecoveryDispatch(unittest.TestCase):
             self.assertIn("tag:", content, f"{name} missing tag input")
 
     def test_all_publish_templates_have_tag_concurrency(self):
-        """All 13 publish templates use tag-based concurrency."""
+        """Every publish template uses tag-based concurrency."""
         import os, glob
 
         tpl_dir = os.path.join(
@@ -451,7 +420,7 @@ class TestRecoveryDispatch(unittest.TestCase):
                           f"{name} missing tag-based concurrency")
 
     def test_all_publish_templates_checkout_with_tag_ref(self):
-        """All 13 publish templates checkout with inputs.tag fallback."""
+        """Every publish template checks out with inputs.tag fallback."""
         import os, glob
 
         tpl_dir = os.path.join(
@@ -502,20 +471,6 @@ class TestRecoveryDispatch(unittest.TestCase):
             content = f.read()
         self.assertIn("RELEASE_TAG: ${{ inputs.tag || github.ref_name }}", content)
         self.assertIn('TAG="${RELEASE_TAG}"', content)
-        self.assertNotIn("GITHUB_REF_NAME", content)
-
-    def test_maven_central_template_derives_version_via_release_tag_env(self):
-        """maven/publish-central.yml.tpl derives VERSION from the RELEASE_TAG step env."""
-        import os
-
-        tpl_path = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)),
-            "rlsbl", "templates", "maven", "publish-central.yml.tpl",
-        )
-        with open(tpl_path) as f:
-            content = f.read()
-        self.assertIn("RELEASE_TAG: ${{ inputs.tag || github.ref_name }}", content)
-        self.assertIn('VERSION="${RELEASE_TAG#v}"', content)
         self.assertNotIn("GITHUB_REF_NAME", content)
 
     def test_retry_config_has_tag_field(self):

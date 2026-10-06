@@ -331,7 +331,7 @@ def run_external_preflight_checks(ctx, config, *, tag_expr="preflight",
     """Run ONLY the config-declared external checks matching *tag_expr*.
 
     Used when the pre-release hook is customized: built-in preflight checks
-    (test-suite, lint, maven-central-metadata) are the hook's responsibility
+    (test-suite, lint) are the hook's responsibility
     and must be skipped, but config-declared external checks must still run.
 
     Selection mechanism: each external check is selected by its exact name

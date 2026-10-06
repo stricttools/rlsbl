@@ -90,7 +90,7 @@ def _setup_released_repo(env):
     tree = _git(repo, "rev-parse", f"{released}^{{tree}}")
     write_archived_release_file(
         str(repo / ".rlsbl" / "releases"), "1.0.0",
-        bump="minor", include=["plain"], description="The first release.",
+        bump="minor", include=["spec"], description="The first release.",
         candidate_sha=released, tree_hashes={".": tree},
     )
     generate_changelog(str(repo))

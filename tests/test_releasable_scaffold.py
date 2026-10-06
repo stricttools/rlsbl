@@ -314,8 +314,9 @@ class TestReleasableMemberChangelogSkip:
 
         monkeypatch.chdir(proj_dir)
         ctx = create_context(proj_dir)
+        (proj_dir / "version.json").write_text('{"version": "0.1.0"}\n')
 
-        run_cmd("plain", [], {
+        run_cmd("spec", [], {
             "auto-commit": False,
             "auto-tag": False,
             "skip-shared": False,

@@ -53,7 +53,6 @@ class TestSkipLockInRunCmdInner:
     @patch("rlsbl.commands.release.validate_pipeline_config")
     @patch("rlsbl.commands.release.validate_gh_cli")
     @patch("rlsbl.commands.release.validate_config_integrity")
-    @patch("rlsbl.commands.release.validate_ota_mode")
     @patch("rlsbl.commands.release.validate_release_targets", return_value="pypi")
     @patch("rlsbl.commands.release._abort_on_scaffold_conflicts")
     @patch("rlsbl.commands.release.resolve_target_paths", return_value={})
@@ -72,7 +71,7 @@ class TestSkipLockInRunCmdInner:
         self, _selfdoc_post, _selfdoc_check, _selfdoc_gen, _schema_dump,
         _hook_empty, _hook_timeout, _hook_env,
         _porcelain, _run, _extract, _compute, _resolve_targets,
-        _scaffold, _validate_targets_top, _validate_ota, _validate_config,
+        _scaffold, _validate_targets_top, _validate_config,
         _validate_gh, _validate_pipeline, _validate_validate_branch,
         _resolve_mono, _validate_blog, _validate_changelog, _gen_changelog,
         _dry_run_summary, _resolve_release_targets, _mutating,
@@ -105,7 +104,6 @@ class TestSkipLockInRunCmdInner:
     @patch("rlsbl.commands.release.validate_pipeline_config")
     @patch("rlsbl.commands.release.validate_gh_cli")
     @patch("rlsbl.commands.release.validate_config_integrity")
-    @patch("rlsbl.commands.release.validate_ota_mode")
     @patch("rlsbl.commands.release.validate_release_targets", return_value="pypi")
     @patch("rlsbl.commands.release._abort_on_scaffold_conflicts")
     @patch("rlsbl.commands.release.resolve_target_paths", return_value={})
@@ -125,7 +123,7 @@ class TestSkipLockInRunCmdInner:
         self, _selfdoc_post, _selfdoc_check, _selfdoc_gen, _schema_dump,
         _run_checks, _hook_empty, _hook_timeout, _hook_env,
         _porcelain, _run, _extract, _compute, _resolve_targets,
-        _scaffold, _validate_targets_top, _validate_ota, _validate_config,
+        _scaffold, _validate_targets_top, _validate_config,
         _validate_gh, _validate_pipeline, _validate_validate_branch,
         _resolve_mono, _validate_blog, _validate_changelog, _gen_changelog,
         _dry_run_summary, _resolve_release_targets, _mutating,

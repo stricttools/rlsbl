@@ -90,22 +90,20 @@ class TestSchemaToCodeEdge:
         # One document carrying every declared field; each must arrive bound.
         p = _write(
             tmp_path,
-            'format_version = 1\nbump = "prerelease"\ninclude = ["flutter"]\n'
+            'format_version = 1\nbump = "prerelease"\ninclude = ["pypi"]\n'
             'exclude = ["npm"]\ndescription = "d"\ncontext = "c"\n'
             'preid = "alpha"\nblog = true\n'
             f'candidate_sha = "{_SHA}"\n'
-            '[targets.flutter]\nmode = "ota"\n'
             f'[tree_hashes]\n"." = "{_TREE}"\n',
         )
         cfg = read_release_file(p)
         assert cfg.bump == "prerelease"
-        assert cfg.include == ["flutter"]
+        assert cfg.include == ["pypi"]
         assert cfg.exclude == ["npm"]
         assert cfg.description == "d"
         assert cfg.context == "c"
         assert cfg.preid == "alpha"
         assert cfg.blog is True
-        assert cfg.targets == {"flutter": {"mode": "ota"}}
         assert cfg.candidate_sha == _SHA
         assert cfg.tree_hashes == {".": _TREE}
 

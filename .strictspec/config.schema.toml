@@ -95,7 +95,7 @@ type = "record"
 [types.Pipeline.fields.type]
 type = "enum"
 required = true
-values = ["cloudflare-pages", "deno", "docker", "go", "hex", "maven", "maven-central", "npm", "pypi"]
+values = ["cloudflare-pages", "go", "npm", "pypi"]
 description = "Pipeline kind (PIPELINE_TYPES). Required."
 
 [types.Pipeline.fields.local]

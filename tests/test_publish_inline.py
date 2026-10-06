@@ -1449,45 +1449,6 @@ class TestInputsTagFallback:
                 f"(context: {result[max(0, m.start() - 40):m.start() + 14]!r})"
             )
 
-    def test_docker_template_render_carries_fallback(self):
-        from rlsbl.commands.init_cmd import process_template
-        from rlsbl.targets.docker import DockerTarget
-
-        tpl = os.path.join(DockerTarget().template_dir(), "publish.yml.tpl")
-        with open(tpl, encoding="utf-8") as f:
-            content = f.read()
-        rendered, _ = process_template(
-            content,
-            {"publishGate": "  gate:\n    runs-on: ubuntu-latest\n    steps: []"},
-        )
-        assert (
-            "build-args: VERSION=${{ inputs.tag || github.ref_name }}" in rendered
-        )
-        assert (
-            "enable=${{ !contains(inputs.tag || github.ref_name, '-') }}"
-            in rendered
-        )
-
-    def test_zig_template_render_carries_fallback(self):
-        from rlsbl.commands.init_cmd import process_template
-        from rlsbl.targets.zig import ZigTarget
-
-        tpl = os.path.join(ZigTarget().template_dir(), "publish.yml.tpl")
-        with open(tpl, encoding="utf-8") as f:
-            content = f.read()
-        rendered, _ = process_template(
-            content,
-            {
-                "publishGate": "  gate:\n    runs-on: ubuntu-latest\n    steps: []",
-                "npmPublishJobs": "",
-                "zig": {"projectName": "mytool", "minRequiredZig": "0.13.0"},
-            },
-        )
-        assert (
-            'gh release upload "${{ inputs.tag || github.ref_name }}"' in rendered
-        )
-
-
 # ---------------------------------------------------------------------------
 # Router cache versioning (rlsbl version invalidates the publish cache)
 # ---------------------------------------------------------------------------

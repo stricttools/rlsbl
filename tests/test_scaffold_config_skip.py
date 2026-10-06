@@ -179,17 +179,18 @@ class TestConfigJsonSkip:
             {"path": "app", "name": "app", "releasable": "www"},
         ])
 
-        # Scaffold writes: targets=["plain"], private (auto-detected, likely False)
+        # Scaffold writes: targets=["spec"], private (auto-detected, likely False)
         # Pre-create the releasable config with these same values
         _setup_releasable(mock_git_repo, "www", config={
-            "targets": ["plain"],
+            "targets": ["spec"],
             "publish_mode": "ci",
         })
 
         monkeypatch.chdir(proj_dir)
         ctx = create_context(proj_dir)
+        (proj_dir / "version.json").write_text('{"version": "0.1.0"}\n')
 
-        run_cmd("plain", [], {
+        run_cmd("spec", [], {
             "auto-commit": False,
             "auto-tag": False,
             "skip-shared": False,
@@ -266,8 +267,9 @@ class TestNonReleasableConfigPreserved:
         """Scaffold for a non-monorepo project writes config.json normally."""
         monkeypatch.chdir(mock_git_repo)
         ctx = create_context(mock_git_repo)
+        (mock_git_repo / "version.json").write_text('{"version": "0.1.0"}\n')
 
-        run_cmd("plain", [], {
+        run_cmd("spec", [], {
             "auto-commit": False,
             "auto-tag": False,
             "skip-shared": False,
@@ -279,7 +281,7 @@ class TestNonReleasableConfigPreserved:
         )
         config = json.loads(config_path.read_text())
         assert "targets" in config
-        assert "plain" in config["targets"]
+        assert "spec" in config["targets"]
 
 
 # ---------------------------------------------------------------------------
@@ -378,7 +380,7 @@ class TestSafermInvocation:
             return original_run(cmd, *args, **kwargs)
 
         with patch("rlsbl.effects.run", side_effect=tracking_run):
-            config = {"targets": ["plain"], "publish_mode": "ci"}
+            config = {"targets": ["spec"], "publish_mode": "ci"}
             created = []
             _finalize_scaffold(
                 all_hash_dicts=[{}],
@@ -459,7 +461,7 @@ class TestOrphanBaseSweep:
             return original_run(cmd, *args, **kwargs)
 
         with patch("rlsbl.effects.run", side_effect=tracking_run):
-            config = {"targets": ["plain"], "publish_mode": "ci"}
+            config = {"targets": ["spec"], "publish_mode": "ci"}
             _finalize_scaffold(
                 all_hash_dicts=[{}],
                 created=[],
@@ -510,7 +512,7 @@ class TestOrphanBaseSweep:
             return original_run(cmd, *args, **kwargs)
 
         with patch("rlsbl.effects.run", side_effect=tracking_run):
-            config = {"targets": ["plain"], "publish_mode": "ci"}
+            config = {"targets": ["spec"], "publish_mode": "ci"}
             _finalize_scaffold(
                 all_hash_dicts=[{}],
                 created=[],
@@ -575,7 +577,7 @@ class TestOrphanBaseSweep:
         current_hashes = {managed_rel: managed_hash}
 
         with patch("rlsbl.effects.run", side_effect=tracking_run):
-            config = {"targets": ["plain"], "publish_mode": "ci"}
+            config = {"targets": ["spec"], "publish_mode": "ci"}
             _finalize_scaffold(
                 all_hash_dicts=[current_hashes],
                 created=[],
@@ -627,7 +629,7 @@ class TestEmptyDirectoryCleanup:
             return original_run(cmd, *args, **kwargs)
 
         with patch("rlsbl.effects.run", side_effect=tracking_run):
-            config = {"targets": ["plain"], "publish_mode": "ci"}
+            config = {"targets": ["spec"], "publish_mode": "ci"}
             _finalize_scaffold(
                 all_hash_dicts=[{}],
                 created=[],

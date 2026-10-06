@@ -11,7 +11,6 @@ scratch directories use (:mod:`rlsbl.scratch_dirs`):
   resolves the path against the directory it starts in, which is the member's
   own directory in rlsbl's runs and in the CI templates; ``norecursedirs``
   would match by basename and could skip an unrelated directory.
-- Deno: the path in the configuration file's top-level ``exclude``.
 - Go needs nothing: the go command never descends into a directory holding
   its own ``go.mod``.
 - npm is the same stated gap as for the scratch directories: the runner is
@@ -21,13 +20,11 @@ scratch directories use (:mod:`rlsbl.scratch_dirs`):
 check reads, so the check and the writer cannot disagree about what is owed.
 """
 
-import json
 import os
-import re
 import shlex
 
 from . import effects
-from .scratch_dirs import DENO_CONFIG_EXCLUDE, PYTEST_NORECURSEDIRS
+from .scratch_dirs import PYTEST_NORECURSEDIRS
 
 #: The check that refuses a missing exclusion, named in every finding.
 CHECK_NAME = "nested-member-runner-exclusion"
@@ -67,20 +64,13 @@ def _read_pyproject_addopts(pyproject):
     )
 
 
-def _read_deno_exclude(json_path):
-    with open(json_path, encoding="utf-8") as f:
-        data = json.load(f)
-    exclude = data.get("exclude")
-    return exclude if isinstance(exclude, list) else None
-
-
 def missing_exclusions(mechanism, target_dir_abs, nested_rel):
     """``(config file, [missing entries])`` for one target, or None when nothing is owed.
 
     *nested_rel* are the nested members' paths relative to the target
     directory. A configuration file the mechanism cannot be written into
-    (a ``pytest.ini`` outranking ``pyproject.toml``, no ``pyproject.toml``, a
-    ``deno.jsonc``) owes every entry, named in that file.
+    (a ``pytest.ini`` outranking ``pyproject.toml``, no ``pyproject.toml``)
+    owes every entry, named in that file.
     """
     if not nested_rel:
         return None
@@ -93,13 +83,6 @@ def missing_exclusions(mechanism, target_dir_abs, nested_rel):
         tokens = _read_pyproject_addopts(pyproject)
         missing = [w for w in wanted if w not in tokens]
         return (pyproject, missing) if missing else None
-    if mechanism == DENO_CONFIG_EXCLUDE:
-        json_path = os.path.join(target_dir_abs, "deno.json")
-        if not os.path.isfile(json_path):
-            return os.path.join(target_dir_abs, "deno.jsonc"), list(nested_rel)
-        exclude = _read_deno_exclude(json_path) or []
-        missing = [rel for rel in nested_rel if rel not in exclude]
-        return (json_path, missing) if missing else None
     return None
 
 
@@ -190,43 +173,6 @@ def _apply_pytest(target_dir, nested_rel, created, skipped, warnings, dry_run):
     created.append((pyproject_rel, "updated (pytest nested-member ignores)"))
 
 
-def _apply_deno(target_dir, nested_rel, created, skipped, warnings, dry_run):
-    json_rel = _rel(target_dir, "deno.json")
-    if not os.path.isfile(json_rel):
-        warnings.append(
-            f"rlsbl could not write deno's exclusions for the nested members "
-            f"into {json_rel}; add {', '.join(nested_rel)} to its top-level "
-            f'"exclude" array yourself, or the `{CHECK_NAME}` check keeps failing.'
-        )
-        return
-    with open(json_rel, encoding="utf-8") as handle:
-        original = handle.read()
-    data = json.loads(original)
-    exclude = data.get("exclude")
-    if exclude is None:
-        exclude = []
-        data["exclude"] = exclude
-    elif not isinstance(exclude, list):
-        warnings.append(
-            f'the "exclude" key in {json_rel} is not an array, so rlsbl left it '
-            f"alone. Make it an array containing {', '.join(nested_rel)}."
-        )
-        return
-    missing = [rel for rel in nested_rel if rel not in exclude]
-    if not missing:
-        skipped.append((json_rel, "unchanged (deno nested-member exclude)"))
-        return
-    exclude.extend(missing)
-    indent_match = re.search(r'^( +|\t+)"', original, re.MULTILINE)
-    indent = indent_match.group(1) if indent_match else "  "
-    trailing = "\n" if original.endswith("\n") else ""
-    updated = json.dumps(data, indent=indent, ensure_ascii=False) + trailing
-    if not dry_run:
-        effects.atomic_write_text(json_rel, updated)
-    created.append((json_rel, "updated (deno nested-member exclude)"))
-
-
 _HANDLERS = {
     PYTEST_NORECURSEDIRS: _apply_pytest,
-    DENO_CONFIG_EXCLUDE: _apply_deno,
 }

@@ -762,7 +762,7 @@ def validate_pipeline_target_links(config):
     ``validate_pipelines_config`` and mirrors its style.
 
     This validator does NOT require every target to be referenced by a
-    pipeline -- pipeline-less targets (e.g. ``plain``/``spec``) are legal.
+    pipeline -- pipeline-less targets (e.g. ``spec``) are legal.
 
     Raises ``ConfigError`` on any violation.
     """
@@ -1207,19 +1207,6 @@ def clean_stale_exclusions(config_path):
     batch_limits["exclusions"] = cleaned
     effects.atomic_write_text(config_path, json.dumps(config, indent=2, ensure_ascii=False) + "\n")
     return removed
-
-
-def update_last_build_release(project_dir, version):
-    """Store last_build_release version in .rlsbl/config.json for OTA validation."""
-    config_path = os.path.join(project_dir, ".rlsbl", "config.json")
-    try:
-        config = read_json_config(config_path)
-    except Exception as e:
-        raise RuntimeError(
-            f"{config_path} is corrupted or unreadable — fix it before releasing: {e}"
-        ) from e
-    config["last_build_release"] = version
-    effects.atomic_write_text(config_path, json.dumps(config, indent=2) + "\n")
 
 
 def write_project_config(key, value, project_root):

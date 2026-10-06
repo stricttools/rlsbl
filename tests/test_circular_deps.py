@@ -6,7 +6,6 @@ from pathlib import Path
 
 from rlsbl.dep_validation import (
     find_circular_deps,
-    find_circular_dart_deps,
     find_circular_npm_deps,
     find_circular_python_deps,
 )
@@ -293,58 +292,6 @@ class TestFindCircularNpmDeps:
 
 
 # ---------------------------------------------------------------------------
-# Dart circular dependency detection
-# ---------------------------------------------------------------------------
-
-
-class TestFindCircularDartDeps:
-    """find_circular_dart_deps detects cycles in Dart projects."""
-
-    def test_no_pubspec_returns_empty(self, tmp_path):
-        """No pubspec.yaml means no Dart analysis."""
-        (tmp_path / "main.dart").write_text("void main() {}\n")
-        cycles = find_circular_dart_deps(str(tmp_path))
-        assert cycles == []
-
-    def test_no_cycles_clean_project(self, tmp_path):
-        """A Dart project with no circular imports returns empty."""
-        (tmp_path / "pubspec.yaml").write_text("name: example\n")
-        lib = tmp_path / "lib"
-        lib.mkdir()
-        (lib / "a.dart").write_text("import 'b.dart';\n")
-        (lib / "b.dart").write_text("void hello() {}\n")
-
-        cycles = find_circular_dart_deps(str(tmp_path))
-        assert cycles == []
-
-    def test_two_file_cycle_detected(self, tmp_path):
-        """A -> B -> A cycle in Dart is detected."""
-        (tmp_path / "pubspec.yaml").write_text("name: example\n")
-        lib = tmp_path / "lib"
-        lib.mkdir()
-        (lib / "a.dart").write_text("import 'b.dart';\nvoid a() {}\n")
-        (lib / "b.dart").write_text("import 'a.dart';\nvoid b() {}\n")
-
-        cycles = find_circular_dart_deps(str(tmp_path))
-        assert len(cycles) == 1
-        cycle_files = set(cycles[0])
-        assert "lib/a.dart" in cycle_files
-        assert "lib/b.dart" in cycle_files
-
-    def test_package_imports_ignored(self, tmp_path):
-        """Package imports (package:foo/...) don't contribute to cycles."""
-        (tmp_path / "pubspec.yaml").write_text("name: example\n")
-        lib = tmp_path / "lib"
-        lib.mkdir()
-        # Only package imports, no relative imports -- no cycle possible
-        (lib / "a.dart").write_text("import 'package:other/other.dart';\n")
-        (lib / "b.dart").write_text("import 'dart:core';\n")
-
-        cycles = find_circular_dart_deps(str(tmp_path))
-        assert cycles == []
-
-
-# ---------------------------------------------------------------------------
 # Check registration integration tests
 # ---------------------------------------------------------------------------
 
@@ -362,7 +309,7 @@ class TestCircularDepsCheck:
         assert "circular-deps" in captured
 
     def test_skip_unsupported_target(self, tmp_path):
-        """circular-deps skips for projects that are neither Python, npm, nor Dart."""
+        """circular-deps skips for projects that are neither Python nor npm."""
         from rlsbl.context import ProjectContext
 
         # Create a Go-only project

@@ -30,12 +30,12 @@ def _git(repo, *args):
     ).stdout.strip()
 
 
-def _plain_project(repo):
+def _spec_project(repo):
     (repo / ".rlsbl").mkdir(exist_ok=True)
     (repo / ".rlsbl" / "config.json").write_text(
-        json.dumps({"targets": ["plain"], "publish_mode": "ci"})
+        json.dumps({"targets": ["spec"], "publish_mode": "ci"})
     )
-    (repo / "VERSION").write_text("0.1.0\n")
+    (repo / "version.json").write_text('{"version": "0.1.0"}\n')
 
 
 def test_a_hooks_path_elsewhere_is_refused_and_unsetting_it_clears(mock_git_repo):
@@ -55,7 +55,7 @@ def test_a_hooks_path_elsewhere_is_refused_and_unsetting_it_clears(mock_git_repo
 
 
 def test_scaffold_refuses_before_writing_anything(mock_git_repo, monkeypatch):
-    _plain_project(mock_git_repo)
+    _spec_project(mock_git_repo)
     _git(mock_git_repo, "config", "core.hooksPath", ".githooks")
     monkeypatch.chdir(mock_git_repo)
     result = app.test(["scaffold", "--no-auto-tag"])

@@ -417,7 +417,6 @@ _FULL_FLOW_PATCHES = (
     patch("rlsbl.commands.release.validate_release_targets", return_value="npm"),
     patch("rlsbl.commands.release.validate_pipeline_config"),
     patch("rlsbl.commands.release.validate_config_integrity"),
-    patch("rlsbl.commands.release.validate_ota_mode"),
     patch("rlsbl.commands.release.validate_gh_cli"),
     patch("rlsbl.commands.release.validate_gh_push_access"),
     patch("rlsbl.commands.release.validate_branch_and_remote", return_value="main"),

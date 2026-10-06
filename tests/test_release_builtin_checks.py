@@ -506,7 +506,6 @@ class TestFullFlowOrder:
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     @patch("rlsbl.commands.release.validate_pipeline_config")
     @patch("rlsbl.commands.release.validate_config_integrity")
-    @patch("rlsbl.commands.release.validate_ota_mode")
     @patch("rlsbl.commands.release.validate_gh_cli")
     @patch("rlsbl.commands.release.validate_gh_push_access")
     @patch("rlsbl.commands.release.validate_branch_and_remote", return_value="main")
@@ -536,7 +535,7 @@ class TestFullFlowOrder:
         _extract, _compute, _resolve_targets, _scaffold,
         _validate_blog, _validate_changelog, _resolve_mono,
         _validate_branch, _validate_validate_push_access, _validate_gh,
-        _validate_ota, _validate_config, _validate_pipeline,
+        _validate_config, _validate_pipeline,
         _validate_targets,
         _validate,
         _gen_cl,
@@ -620,7 +619,6 @@ class TestFullFlowOrder:
     @patch("rlsbl.commands.release.validate_release_targets", return_value="npm")
     @patch("rlsbl.commands.release.validate_pipeline_config")
     @patch("rlsbl.commands.release.validate_config_integrity")
-    @patch("rlsbl.commands.release.validate_ota_mode")
     @patch("rlsbl.commands.release.validate_gh_cli")
     @patch("rlsbl.commands.release.validate_gh_push_access")
     @patch("rlsbl.commands.release.validate_branch_and_remote", return_value="main")
@@ -650,7 +648,7 @@ class TestFullFlowOrder:
         _extract, _compute, _resolve_targets, _scaffold,
         _validate_blog, _validate_changelog, _resolve_mono,
         _validate_branch, _validate_validate_push_access, _validate_gh,
-        _validate_ota, _validate_config, _validate_pipeline,
+        _validate_config, _validate_pipeline,
         _validate_targets,
         _validate,
         _gen_cl,

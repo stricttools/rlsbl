@@ -25,11 +25,11 @@ class TestUnsupportedIsAnExplicitSkip:
     """The silent success is gone; every non-runner answers SKIPPED by name."""
 
     def test_a_registered_target_without_a_runner(self):
-        outcome = TARGETS["zig"].run_tests(project_dir=".", config={})
+        outcome = TARGETS["spec"].run_tests(project_dir=".", config={})
         assert outcome.status is SuiteRunStatus.SKIPPED
         assert not outcome.passed
         assert outcome.skipped
-        assert "zig" in outcome.message
+        assert "spec" in outcome.message
 
     def test_a_name_that_is_not_a_target_at_all(self):
         outcome = run_project_tests("cargo", project_dir=".")
@@ -48,12 +48,12 @@ class TestUnsupportedIsAnExplicitSkip:
 
     def test_a_skip_runs_no_subprocess(self):
         with patch("rlsbl.effects.run") as mock_run:
-            run_project_tests("zig", project_dir=".")
+            run_project_tests("spec", project_dir=".")
         mock_run.assert_not_called()
 
     def test_a_skip_prints_no_running_tests_banner(self, capsys):
         """"Running tests..." must not appear for a suite that never runs."""
-        run_project_tests("zig", project_dir=".")
+        run_project_tests("spec", project_dir=".")
         assert "Running tests" not in capsys.readouterr().out
 
 
@@ -66,7 +66,6 @@ class TestSupportedTargetsAreUnchanged:
             ("pypi", "_run_pypi_tests"),
             ("go", "_run_go_tests"),
             ("npm", "_run_npm_tests"),
-            ("maven", "_run_maven_tests"),
         ],
     )
     def test_pass_and_fail_both_reach_the_original_runner(self, target_name, runner):
@@ -112,8 +111,8 @@ class TestDerivedRunnerSet:
             n for n, t in TARGETS.items() if t.has_builtin_test_runner
         )
 
-    def test_the_four_that_had_runners_still_do(self):
-        assert targets_with_builtin_tests() == {"pypi", "go", "npm", "maven"}
+    def test_the_three_that_have_runners_still_do(self):
+        assert targets_with_builtin_tests() == {"pypi", "go", "npm"}
 
 
 class TestStepSummaryShowsTheSkip:
@@ -130,18 +129,18 @@ class TestStepSummaryShowsTheSkip:
 
         repo = tmp_path / "repo"
         (repo / ".rlsbl").mkdir(parents=True)
-        (repo / ".rlsbl" / "config.json").write_text('{"targets": ["zig"]}')
+        (repo / ".rlsbl" / "config.json").write_text('{"targets": ["spec"]}')
         monkeypatch.chdir(repo)
 
         ctx = make_ctx(repo)
         with patch(
             "rlsbl.targets.detect_targets",
-            return_value=[TargetEntry("zig", str(repo))],
+            return_value=[TargetEntry("spec", str(repo))],
         ):
             result = self._run_check("test-suite", ctx)
 
         assert result.status == "skip"
-        assert "zig" in result.message
+        assert "spec" in result.message
         assert "built-in test runner" in result.message
 
     def test_test_suite_skip_names_the_targets_that_do_have_runners(
@@ -152,13 +151,13 @@ class TestStepSummaryShowsTheSkip:
 
         repo = tmp_path / "repo"
         (repo / ".rlsbl").mkdir(parents=True)
-        (repo / ".rlsbl" / "config.json").write_text('{"targets": ["docker"]}')
+        (repo / ".rlsbl" / "config.json").write_text('{"targets": ["spec"]}')
         monkeypatch.chdir(repo)
 
         ctx = make_ctx(repo)
         with patch(
             "rlsbl.targets.detect_targets",
-            return_value=[TargetEntry("docker", str(repo))],
+            return_value=[TargetEntry("spec", str(repo))],
         ):
             result = self._run_check("test-suite", ctx)
 

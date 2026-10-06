@@ -1831,7 +1831,6 @@ _LOCKFILE_SPECS = [
     ("package-lock.json", "npm", ["npm", "install", "--package-lock-only"], None),
     ("go.sum", "go", GO_TIDY, None),
     ("go.work.sum", "go", GO_WORK_SYNC, "go.work"),
-    ("gradle.lockfile", "gradle", ["./gradlew", "dependencies", "--write-locks"], None),
 ]
 
 _LOCKFILE_SYNC_TIMEOUT = 30
@@ -1927,13 +1926,6 @@ def lockfile_sync_failure(cmd, cwd, lockfile, *, exc, rerun):
     return head + f"Fix the error {cmd[0]} printed, then {rerun}."
 
 
-#: What puts a missing lockfile wrapper script in place, by the ``./`` command
-#: a lockfile spec runs.
-_WRAPPER_INSTALL = {
-    "./gradlew": "Add the Gradle wrapper (`gradle wrapper`)",
-}
-
-
 class LockfileToolMissingError(Exception):
     """A lockfile the release owes a re-lock has no tool to re-lock it.
 
@@ -1960,12 +1952,6 @@ class LockfileToolMissingError(Exception):
             f"bump (`{command}` in {where}), and the release commit would "
             f"carry it stale"
         )
-        if self.sync_cmd[0].startswith("./"):
-            return (
-                f"`{self.sync_cmd[0]}` is not in {where}, {consequence}. "
-                f"{_WRAPPER_INSTALL[self.sync_cmd[0]]} in {where} and commit "
-                f"it, then {rerun}."
-            )
         return (
             f"`{self.tool_name}` is not on PATH, {consequence}. Install "
             f"{self.tool_name} (or put it on PATH), then {rerun}."
@@ -1988,9 +1974,9 @@ def _target_lockfile_syncs(target_paths, log, specs=None):
     such a project is not a release target, and the only lockfile the bump can
     stale there is the one recording the bumped sibling.
 
-    A lockfile whose tool is missing from PATH (or whose wrapper script is
-    missing from the project) raises :class:`LockfileToolMissingError`: the
-    release cannot ship that lockfile fresh.
+    A lockfile whose tool is missing from PATH raises
+    :class:`LockfileToolMissingError`: the release cannot ship that lockfile
+    fresh.
 
     Returns a list of dicts the plan carries verbatim::
 
@@ -2009,11 +1995,7 @@ def _target_lockfile_syncs(target_paths, log, specs=None):
             lockfile_path = os.path.join(t_path, lockfile)
             if not os.path.exists(lockfile_path):
                 continue
-            if sync_cmd[0].startswith("./"):
-                tool_found = os.path.exists(os.path.join(t_path, sync_cmd[0][2:]))
-            else:
-                tool_found = shutil.which(tool_name) is not None
-            if not tool_found:
+            if shutil.which(tool_name) is None:
                 raise LockfileToolMissingError(
                     sync_cmd=sync_cmd, tool_name=tool_name, lockfile=lockfile,
                     cwd=t_path,

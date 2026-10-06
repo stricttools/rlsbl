@@ -2,11 +2,10 @@
 
 This taxonomy is deliberately NOT the release-target taxonomy. ``python`` is
 not ``pypi``: a language is a way of writing source files, a target is a way of
-publishing them, and one language can back several targets (Kotlin and Java
-both arrive here as ``maven``). Keeping the two apart is the point -- the
-mapping between them is a single property on the target
-(``ReleaseTarget.lint_language``), not a name comparison repeated per call
-site.
+publishing them, and one language could back several targets. Keeping the two
+apart is the point -- the mapping between them is a single property on the
+target (``ReleaseTarget.lint_language``), not a name comparison repeated per
+call site.
 
 Before this table, the same four language names were spelled out in several
 separate places: ``_detect_languages`` (manifest -> language),
@@ -115,12 +114,6 @@ def _npm_regex():
     return NpmRegexLinter()
 
 
-def _maven():
-    from .maven import MavenLinter
-
-    return MavenLinter()
-
-
 LANGUAGES: tuple[LintLanguage, ...] = (
     LintLanguage(
         name="python",
@@ -157,12 +150,6 @@ LANGUAGES: tuple[LintLanguage, ...] = (
             "express", "koa", "hono",
             "commander", "yargs",
         ),
-    ),
-    LintLanguage(
-        name="maven",
-        manifests=("build.gradle.kts", "build.gradle", "pom.xml"),
-        default_excludes=(),
-        linters={"default": _maven, "ast": _maven, "regex": _maven},
     ),
 )
 

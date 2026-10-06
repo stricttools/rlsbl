@@ -1,23 +1,18 @@
 """Per-axis conformance: detection.
 
-Detection had two duplications of the registry. Targets declared
-``detection_files`` and then re-implemented the same ``os.path.exists`` calls
-in a hand-written ``detect()``; and ``PlainTarget`` carried a hand-maintained
-list of "manifests belonging to some other target" that had to be edited every
-time a target was added or retired.
+Targets declared ``detection_files`` and then re-implemented the same
+``os.path.exists`` calls in a hand-written ``detect()``, a duplication of the
+registry.
 
-``BaseTarget.detect`` now consumes ``detection_files``, and plain's stand-off
-set is derived from the registry plus a declared extras set for manifests that
-belong to no current target. Targets that inspect file CONTENT keep their
-overrides -- that is the honest half of the axis, and this file pins it.
+``BaseTarget.detect`` now consumes ``detection_files``. Targets that inspect
+file CONTENT keep their overrides -- that is the honest half of the axis, and
+this file pins it.
 """
-
 
 import pytest
 
 from rlsbl.targets import TARGETS
 from rlsbl.targets.base import BaseTarget
-from rlsbl.targets.plain import _EXTRA_FOREIGN_MANIFESTS, _foreign_manifests
 
 # Targets that legitimately keep their own detect(), each with the reason.
 # Every other target must inherit the base implementation and let its declared
@@ -26,25 +21,8 @@ from rlsbl.targets.plain import _EXTRA_FOREIGN_MANIFESTS, _foreign_manifests
 # deliberate narrowing".
 DECLARED_DETECT_OVERRIDES = {
     "pypi": "pyproject.toml without a [project] table is a uv virtual root",
-    "dart": "pubspec.yaml WITHOUT a flutter: section",
-    "flutter": "pubspec.yaml WITH a flutter: section",
-    "maven": "build.gradle that is not an Android application",
-    "native-android": "build.gradle that IS an Android application",
-    "native-ios": ".pbxproj / Tuist discovery, and Package.swift rejects it",
     "spec": "version.json in the project root OR in a spec/ subdirectory",
-    "swift-apple": "never auto-detects; must be declared in config",
-    "plain": "VERSION plus the absence of every foreign manifest",
-    "pgdesign": (
-        "keeps an explicit override whose docstring records that detection "
-        "looks only at the directory it is handed and never descends into a "
-        "schema/ subdirectory"
-    ),
 }
-
-# The subset whose override actually changes the answer relative to the base
-# implementation. pgdesign's does not -- it is documentation -- so it is
-# excluded from the base-equivalence exemption below.
-DETECT_EQUIVALENT_TO_BASE = {"pgdesign"}
 
 
 @pytest.mark.parametrize("name", sorted(TARGETS))
@@ -71,8 +49,7 @@ def test_filename_only_targets_inherit_base_detect(name):
     sorted(
         n
         for n in TARGETS
-        if (n not in DECLARED_DETECT_OVERRIDES or n in DETECT_EQUIVALENT_TO_BASE)
-        and TARGETS[n].detection_files
+        if n not in DECLARED_DETECT_OVERRIDES and TARGETS[n].detection_files
     ),
 )
 def test_base_detect_finds_each_declared_manifest(tmp_path, name):
@@ -87,66 +64,7 @@ def test_base_detect_finds_each_declared_manifest(tmp_path, name):
 
 @pytest.mark.parametrize("name", sorted(TARGETS))
 def test_no_target_detects_an_empty_directory(tmp_path, name):
-    """An empty directory belongs to nobody -- including plain (no VERSION)."""
+    """An empty directory belongs to nobody."""
     d = tmp_path / name
     d.mkdir()
     assert not TARGETS[name].detect(str(d))
-
-
-class TestPlainStandOff:
-    """Plain's foreign-manifest set is derived, not hand-maintained."""
-
-    def test_derived_set_covers_every_other_target_manifest(self):
-        derived = _foreign_manifests()
-        for name, target in TARGETS.items():
-            if name == "plain":
-                continue
-            for filename in target.detection_files:
-                assert filename in derived, (
-                    f"plain would auto-detect over {name}'s {filename}"
-                )
-
-    def test_extras_are_only_manifests_no_target_claims(self):
-        """The declared extras must not restate something the registry knows."""
-        registry_manifests = {
-            f
-            for name, t in TARGETS.items()
-            if name != "plain"
-            for f in t.detection_files
-        }
-        overlap = _EXTRA_FOREIGN_MANIFESTS & registry_manifests
-        assert not overlap, (
-            f"{sorted(overlap)} is declared as an extra but a registered target "
-            f"already declares it; delete the extra"
-        )
-
-    def test_plain_detects_a_bare_version_file(self, tmp_path):
-        (tmp_path / "VERSION").write_text("1.0.0\n")
-        assert TARGETS["plain"].detect(str(tmp_path))
-
-    @pytest.mark.parametrize("manifest", sorted(_foreign_manifests()))
-    def test_plain_stands_off_every_foreign_manifest(self, tmp_path, manifest):
-        d = tmp_path / manifest.replace("/", "_")
-        d.mkdir()
-        (d / "VERSION").write_text("1.0.0\n")
-        (d / manifest).write_text("")
-        assert not TARGETS["plain"].detect(str(d))
-
-    def test_a_new_target_teaches_plain_without_editing_plain(self, monkeypatch):
-        """Registering a target extends the stand-off set automatically."""
-
-        class FakeTarget(BaseTarget):
-            detection_files = ("Wibble.toml",)
-
-            @property
-            def name(self):
-                return "wibble"
-
-        import rlsbl.targets as targets_pkg
-
-        _foreign_manifests.cache_clear()
-        monkeypatch.setitem(targets_pkg.TARGETS, "wibble", FakeTarget())
-        try:
-            assert "Wibble.toml" in _foreign_manifests()
-        finally:
-            _foreign_manifests.cache_clear()

@@ -114,8 +114,6 @@ class TestTheReclassificationIsDeclared:
         "workspace-unbuildable",  # uv sync materializes an environment
         "test-suite",
         "test-suite-workspace",
-        "library-lint",           # reaches gradle/detekt on JVM projects
-        "maven-central-metadata",  # generates a POM via gradlew
     ])
     def test_writing_tool_check_stays_impure(self, name):
         assert _check_defs()[name]["pure"] is False

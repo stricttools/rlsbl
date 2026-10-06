@@ -167,7 +167,7 @@ class TestNextStepsMatchTheArtifactKind:
 
     def test_unknown_registry_has_no_steps(self):
         from rlsbl.commands.init_cmd import _next_steps_for
-        assert _next_steps_for("zig", {}) is None
+        assert _next_steps_for("spec", {}) is None
 
     def test_missing_pipelines_falls_back_to_the_generic_text(self):
         from rlsbl.commands.init_cmd import NEXT_STEPS, _next_steps_for

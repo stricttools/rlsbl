@@ -139,7 +139,7 @@ def test_internal_tag_counts_match():
 
 def test_no_undocumented_tag_exists():
     """A new tag must be documented, not silently absent from the page."""
-    internal = {"preflight", "preflight-changelog", "maven"}
+    internal = {"preflight", "preflight-changelog"}
     live = {tag for meta in _checks().values() for tag in meta["tags"]}
     assert live == set(TAG_SECTIONS) | internal, (
         f"checks.toml tags {sorted(live)} do not match the tags documented in "
@@ -148,7 +148,7 @@ def test_no_undocumented_tag_exists():
     body = _section("Tags")
     intro = _docs_text().split("\n## Running checks")[0]
     assert f"{len(TAG_SECTIONS)} primary tags" in intro
-    assert "Three further tags" in intro and len(internal) == 3
+    assert "Two further tags" in intro and len(internal) == 2
     assert body
 
 

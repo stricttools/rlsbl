@@ -152,8 +152,7 @@ def build_npm_publish_jobs(
     extract command, binary name) so this function is target-agnostic.
 
     ``depends_on`` is the name of the job that must complete before
-    npm-publish runs (e.g. ``"goreleaser"`` for Go, ``"build-and-upload"``
-    for Zig).
+    npm-publish runs (e.g. ``"goreleaser"`` for Go).
 
     ``provenance`` threads ``--provenance`` into ``npm publish`` commands
     and adds ``id-token: write`` permission to the job (required for npm

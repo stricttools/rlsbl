@@ -15,7 +15,6 @@ import os
 
 from ..targets import (
     TARGETS,
-    targets_consumed_by_repository_url,
     targets_with_builtin_tests,
     targets_with_circular_dep_analysis,
     targets_with_dep_floors,
@@ -70,8 +69,7 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # (supports_dep_floors), not a list restated here.
     "dep-floors": targets_with_dep_floors(),
     # dep-locks names the lockfile FORMATS its readers understand, which is a
-    # fact about this check rather than about the ecosystems: gradle also has a
-    # lockfile, and there is no reader for it here.
+    # fact about this check rather than about the ecosystems.
     "dep-locks": frozenset({"pypi", "npm", "go"}),
     # go-module-identity compares a go.mod module path against the repository's
     # own origin identity, which only Go has.
@@ -80,13 +78,11 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     # with its Go members' paths; go-module-major-suffix reads go.mod.
     "path-tag-format-go-member": frozenset({"go"}),
     "go-module-major-suffix": frozenset({"go"}),
-    # nested-member-runner-exclusion writes into the runners rlsbl can
-    # configure: pytest (pypi) and deno.
-    "nested-member-runner-exclusion": frozenset({"pypi", "deno"}),
-    # nested-member-upload-contents lists what npm and Go publish offline; a
-    # Docker build context is left out, since a Dockerfile may build from its
-    # nested members on purpose. A Python upload is checked in CI (the pypi CI
-    # template).
+    # nested-member-runner-exclusion writes into the runner rlsbl can
+    # configure: pytest (pypi).
+    "nested-member-runner-exclusion": frozenset({"pypi"}),
+    # nested-member-upload-contents lists what npm and Go publish offline. A
+    # Python upload is checked in CI (the pypi CI template).
     "nested-member-upload-contents": frozenset({"npm", "go"}),
     # upload-private-paths lists every upload a target can list offline
     # (offline_upload_listing); a Python upload is checked in CI.
@@ -112,11 +108,10 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "branch-sync": None,
     # ci-publish-secrets probes for the credentials the configured CI publish
     # pipelines authenticate with. The targets listed are the ones whose
-    # pipelines declare any (ci_secret_names): npm (NPM_TOKEN), maven (the
-    # maven-central pipeline's Central Portal credentials and GPG signing key)
-    # and hex (HEX_API_KEY). A pypi pipeline publishes through OIDC trusted
-    # publishing and declares none, so the check can find nothing there.
-    "ci-publish-secrets": frozenset({"npm", "maven", "hex"}),
+    # pipelines declare any (ci_secret_names): npm (NPM_TOKEN). A pypi
+    # pipeline publishes through OIDC trusted publishing and declares none, so
+    # the check can find nothing there.
+    "ci-publish-secrets": frozenset({"npm"}),
     # npm-token-synced compares the npm token in ~/.npmrc with the NPM_TOKEN
     # secret an npm CI publish authenticates with.
     "npm-token-synced": frozenset({"npm"}),
@@ -153,11 +148,6 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "deps-stale": "workspace",
     "dead-workspace-packages": "workspace",
     "subtree-remote-reachable": "workspace",
-    # mirror-required's scope is the ecosystems with no registry at all: their
-    # consumers resolve a package by repository URL, so a monorepo member of
-    # that kind is unconsumable without a mirror. The set is the targets' own
-    # answer, never a name list restated here.
-    "mirror-required": targets_consumed_by_repository_url(),
     "workspace-unbuildable": "workspace",
     # --- workspace + language-specific import scanners ---
     # All five sets below are the targets' own answers, derived from the
@@ -207,8 +197,6 @@ CHECK_TARGETS: dict[str, frozenset[str] | None | str] = {
     "prepush-manual-warning": None,
     "test-suite": targets_with_builtin_tests(),
     "test-suite-workspace": "workspace",
-    # --- maven-specific checks ---
-    "maven-central-metadata": frozenset({"maven"}),
     # --- scaffold checks ---
     "scaffold-gitignore-stale": "workspace",
     # --- root config conflict ---
@@ -236,9 +224,7 @@ CHECK_EXCLUDED_TARGETS: dict[str, dict[str, str]] = {
 # assertion guarantees completeness: if a new target is added but not
 # listed here, startup fails loudly.
 MATRIX_COLUMNS: tuple[str, ...] = (
-    "pypi", "go", "npm", "dart", "deno", "hex", "zig",
-    "swift", "swift-apple", "maven", "native-android", "native-ios", "docker", "flutter",
-    "pgdesign", "plain", "spec",
+    "pypi", "go", "npm", "spec",
 )
 assert set(MATRIX_COLUMNS) == set(TARGETS.keys()), (
     f"MATRIX_COLUMNS is out of sync with TARGETS: "

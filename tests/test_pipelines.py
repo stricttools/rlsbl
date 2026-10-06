@@ -6,7 +6,7 @@ import pytest
 import rlsbl.pipelines as _pipelines_mod
 from rlsbl.errors import ConfigError
 from rlsbl.pipelines import Pipeline, PIPELINE_TYPES, load_pipelines
-from rlsbl.pipelines.base import BasePipeline, TokenPipeline, CredentialPipeline
+from rlsbl.pipelines.base import BasePipeline, TokenPipeline
 from rlsbl.config import validate_pipelines_config, validate_pipeline_target_links
 
 
@@ -23,11 +23,6 @@ class TestPipelineProtocol:
     def test_token_pipeline_satisfies_protocol(self):
         p = TokenPipeline(name="test", pipeline_type="token", local=True, config={})
         assert isinstance(p, Pipeline)
-
-    def test_credential_pipeline_satisfies_protocol(self):
-        p = CredentialPipeline(name="test", pipeline_type="cred", local=True, config={})
-        assert isinstance(p, Pipeline)
-
 
 # ---------------------------------------------------------------------------
 # BasePipeline
@@ -157,115 +152,6 @@ class TestTokenPipeline:
 
 
 # ---------------------------------------------------------------------------
-# CredentialPipeline
-# ---------------------------------------------------------------------------
-
-
-class _TestCredentialPipeline(CredentialPipeline):
-    """Concrete subclass for testing CredentialPipeline."""
-
-    _default_username_var = "TEST_USER"
-    _default_password_var = "TEST_PASS"
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.publish_calls = []
-
-    def _publish_command(self, dir_path, version, username, password):
-        self.publish_calls.append((dir_path, version, username, password))
-
-
-class TestCredentialPipeline:
-    def test_credential_vars_from_config(self):
-        p = _TestCredentialPipeline(
-            name="c", pipeline_type="cred", local=True,
-            config={"username_var": "MY_USER", "password_var": "MY_PASS"},
-        )
-        assert p.username_var == "MY_USER"
-        assert p.password_var == "MY_PASS"
-
-    def test_credential_vars_default(self):
-        p = _TestCredentialPipeline(
-            name="c", pipeline_type="cred", local=True, config={},
-        )
-        assert p.username_var == "TEST_USER"
-        assert p.password_var == "TEST_PASS"
-
-    def test_publish_with_credentials_calls_publish_command(self, monkeypatch):
-        monkeypatch.setenv("TEST_USER", "admin")
-        monkeypatch.setenv("TEST_PASS", "hunter2")
-        p = _TestCredentialPipeline(
-            name="c", pipeline_type="cred", local=True, config={},
-        )
-        p.publish("./proj", "3.0.0", None)
-        assert p.publish_calls == [("./proj", "3.0.0", "admin", "hunter2")]
-
-    def test_publish_missing_username_exits(self, monkeypatch):
-        monkeypatch.delenv("TEST_USER", raising=False)
-        monkeypatch.setenv("TEST_PASS", "hunter2")
-        p = _TestCredentialPipeline(
-            name="c", pipeline_type="cred", local=True, config={},
-        )
-        with pytest.raises(SystemExit) as exc_info:
-            p.publish(".", "1.0.0", None)
-        assert exc_info.value.code == 1
-
-    def test_publish_missing_password_exits(self, monkeypatch):
-        monkeypatch.setenv("TEST_USER", "admin")
-        monkeypatch.delenv("TEST_PASS", raising=False)
-        p = _TestCredentialPipeline(
-            name="c", pipeline_type="cred", local=True, config={},
-        )
-        with pytest.raises(SystemExit) as exc_info:
-            p.publish(".", "1.0.0", None)
-        assert exc_info.value.code == 1
-
-    def test_publish_missing_both_exits_with_both_names(self, monkeypatch, capsys):
-        monkeypatch.delenv("TEST_USER", raising=False)
-        monkeypatch.delenv("TEST_PASS", raising=False)
-        p = _TestCredentialPipeline(
-            name="c", pipeline_type="cred", local=True, config={},
-        )
-        with pytest.raises(SystemExit):
-            p.publish(".", "1.0.0", None)
-        err = capsys.readouterr().err
-        assert "TEST_USER" in err
-        assert "TEST_PASS" in err
-
-    def test_publish_local_false_skips(self, monkeypatch, capsys):
-        monkeypatch.setenv("TEST_USER", "admin")
-        monkeypatch.setenv("TEST_PASS", "hunter2")
-        p = _TestCredentialPipeline(
-            name="c", pipeline_type="cred", local=False, config={},
-        )
-        p.publish(".", "1.0.0", None)
-        assert p.publish_calls == []
-        assert "local=false" in capsys.readouterr().out
-
-    def test_required_env_vars_local_true(self):
-        p = _TestCredentialPipeline(
-            name="c", pipeline_type="cred", local=True, config={},
-        )
-        assert p.required_env_vars() == ["TEST_USER", "TEST_PASS"]
-
-    def test_required_env_vars_local_false(self):
-        p = _TestCredentialPipeline(
-            name="c", pipeline_type="cred", local=False, config={},
-        )
-        assert p.required_env_vars() == []
-
-    def test_publish_command_not_implemented_on_base(self, monkeypatch):
-        monkeypatch.setenv("CRED_USER", "u")
-        monkeypatch.setenv("CRED_PASS", "p")
-        p = CredentialPipeline(
-            name="c", pipeline_type="cred", local=True,
-            config={"username_var": "CRED_USER", "password_var": "CRED_PASS"},
-        )
-        with pytest.raises(NotImplementedError):
-            p.publish(".", "1.0.0", None)
-
-
-# ---------------------------------------------------------------------------
 # load_pipelines
 # ---------------------------------------------------------------------------
 
@@ -309,12 +195,12 @@ class TestLoadPipelines:
     def test_multiple_pipelines(self, monkeypatch):
         monkeypatch.setattr(
             _pipelines_mod, "PIPELINE_TYPES",
-            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline, "test_cred": _TestCredentialPipeline},
+            {**PIPELINE_TYPES, "test_token": _TestTokenPipeline, "test_token2": _TestTokenPipeline},
         )
         config = {
             "pipelines": {
                 "pub1": {"type": "test_token", "local": True},
-                "pub2": {"type": "test_cred", "local": False},
+                "pub2": {"type": "test_token2", "local": False},
             }
         }
         result = load_pipelines(config)
@@ -700,7 +586,7 @@ class TestValidatePipelineTargetLinks:
         )
 
     def test_unreferenced_target_is_legal(self):
-        # A target with no pipeline (e.g. plain/spec) must NOT be required.
+        # A target with no pipeline (e.g. spec) must NOT be required.
         validate_pipeline_target_links(
             {
                 "targets": ["pypi", "spec"],

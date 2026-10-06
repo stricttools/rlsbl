@@ -279,7 +279,7 @@ def _check_duplicate_commits(existing_entries, new_entry):
 def _build_entry(flags, resolved_commits):
     """Build and validate a ChangelogEntry from CLI flags and resolved commits.
 
-    Reads user_facing, description, type, and release_type from flags.
+    Reads user_facing, description, and type from flags.
     Validates that user-facing entries have description and type.
     Returns a validated ChangelogEntry.
     """
@@ -308,7 +308,6 @@ def _build_entry(flags, resolved_commits):
         user_facing=user_facing,
         description=description,
         type=entry_type,
-        release_type=flags.get("release-type") or None,
         id=generate_entry_id(),
     )
 

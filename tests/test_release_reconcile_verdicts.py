@@ -58,7 +58,7 @@ def release_record(tmp_path):
     """A releases directory holding one recorded version, 1.0.0 at NEW."""
     releases = tmp_path / ".rlsbl" / "releases"
     write_archived_release_file(
-        str(releases), "1.0.0", bump="minor", include=["plain"],
+        str(releases), "1.0.0", bump="minor", include=["spec"],
         description="The first release.",
         candidate_sha=NEW, tree_hashes={".": "f" * 40},
     )
@@ -232,12 +232,12 @@ class TestNeverReleasedVersions:
     def _record(self, tmp_path):
         releases = tmp_path / ".rlsbl" / "releases"
         write_archived_release_file(
-            str(releases), "1.0.0", bump="minor", include=["plain"],
+            str(releases), "1.0.0", bump="minor", include=["spec"],
             description="The first release.",
             candidate_sha=NEW, tree_hashes={".": "f" * 40},
         )
         write_archived_release_file(
-            str(releases), "1.1.0", bump="minor", include=["plain"],
+            str(releases), "1.1.0", bump="minor", include=["spec"],
             description="Claimed and abandoned.",
             candidate_sha=None, tree_hashes=None, never_released=True,
         )
@@ -363,7 +363,7 @@ class TestRecordedNonVersionTagsInAWorkspace:
         core = repo / "packages" / "core"
         (core / ".rlsbl").mkdir(parents=True)
         (core / ".rlsbl" / "config.json").write_text(
-            json.dumps({"publish_mode": "ci", "targets": ["plain"]}) + "\n",
+            json.dumps({"publish_mode": "ci", "targets": ["spec"]}) + "\n",
             encoding="utf-8",
         )
         rel_dir = repo / ".rlsbl-monorepo" / "releasables" / "core"
@@ -374,7 +374,7 @@ class TestRecordedNonVersionTagsInAWorkspace:
             releasables=[{"name": "core", "tag_format": "{name}@v{version}"}],
         )
         write_archived_release_file(
-            str(rel_dir / "releases"), "1.0.0", bump="minor", include=["plain"],
+            str(rel_dir / "releases"), "1.0.0", bump="minor", include=["spec"],
             description="The first release.",
             candidate_sha=NEW, tree_hashes={"packages/core": "f" * 40},
         )
@@ -461,7 +461,7 @@ class TestAnUnderivableRefSetIsAReconcileError:
 
         releases = tmp_path / ".rlsbl" / "releases"
         write_archived_release_file(
-            str(releases), "1.0.0", bump="minor", include=["plain"],
+            str(releases), "1.0.0", bump="minor", include=["spec"],
             description="The first release.", candidate_sha=NEW,
             tree_hashes={".": "f" * 40}, shipped_as="old@v1.0.0",
         )
@@ -508,7 +508,7 @@ class TestAnUnderivableRefSetIsAReconcileError:
         sha = commit_file(repo, "a.txt", "a\n", "the release")
         write_archived_release_file(
             str(repo / ".rlsbl" / "releases"), "1.0.0", bump="minor",
-            include=["plain"], description="The first release.",
+            include=["spec"], description="The first release.",
             candidate_sha=sha, tree_hashes={".": git(repo, "rev-parse", "HEAD^{tree}")},
             shipped_as="old@v1.0.0",
         )
@@ -544,7 +544,7 @@ class TestAnUnderivableRefSetIsAReconcileError:
 
         releases = tmp_path / ".rlsbl" / "releases"
         write_archived_release_file(
-            str(releases), "2.0.0", bump="major", include=["plain"],
+            str(releases), "2.0.0", bump="major", include=["spec"],
             description="Claimed, never shipped.", candidate_sha=None,
             tree_hashes=None, never_released=True,
         )
@@ -576,7 +576,7 @@ class TestTheTripwire:
         releases = tmp_path / ".rlsbl" / "releases"
         for version, sha in (("1.0.0", NEW), ("1.1.0", OLD)):
             write_archived_release_file(
-                str(releases), version, bump="minor", include=["plain"],
+                str(releases), version, bump="minor", include=["spec"],
                 description="d", candidate_sha=sha, tree_hashes={".": "f" * 40},
             )
         preview = build_preview(
@@ -663,7 +663,7 @@ class TestTheReleaseHalf:
         monkeypatch.chdir(tmp_path)
         releases = tmp_path / ".rlsbl" / "releases"
         write_archived_release_file(
-            str(releases), "1.0.0-rc.1", bump="prerelease", include=["plain"],
+            str(releases), "1.0.0-rc.1", bump="prerelease", include=["spec"],
             description="d", candidate_sha=NEW, tree_hashes={".": "f" * 40},
         )
         preview = build_preview(
@@ -745,7 +745,7 @@ class TestTheFreshCloneCase:
         }))
         releases = tmp_path / ".rlsbl" / "releases"
         write_archived_release_file(
-            str(releases), "1.0.0", bump="minor", include=["plain"],
+            str(releases), "1.0.0", bump="minor", include=["spec"],
             description="d", candidate_sha=NEW, tree_hashes={".": "f" * 40},
         )
 
@@ -775,7 +775,7 @@ class TestTheFreshCloneCase:
 
         releases = tmp_path / ".rlsbl" / "releases"
         write_archived_release_file(
-            str(releases), "1.0.0", bump="minor", include=["plain"],
+            str(releases), "1.0.0", bump="minor", include=["spec"],
             description="d", candidate_sha=NEW, tree_hashes={".": "f" * 40},
         )
         transition_record = get_transition_record_path(str(tmp_path))
@@ -799,7 +799,7 @@ class TestTheFreshCloneCase:
         """A commit rewritten twice is still explained."""
         releases = tmp_path / ".rlsbl" / "releases"
         write_archived_release_file(
-            str(releases), "1.0.0", bump="minor", include=["plain"],
+            str(releases), "1.0.0", bump="minor", include=["spec"],
             description="d", candidate_sha=NEW, tree_hashes={".": "f" * 40},
         )
         middle = "9" * 40
@@ -842,7 +842,7 @@ class TestTheExpectedRefSet:
 
         releases = tmp_path / ".rlsbl" / "releases"
         write_archived_release_file(
-            str(releases), "1.0.0", bump="minor", include=["plain"],
+            str(releases), "1.0.0", bump="minor", include=["spec"],
             description="d", candidate_sha=NEW, tree_hashes={".": "f" * 40},
         )
         append_event(get_transition_record_path(str(tmp_path)), BoundaryAliasEvent(

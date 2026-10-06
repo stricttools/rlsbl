@@ -72,15 +72,12 @@ def is_generated_router(filepath) -> bool:
 # list is written out, and a missing entry only costs an under-trigger for a
 # root-level lockfile nobody has yet.
 _ROOT_LOCKFILES = (
-    "deno.lock",
     "go.sum",
     "go.work",
     "go.work.sum",
-    "mix.lock",
     "package-lock.json",
     "pnpm-lock.yaml",
     "poetry.lock",
-    "pubspec.lock",
     "uv.lock",
     "yarn.lock",
 )
@@ -198,22 +195,12 @@ class RouterFilters:
     under-trigger the dependent's CI.  The command reports the error instead.
 
     A manifest the graph could not READ is the same failure wearing different
-    clothes, and so is a Gradle file that parsed but declares a dependency in a
-    form no scanner recognizes.  The graph is deliberately tolerant of both
-    (see :class:`~rlsbl.workspace_graph.WorkspaceGraph`) -- so this constructor
+    clothes.  The graph is deliberately tolerant of it (see
+    :class:`~rlsbl.workspace_graph.WorkspaceGraph`) -- so this constructor
     asks the graph whether any scan failed and refuses when one did.  The
     narrowing is otherwise invisible from here and from the freshness check,
-    which re-derives from the same unreadable manifest or declaration and
-    therefore agrees the narrowed router is fresh.
-
-    The refusal's own remedy is its way out, and it really is one: a member
-    whose ``workspace.toml`` entry declares ``depends_on`` has stated its
-    workspace edges by hand, so an unrecognized Gradle line in it can no
-    longer narrow anything and the graph does not record it
-    (:meth:`~rlsbl.workspace_graph.ManifestScanError.acknowledged_by`) -- the
-    warning still reaches stderr.  Nothing else is acknowledged this way: an
-    unreadable manifest withheld a whole dependency section, which no
-    declaration answers for.
+    which re-derives from the same unreadable manifest and therefore agrees
+    the narrowed router is fresh.
     """
 
     def __init__(self, root, projects, releasables=None):
@@ -238,8 +225,7 @@ class RouterFilters:
             )
             raise WorkspaceError(
                 "cannot derive the CI router's paths filters: a manifest could "
-                "not be read, or declared a dependency in a form no scanner "
-                "recognizes, so the workspace dependency graph is missing "
+                "not be read, so the workspace dependency graph is missing "
                 "edges and every filter derived from it would be NARROWER "
                 "than the workspace it describes -- a member would stop "
                 "reacting to a dependency it really has, and its CI job would "

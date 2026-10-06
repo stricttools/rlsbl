@@ -38,7 +38,7 @@ def _released_repo(tmp_path, *, version="1.0.0"):
     releases = repo / ".rlsbl" / "releases"
     write_archived_release_file(
         str(releases), version,
-        bump="minor", include=["plain"], description="The first release.",
+        bump="minor", include=["spec"], description="The first release.",
         candidate_sha=sha, tree_hashes={".": tree},
     )
     git(repo, "tag", f"v{version}", sha)
@@ -151,7 +151,7 @@ class TestWhatIsLeftAlone:
         releases = repo / ".rlsbl" / "releases"
         write_archived_release_file(
             str(releases), "0.9.0",
-            bump="patch", include=["plain"], description="Lost to history.",
+            bump="patch", include=["spec"], description="Lost to history.",
             candidate_sha=None, tree_hashes=None, unrecoverable=True,
         )
         old, new = _rewrite(repo)

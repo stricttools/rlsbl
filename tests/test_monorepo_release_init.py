@@ -616,13 +616,13 @@ class TestRenderCommentedSection:
 
     def test_multiple_targets_include_rendered(self):
         """A multi-element include list is rendered as a TOML array."""
-        result = _render_commented_section("widget", ["npm", "pypi", "docker"], "tagged")
+        result = _render_commented_section("widget", ["npm", "pypi", "spec"], "tagged")
         assert "# [releasables.widget]" in result
         # The include line must contain all three targets in array syntax
         include_line = [l for l in result.splitlines() if "include" in l][0]
         assert "npm" in include_line
         assert "pypi" in include_line
-        assert "docker" in include_line
+        assert "spec" in include_line
 
     def test_empty_target_list_does_not_crash(self):
         """An empty target list produces valid output (edge case)."""

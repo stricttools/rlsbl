@@ -1,4 +1,4 @@
-"""Base classes for release pipelines, including no-op defaults for optional methods and token/credential authentication mixins."""
+"""Base classes for release pipelines, including no-op defaults for optional methods and the token authentication mixin."""
 
 import os
 import sys
@@ -27,8 +27,7 @@ class BasePipeline:
     #: repository secret, and claiming one would make a check demand a secret
     #: that must not exist.
     #:
-    #: A tuple rather than a single name because a workflow may read several
-    #: (maven-central reads Central Portal credentials and a GPG signing key);
+    #: A tuple rather than a single name because a workflow may read several;
     #: a pipeline reading exactly one declares a one-element tuple.
     #:
     #: It is a CLASS attribute rather than a config key because the names are
@@ -265,53 +264,4 @@ class TokenPipeline(BasePipeline):
         """Return the token var when local publish is enabled."""
         if self.local:
             return [self.token_var]
-        return []
-
-
-class CredentialPipeline(BasePipeline):
-    """Base for pipelines that authenticate via username/password env vars.
-
-    Subclasses set ``_default_username_var`` and ``_default_password_var``
-    and implement ``_publish_command``.
-    """
-
-    _default_username_var: str = ""
-    _default_password_var: str = ""
-
-    def __init__(self, name: str, pipeline_type: str, local: bool, config: dict):
-        """Initialize and resolve username/password env vars from config or defaults."""
-        super().__init__(name, pipeline_type, local, config)
-        self.username_var = config.get("username_var", self._default_username_var)
-        self.password_var = config.get("password_var", self._default_password_var)
-
-    def publish(self, dir_path: str, version: str, ctx) -> None:
-        """Resolve credentials and delegate to ``_publish_command``."""
-        if not self.local:
-            print(f"  Skipping pipeline '{self.name}' local publish (config: local=false)")
-            return
-        username = os.environ.get(self.username_var)
-        password = os.environ.get(self.password_var)
-        if not username or not password:
-            missing = []
-            if not username:
-                missing.append(self.username_var)
-            if not password:
-                missing.append(self.password_var)
-            print(
-                f"Error: pipeline '{self.name}' requires {' and '.join(missing)} but "
-                f"{'it is' if len(missing) == 1 else 'they are'} not set",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        self._publish_command(dir_path, version, username, password)
-
-    def _publish_command(self, dir_path: str, version: str, username: str, password: str) -> None:
-        raise NotImplementedError(
-            f"{type(self).__name__} must implement _publish_command"
-        )
-
-    def required_env_vars(self) -> list[str]:
-        """Return username and password vars when local publish is enabled."""
-        if self.local:
-            return [self.username_var, self.password_var]
         return []

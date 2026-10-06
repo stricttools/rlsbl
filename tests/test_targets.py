@@ -19,11 +19,8 @@ from rlsbl.targets.npm import NpmTarget
 from rlsbl.targets.pypi import PypiTarget
 from conftest import make_ctx
 from rlsbl.targets.go import GoTarget
-from rlsbl.targets.swift import SwiftTarget
-from rlsbl.targets.swift_apple import SwiftAppleTarget
 from rlsbl.targets.spec import SpecTarget
-from rlsbl.targets.hex import HexTarget
-from rlsbl.targets.deno import DenoTarget
+from rlsbl.errors import ConfigError
 from rlsbl.targets import TARGETS, detect_targets
 
 
@@ -440,6 +437,12 @@ class TestTargetRegistryIntegration:
             TARGETS["npm"].build(d, "1.0.0", config={"build_timeout": 30})
 
 
+class _SlowBuildTarget(BaseTarget):
+    """A target whose class default build timeout differs from the base's."""
+
+    BUILD_TIMEOUT_DEFAULT = 300
+
+
 class TestBuildTimeoutResolution:
     """Tests for BaseTarget._resolve_build_timeout: config key > class default.
 
@@ -456,8 +459,7 @@ class TestBuildTimeoutResolution:
 
     def test_level4_subclass_override(self):
         """Subclass BUILD_TIMEOUT_DEFAULT overrides the base."""
-        from rlsbl.targets.maven import MavenTarget
-        t = MavenTarget()
+        t = _SlowBuildTarget()
         assert t._resolve_build_timeout(None) == 300
 
     def test_level3_config_int(self):
@@ -494,18 +496,9 @@ class TestBuildTimeoutResolution:
 
     def test_precedence_order(self):
         """Config key overrides the class default; nothing else participates."""
-        from rlsbl.targets.maven import MavenTarget
-        t = MavenTarget()
+        t = _SlowBuildTarget()
         assert t._resolve_build_timeout(None) == 300
         assert t._resolve_build_timeout({"build_timeout": 150}) == 150
-
-    def test_pgdesign_default(self):
-        """PgdesignTarget has BUILD_TIMEOUT_DEFAULT = 60."""
-        from rlsbl.targets.pgdesign import PgdesignTarget
-        t = PgdesignTarget()
-        assert t.BUILD_TIMEOUT_DEFAULT == 60
-        assert t._resolve_build_timeout(None) == 60
-
 
 class TestDetectionFiles:
     """Tests that detection_files is the single source of truth for PROJECT_MANIFESTS."""
@@ -583,70 +576,15 @@ class TestDetectTargetsConfig:
             result = detect_targets(d)
             assert result == []
 
-    def test_unknown_target_warns_and_skips(self, capsys):
-        """Unknown target names produce a warning and are skipped."""
+    def test_unknown_target_is_refused(self):
+        """An unknown target name is a hard error naming the supported targets."""
         with tempfile.TemporaryDirectory() as d:
             rlsbl_dir = os.path.join(d, ".rlsbl")
             os.makedirs(rlsbl_dir)
             with open(os.path.join(rlsbl_dir, "config.json"), "w") as f:
                 json.dump({"targets": ["npm", "nonexistent"]}, f)
-            result = detect_targets(d)
-            assert [entry.name for entry in result] == ["npm"]
-            captured = capsys.readouterr()
-            assert "nonexistent" in captured.err
-            assert "Warning" in captured.err
-
-
-class TestSwiftTarget:
-    def test_protocol_conformance(self):
-        assert isinstance(SwiftTarget(), ReleaseTarget)
-
-    def test_detection(self, tmp_path):
-        # No Package.swift -> not detected
-        assert not SwiftTarget().detect(str(tmp_path))
-        # With Package.swift -> detected
-        (tmp_path / "Package.swift").write_text("// swift package")
-        assert SwiftTarget().detect(str(tmp_path))
-
-    def test_version_read_write(self, tmp_path):
-        target = SwiftTarget()
-        (tmp_path / "VERSION").write_text("1.2.3\n")
-        assert target.read_version(str(tmp_path)) == "1.2.3"
-        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
-        assert (tmp_path / "VERSION").read_text().strip() == "2.0.0"
-
-    def test_tag_format(self):
-        assert SwiftTarget().tag_format("1.2.3") == "v1.2.3"
-
-
-class TestSwiftAppleTarget:
-    def test_detect_returns_false(self, tmp_path):
-        """SwiftAppleTarget.detect() always returns False, even with Package.swift."""
-        target = SwiftAppleTarget()
-        (tmp_path / "Package.swift").write_text("// swift-tools-version:5.9")
-        assert target.detect(str(tmp_path)) is False
-
-    def test_name(self):
-        assert SwiftAppleTarget().name == "swift-apple"
-
-    def test_version_read_write(self, tmp_project):
-        target = SwiftAppleTarget()
-        (tmp_project / "VERSION").write_text("1.2.3\n")
-        assert target.read_version(str(tmp_project)) == "1.2.3"
-        target.write_version(str(tmp_project), "2.0.0", ctx=_ctx())
-        assert (tmp_project / "VERSION").read_text().strip() == "2.0.0"
-
-    def test_config_based_detection(self, tmp_project):
-        """detect_targets returns swift-apple when declared in config."""
-        (tmp_project / "Package.swift").write_text("// swift-tools-version:5.9")
-        rlsbl_dir = tmp_project / ".rlsbl"
-        rlsbl_dir.mkdir()
-        (rlsbl_dir / "config.json").write_text(json.dumps({"targets": ["swift-apple"]}))
-        result = detect_targets(".")
-        assert [entry.name for entry in result] == ["swift-apple"]
-
-    def test_tag_format(self):
-        assert SwiftAppleTarget().tag_format("1.2.3") == "v{version}".format(version="1.2.3")
+            with pytest.raises(ConfigError, match="names target 'nonexistent'"):
+                detect_targets(d)
 
 
 class TestSpecTarget:
@@ -668,177 +606,6 @@ class TestSpecTarget:
 
     def test_tag_format(self):
         assert SpecTarget().tag_format("1.2.3") == "spec-v1.2.3"
-
-
-class TestHexTarget:
-    def test_protocol_conformance(self):
-        assert isinstance(HexTarget(), ReleaseTarget)
-
-    def test_detection(self, tmp_path):
-        assert not HexTarget().detect(str(tmp_path))
-        (tmp_path / "mix.exs").write_text('defmodule MyApp.MixProject do\n  def project do\n    [app: :myapp, version: "1.0.0"]\n  end\nend')
-        assert HexTarget().detect(str(tmp_path))
-
-    def test_version_read_write(self, tmp_path):
-        target = HexTarget()
-        content = 'defmodule MyApp.MixProject do\n  def project do\n    [app: :myapp, version: "1.2.3"]\n  end\nend'
-        (tmp_path / "mix.exs").write_text(content)
-        assert target.read_version(str(tmp_path)) == "1.2.3"
-        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
-        assert '"2.0.0"' in (tmp_path / "mix.exs").read_text()
-
-    def test_tag_format(self):
-        assert HexTarget().tag_format("1.2.3") == "v1.2.3"
-
-
-class TestDenoTarget:
-    def test_protocol_conformance(self):
-        assert isinstance(DenoTarget(), ReleaseTarget)
-
-    def test_detection(self, tmp_path):
-        assert not DenoTarget().detect(str(tmp_path))
-        (tmp_path / "deno.json").write_text('{"name": "@scope/pkg", "version": "1.0.0"}')
-        assert DenoTarget().detect(str(tmp_path))
-
-    def test_detection_jsonc(self, tmp_path):
-        (tmp_path / "deno.jsonc").write_text('// config\n{"name": "@scope/pkg", "version": "1.0.0"}')
-        assert DenoTarget().detect(str(tmp_path))
-
-    def test_version_read_write(self, tmp_path):
-        target = DenoTarget()
-        (tmp_path / "deno.json").write_text('{"name": "@scope/pkg", "version": "1.2.3"}')
-        assert target.read_version(str(tmp_path)) == "1.2.3"
-        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
-        data = json.loads((tmp_path / "deno.json").read_text())
-        assert data["version"] == "2.0.0"
-
-    def test_version_read_jsonc(self, tmp_path):
-        target = DenoTarget()
-        (tmp_path / "deno.jsonc").write_text('// comment\n{"name": "@scope/pkg", "version": "3.0.0"}')
-        assert target.read_version(str(tmp_path)) == "3.0.0"
-
-    def test_version_write_jsonc_preserves_comments(self, tmp_path):
-        target = DenoTarget()
-        content = '// my config\n{"name": "@scope/pkg", "version": "1.0.0"}'
-        (tmp_path / "deno.jsonc").write_text(content)
-        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
-        result = (tmp_path / "deno.jsonc").read_text()
-        assert "// my config" in result
-        assert '"2.0.0"' in result
-
-    def test_tag_format(self):
-        assert DenoTarget().tag_format("1.2.3") == "v1.2.3"
-
-    def test_version_file_default(self):
-        """version_file() with no args returns 'deno.json'."""
-        assert DenoTarget().version_file() == "deno.json"
-
-    def test_version_file_json_project(self, tmp_path):
-        """version_file(dir_path) returns 'deno.json' when deno.json exists."""
-        (tmp_path / "deno.json").write_text('{"version": "1.0.0"}')
-        assert DenoTarget().version_file(str(tmp_path)) == "deno.json"
-
-    def test_version_file_jsonc_project(self, tmp_path):
-        """version_file(dir_path) returns 'deno.jsonc' when only deno.jsonc exists."""
-        (tmp_path / "deno.jsonc").write_text('// config\n{"version": "1.0.0"}')
-        assert DenoTarget().version_file(str(tmp_path)) == "deno.jsonc"
-
-    def test_version_file_no_file(self, tmp_path):
-        """version_file(dir_path) falls back to 'deno.json' when no config file exists."""
-        assert DenoTarget().version_file(str(tmp_path)) == "deno.json"
-
-
-class TestDockerTarget:
-    def test_protocol_conformance(self):
-        from rlsbl.targets.docker import DockerTarget
-        assert isinstance(DockerTarget(), ReleaseTarget)
-
-    def test_detection(self, tmp_path):
-        from rlsbl.targets.docker import DockerTarget
-        target = DockerTarget()
-        assert not target.detect(str(tmp_path))
-        (tmp_path / "Dockerfile").write_text("FROM python:3.12\n")
-        assert target.detect(str(tmp_path))
-
-    def test_version_read_write(self, tmp_path):
-        from rlsbl.targets.docker import DockerTarget
-        target = DockerTarget()
-        (tmp_path / "VERSION").write_text("1.2.3\n")
-        assert target.read_version(str(tmp_path)) == "1.2.3"
-        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
-        assert (tmp_path / "VERSION").read_text().strip() == "2.0.0"
-
-    def test_tag_format(self):
-        from rlsbl.targets.docker import DockerTarget
-        assert DockerTarget().tag_format("1.2.3") == "v1.2.3"
-
-
-class TestMavenTarget:
-    def test_protocol_conformance(self):
-        from rlsbl.targets.maven import MavenTarget
-        assert isinstance(MavenTarget(), ReleaseTarget)
-
-    def test_detection_gradle_kts(self, tmp_path):
-        from rlsbl.targets.maven import MavenTarget
-        assert not MavenTarget().detect(str(tmp_path))
-        (tmp_path / "build.gradle.kts").write_text('plugins { id("java") }\nversion = "1.0.0"\n')
-        assert MavenTarget().detect(str(tmp_path))
-
-    def test_detection_pom(self, tmp_path):
-        from rlsbl.targets.maven import MavenTarget
-        pom = '<project><version>1.0.0</version></project>'
-        (tmp_path / "pom.xml").write_text(pom)
-        assert MavenTarget().detect(str(tmp_path))
-
-    def test_version_from_gradle_properties(self, tmp_path):
-        from rlsbl.targets.maven import MavenTarget
-        (tmp_path / "build.gradle.kts").write_text('plugins { id("java") }')
-        (tmp_path / "gradle.properties").write_text("VERSION_NAME=1.2.3\n")
-        target = MavenTarget()
-        assert target.read_version(str(tmp_path)) == "1.2.3"
-        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
-        assert "VERSION_NAME=2.0.0" in (tmp_path / "gradle.properties").read_text()
-
-    def test_version_from_gradle_kts(self, tmp_path):
-        from rlsbl.targets.maven import MavenTarget
-        (tmp_path / "build.gradle.kts").write_text('version = "1.2.3"\n')
-        target = MavenTarget()
-        assert target.read_version(str(tmp_path)) == "1.2.3"
-        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
-        assert 'version = "2.0.0"' in (tmp_path / "build.gradle.kts").read_text()
-
-    def test_version_from_pom(self, tmp_path):
-        from rlsbl.targets.maven import MavenTarget
-        pom = '<?xml version="1.0"?>\n<project xmlns="http://maven.apache.org/POM/4.0.0">\n  <version>1.2.3</version>\n</project>'
-        (tmp_path / "pom.xml").write_text(pom)
-        target = MavenTarget()
-        assert target.read_version(str(tmp_path)) == "1.2.3"
-        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
-        assert "2.0.0" in (tmp_path / "pom.xml").read_text()
-
-    def test_version_priority(self, tmp_path):
-        from rlsbl.targets.maven import MavenTarget
-        # gradle.properties takes priority over build.gradle.kts
-        (tmp_path / "build.gradle.kts").write_text('version = "9.9.9"\n')
-        (tmp_path / "gradle.properties").write_text("version=1.0.0\n")
-        assert MavenTarget().read_version(str(tmp_path)) == "1.0.0"
-
-    def test_tag_format(self):
-        from rlsbl.targets.maven import MavenTarget
-        assert MavenTarget().tag_format("1.2.3") == "v1.2.3"
-
-    def test_version_from_groovy_gradle(self, tmp_path):
-        from rlsbl.targets.maven import MavenTarget
-        (tmp_path / "build.gradle").write_text("version = '1.5.0'\n")
-        target = MavenTarget()
-        assert target.read_version(str(tmp_path)) == "1.5.0"
-        target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
-        assert "version = '2.0.0'" in (tmp_path / "build.gradle").read_text()
-
-    def test_detection_groovy_gradle(self, tmp_path):
-        from rlsbl.targets.maven import MavenTarget
-        (tmp_path / "build.gradle").write_text("apply plugin: 'java'\n")
-        assert MavenTarget().detect(str(tmp_path))
 
 
 class TestGoScaffoldTemplates:
@@ -1021,17 +788,12 @@ class TestNpmPackageManagerDetection:
 
 
 class TestDetectTargetsAutoDetection:
-    """Parametrized test that verifies detect_targets() auto-detects all 10 auto-detectable targets."""
+    """Parametrized test that verifies detect_targets() auto-detects every target by its marker file."""
 
     @pytest.mark.parametrize("target_name,filename,content", [
         ("npm", "package.json", '{"name": "test", "version": "0.1.0"}'),
         ("pypi", "pyproject.toml", '[project]\nname = "test"\nversion = "0.1.0"'),
         ("go", "go.mod", "module example.com/test\n\ngo 1.21"),
-        ("swift", "Package.swift", "// swift-tools-version:5.9"),
-        ("deno", "deno.json", '{"name": "test", "version": "0.1.0"}'),
-        ("docker", "Dockerfile", "FROM alpine"),
-        ("hex", "mix.exs", "defmodule Test.MixProject do"),
-        ("maven", "pom.xml", "<project><modelVersion>4.0.0</modelVersion><groupId>com.test</groupId><artifactId>test</artifactId><version>0.1.0</version></project>"),
         ("spec", "version.json", '{"version": "0.1.0"}'),
     ])
     def test_detect_target_by_marker_file(self, tmp_project, target_name, filename, content):
@@ -1100,42 +862,6 @@ class TestWriteVersionReturnPaths:
             result = target.write_version(d, "2.0.0", ctx=_ctx())
             assert result == ["pyproject.toml"]
 
-    def test_zig_returns_both_files_with_zon(self):
-        """ZigTarget.write_version returns VERSION and build.zig.zon when zon exists."""
-        from rlsbl.targets.zig import ZigTarget
-        target = ZigTarget()
-        with tempfile.TemporaryDirectory() as d:
-            zon_content = '.{\n    .name = "my-project",\n    .version = "0.1.0",\n}\n'
-            with open(os.path.join(d, "build.zig.zon"), "w") as f:
-                f.write(zon_content)
-            result = target.write_version(d, "1.0.0", ctx=_ctx())
-            assert result == ["VERSION", "build.zig.zon"]
-
-    def test_zig_returns_only_version_without_zon(self):
-        """ZigTarget.write_version returns only VERSION when no build.zig.zon."""
-        from rlsbl.targets.zig import ZigTarget
-        target = ZigTarget()
-        with tempfile.TemporaryDirectory() as d:
-            result = target.write_version(d, "1.0.0", ctx=_ctx())
-            assert result == ["VERSION"]
-
-    def test_maven_returns_gradle_properties(self, tmp_path):
-        """MavenTarget.write_version returns the gradle.properties path."""
-        from rlsbl.targets.maven import MavenTarget
-        target = MavenTarget()
-        (tmp_path / "build.gradle.kts").write_text('plugins { id("java") }')
-        (tmp_path / "gradle.properties").write_text("VERSION_NAME=1.0.0\n")
-        result = target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
-        assert result == ["gradle.properties"]
-
-    def test_maven_returns_pom_xml(self, tmp_path):
-        """MavenTarget.write_version returns pom.xml when that is the version source."""
-        from rlsbl.targets.maven import MavenTarget
-        pom = '<project><version>1.0.0</version></project>'
-        (tmp_path / "pom.xml").write_text(pom)
-        result = MavenTarget().write_version(str(tmp_path), "2.0.0", ctx=_ctx())
-        assert result == ["pom.xml"]
-
     def test_npm_returns_package_json(self, tmp_path):
         """NpmTarget.write_version returns ['package.json']."""
         target = NpmTarget()
@@ -1148,27 +874,6 @@ class TestWriteVersionReturnPaths:
         target = GoTarget()
         result = target.write_version(str(tmp_path), "1.0.0", ctx=_ctx())
         assert result == ["VERSION"]
-
-    def test_deno_returns_deno_json(self, tmp_path):
-        """DenoTarget.write_version returns ['deno.json']."""
-        target = DenoTarget()
-        (tmp_path / "deno.json").write_text('{"name": "test", "version": "1.0.0"}')
-        result = target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
-        assert result == ["deno.json"]
-
-    def test_deno_returns_deno_jsonc(self, tmp_path):
-        """DenoTarget.write_version returns ['deno.jsonc'] for jsonc files."""
-        target = DenoTarget()
-        (tmp_path / "deno.jsonc").write_text('// comment\n{"name": "test", "version": "1.0.0"}')
-        result = target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
-        assert result == ["deno.jsonc"]
-
-    def test_hex_returns_mix_exs(self, tmp_path):
-        """HexTarget.write_version returns ['mix.exs']."""
-        target = HexTarget()
-        (tmp_path / "mix.exs").write_text('defmodule T do\n  [version: "1.0.0"]\nend')
-        result = target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
-        assert result == ["mix.exs"]
 
     def test_spec_returns_version_json(self, tmp_path):
         """SpecTarget.write_version returns ['version.json']."""
@@ -1184,26 +889,6 @@ class TestWriteVersionReturnPaths:
         (tmp_path / "spec" / "version.json").write_text('{"version": "1.0.0"}')
         result = target.write_version(str(tmp_path), "2.0.0", ctx=_ctx())
         assert result == [os.path.join("spec", "version.json")]
-
-    def test_plain_returns_version_file(self, tmp_path):
-        """PlainTarget.write_version returns ['VERSION']."""
-        from rlsbl.targets.plain import PlainTarget
-        target = PlainTarget()
-        result = target.write_version(str(tmp_path), "1.0.0", ctx=_ctx())
-        assert result == ["VERSION"]
-
-    def test_swift_returns_version_file(self, tmp_path):
-        """SwiftTarget.write_version returns ['VERSION']."""
-        target = SwiftTarget()
-        result = target.write_version(str(tmp_path), "1.0.0", ctx=_ctx())
-        assert result == ["VERSION"]
-
-    def test_swift_apple_returns_version_file(self, tmp_path):
-        """SwiftAppleTarget.write_version returns ['VERSION']."""
-        target = SwiftAppleTarget()
-        result = target.write_version(str(tmp_path), "1.0.0", ctx=_ctx())
-        assert result == ["VERSION"]
-
 
 class TestGoMonorepoTagFormat:
     """Tests for Go monorepo tag format using path-based tags (go/v0.1.1) instead of name-based (name@v0.1.1)."""

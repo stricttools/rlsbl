@@ -1232,7 +1232,7 @@ def monorepo_fixture(tmp_path, monkeypatch):
     (go_dir / ".rlsbl" / "changes").mkdir(parents=True)
     (go_dir / ".rlsbl" / "changes" / "unreleased.jsonl").write_text("")
     (go_dir / ".rlsbl" / "config.json").write_text(
-        json.dumps({"publish_mode": "ci", "targets": ["plain"]}) + "\n"
+        json.dumps({"publish_mode": "ci", "targets": ["spec"]}) + "\n"
     )
 
     # Create minimal project files
@@ -1240,6 +1240,7 @@ def monorepo_fixture(tmp_path, monkeypatch):
         '[project]\nname = "mypylib"\nversion = "0.1.0"\n'
     )
     (go_dir / "VERSION").write_text("0.1.0\n")
+    (go_dir / "version.json").write_text('{"version": "0.1.0"}\n')
 
     # Commit all subproject files
     run_git(tmp_path, "add", WORKSPACE_DIR)

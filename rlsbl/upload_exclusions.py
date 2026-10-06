@@ -7,8 +7,8 @@ refusal without hand edits:
 - a hatchling ``pyproject.toml`` gets the entries under ``exclude`` in
   ``[tool.hatch.build.targets.sdist]`` (merged, never replacing the project's
   own entries; ``uv build`` builds the wheel from that sdist);
-- the npm ``.npmignore`` and the Docker ``.dockerignore`` render their private
-  block from the template variables below;
+- the npm ``.npmignore`` renders its private block from the template
+  variables below;
 - a Go module gets a stub ``go.mod`` in each private directory at its root,
   through the shared template mappings (:func:`go_stub_directories`);
 - the pypi CI template embeds :mod:`rlsbl.private_paths` itself.
@@ -52,26 +52,9 @@ def private_go_stub_content():
     return content
 
 
-def dockerignore_entry(rule):
-    """*rule* (gitignore syntax) in ``.dockerignore`` syntax.
-
-    Docker matches a pattern against the whole context-relative path, so a
-    rule that holds at any depth needs a leading ``**/``, and a trailing slash
-    means nothing to it.
-    """
-    if rule.startswith("/"):
-        return rule.strip("/")
-    return "**/" + rule.rstrip("/")
-
-
 def npmignore_block():
     """The private-path lines of a scaffolded ``.npmignore``."""
     return "\n".join(exclude_entries())
-
-
-def dockerignore_block():
-    """The private-path lines of a scaffolded ``.dockerignore``."""
-    return "\n".join(dockerignore_entry(rule) for rule in exclude_entries())
 
 
 def ci_check_script(indent):

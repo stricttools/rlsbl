@@ -1,11 +1,10 @@
 """Scaffold keeps the private paths out of every upload it sets up.
 
 A newly scaffolded project passes the private-path refusal without hand edits:
-the hatch sdist gets an exclude list, the npm package a ``.npmignore``, a Go
-module a stub ``go.mod`` in each private directory, and a Docker image a
-``.dockerignore``. Each test plants every kind of private path and runs the
-real listing (``npm pack``, ``uv build``, Go's zip rule, the Docker context)
-against what scaffold wrote.
+the hatch sdist gets an exclude list, the npm package a ``.npmignore``, and a
+Go module a stub ``go.mod`` in each private directory. Each test plants every
+kind of private path and runs the real listing (``npm pack``, ``uv build``,
+Go's zip rule) against what scaffold wrote.
 """
 
 import json
@@ -308,34 +307,6 @@ def test_go_build_skips_a_stubbed_private_dir(tmp_path):
         ["go", "build", "./..."], cwd=root, env=env, capture_output=True, text=True,
     )
     assert result.returncode == 0, result.stdout + result.stderr
-
-
-# ---------------------------------------------------------------------------
-# Docker
-# ---------------------------------------------------------------------------
-
-
-def test_a_docker_project_gets_a_dockerignore(tmp_path):
-    from rlsbl.commands.init_cmd import USER_OWNED
-    from rlsbl.targets import TARGETS
-
-    targets = {m["target"] for m in TARGETS["docker"].template_mappings(make_ctx(tmp_path, {}))}
-    assert ".dockerignore" in targets
-    assert ".dockerignore" in USER_OWNED
-
-
-def test_the_scaffolded_dockerignore_keeps_every_private_path_out(tmp_path):
-    root = tmp_path / "img"
-    root.mkdir()
-    (root / "Dockerfile").write_text("FROM scratch\nCOPY . /app\n")
-    (root / "VERSION").write_text("0.1.0\n")
-    _plant(root)
-    (root / ".dockerignore").write_text(_render("docker", "dockerignore.tpl", root))
-    run_git(root, "init", "-q", "-b", "main")
-    run_git(root, "add", "-A", "-f")
-    run_git(root, "commit", "-q", "-m", "fixture")
-    result = _check(root, {"publish_mode": "ci", "targets": ["docker"]})
-    assert result.status == "pass", _texts(result)
 
 
 def test_a_stub_module_is_not_an_unregistered_workspace_member(tmp_path, monkeypatch):

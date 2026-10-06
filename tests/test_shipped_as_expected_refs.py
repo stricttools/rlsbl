@@ -49,7 +49,7 @@ def _releasable(tmp_path, name="core"):
 
 def _archive(rel_dir, version, *, shipped_as=None, sha=SHA):
     write_archived_release_file(
-        str(rel_dir / "releases"), version, bump="minor", include=["plain"],
+        str(rel_dir / "releases"), version, bump="minor", include=["spec"],
         description=f"Version {version}.",
         candidate_sha=sha, tree_hashes={".": "f" * 40},
         shipped_as=shipped_as,
@@ -123,7 +123,7 @@ class TestShippedAsIsThePrimaryRef:
     def test_a_standalone_repository_reads_its_own_archives(self, tmp_path):
         releases = tmp_path / ".rlsbl" / "releases"
         write_archived_release_file(
-            str(releases), "1.0.0", bump="minor", include=["plain"],
+            str(releases), "1.0.0", bump="minor", include=["spec"],
             description="d", candidate_sha=SHA, tree_hashes={".": "f" * 40},
             shipped_as="widget@v1.0.0",
         )

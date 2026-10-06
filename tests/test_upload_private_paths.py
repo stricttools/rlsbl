@@ -3,8 +3,8 @@
 Planning notes (``todo/``), release metadata (``.rlsbl/``), agent instructions
 (``CLAUDE.md``), scratch output, and environment files reached PyPI, npm, and
 the Go module proxy because nothing listed what an upload carried. The npm
-package, the Go module zip, and the Docker build context are listed offline by
-the ``upload-private-paths`` check before a release mutates anything; the
+package and the Go module zip are listed offline by the
+``upload-private-paths`` check before a release mutates anything; the
 Python sdist and wheel are built and checked in CI on the candidate commit,
 by the pypi CI template running :mod:`rlsbl.private_paths` over ``uv build``'s
 output. Every refusal names the file and the ecosystem's own exclusion, and
@@ -112,7 +112,7 @@ def test_the_check_is_registered_for_preflight():
         spec = tomllib.load(f)["checks"]["upload-private-paths"]
     assert spec["severity"] == "error"
     assert "preflight" in spec["tags"]
-    assert CHECK_TARGETS["upload-private-paths"] == frozenset({"npm", "go", "docker"})
+    assert CHECK_TARGETS["upload-private-paths"] == frozenset({"npm", "go"})
 
 
 # ---------------------------------------------------------------------------
@@ -288,68 +288,6 @@ def test_the_named_selfdoc_fix_clears_the_claude_md_refusal(go_project):
     _commit(go_project)
     texts = _texts(_check(go_project, _GO_CONFIG))
     assert not [t for t in texts if "CLAUDE.md" in t], texts
-
-
-# ---------------------------------------------------------------------------
-# Docker: the build context, tracked files less .dockerignore
-# ---------------------------------------------------------------------------
-
-_DOCKER_CONFIG = {"publish_mode": "ci", "targets": ["docker"]}
-
-
-@pytest.fixture
-def docker_project(tmp_path):
-    root = tmp_path / "img"
-    root.mkdir()
-    (root / "Dockerfile").write_text("FROM scratch\nCOPY . /app\n")
-    (root / "VERSION").write_text("0.1.0\n")
-    (root / "app.sh").write_text("echo hi\n")
-    _plant(root, "todo/plan.md", "sub/CLAUDE.md", ".env")
-    (root / ".rlsbl").mkdir()
-    (root / ".rlsbl" / "config.json").write_text(json.dumps(_DOCKER_CONFIG))
-    run_git(root, "init", "-q", "-b", "main")
-    _commit(root)
-    return root
-
-
-def test_a_docker_build_context_carrying_private_paths_is_refused(docker_project):
-    result = _check(docker_project, _DOCKER_CONFIG)
-    assert result.status == "fail"
-    text = "\n".join(_texts(result))
-    assert "the Docker build context would ship todo/plan.md" in text
-    assert 'add "todo" to .dockerignore' in text
-    assert "the Docker build context would ship sub/CLAUDE.md" in text
-    assert 'add "**/CLAUDE.md" to .dockerignore' in text
-    assert 'add "**/.env*" to .dockerignore' in text
-    assert 'add "**/.rlsbl" to .dockerignore' in text
-
-
-def test_dockerignore_entries_clear_the_docker_refusal(docker_project):
-    (docker_project / ".dockerignore").write_text(
-        "todo\n**/CLAUDE.md\n**/.env*\n**/.rlsbl\n"
-    )
-    _commit(docker_project)
-    result = _check(docker_project, _DOCKER_CONFIG)
-    assert result.status == "pass", _texts(result)
-
-
-@pytest.mark.parametrize("patterns, path, ignored", [
-    (["todo"], "todo/plan.md", True),
-    (["todo"], "sub/todo/plan.md", False),
-    (["/todo/"], "todo/plan.md", True),
-    (["**/CLAUDE.md"], "CLAUDE.md", True),
-    (["**/CLAUDE.md"], "a/b/CLAUDE.md", True),
-    (["CLAUDE.md"], "a/CLAUDE.md", False),
-    (["*.md", "!README.md"], "README.md", False),
-    (["*.md", "!README.md"], "NOTES.md", True),
-    (["**/.env*"], "bin/.env.local", True),
-    (["docs/*.md"], "docs/a.md", True),
-    (["docs/*.md"], "docs/sub/a.md", False),
-])
-def test_the_dockerignore_reader_follows_dockers_rules(patterns, path, ignored):
-    from rlsbl.targets.docker import dockerignore_excludes
-
-    assert dockerignore_excludes(patterns, path) is ignored
 
 
 # ---------------------------------------------------------------------------

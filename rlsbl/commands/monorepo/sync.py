@@ -875,8 +875,3 @@ def _cmd_sync(flags, project_root):
     if stale_removed:
         msg += f" Removed {stale_removed} stale workflow(s)."
     print(msg)
-
-    # A member consumed by repository URL (SPM) needs a mirror to be
-    # resolvable at all. That is the `mirror-required` check's finding, a hard
-    # error asked of the target registry rather than a target-name literal and
-    # an advisory warning here.

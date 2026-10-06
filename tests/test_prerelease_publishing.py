@@ -50,13 +50,6 @@ class TestNonPypiTargetsFormatVersion:
         assert t.format_version("1.0.0-beta.1") == "1.0.0-beta.1"
         assert t.format_version("0.5.0") == "0.5.0"
 
-    def test_plain_target(self):
-        from rlsbl.targets.plain import PlainTarget
-        t = PlainTarget()
-        assert t.format_version("1.0.0-rc.2") == "1.0.0-rc.2"
-        assert t.format_version("3.1.4") == "3.1.4"
-
-
 class TestPypiFormatVersion:
     """PypiTarget.format_version translates semver pre-release to PEP 440."""
 
@@ -268,41 +261,6 @@ class TestNpmPipelinePrerelease:
             args = mock_run.call_args[0][1]
             tag_idx = args.index("--tag")
             assert args[tag_idx + 1] == "rc"
-
-
-class TestDockerPipelinePrerelease:
-    """Docker pipeline skips :latest push for pre-release versions."""
-
-    def _make_pipeline(self):
-        from rlsbl.pipelines.docker import DockerPipeline
-        return DockerPipeline(
-            name="docker", pipeline_type="docker", local=True,
-            config={"image": "myapp", "registry": "ghcr.io/org"},
-        )
-
-    def test_stable_pushes_latest(self):
-        pipeline = self._make_pipeline()
-        with patch("rlsbl.pipelines.docker.require_tool", return_value=True):
-            with patch("rlsbl.pipelines.docker.run") as mock_run:
-                pipeline._publish_command(".", "1.0.0", "user", "pass")
-                # Should have 4 calls: build, push versioned, tag latest, push latest
-                assert mock_run.call_count == 4
-                tag_call = mock_run.call_args_list[2]
-                # The docker tag command receives [tag, versioned, latest]
-                assert any("latest" in arg for arg in tag_call[0][1])
-                push_latest_call = mock_run.call_args_list[3]
-                assert any("latest" in arg for arg in push_latest_call[0][1])
-
-    def test_prerelease_skips_latest(self):
-        pipeline = self._make_pipeline()
-        with patch("rlsbl.pipelines.docker.require_tool", return_value=True):
-            with patch("rlsbl.pipelines.docker.run") as mock_run:
-                pipeline._publish_command(".", "1.0.0-alpha.0", "user", "pass")
-                # Should have only 2 calls: build, push versioned
-                assert mock_run.call_count == 2
-                # Verify no :latest in any call
-                for c in mock_run.call_args_list:
-                    assert "latest" not in str(c)
 
 
 class TestGitHubReleasePrerelease:

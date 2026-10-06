@@ -591,7 +591,6 @@ def remap_jsonl_hashes(changes_dir, sha_map) -> RemapReport:
                 user_facing=entry.user_facing,
                 description=entry.description,
                 type=entry.type,
-                release_type=entry.release_type,
                 id=entry.id,
                 packages=entry.packages,
             ))

@@ -51,56 +51,6 @@ def _make_go(dir_path):
         )
 
 
-def _make_hex(dir_path, app="myapp"):
-    """Create a minimal mix.exs so the hex target is detected."""
-    os.makedirs(dir_path, exist_ok=True)
-    with open(os.path.join(dir_path, "mix.exs"), "w", encoding="utf-8") as f:
-        f.write(
-            'defmodule MyApp.MixProject do\n'
-            '  use Mix.Project\n'
-            '  def project do\n'
-            f'    [app: :{app}, version: "0.1.0"]\n'
-            '  end\n'
-            'end\n'
-        )
-
-
-def _make_deno(dir_path, name="mydeno"):
-    """Create a minimal deno.json so the deno target is detected."""
-    os.makedirs(dir_path, exist_ok=True)
-    with open(os.path.join(dir_path, "deno.json"), "w", encoding="utf-8") as f:
-        json.dump({"name": name, "version": "0.1.0"}, f)
-
-
-def _make_zig(dir_path, name="myzig"):
-    """Create a minimal build.zig.zon + VERSION so the zig target is detected."""
-    os.makedirs(dir_path, exist_ok=True)
-    with open(os.path.join(dir_path, "build.zig.zon"), "w", encoding="utf-8") as f:
-        f.write(
-            '.{\n'
-            f'    .name = "{name}",\n'
-            '    .version = "0.1.0",\n'
-            '    .minimum_zig_version = "0.14.0",\n'
-            '    .paths = .{""},\n'
-            '}\n'
-        )
-    with open(os.path.join(dir_path, "VERSION"), "w", encoding="utf-8") as f:
-        f.write("0.1.0\n")
-
-
-def _make_swift(dir_path, name="MySwift"):
-    """Create a minimal Package.swift + VERSION so the swift target is detected."""
-    os.makedirs(dir_path, exist_ok=True)
-    with open(os.path.join(dir_path, "Package.swift"), "w", encoding="utf-8") as f:
-        f.write(
-            '// swift-tools-version:5.7\n'
-            'import PackageDescription\n'
-            f'let package = Package(name: "{name}")\n'
-        )
-    with open(os.path.join(dir_path, "VERSION"), "w", encoding="utf-8") as f:
-        f.write("0.1.0\n")
-
-
 class _Capture:
     """Tiny helper to record subprocess.run calls without executing them."""
 
@@ -200,16 +150,16 @@ def test_no_targets_returns_error(tmp_project, fake_run, all_tools_present, caps
 
 
 def test_unsupported_target_skipped(tmp_project, fake_run, all_tools_present, capsys):
-    # plain is a registered target with no dev_install_command override (inherits None from BaseTarget)
+    # spec is a registered target with no dev_install_command override (inherits None from BaseTarget)
     os.makedirs(str(tmp_project / ".rlsbl"))
     with open(str(tmp_project / ".rlsbl" / "config.json"), "w") as f:
-        json.dump({"targets": ["plain"]}, f)
+        json.dump({"targets": ["spec"]}, f)
     rc = run_install({"target": "global"}, project_root=".")
     # No supported targets -> nothing ran, no error.
     assert rc == 0
     assert fake_run.calls == []
     captured = capsys.readouterr()
-    assert "Skipping plain" in captured.out
+    assert "Skipping spec" in captured.out
     assert "install not yet supported" in captured.out
 
 
@@ -574,135 +524,6 @@ def test_go_venv_skipped_with_clear_message(
     captured = capsys.readouterr()
     assert "Skipping go" in captured.out
     assert "--target venv not supported" in captured.out
-
-
-# ---------------------------------------------------------------------------
-# Hex (Elixir)
-# ---------------------------------------------------------------------------
-
-
-def test_hex_global_runs_mix_deps_get(tmp_project, fake_run, all_tools_present):
-    _make_hex(str(tmp_project))
-    rc = run_install({"target": "global"}, project_root=".")
-    assert rc == 0
-    assert len(fake_run.calls) == 1
-    assert fake_run.calls[0]["cmd"] == ["mix", "deps.get"]
-
-
-def test_hex_venv_also_runs_mix_deps_get(tmp_project, fake_run, all_tools_present):
-    """Hex has no global/local distinction; --target venv returns the same spec."""
-    _make_hex(str(tmp_project))
-    rc = run_install({"target": "venv"}, project_root=".")
-    assert rc == 0
-    assert len(fake_run.calls) == 1
-    assert fake_run.calls[0]["cmd"] == ["mix", "deps.get"]
-
-
-def test_hex_uninstall_is_skipped(tmp_project, fake_run, all_tools_present, capsys):
-    _make_hex(str(tmp_project))
-    rc = run_install({"target": "global", "uninstall": True}, project_root=".")
-    assert rc == 0
-    assert fake_run.calls == []
-    captured = capsys.readouterr()
-    assert "Skipping hex uninstall" in captured.out
-
-
-# ---------------------------------------------------------------------------
-# Deno
-# ---------------------------------------------------------------------------
-
-
-def test_deno_global_runs_deno_install(tmp_project, fake_run, all_tools_present):
-    _make_deno(str(tmp_project))
-    rc = run_install({"target": "global"}, project_root=".")
-    assert rc == 0
-    assert len(fake_run.calls) == 1
-    assert fake_run.calls[0]["cmd"] == ["deno", "install"]
-
-
-def test_deno_venv_runs_deno_cache(tmp_project, fake_run, all_tools_present):
-    _make_deno(str(tmp_project))
-    rc = run_install({"target": "venv"}, project_root=".")
-    assert rc == 0
-    assert len(fake_run.calls) == 1
-    assert fake_run.calls[0]["cmd"] == ["deno", "cache", "."]
-
-
-def test_deno_uninstall_uses_project_name(
-    tmp_project, fake_run, all_tools_present
-):
-    _make_deno(str(tmp_project), name="mydeno")
-    rc = run_install({"target": "global", "uninstall": True}, project_root=".")
-    assert rc == 0
-    assert fake_run.calls[0]["cmd"] == ["deno", "uninstall", "mydeno"]
-
-
-# ---------------------------------------------------------------------------
-# Zig
-# ---------------------------------------------------------------------------
-
-
-def test_zig_global_runs_zig_build_install(tmp_project, fake_run, all_tools_present):
-    _make_zig(str(tmp_project))
-    rc = run_install({"target": "global"}, project_root=".")
-    assert rc == 0
-    assert len(fake_run.calls) == 1
-    assert fake_run.calls[0]["cmd"] == ["zig", "build", "install"]
-
-
-def test_zig_venv_skipped_with_clear_message(
-    tmp_project, fake_run, all_tools_present, capsys
-):
-    _make_zig(str(tmp_project))
-    rc = run_install({"target": "venv"}, project_root=".")
-    assert rc == 0
-    assert fake_run.calls == []
-    captured = capsys.readouterr()
-    assert "Skipping zig" in captured.out
-    assert "--target venv not supported" in captured.out
-
-
-def test_zig_uninstall_is_skipped(tmp_project, fake_run, all_tools_present, capsys):
-    _make_zig(str(tmp_project))
-    rc = run_install({"target": "global", "uninstall": True}, project_root=".")
-    assert rc == 0
-    assert fake_run.calls == []
-    captured = capsys.readouterr()
-    assert "Skipping zig uninstall" in captured.out
-
-
-# ---------------------------------------------------------------------------
-# Swift
-# ---------------------------------------------------------------------------
-
-
-def test_swift_global_runs_swift_build(tmp_project, fake_run, all_tools_present):
-    _make_swift(str(tmp_project))
-    rc = run_install({"target": "global"}, project_root=".")
-    assert rc == 0
-    assert len(fake_run.calls) == 1
-    assert fake_run.calls[0]["cmd"] == ["swift", "build"]
-
-
-def test_swift_venv_skipped_with_clear_message(
-    tmp_project, fake_run, all_tools_present, capsys
-):
-    _make_swift(str(tmp_project))
-    rc = run_install({"target": "venv"}, project_root=".")
-    assert rc == 0
-    assert fake_run.calls == []
-    captured = capsys.readouterr()
-    assert "Skipping swift" in captured.out
-    assert "--target venv not supported" in captured.out
-
-
-def test_swift_uninstall_is_skipped(tmp_project, fake_run, all_tools_present, capsys):
-    _make_swift(str(tmp_project))
-    rc = run_install({"target": "global", "uninstall": True}, project_root=".")
-    assert rc == 0
-    assert fake_run.calls == []
-    captured = capsys.readouterr()
-    assert "Skipping swift uninstall" in captured.out
 
 
 # ---------------------------------------------------------------------------

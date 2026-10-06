@@ -1,7 +1,6 @@
 """Tests for pre-release awareness in CI publish templates.
 
-Verifies that npm/pnpm/yarn templates include the dist-tag detection step,
-and that the Docker template conditionally skips :latest for pre-releases.
+Verifies that npm/pnpm/yarn templates include the dist-tag detection step.
 Also verifies the shell-level grep/sed logic for extracting pre-release
 identifiers from version strings.
 """
@@ -11,11 +10,9 @@ import subprocess
 
 import pytest
 
-from rlsbl.targets.docker import DockerTarget
 from rlsbl.targets.npm import NpmTarget
 
 NPM_TEMPLATE_DIR = NpmTarget().template_dir()
-DOCKER_TEMPLATE_DIR = DockerTarget().template_dir()
 
 
 def _read_template(directory, name):
@@ -118,38 +115,6 @@ class TestYarnPublishDistTag:
         # Match the STEP, not a prose mention in a comment.
         publish_pos = content.index("- run: yarn npm publish")
         assert dist_tag_pos < publish_pos
-
-
-# ---------------------------------------------------------------------------
-# Docker publish template -- conditional :latest
-# ---------------------------------------------------------------------------
-
-
-class TestDockerPublishConditionalLatest:
-    """Docker publish.yml.tpl skips :latest for pre-release tags."""
-
-    def test_latest_tag_has_enable_condition(self):
-        content = _read_template(DOCKER_TEMPLATE_DIR, "publish.yml.tpl")
-        assert "type=raw,value=latest,enable=" in content
-
-    def test_enable_uses_contains_check(self):
-        content = _read_template(DOCKER_TEMPLATE_DIR, "publish.yml.tpl")
-        assert "!contains(inputs.tag || github.ref_name, '-')" in content
-
-    def test_semver_tag_still_present(self):
-        content = _read_template(DOCKER_TEMPLATE_DIR, "publish.yml.tpl")
-        # The escaped template var becomes literal {{version}} in output
-        assert r"type=semver,pattern=\{{version}}" in content
-
-    def test_no_unconditional_latest(self):
-        """There must not be a bare 'type=raw,value=latest' without enable."""
-        content = _read_template(DOCKER_TEMPLATE_DIR, "publish.yml.tpl")
-        for line in content.splitlines():
-            stripped = line.strip()
-            if stripped.startswith("type=raw,value=latest"):
-                assert "enable=" in stripped, (
-                    f"Found unconditional :latest line: {stripped!r}"
-                )
 
 
 # ---------------------------------------------------------------------------

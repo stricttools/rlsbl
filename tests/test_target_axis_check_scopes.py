@@ -32,52 +32,32 @@ from rlsbl.targets import (
 )
 from rlsbl.targets.base import BaseTarget
 
-# The scopes as they were hand-listed before the migration. Deriving them must
-# reproduce these exactly: that axis was a refactor, not a scope change.
+# The scopes as they were hand-listed before the migration, less the targets
+# rlsbl no longer supports. Deriving them must reproduce these exactly: that
+# axis was a refactor, not a scope change.
 SCOPES_BEFORE_MIGRATION = {
     "dep-floors": {"pypi", "npm", "go"},
-    "deps-unused": {"pypi", "dart", "npm", "go", "maven"},
-    "deps-undeclared": {"pypi", "dart", "npm", "go", "maven"},
-    "deps-runtime-test-only": {"pypi", "dart", "npm", "go", "maven"},
-    "deps-dev-in-lib": {"pypi", "dart", "npm", "go", "maven"},
-    "dead-modules": {"pypi", "go", "npm", "dart", "maven"},
-    "dead-modules-stale": {"pypi", "go", "npm", "dart", "maven"},
-    "circular-deps": {"pypi", "npm", "dart", "maven"},
-    "library-lint": {"pypi", "go", "npm", "maven"},
-    "test-suite": {"pypi", "go", "npm", "maven"},
-}
-
-# Scope WIDENINGS decided since the migration, kept apart from the sets above so
-# the migration's own claim -- deriving reproduces the hand-listed scopes
-# exactly -- stays checkable, and so every later change to a check's scope has
-# to be written down here as the deliberate decision it is.
-#
-# Flutter: a Flutter app IS Dart sources, so the Dart analysers FlutterTarget
-# inherits answer for it. They were pinned back to the base during the
-# migration to keep behavior identical; that pin was caution, not design, and
-# was removed.
-SCOPE_ADDITIONS_SINCE_MIGRATION = {
-    "deps-unused": {"flutter"},
-    "deps-undeclared": {"flutter"},
-    "deps-runtime-test-only": {"flutter"},
-    "deps-dev-in-lib": {"flutter"},
-    "dead-modules": {"flutter"},
-    "dead-modules-stale": {"flutter"},
-    "circular-deps": {"flutter"},
+    "deps-unused": {"pypi", "npm", "go"},
+    "deps-undeclared": {"pypi", "npm", "go"},
+    "deps-runtime-test-only": {"pypi", "npm", "go"},
+    "deps-dev-in-lib": {"pypi", "npm", "go"},
+    "dead-modules": {"pypi", "go", "npm"},
+    "dead-modules-stale": {"pypi", "go", "npm"},
+    "circular-deps": {"pypi", "npm"},
+    "library-lint": {"pypi", "go", "npm"},
+    "test-suite": {"pypi", "go", "npm"},
 }
 
 
 def expected_scope(check_name):
-    """The scope a check should have today: the pre-migration set plus widenings."""
-    return SCOPES_BEFORE_MIGRATION[check_name] | SCOPE_ADDITIONS_SINCE_MIGRATION.get(
-        check_name, set()
-    )
+    """The scope a check should have today."""
+    return SCOPES_BEFORE_MIGRATION[check_name]
 
 
 class TestDerivedScopesReproduceTheHandListedOnes:
 
     @pytest.mark.parametrize("check_name", sorted(SCOPES_BEFORE_MIGRATION))
-    def test_scope_is_the_hand_listed_one_plus_the_recorded_widenings(self, check_name):
+    def test_scope_is_the_hand_listed_one(self, check_name):
         assert set(CHECK_TARGETS[check_name]) == expected_scope(check_name)
 
     def test_each_scope_comes_from_a_protocol_property(self):
@@ -96,22 +76,6 @@ class TestDerivedScopesReproduceTheHandListedOnes:
         assert not TARGETS["go"].supports_circular_dep_analysis
         assert TARGETS["go"].supports_import_analysis
         assert "go" in CHECK_EXCLUDED_TARGETS["circular-deps"]
-
-    def test_flutter_answers_the_source_analysis_axes_like_dart(self):
-        """A Flutter app IS Dart sources, so it answers like Dart.
-
-        FlutterTarget extends DartTarget and inherits its analysers. The
-        migration rebound both detectors back to the base so the derived scopes
-        would reproduce the hand-listed ones unchanged; that pin was caution,
-        not design, and is gone -- Flutter is in scope for import analysis and
-        cycle detection exactly as Dart is.
-        """
-        assert TARGETS["dart"].supports_import_analysis
-        assert TARGETS["flutter"].supports_import_analysis
-        assert TARGETS["flutter"].supports_circular_dep_analysis
-        assert "flutter" in targets_with_import_analysis()
-        assert "flutter" in targets_with_circular_dep_analysis()
-
 
 class TestPerTargetDetectorsAreProtocolMethods:
 
@@ -168,18 +132,18 @@ class TestPerTargetDetectorsAreProtocolMethods:
 class TestSingleTargetChecksReadTheMatrix:
 
     @pytest.mark.parametrize(
-        "check_name", ["ruff-lint", "maven-central-metadata", "dunder-version-missing"],
+        "check_name", ["ruff-lint", "dunder-version-missing"],
     )
     def test_scope_is_answerable_from_the_matrix(self, check_name):
         assert targets_for_check(check_name)
 
     def test_skip_reason_names_the_supported_targets(self):
-        reason = check_scope_skip_reason("ruff-lint", {"zig"})
+        reason = check_scope_skip_reason("ruff-lint", {"spec"})
         assert reason is not None
         assert "pypi" in reason
 
     def test_no_skip_when_the_target_is_in_scope(self):
-        assert check_scope_skip_reason("ruff-lint", {"zig", "pypi"}) is None
+        assert check_scope_skip_reason("ruff-lint", {"spec", "pypi"}) is None
 
     def test_a_universal_check_has_no_target_set(self):
         with pytest.raises(ValueError, match="not target-specific"):

@@ -26,10 +26,10 @@ class TestYankAxis:
 
     def test_unsupported_target_reports_unsupported_naming_itself(self):
         """A target with no registry-removal action says so, naming itself."""
-        target = TARGETS["plain"]
+        target = TARGETS["spec"]
         outcome = target.yank(".", "1.0.0", "v1.0.0", reason=None, dry_run=True)
         assert outcome.status is YankStatus.UNSUPPORTED
-        assert "plain" in outcome.message
+        assert "spec" in outcome.message
 
     @pytest.mark.parametrize("name", sorted(TARGETS))
     def test_every_target_answers_yank(self, name):
@@ -96,9 +96,9 @@ class TestYankAxis:
         """The command surfaces the skip on stderr naming the target."""
         from rlsbl.commands.yank import _yank_target
 
-        outcome = _yank_target(TARGETS["plain"], ".", "1.0.0", "v1.0.0", None, True)
+        outcome = _yank_target(TARGETS["spec"], ".", "1.0.0", "v1.0.0", None, True)
         assert outcome.status is YankStatus.UNSUPPORTED
         err = capsys.readouterr().err
-        assert "plain: no yank implementation (skipping)" in err
+        assert "spec: no yank implementation (skipping)" in err
 
 

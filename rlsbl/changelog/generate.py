@@ -170,9 +170,6 @@ def generate_version_section(
     sub-headers (Breaking, Features, Fixes, Other). Empty groups are omitted.
     If no user-facing entries exist, emits a single "No user-facing changes." bullet.
 
-    If all entries share a release_type (e.g., "ota" or "build"), a marker
-    is appended to the version heading.
-
     When ``description`` is provided, it is added as a paragraph after the
     version heading and before the first type group. When ``context`` is
     provided, it is rendered as a collapsible ``<details>`` block after the
@@ -183,17 +180,10 @@ def generate_version_section(
     release record records as never released can carry finalized changelog
     files, and dropping the section would lose them.
     """
-    # Determine release type marker from entries
-    release_types = {e.release_type for e in entries if e.release_type}
-    release_marker = ""
-    if len(release_types) == 1:
-        rt = release_types.pop()
-        release_marker = f" ({rt.upper()})"
-
     user_facing = [e for e in entries if e.user_facing]
 
     if not user_facing:
-        section = f"## {version}{release_marker}\n\n"
+        section = f"## {version}\n\n"
         if never_released:
             section += f"{NEVER_RELEASED_NOTE}\n\n"
         if description:
@@ -219,7 +209,7 @@ def generate_version_section(
             desc = prefix + desc
         buckets.setdefault(key, []).append(desc)
 
-    parts: list[str] = [f"## {version}{release_marker}"]
+    parts: list[str] = [f"## {version}"]
 
     if never_released:
         parts.append("")

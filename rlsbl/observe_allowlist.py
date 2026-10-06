@@ -310,11 +310,6 @@ OBSERVE_ALLOWLIST = (
         "prints go.work as JSON; -json prints the result instead of writing "
         "go.work (the release's go work sync guard)",
     ),
-    ObserveEntry(
-        ("go", "env", "GOVERSION"), "self-report",
-        "prints the installed Go's version (the pgdesign scaffold seeds "
-        ".go-version from it)",
-    ),
     ObserveEntry(("uv", "--version"), "self-report", "prints uv's version"),
     ObserveEntry(("ruff", "--version"), "self-report", "prints ruff's version"),
     ObserveEntry(("safegit", "--version"), "self-report", "prints safegit's version"),
