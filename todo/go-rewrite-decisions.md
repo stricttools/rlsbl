@@ -34,3 +34,8 @@ Recorded by the session that deleted the removed targets; each is an implementat
 - Fork-upstream support is kept: `upstream adopt-tags` and the upstream filters in changelog coverage.
 - The prerelease channel is dropped: the preid option and its branches in version computation, tagging, and publishing.
 - Blog-on-release is dropped: the release file field and its release steps.
+- npm also ships Go binaries, the way esbuild does: one package per platform holding the binary, selected through `optionalDependencies` with `os` and `cpu`, and no postinstall script. rlsbl's npm wrapper feature is kept and ported for this; it replaces the hand-written postinstall downloaders (saferm's and pgdesign's) when those projects next release.
+- The launcher artifact is dropped.
+- The `spec` target is dropped, so the supported targets are exactly go, npm, and pypi.
+- Local asset upload (`assets`, `custom_assets`) is dropped: the generated publish workflow already builds and attaches release archives in CI.
+- The Cloudflare Pages pipeline is dropped: selfdoc deploys documentation sites itself.
