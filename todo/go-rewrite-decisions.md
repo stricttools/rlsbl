@@ -25,3 +25,10 @@ Recorded by the session that deleted the removed targets; each is an implementat
 - Not edited, and left for a follow-up: `rlsbl/commands/init_cmd.py`, which held another session's uncommitted work (its `USER_OWNED` set still lists `.dockerignore`, and comments name zig, plain, and Docker); the module docstring of `rlsbl/private_paths.py`, which still mentions the Docker build context, because the module's source is embedded verbatim in every scaffolded pypi CI workflow, rlsbl's own included, so editing it means re-scaffolding those workflows; `rlsbl/targets/AXES-WORKLIST.md`, a record of the axes migration that names the removed targets; and the names of test files that mention removed targets (`test_batch_release_init_flutter.py`, `test_monorepo_add_plain.py`, `test_scaffold_plain_devnode.py`), which await a naming decision.
 - `library-lint` stays declared impure, though the maven linter was the only reason it started a program that writes.
 - Tests that used a removed target as a convenient fixture were moved to a kept target, mostly spec, the kept target that only bumps a version.
+
+## Rulings on the subsystem survey
+
+- `monorepo extract` and `monorepo absorb` are kept.
+- The subtree mirror is dropped: the `monorepo mirror` command, mirror publication, the release mirror step, and its checks.
+- Deploy is dropped: deploy.py, its config key, and its release step.
+- Fork-upstream support is kept: `upstream adopt-tags` and the upstream filters in changelog coverage.
