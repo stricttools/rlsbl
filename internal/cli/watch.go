@@ -19,14 +19,14 @@ import (
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
 
-const watchHelp = "Watch the GitHub Actions runs of a commit (HEAD when none is named), or of the runs --run-id names, until each concludes, " +
-	"through the authenticated gh command line. A run gh stops watching without a pass is a failure only when the run's own state says it " +
-	"completed; a run still going is watched again. A failed run is classified from its failing jobs' logs: a deterministic failure (tests, " +
-	"compilation, configuration, workflow syntax, a missing secret) is reported with the command running its failed jobs by hand, and any " +
-	"other failure is run again once (only its failed jobs for an infrastructure failure, where the run never executed). When the commit is " +
-	"a release commit of a releasable the release record holds, every release-triggered workflow of the tagged tree must show a run for " +
-	"its tag, or the command fails naming what it found. Runs started after the first listing are watched too. A commit on which no run " +
-	"appears within two minutes fails, naming the command to run again. Exits 0 when every run passed and 1 otherwise."
+var watchHelp = fmt.Sprintf("Watch the GitHub Actions runs of a commit (HEAD when none is named), or of the runs --run-id names, until each concludes, "+
+	"through the authenticated gh command line. A run gh stops watching without a pass is a failure only when the run's own state says it "+
+	"completed; a run still going is watched again. A failed run is classified from its failing jobs' logs: a deterministic failure (tests, "+
+	"compilation, configuration, workflow syntax, a missing secret) is reported with the command running its failed jobs by hand, and any "+
+	"other failure is run again once (only its failed jobs for an infrastructure failure, where the run never executed). When the commit is "+
+	"a release commit of a releasable the release record holds, every release-triggered workflow of the tagged tree must show a run for "+
+	"its tag, or the command fails naming what it found. Runs started after the first listing are watched too. A commit on which no run "+
+	"appears within %d seconds fails, naming the command to run again. Exits 0 when every run passed and 1 otherwise.", int64(ci.WatchDiscovery/time.Second))
 
 // watchPayload is watch's payload.
 type watchPayload struct {

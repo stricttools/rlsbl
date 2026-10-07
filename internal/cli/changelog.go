@@ -20,12 +20,12 @@ const changelogGroupHelp = "The structured changelog: one JSONL file of entries 
 	"or breaking and naming the commits it describes, with CHANGELOG.md generated from them. Every command acts on the releasable of the " +
 	"member whose directory holds the working directory, except remap, which rewrites every changelog of the repository."
 
-const changelogAddHelp = "Append an entry to the releasable's unreleased.jsonl and commit it. Each commit must resolve and change a file " +
-	"the releasable's changelog covers (its members' files and its own state directories). A user-facing entry (the default) needs " +
-	"--description and --type; --no-user-facing marks an internal change that CHANGELOG.md and the release notes leave out. A commit an " +
-	"entry of the same type and user-facing value already names is refused. An entry naming more than five commits needs --batch-reason " +
-	"saying why they are one change, which the entry carries and which exempts it from the per-entry limit; an entry within the limit " +
-	"refuses one. In a workspace the entry records the releasable's members the commits change. Committed unless --no-auto-commit."
+var changelogAddHelp = fmt.Sprintf("Append an entry to the releasable's unreleased.jsonl and commit it. Each commit must resolve and change a file "+
+	"the releasable's changelog covers (its members' files and its own state directories). A user-facing entry (the default) needs "+
+	"--description and --type; --no-user-facing marks an internal change that CHANGELOG.md and the release notes leave out. A commit an "+
+	"entry of the same type and user-facing value already names is refused. An entry naming more than %d commits needs --batch-reason "+
+	"saying why they are one change, which the entry carries and which exempts it from the per-entry limit; an entry within the limit "+
+	"refuses one. In a workspace the entry records the releasable's members the commits change. Committed unless --no-auto-commit.", changelog.MaxCommitsPerEntry)
 
 const changelogGenerateHelp = "Write the releasable's CHANGELOG.md from its changelog files and release archives (the root CHANGELOG.md " +
 	"standalone; .strictmetadata/changelog/<releasable>/CHANGELOG.md and the root roll-up in a workspace), and commit what changed with the " +
@@ -94,7 +94,7 @@ func registerChangelog(r *commandSet) {
 			strictcli.StringFlag("type", "What the change is (required for a user-facing entry)", strictcli.Optional(), entryTypeChoices),
 			strictcli.BoolFlag("user-facing", "Whether CHANGELOG.md and the release notes show the entry (user-facing when neither --user-facing nor --no-user-facing is passed)", strictcli.Optional()),
 			strictcli.BoolFlag("auto-commit", "Commit the unreleased file (committed when neither --auto-commit nor --no-auto-commit is passed)", strictcli.Optional()),
-			strictcli.StringFlag("batch-reason", "Why the entry's more than five commits are one change; the entry carries it, and it exempts the entry from the per-entry commit limit", strictcli.Optional()),
+			strictcli.StringFlag("batch-reason", fmt.Sprintf("Why the entry's more than %d commits are one change; the entry carries it, and it exempts the entry from the per-entry commit limit", changelog.MaxCommitsPerEntry), strictcli.Optional()),
 		},
 		run: runChangelogAdd,
 	})
