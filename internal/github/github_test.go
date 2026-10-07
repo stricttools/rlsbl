@@ -2,6 +2,7 @@ package github
 
 import (
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -378,4 +379,29 @@ func TestAPIGetRefusesTheRepositoryPlaceholders(t *testing.T) {
 		}
 		return nil
 	}))
+}
+
+// No call site asks gh for the raw credential: `gh auth token` and the
+// --show-token forms print it to a captured stdout.
+func TestNoCallSiteAsksForTheRawToken(t *testing.T) {
+	hygiene.Isolate(t)
+	files, err := filepath.Glob("*.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range files {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(data)
+		for _, banned := range []string{`"auth", "token"`, "show-token", `"-t"`} {
+			if strings.Contains(text, banned) {
+				t.Errorf("%s spells %s", path, banned)
+			}
+		}
+	}
 }
