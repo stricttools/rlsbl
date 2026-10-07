@@ -57,6 +57,10 @@ type PublishTarget struct {
 	// License is the releasable's license, which the manifests a go-binary
 	// pipeline generates carry.
 	License string
+	// RepositoryURL is the repository the npm platform packages a go-binary
+	// pipeline generates name, written only where the features allow
+	// repository URLs.
+	RepositoryURL string
 	// Tag is the releasable's tag scheme, from which a go-binary pipeline's
 	// jobs read the released version.
 	Tag workflows.TagParts
@@ -83,9 +87,10 @@ var packageManagerSteps = map[string]struct{ setupAction, install, pack, publish
 	"yarn": {"", "yarn install --immutable", `yarn pack --out "$RUNNER_TEMP/artifacts/package.tgz"`, "yarn npm publish"},
 }
 
-// actionVersions is the pinned action table in the form internal/workflows
-// takes it.
-func actionVersions() (workflows.ActionVersions, error) {
+// ActionVersions is the pinned action table in the form internal/workflows
+// takes it: the pins every generated workflow uses, the workspace's routers
+// included.
+func ActionVersions() (workflows.ActionVersions, error) {
 	table, err := actions()
 	if err != nil {
 		return nil, err
@@ -185,7 +190,7 @@ func renderGoBinaryJobs(t PublishTarget, f Features) (PublishJob, error) {
 	if p.BinaryPipeline == "" {
 		return PublishJob{}, fmt.Errorf("the %s pipeline %q packages a go binary pipeline's binaries and names no binary_pipeline in %s", p.Type, p.Name, declarations.ReleasablesFile)
 	}
-	versions, err := actionVersions()
+	versions, err := ActionVersions()
 	if err != nil {
 		return PublishJob{}, err
 	}
@@ -197,11 +202,16 @@ func renderGoBinaryJobs(t PublishTarget, f Features) (PublishJob, error) {
 	perms := map[string]string{"contents": "read", "id-token": "write"}
 	switch p.Type {
 	case declarations.TargetNPM:
+		repositoryURL := ""
+		if f.RepositoryURLs {
+			repositoryURL = t.RepositoryURL
+		}
 		text, err := workflows.NPMPackagingJobs(workflows.NPMPackaging{
 			GoBinaryRelease: release,
 			Package:         t.PackageName,
 			Dir:             dir,
 			License:         t.License,
+			RepositoryURL:   repositoryURL,
 			Provenance:      f.BuildAttestations,
 			Actions:         versions,
 		})
@@ -243,10 +253,14 @@ func boolVar(b bool) string {
 	return ""
 }
 
-// joinDir is rel inside dir, both slash-separated; dir "." is the root.
+// joinDir is rel inside dir, both slash-separated; "." (or empty) on either
+// side is the other side's directory itself.
 func joinDir(dir, rel string) string {
-	if dir == "." || dir == "" {
+	switch {
+	case dir == "." || dir == "":
 		return rel
+	case rel == "." || rel == "":
+		return dir
 	}
 	return strings.TrimSuffix(dir, "/") + "/" + rel
 }
