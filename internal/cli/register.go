@@ -40,16 +40,36 @@ type command struct {
 	consequential bool
 	// noDryRun, when set, is why --dry-run is refused.
 	noDryRun string
-	flags    []strictcli.Flag
-	args     []strictcli.Arg
+	// grants are the command's labelled authorizations for dangerous
+	// effects, shown in its preview.
+	grants []strictcli.Grant
+	flags  []strictcli.Flag
+	args   []strictcli.Arg
 	// payload is the JSON Schema of the --json payload; nil declares none.
 	payload map[string]any
 	// render is the human rendering of the payload, required with payload.
 	render func(payload any) string
 	// run performs the command and returns its payload (nil for a command
 	// declaring none). A non-nil error ends the command with exit status 1
-	// and the error on stderr; a payload returned with it is still emitted.
+	// and the error on stderr, or with the status an *exitStatus states; a
+	// payload returned with it is still emitted.
 	run func(ctx *strictcli.Context, kw map[string]any) (any, error)
+}
+
+// exitStatus is an error that ends a command with a status of its own, for
+// a command whose exit status is part of its answer (check-name exits 1 for
+// a taken name and 2 for a check that could not be made). An empty message
+// prints nothing, because the command's output already said why.
+type exitStatus struct {
+	code    int
+	message string
+}
+
+func (e *exitStatus) Error() string {
+	if e.message == "" {
+		return fmt.Sprintf("exit status %d", e.code)
+	}
+	return e.message
 }
 
 // registry registers commands and the groups that hold them.
@@ -107,6 +127,9 @@ func (r *registry) add(c command) {
 	if c.noDryRun != "" {
 		opts = append(opts, strictcli.WithDryRunUnsupported(c.noDryRun))
 	}
+	if len(c.grants) > 0 {
+		opts = append(opts, strictcli.WithGrants(c.grants...))
+	}
 	if len(c.flags) > 0 {
 		opts = append(opts, strictcli.WithFlags(c.flags...))
 	}
@@ -128,6 +151,13 @@ func (r *registry) add(c command) {
 			}
 		}
 		if err != nil {
+			var status *exitStatus
+			if errors.As(err, &status) && status.code != 0 {
+				if status.message != "" {
+					ctx.Error(status.message)
+				}
+				return strictcli.Exit(status.code)
+			}
 			ctx.Error(err.Error())
 			return strictcli.Exit(1)
 		}

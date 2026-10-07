@@ -83,6 +83,35 @@ func TestAHandlerErrorEndsTheCommandWithExitOne(t *testing.T) {
 	}
 }
 
+// A command whose exit status is part of its answer ends with the status it
+// states, printing its message only when it has one.
+func TestAnExitStatusEndsTheCommandWithItsOwnCode(t *testing.T) {
+	hygiene.Isolate(t)
+	r := scratchRegistry()
+	r.add(command{
+		path:   []string{"silent"},
+		help:   "End with status 2 and no message",
+		effect: readOnly,
+		run: func(*strictcli.Context, map[string]any) (any, error) {
+			return nil, &exitStatus{code: 2}
+		},
+	})
+	r.add(command{
+		path:   []string{"loud"},
+		help:   "End with status 3 and a message",
+		effect: readOnly,
+		run: func(*strictcli.Context, map[string]any) (any, error) {
+			return nil, &exitStatus{code: 3, message: "the registry did not answer"}
+		},
+	})
+	if res := r.app.Test([]string{"silent"}); res.ExitCode != 2 || strings.Contains(res.Stderr, "error:") {
+		t.Fatalf("silent: exit %d, %q", res.ExitCode, res.Stderr)
+	}
+	if res := r.app.Test([]string{"loud"}); res.ExitCode != 3 || !strings.Contains(res.Stderr, "the registry did not answer") {
+		t.Fatalf("loud: exit %d, %q", res.ExitCode, res.Stderr)
+	}
+}
+
 func TestAPayloadFromACommandDeclaringNoneIsAnError(t *testing.T) {
 	hygiene.Isolate(t)
 	r := scratchRegistry()
