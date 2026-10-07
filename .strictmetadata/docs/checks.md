@@ -1,75 +1,47 @@
 +++
-description = "The checks rlsbl runs, grouped by tag with severity and option: running and scoping a check run, failing-checks, hook selections, what each check compares, target applicability, and unpublished-refs."
+description = "The checks rlsbl runs, listed by tag from its checks registry: running a check run and where it is scoped, failing-checks and the hook selections, options that soften or switch off a check, the strictcode check, unpublished-refs, the framework checks, and check metadata and purity."
 +++
 
 # Check system
 
 :-: check-count
 
-Run checks via the `rlsbl check` command. Checks are organized across 6 primary tags (project, release, changelog, workspace, quality, prepush) and validate project metadata, release state, changelog structure, workspace integrity, code quality, and pre-push enforcement. Four additional untagged checks run only with `--all` or `--name`. Two further tags exist for pipeline grouping: `preflight` and `preflight-changelog` are run internally by `rlsbl release run`. A few more checks come from strictcli rather than from rlsbl's own `checks.toml` and are therefore outside every count on this page; they are documented under [framework checks](#framework-checks).
+Every check is declared in `internal/checks/checks.toml`, which rlsbl embeds and registers through strictcli's check framework; the tables on this page are rendered from that file. A few more checks come from strictcli itself and are listed under [framework checks](#framework-checks).
 
 ## Running checks
 
 ```bash
-# Run all checks
-rlsbl check --all
-
-# Run all checks in a tag
-rlsbl check --tag changelog
-
-# Run a single check by name
+rlsbl check --all                    # every check, untagged ones included
+rlsbl check --tag changelog          # one tag
 rlsbl check --name version-consistency
-
-# Scope a run to one releasable (required at a monorepo workspace root)
-rlsbl check --tag changelog --releasable core
-
-# Run the checks a declared hook selects
-rlsbl check --hook pre-push
-
-# Report only the error-level failures, exiting 1 only when one exists
-rlsbl failing-checks --hook pre-push
+rlsbl check --hook pre-push          # the selection a hook declares
+rlsbl check --list                   # each check, its option value, and where the value came from
+rlsbl failing-checks --hook pre-push # only the error-level failures
 ```
 
-### Full report and failing checks
+`rlsbl check` is the full report: every selected check's result, exiting non-zero on any failure. `rlsbl failing-checks` takes the same selection flags, prints only the failures that block, and exits 1 only when one exists; a check at `warn`, registered that way or softened by an options entry, never appears in it.
 
-`rlsbl check` is the full report: every selected check's result, and a nonzero exit on any failure or warning. `rlsbl failing-checks` takes the same selection flags (`--all`, `--tag`, `--name`, `--hook`, and `--releasable`), applies each check's [option](#options) value, prints only the error-level failures, and exits 1 only when one exists; a check at `warn`, registered that way or softened by an options entry, never appears in it.
-
-`--hook <name>` runs the selection a `[hooks.<name>]` table in rlsbl's `checks.toml` declares, and cannot be combined with `--all`, `--tag`, or `--name`:
+`--hook <name>` runs the selection a `[hooks.<name>]` table of `checks.toml` declares:
 
 | Hook | Selection | Run by |
 | --- | --- | --- |
 | `pre-push` | tag `prepush` | the installed `.git/hooks/pre-push`, as `rlsbl failing-checks --hook pre-push` |
-| `pre-release` | tag `preflight` | the check step of `rlsbl release run`, which blocks on error-level failures only |
+| `pre-release` | tag `preflight` | the preflight of `rlsbl release run`, which blocks on error-level failures only |
 
 ### Where a check run is scoped
 
-In a standalone repository, and in a workspace member's directory, the cwd names exactly one project and every check answers for it.
+A check answers for what the working directory selects:
 
-A workspace ROOT does not: it names the workspace. The checks that answer for one project -- the whole `project`, `changelog` and `release` families, and every `quality` check that is not workspace-scoped -- therefore refuse there with an error result naming both routes, rather than reading the root as a project of its own (which reported SKIP "no targets detected" and demanded config keys in a `.rlsbl/config.json` a workspace root must not have). Name the releasable with `--releasable <name>` to scope the run to it, or run `rlsbl check` from a member directory.
+- A check without a scope answers for the member holding the working directory and the releasable it is versioned under; in a standalone repository that is the root member and the one releasable. At a workspace root, which names no releasable, such a check refuses, naming running it from a member's directory. The changelog checks skip a member versioned under no releasable, which has no changelog.
+- A `repository` check answers for the whole repository, wherever it is run.
+- A `workspace` check answers for the workspace and skips in a standalone repository.
+- `non_dev_only`, `non_dev_node`, `library`, and `releasable` narrow the members a check sees, and `push` skips a check outside a push.
 
-Two families are untouched at the root, because it is the position they are meant to be run from: the workspace-scoped checks (`--tag workspace`), and the `prepush` family, which the pre-push hook runs at the repository root of every workspace.
-
-`--releasable` is refused anywhere the directory already answers -- a member directory, or a standalone repository.
-
-`check` and `failing-checks` are strictcli's own auto-registered commands and their flags are the framework's, so rlsbl lifts `--releasable` out of argv before the app parses it, exactly as it does for the positional arguments strictcli cannot express. It is therefore absent from `rlsbl check --help`, from `rlsbl failing-checks --help`, and from the dumped CLI schema; this page and the refusal itself are where it is documented.
-
-## Check results
-
-Each check returns one of four statuses that determine how the result is displayed and whether it blocks the release pipeline. The severity level (error or warn) is declared per-check in the check metadata stored in `checks.toml` and controls which status is reported on failure versus advisory findings:
-
-| Status | Meaning | Effect |
-| --- | --- | --- |
-| pass | Check passed | No action needed |
-| fail | Check failed | Blocking error -- must be fixed before release |
-| warn | Advisory finding | Informational -- does not block release |
-| skip | Not applicable | Check cannot run for this project (e.g., workspace check in a standalone project) |
-| off | Switched off | The check's [option](#options) is `off` for this project, so it did not run; the row names the options entry (or the default) the value came from |
-
-Severity is declared per-check in metadata. A check with `severity = "error"` reports `fail` on failure; one with `severity = "warn"` reports `warn`. A project can lower a check's severity, never raise it, through the check's option.
+A check that cannot answer (the declarations, the options, the lifecycle-and-license record, or a fork's upstream cannot be read) fails as an error, whatever its severity; `declarations-valid` and `lifecycle-record-valid` name why.
 
 ## Options
 
-Every check is an option, `rlsbl:<check name>`, and so are the checks strictcli registers into rlsbl (see [framework checks](#framework-checks)). An error check ranks `error > warn > off` and a warning check `warn > off`; the default is the check's registered severity. A project deviates from a default only by filing an entry in `.strictmetadata/options/` at its git root, in the subject file the option names, with the value it runs today (`current`), the value it should run (`ideal`), and its reason. The options model, its validation and its dependency rules are strictspec's (see strictspec's options appendix); rlsbl ships the registry and applies the entries.
+Every check is an option, `rlsbl:<check name>`. An error check ranks `error > warn > off` and a warning check `warn > off`; the default is the check's registered severity. A repository deviates from a default only by filing an entry under `.strictmetadata/options/`, in the subject file the option names, with the value it runs (`current`), the value it should run (`ideal`), and the reason. strictspec owns the options model and validates every entry; rlsbl ships the registry and applies the entries.
 
 | Value | What the check does |
 | --- | --- |
@@ -77,328 +49,130 @@ Every check is an option, `rlsbl:<check name>`, and so are the checks strictcli 
 | `warn` | Runs and reports its failures as warnings, which never block. |
 | `off` | Does not run, and is shown as `off` with the entry it came from. |
 
-`rlsbl options registry` prints the registry (`--json` for the declarations as data), and `rlsbl options set <id> --current <value> --ideal <value> --reason <text> [--scope <member>]` writes an entry, creating the directory and its `manifest.toml` when absent, validating the result before anything is written, and committing it with the `Autogenerated` trailer. `rlsbl check --list` shows each check's value and where it came from.
+`rlsbl options registry` prints the registry (`--json` for the declarations as data), and `rlsbl options set <id> --current <value> --ideal <value> --reason <text> [--scope <member path>]` writes an entry, creating the directory and its `manifest.toml` when absent, validating the result before anything is written, and committing it with the `Autogenerated: true` trailer.
 
-- **Requirements.** An option requires the options of the checks its check `depends_on`, and strictspec refuses an entry switching an option `off` while an option requiring it is not off too. Switch each dependent off in its own entry with its own reason.
-- **Invalid entries stop everything.** Every check run and every release loads the entries and refuses on any diagnostic -- a document strictspec cannot read, an rlsbl entry it refuses, a scope naming no workspace member -- rather than running with some of them.
-- **Adoption options default to `off`.** `rlsbl:dep-floors`, `rlsbl:lint`, `rlsbl:format`, `rlsbl:type-check` and `rlsbl:strictspec-certificate-gate` stand for checks most projects do not need, and `rlsbl:test-sandbox` (`on > off`) for the sandboxed test runner. Each governs a setting in `.rlsbl/config.json` that is required while the option is on and refused while it is off ([settings that belong to an option](configuration.md#settings-that-belong-to-an-option)).
-- **Path scopes.** The adoption options take a `path` scope: an entry with `scope = "<member path>"`, the member's directory relative to the repository root, covers that workspace member alone, and wins over an entry with no scope.
+- **Requirements.** An option requires the options of the checks its check `depends_on`, and strictspec refuses an entry switching an option off while an option requiring it is on.
+- **Invalid entries stop everything.** Every check run and every release refuses on any diagnostic rather than running with some of the entries.
+- **Options that are not checks.** `rlsbl:test-sandbox` (`on > off`, default `off`) adopts the sandboxed test runner, and `rlsbl:ecosystem-tagging` (`on > off`, default `on`) adds the `rlsbl` keyword to npm and PyPI manifests and the `rlsbl` topic to the GitHub repository.
+- **Adoption options.** `rlsbl:dep-floors` and `rlsbl:test-sandbox` stand for things most repositories do not need: they default to `off`, take a path scope naming one workspace member (`--scope <member path>`), and govern a [declaration](declarations.md#settings-that-belong-to-an-option) that is required while they are on and refused while they are off.
+- **Linting, formatting, and type checking are strictcode's.** They are adopted through strictcode's own options (`strictcode:lint`, `strictcode:format`, `strictcode:type-check`), and `rlsbl:strictcode` (default `error`) runs every strictcode rule in every release.
 
 ## Tags
 
-| Tag | Purpose | Check count |
-| --- | --- | --- |
-| `project` | Project-level metadata, config schema, version consistency | 30 |
-| `release` | Released-version refs, branch sync, CI credentials, private-repository publishing, and conversion follow-ups | 8 |
-| `changelog` | JSONL changelog validation and structure | 10 |
-| `workspace` | Monorepo workspace integrity and dependency rules | 24 |
-| `quality` | Code quality, dependency analysis, scaffold hygiene | 15 |
-| `prepush` | Pre-push enforcement: changelog coverage, gitignore guard, manual-push refusal, tests | 6 |
+:-: table-check-tags
 
-Some checks carry multiple tags, so they appear in multiple tag counts: `test-suite` is tagged `prepush` and `quality`, `test-suite-workspace` is tagged `prepush` and `workspace`, and `scaffold-conflicts` is tagged `project`, `prepush`, and `release`. Four checks (`layers-violations`, `deps-unused`, `deps-undeclared`, `deps-stale`) have no tag and only run with `--all` or `--name`. Internal tags used by the release pipeline: `preflight` (30 checks: `npm-token-synced`, `library-lint`, `test-suite`, `dev-overlay-drift`, `wrapper-producer`, `strictspec-certificate-gate`, `testisolation-floor`, `dep-floors`, `dep-locks`, `go-module-identity`, `go-module-major-suffix`, `path-tag-format-go-member`, `nested-member-runner-exclusion`, `nested-member-upload-contents`, `nested-member-uv-sources`, `upload-private-paths`, `go-workspace-require-current`, `go-workspace-replace`, `go-toolchain-declared`, `ldflags-symbol`, `strictspec-generated-format`, `target-matrix-fresh`, `router-filters-fresh`, `workspace-unbuildable`, and the six path-capable tool checks `lint`, `lint-scope-guard`, `format`, `format-scope-guard`, `type-check`, `type-check-scope-guard`) and `preflight-changelog` (9 checks: the structural changelog checks, i.e. all changelog checks except `changelog-entry`).
+A check can carry several tags, so it appears under each. `preflight` is the selection every release runs before it writes anything (the `pre-release` hook), and `preflight-changelog` the changelog checks the release runs as its changelog validation. A check carrying no tag runs only under `--all` or `--name`.
 
-## Project checks
+### `project`
 
-| Check | Severity | Description |
-| --- | --- | --- |
-| `lock` | warn | Detects stale lock state in `.rlsbl/` |
-| `version-consistency` | error | Project version matches across all target files (e.g., `pyproject.toml`, `package.json`); `.rlsbl/version` is not compared, since it names the rlsbl that last scaffolded or released the project |
-| `name-consistency` | warn | Package name is consistent across manifest files |
-| `description-consistency` | warn | Package description is consistent across manifest files |
-| `license-file` | error | A LICENSE file exists in the project root |
-| `license-consistency` | warn | License identifier matches across manifest files |
-| `config-schema` | error | What `.rlsbl/config.json` may not say: the retired `private` key (`publish_mode` is required in its place), an empty `targets` list (`publish_mode: "none"` is how publishing is suppressed), a `release.mode` key (PR mode was removed), and the retired `changelog_format_version_enforced` key (the `rlsbl:changelog-format-version-gate` option replaced it). A setting that belongs to an adoption option must agree with it: required while the option is on, refused while it is off. Plus the shape of the `pipelines` section and its links to the declared targets. An unknown key is NOT policed here — see [policed configuration surfaces](configuration.md#policed-configuration-surfaces) |
-| `private-hook-stale` | error | Detects leftover private repo hook files that should be deleted |
-| `publish-mode-workflow` | error | `publish_mode: "none"` repos must not have a publish workflow that pushes to public registries |
-| `npm-private-mismatch` | error | `package.json` private field matches `.rlsbl/config.json` private flag (npm targets only) |
-| `target-version-readable` | error | Version can be read from all declared target files |
-| `dunder-version-missing` | error | PyPI targets that keep a version constant in source must use `__version__` |
-| `selfdoc-version-drift` | error | selfdoc-generated version references match the actual project version |
-| `scaffold-conflicts` | error | Unresolved git merge conflict markers in scaffold files (managed-files registry, `.github/workflows/`, all of `.rlsbl/`); also tagged `prepush` and `release` |
-| `stash-free` | error | The repository carries no stash. A stash is uncommitted work with no branch of its own, so nothing records what it belongs to; `rlsbl release run`, `rlsbl release resume`, `rlsbl release reconcile --apply` and `rlsbl release backfill --apply` each refuse one outright, and this reports it before any of them is reached |
-| `cross-repo-path-sources` | error | `[tool.uv.sources]` path entries in the committed `pyproject.toml` must resolve inside the repository (in-repo paths and `workspace = true` are legal; local overrides belong in `dev-sources.toml.local-only`). Also enforced unconditionally by `rlsbl release run` |
-| `dev-overlay-drift` | error | Packages recorded in the `rlsbl dev sync` sentinel are still editable installs of their declared checkouts (a bare `uv sync` silently replaces an overlay with the released wheel) |
-| `requires-services` | error | CI service containers declared under `services`/`test_env` are actually provisioned in the rendered CI workflow |
-| `wrapper-producer` | error | Every launcher pipeline's `wraps` reference names a real binary-artifact pipeline, and the wrapped target's manifest still carries the shim-critical fields |
-| `strictspec-certificate-gate` | error | The strictspec diff certificate the `strictspec_gate` section names reports no violated (or unsupported-and-unadjudicated) claim. Its option, `rlsbl:strictspec-certificate-gate`, defaults to `off` |
-| `testisolation-floor` | error | An adopted sandboxed test runner works: the `test_sandbox` runner script exists and is executable, the config family is complete, and every CI workflow the family names actually invokes the runner. Skips when the project has adopted neither the runner (the `rlsbl:test-sandbox` option) nor the testisolation plugin |
-| `dep-floors` | error | Ecosystem-internal dependencies declare a `>=` floor at the version the lock resolves. Compares `pyproject.toml` against `uv.lock` and `package.json` against `package-lock.json`; Go is structurally satisfied (`require` lines are the minimums). Its option, `rlsbl:dep-floors`, defaults to `off`; while it is on, the `internal_dep_floors` config key names the packages it polices |
-| `dep-locks` | error | Every lockfile still resolves the manifest beside it: `uv.lock`'s entry for this project against `pyproject.toml` (version, requirements, dependency groups), `package-lock.json`'s root entry against `package.json`, and `go.sum`'s coverage of `go.mod`'s requires. Structural and offline -- no package manager is invoked and nothing is resolved. Each finding names the command that refreshes the lock |
-| `go-module-identity` | error | Every `go.mod`'s module path equals the repository's origin identity plus the module's subdirectory (`git@github.com:owner/repo.git` + `services/api` -> `github.com/owner/repo/services/api`), with a `/vN` major suffix accepted. Findings name the `rlsbl rewrite go-module-path` invocation that fixes them. Skips when there is no origin remote; when the remote names an SSH host alias rather than a domain, the host segment is left unverified and the outcome says so |
-| `go-module-major-suffix` | error | No `go.mod` module path ends in a major-version suffix (`/v2` and above): Go resolves only `v2.x.y` and later versions of such a module, and a Go tag is permanent, so it is refused before anything is tagged. Findings name the `rlsbl rewrite go-module-path` invocation that drops the suffix. Also tagged `preflight` |
-| `go-toolchain-declared` | error | Every Go module's `go.mod` carries a `toolchain` line. `actions/setup-go` installs the Go that line names and, without it, the `go` directive's version -- the oldest Go consumers may build with -- so CI would test on a Go nobody develops with. Presence only: the line is never compared with the Go installed on the machine running the check. Findings name the remedy, `go mod edit -toolchain=<version>` in the module's directory |
-| `ldflags-symbol` | error | Every `-X importpath.Symbol=value` linker flag in the project's tracked build configuration (`.goreleaser.yml`/`.yaml`, Makefiles, shell scripts, CI workflow YAML) names a symbol the Go source declares as a package-level `var` of type string, uninitialized or initialized to a constant string -- the only shape the linker can set. A `-X` naming a symbol that does not exist links SILENTLY, so the released binary reports its fallback version forever and nothing in the toolchain says so. Symbol-agnostic: `main.version` with `var version` and `main.Version` with `var Version` both pass; only the relationship is checked. A symbol that exists and is injectable but that nothing in the module reads WARNS instead -- the same user-visible bug by a different route, but fixing it can mean adding a version surface. `.rlsbl/bases/` (scaffold base copies) and `dist/` (goreleaser output) are not scanned, and an occurrence whose target cannot be resolved (a build-time template in the import path, a package outside this module) is reported as unverified rather than guessed at |
-| `strictspec-generated-format` | error | Every validator `strictspec.toml` declares carries a `GENERATED_CODE_FORMAT` the linked `strictspec` runtime reads. A generated validator calls `require_generated_code_format(GENERATED_CODE_FORMAT, GENERATED_BY)` at import, and pairing holds while the declared format is inside the inclusive range the runtime publishes -- so an ordinary strictspec release stales nothing, while a validator outside the range, or one predating the format declaration, raises on import for whoever installed the artifact. Every finding names the file and the remedy: regenerate with `strictspec gen`. No dependency floor is derived from `GENERATED_BY`, which is informational. Skips when the project has no `strictspec.toml` |
-| `upload-private-paths` | error | No upload a release would publish carries a private path: planning notes (`todo/`), release and family metadata (`.rlsbl/`, `.rlsbl-monorepo/`, `.strictmetadata/`, and the earlier family roots `stricttools/` and `.stricttools/`), tool state (`.selfdoc/`, `.strictcli/`), agent instructions (`CLAUDE.md`, `AGENTS.md`, `.claude/`), scratch output (`experiments/`, `screenshots/`), environment files (`.env*`), and anything named `*.local-only`. The plain names count at the package directory's root only; the dot-directories, the agent files, and the name patterns count at any depth, except inside a `testdata` directory, whose contents are test fixtures. A registry keeps every upload permanently. The npm package is listed with `npm pack --dry-run --ignore-scripts --offline`, and the Go module zip is derived from the tracked files by Go's own rule, both offline and before the release mutates anything. Each finding names the file and the exclusion that keeps it out: an `.npmignore` entry (or a narrower `files` field), a stub `go.mod` in the private directory (Go leaves a directory holding its own `go.mod` out of the zip, so a private file at the module root moves or stops being committed). A Python upload can only be listed by building it, so the pypi CI template builds it on the candidate commit and runs the same rule over the sdist and wheel, naming the build backend's own exclusion (`exclude` under `[tool.hatch.build.targets.sdist]` for hatchling). `rlsbl scaffold` writes all of these exclusions for a new project. Also tagged `preflight` |
-| `target-matrix-fresh` | error | The committed support matrix (`rlsbl/data/support-matrix.json`) matches a fresh regeneration from the target, check and pipeline registries. The docs directives render from that file instead of importing rlsbl, so a stale file ships wrong documentation. Skips wherever the artifact does not exist |
+:-: table-checks tag="project"
 
-## Release checks
+### `release`
 
-| Check | Severity | Description |
-| --- | --- | --- |
-| `unpublished-refs` | error | Every ref each archived release owns -- its primary tag (the tag an archive records in `shipped_as` for a version that shipped under a historical spelling, else the current scheme's), its ecosystem's companion tags, and its recorded aliases (a rename's or conversion's `boundary-alias` event) -- exists locally, exists on origin, and points at the commit the release recorded; and every version whose primary tag is on origin carries a GitHub Release, under that tag or the current scheme's spelling (requires network) |
-| `branch-sync` | error | Local branch is not behind the remote tracking branch (requires network) |
-| `ci-publish-secrets` | error | Every Actions secret the configured CI publish pipelines authenticate with exists on the repository. Which secrets those are is each pipeline's own declaration (`ci_secret_names`): the npm pipeline declares `NPM_TOKEN`, a pypi pipeline declares none because it publishes through OIDC trusted publishing, and a `local: true` pipeline declares none. Without the secret the publish job fails with `ENEEDAUTH` after the release has already tagged, pushed and created the GitHub Release. Presence only -- the value is never read. The finding names the exact `gh secret set` command (requires network) |
-| `npm-token-synced` | error | npm accepts the token in `~/.npmrc` (asked with `GET /-/whoami`), and the repository's `NPM_TOKEN` secret was set no earlier than that token was created: its `updated_at` from the GitHub API against the token's creation time from `npm token list --json`, matched by the token's first and last characters. A secret set earlier holds an older token, and once that one expires the CI npm publish fails after the release has tagged and pushed. Applies when a configured CI publish pipeline authenticates with `NPM_TOKEN`; a creation time that cannot be determined, or a secret that cannot be read, is an error. The finding names `rlsbl secrets sync-npm-token` as the fix. Also tagged `preflight`, so it blocks the release before anything is tagged (requires network) |
-| `private-repo-publishing` | error | A private repository's release uses nothing that needs a public one: npm build provenance (`"provenance": true` on an npm pipeline), PyPI attestations (a `pypa/gh-action-pypi-publish` step in `.github/workflows/` without `attestations: false`, which would record the repository's name, workflow, and commit in a public transparency log), or the Go module proxy (a Go pipeline publishing a library from CI, or any `local: true` Go pipeline). A publish workflow in `.github/workflows/` that still publishes with `--provenance` or still asks the Go module proxy for the module counts too, because the config fix alone does not change the committed workflow a Release starts. Each finding names its fix: `"provenance": false`, `rlsbl scaffold` (which writes `attestations: false` for a private repository, regenerates the workflow without `--provenance`, and removes it under `publish_mode: "none"`), or `"publish_mode": "none"`, and the fix is committed. The release judges the committed workflows, the check the working tree. The repository's visibility is asked only when one of these is in use, and an unanswered question is an error. `rlsbl release run` refuses the same findings before it pushes anything (requires network) |
-| `old-repo-archived` | error | Every repository this one absorbed (from the transition record's conversion facts) is archived on GitHub, so it stops collecting issues, pull requests and clones for code that moved here. rlsbl never archives it -- the finding prints `gh repo archive`. Skips when the record holds no absorb (requires network) |
-| `go-deprecation-published` | error | Every superseded Go module path (from the transition record's identity transitions) serves a `// Deprecated:` notice in the `go.mod` the module proxy returns for its latest version. rlsbl never commits into the retired repository -- the finding prints the steps. Skips when the record holds no `go-module-path` transition (requires network) |
+These read something outside the working tree (origin's refs, the GitHub API, the Go module proxy, npm), which is why they are kept out of the offline tags. A question that cannot be answered fails the check; it is never read as a pass.
 
-`scaffold-conflicts` (see project checks) is also tagged `release`. `unpublished-refs` depends on `version-consistency`; if it fails, `unpublished-refs` is skipped.
+:-: table-checks tag="release"
 
-Every check in this tag reads something outside the working tree -- the remote's refs, the GitHub API, the Go module proxy. That is why they carry `release` rather than `project`: the offline tags (`project`, `changelog`, `quality`, `prepush`) stay answerable with no network, and a networked check placed in one of them would fail an offline run for a reason that has nothing to do with the repository. All of them are fail-closed: a probe that cannot answer is a hard error, never a pass. Only `npm-token-synced` is also in `preflight`: a replaced npm token leaves the `NPM_TOKEN` secret stale in every repository at once, and only a check that blocks the release before anything is tagged stops the CI publish from failing after it. The others stay out -- the release pipeline's own steps already authenticate against GitHub and the registries, and a probe failure there would block a release for a network condition rather than for anything about the repository.
+### `changelog`
 
-### `unpublished-refs`
+:-: table-checks tag="changelog"
 
-The ref set it renders against reality is `expected_refs`, the target protocol's single authority for what one version owns -- the same derivation the release's tag step acts on, so a ref the release creates can never be a ref the check does not look for.
+`changelog-range` and `changelog-coverage` depend on `changelog-hashes`. See [the changelog](changelog.md#validation) for what each verifies.
 
-Each failure it reports names `rlsbl release reconcile` as the remedy:
+### `workspace`
 
-| Failure | What it means |
+:-: table-checks tag="workspace"
+
+### `quality`
+
+:-: table-checks tag="quality"
+
+### `prepush`
+
+:-: table-checks tag="prepush"
+
+`test-suite` and `test-suite-workspace` depend on `prepush-changelog-coverage`, so a push missing a changelog entry fails before any test runs. Both run with the member's [dev overlays](dev-workflow.md#local-editable-overlays-rlsbl-dev-sync) kept.
+
+### `preflight`
+
+:-: table-checks tag="preflight"
+
+### `preflight-changelog`
+
+:-: table-checks tag="preflight-changelog"
+
+## The strictcode check
+
+rlsbl analyzes no source. Dependency declarations, dead modules, import cycles, library lint, Python lint, formatting, and type checking, and the strictspec certificate, are strictcode's rules, and the `strictcode` check runs strictcode as a program on `PATH`:
+
+1. `strictcode registry rules --json` must list every rule rlsbl requires; a strictcode missing one is refused, naming each missing rule and `go install github.com/smm-h/strictcode/cmd/strictcode@latest`. No version is compared.
+2. `strictcode analyze <repository root> --json` runs within the check budget; each finding is reported with its rule, path, and message, and an error finding fails the check.
+
+strictcode reads the members from `.strictmetadata/releasables/releasables.toml` and its own settings from `strictcode.toml`.
+
+## `unpublished-refs`
+
+For every archived release, the refs the version owns (its primary tag, which is the tag an archive records in `shipped_as` for a version that shipped under an older spelling; its Go companion tags; and the boundary aliases the transition record holds) must exist locally and on origin at the release commit, and a version whose primary tag is on origin must carry a GitHub Release. Each finding names `rlsbl release reconcile` as the repair:
+
+| Finding | What it means |
 | --- | --- |
-| missing locally | The release record records the version as released, but the ref is not in this repository |
-| missing on origin | The ref exists locally but was never pushed, so consumers cannot resolve it |
-| wrong commit | The ref exists but points somewhere other than the release's release commit, so it moved after the release wrote it |
-| no GitHub Release | The version's primary tag is on origin, but no Release document hangs off it, so the forge shows consumers no notes and the publish workflow finds no `rlsbl-ci-sha` marker to judge |
+| missing locally | The record holds the version as released, but the ref is not in this repository. |
+| missing on origin | The ref exists here but was never pushed. |
+| wrong commit | The ref points somewhere other than the release commit. |
+| no GitHub Release | The primary tag is on origin with no Release hanging off it. |
 
-It is fail-closed: a probe that cannot answer -- an unreadable local tag namespace, an `ls-remote` that fails, a Release listing that errors or that `gh` cannot make because it is absent or unauthenticated -- is an error, never a pass. A repository with no `origin` remote at all is a different state: the remote half is skipped and the outcome says so. So is a repository whose origin resolves to no GitHub repository: the Release half is skipped, because there is no forge for a Release to be missing from.
+Every archived release is checked, from one listing of the local tags, one of origin's, and one of the Releases. A version recorded `unrecoverable` has no commit to point a missing ref at, so its absences are counted and named rather than reported as fixable; a version recorded `never_released` owns no refs and is skipped. A repository without an `origin` remote skips the remote half, and one whose origin is no GitHub repository the Release half.
 
-A version the release record records as `unrecoverable` has no recoverable commit, so a ref it is missing cannot be recreated and `rlsbl release reconcile` has nothing to point at -- and no release commit to take a `rlsbl-ci-sha` marker from either, so a Release it lacks cannot be materialized. Both absences are counted and named in the outcome message instead of reported as fixable errors. Every other finding for such a version -- a ref that exists locally but not on origin -- is still reported.
+## The lifecycle checks
 
-A version the release record records as `never_released` is a version NUMBER no release ever used, so it owns no ref and no Release at all. It is skipped, named in the outcome message, and excluded from the released-version count -- reporting a phantom as a release would be the check agreeing with the mistake it exists to surface.
-
-A Release is judged on the version's primary tag, the one the release flow attaches it to, and only when that tag is on origin. A tag that never reached the forge is already reported as missing on origin, and a Release cannot exist without it.
-
-**No version window.** Every half covers every archived release, not a recent slice. The whole local tag namespace comes from one `for-each-ref`, the whole remote namespace from one `ls-remote`, and every Release from one `gh release list`, so probing two hundred releases costs the same as probing one. A per-version probe would have forced a bound and left older releases unchecked.
-
-It replaced three narrower checks (`local-tag`, `remote-tag`, `github-release`) that each looked at the primary tag of the *current* version only, and so saw neither companion tags, nor recorded aliases, nor any past release.
-
-**GitHub Release presence, and its repair.** The retired `github-release` check asked whether the *current* version's Release exists; this check asks it of every archived version, from the same listing, and reports an absence as an error. The repair is `rlsbl release reconcile`: `--plan` gives such a version a `materialize` verdict, and `--apply` creates the Release with the same body the release flow itself writes (the changelog section, the `rlsbl-ci-sha` marker taken from the recorded release commit, and the pre-release flag the version earns). The check finds the gap; the reconcile closes it. See [Reconciling published metadata](release-workflow.md#reconciling-published-metadata).
-
-## Changelog checks
-
-| Check | Severity | Description |
-| --- | --- | --- |
-| `changelog-hashes` | error | Every commit hash in JSONL entries resolves via `git rev-parse` |
-| `changelog-range` | error | Every resolved hash falls within the unreleased range -- the commits after this checkout's nearest release commit. In a workspace, a hash in that range owned by another releasable is reported as out of SCOPE, naming that owner, rather than as out of range |
-| `changelog-coverage` | error | Every unreleased commit appears in at least one JSONL entry |
-| `changelog-orphans` | error | No entries whose every hash is unresolvable, out of range, or owned by another releasable (stale from rebased/amended commits, or cross-filed) |
-| `changelog-schema` | error | User-facing entries have `description` and `type`; type is one of `feature`/`fix`/`breaking` |
-| `changelog-user-facing` | warn | At least one entry is user-facing (warning in check mode; every release except `infra` refuses to run without one) |
-| `changelog-batch-commits` | error | No single entry references more commits than `max_commits_per_entry` (default 5) |
-| `changelog-batch-entries` | error | No single commit appears in more entries than `max_entries_per_commit` (default 5) |
-| `changelog-entry` | error | `CHANGELOG.md` contains an entry for the current project version |
-| `changelog-format-version-gate` | error | Every line in `unreleased.jsonl` and every finalized `x.y.z.jsonl` carries a supported `format_version`. At `warn` (its option, `rlsbl:changelog-format-version-gate`) it still runs and reports without blocking |
-
-Dependencies: `changelog-range` and `changelog-coverage` depend on `changelog-hashes` (hash resolution must succeed first).
-
-## Workspace checks
-
-| Check | Severity | Description |
-| --- | --- | --- |
-| `router-filters-fresh` | error | The `filters:` block of the generated `ci-router.yml` matches a fresh derivation from the workspace: each member's own territory, the territories of everything it depends on (transitively, every scope), the workspace-root manifests and lockfiles, the tool's own machinery, and -- for the root member -- `**` narrowed by negated excludes of every other territory. Also verifies the step declares `predicate-quantifier: some-with-excludes`, without which those excludes match exactly what they exclude. Skips outside a workspace or when no router exists |
-| `workspace-ci-router` | error | The generated `ci-router.yml` exists at the repo root (it holds every project's inlined jobs; per-project coverage is `workspace-ci-synced`) |
-| `workspace-ci-synced` | error | Each in-scope project's CI jobs are inlined into the shared `ci-router.yml`. A member with no CI workflow file of its own (`<member>/.github/workflows/ci*.yml`) contributes no router jobs -- `monorepo sync` mints none for it -- so it is skipped with a note naming it rather than demanded. The root member is the usual case: its `.github/workflows/` holds the generated routers, which are recognized as generated and never counted as its own workflows |
-| `workspace-targets` | error | Every releasable, non-dev-only workspace member has at least one detectable target |
-| `workspace-unregistered` | error | No directory at any depth carries a manifest (or `.rlsbl/config.json`) without being a member declared in `workspace.toml` or a declared target path. Every manifest git lists is read, including one nested inside a member and a `package.json` marked `private`; manifests under a `tests/`, `testdata/`, or `fixtures/` folder are test inputs, and a scratch directory at a member's root holds probes, so neither is read |
-| `workspace-stale-entries` | error | No `workspace.toml` entries point to directories that no longer exist |
-| `dev-only-boundary` | error | No non-dev-only project has a runtime dependency on a dev-only project |
-| `unversioned-boundary` | error | No releasable project has a runtime dependency on an unversioned project (`releasable = false`, not dev-only) |
-| `dead-workspace-packages` | warn | Every unpublished workspace library package is imported by at least one workspace sibling |
-| `subtree-remote-reachable` | error | Configured subtree remote URLs are reachable (requires network) |
-| `workspace-unbuildable` | error | Workspace members build under `uv sync --all-packages` (pypi workspaces only); also tagged `preflight`, so a manifest that stopped resolving blocks the release rather than only narrowing the router's derived filters |
-| `scaffold-gitignore-stale` | warn | Workspace project `.gitignore` files contain all rlsbl-managed entries |
-| `root-rlsbl-conflict` | error | Root `.rlsbl/` does not coexist with `.rlsbl-monorepo/` |
-| `go-companion-tags` | error | Non-private Go members of releasables have companion tags for the releasable's latest released version: one `<path>/v<version>` per Go member the version's release record lists, less the one the primary tag already is. A releasable that has not released owes none. A missing companion tag is reported as a warning; a broken member config is an error |
-| `releasable-residue` | error | Release state sits where something will read it. A releasable member carries no per-package release state (`.rlsbl/changes/`, `.rlsbl/releases/`, `.rlsbl/version`, etc.) -- `hooks/`, the stub `.rlsbl/go.mod` scaffold writes into a Go member (while its content is the stub's), and root-path members are exempt -- and a member that releases nothing (a dev node, or any member declared `releasable = false`) carries no release archives, changelog directory or version tags in its own scheme, unless a `release-history-closed` transition record event names it. The repository's transition record is read on every run, whatever the member list is, so a malformed `transitions.jsonl` reds the check even in a workspace where every member belongs to a releasable |
-| `member-pytest-config` | error | When the workspace root or an enclosing member has a `conftest.py`, every member with a `tests/` directory under it pins its own pytest rootdir (a `[tool.pytest.ini_options]` table in its own `pyproject.toml`), so a member run cannot escape into the enclosing config. Findings name the `pyproject.toml` to edit and the `conftest.py` it would otherwise load |
-| `nested-member-runner-exclusion` | error | Every member's test runner excludes the members nested inside it: pytest through a path-exact `--ignore=<path>` per nested member in `[tool.pytest.ini_options] addopts`. `rlsbl scaffold` writes them; it does not run at the workspace root, so the root member's are written by hand, as its finding names. pytest resolves `--ignore` against the directory it starts in, so run a member's tests from its own directory, as rlsbl and CI do. npm's test runner is the project's own choice, so it is not covered. Also tagged `preflight` |
-| `nested-member-upload-contents` | error | A member's published upload carries none of the files of the members nested inside it. An npm package is listed with `npm pack --dry-run --ignore-scripts --offline` and a Go module zip is derived from the tracked files by Go's own rule (a nested `go.mod` leaves its directory out), both offline; findings name each file and the member that owns it. A Python upload can only be listed by building it, which needs the network, so the pypi CI template builds and checks it on the release commit for a member that has nested members. Also tagged `preflight` |
-| `nested-member-uv-sources` | error | No member nested inside another member declares a `{ workspace = true }` source in its own `[tool.uv.sources]`: uv refuses one there ("references a workspace in `tool.uv.sources` ... but is not a workspace member"), while the same entry in the uv workspace root's `pyproject.toml` resolves for every member. Findings name the root file to move the entries to. Also tagged `preflight` |
-| `go-workspace-require-current` | error | No Go member requires a sibling workspace module below that module's latest release. rlsbl does not raise the line when the sibling releases, because the dependent's `go.sum` needs the new version's hash, which exists only once the tag reaches the module proxy; findings name the `go get <module>@v<version>` to run in the dependent. Also tagged `preflight` |
-| `go-workspace-replace` | error | No releasable Go member replaces a module with a directory in the workspace: `go install <module>@<version>` rejects a module carrying a replace, and its consumers never see it. Findings name the migration to a committed `go.work` (`go work init` when the repository has none yet, `go work use <module dirs>`) and the `go mod edit -dropreplace` that deletes the line. Also tagged `preflight` |
-| `mixed-tag-schemes` | error | No member directory declares both Go's path-based `{path}/v*` tags and `{name}@v*` tags, which would make the publish-router prefix ordering-dependent |
-| `path-tag-format-go-member` | error | A releasable whose `tag_format` is a Go path tag (`<path>/v{version}`) names the path of one of its own Go members: the tag publishes the module at that path, permanently, so any other path would publish a version of a module the releasable does not own, or of none. Findings name `{name}@v{version}` and each Go member's own path as the formats to write. Also tagged `preflight` |
-
-`test-suite-workspace` (see prepush checks) is also tagged `workspace`.
-
-## Quality checks
-
-| Check | Severity | Description |
-| --- | --- | --- |
-| `dead-modules` | warn | Detects source modules with no inbound imports (unreachable code) |
-| `dead-modules-stale` | error | Every path declared in `dead-modules.toml` still exists, so an exclusion cannot silently outlive the file it excused |
-| `circular-deps` | warn | Detects circular import dependencies between modules |
-| `library-lint` | error | Runs lint rules for library projects (API surface, exports) |
-| `ruff-lint` | error | Project passes ruff lint checks (skipped when ruff is not installed) |
-| `lint` | error | Runs `ruff check` over the paths declared in the `checks.lint` config block; also tagged `preflight`. Its option, `rlsbl:lint`, defaults to `off` |
-| `lint-scope-guard` | error | ruff config carries no `include`/`extend-include` competing with `checks.lint.paths`; also tagged `preflight`. Skips while `lint` is off |
-| `format` | error | Runs `ruff format --check` over the paths declared in the `checks.format` config block; also tagged `preflight`. Its option, `rlsbl:format`, defaults to `off` |
-| `format-scope-guard` | error | ruff config carries no `include`/`extend-include` competing with `checks.format.paths`; also tagged `preflight`. Skips while `format` is off |
-| `type-check` | error | Runs `mypy` over the paths declared in the `checks.type-check` config block; also tagged `preflight`. Its option, `rlsbl:type-check`, defaults to `off` |
-| `type-check-scope-guard` | error | mypy config carries no `files`/`packages`/`modules` competing with `checks.type-check.paths`; also tagged `preflight`. Skips while `type-check` is off |
-| `deps-runtime-test-only` | warn | Runtime dependencies that are only imported in test files |
-| `deps-dev-in-lib` | error | Dev dependencies used in library source (should be runtime deps) |
-| `scaffold-unreplaced-vars` | error | Leftover `{{...}}` template placeholders in workflow files |
-
-`test-suite` (see prepush checks) is also tagged `quality`.
-
-## Prepush checks
-
-| Check | Severity | Description |
-| --- | --- | --- |
-| `prepush-changelog-coverage` | error | Verifies every pushed commit has a JSONL changelog entry |
-| `prepush-gitignore-guard` | error | Blocks push if rlsbl-managed files are gitignored |
-| `prepush-manual-warning` | error | Refuses a push to a release branch made outside `rlsbl release` (a release pushes without running the hook, so any push the hook sees there is a manual one) |
-| `test-suite` | error | Runs project tests (`pytest` / `go test` / `npm test`), or the command the [`test`](configuration.md#test) config block names for the target |
-| `test-suite-workspace` | error | Runs tests for affected workspace projects (monorepo only) |
-
-`scaffold-conflicts` (see project checks) is also tagged `prepush`. Dependencies: `test-suite` and `test-suite-workspace` both depend on `prepush-changelog-coverage` -- fast checks fail first, so the test suite is skipped if changelog coverage fails. `test-suite` is also tagged `quality`, so it runs under both `rlsbl check --tag prepush` and `rlsbl check --tag quality`. The `pre-push` hook declared in `checks.toml` selects the `prepush` tag; the installed git hook runs it as `rlsbl failing-checks --hook pre-push`.
-
-Both test-suite checks are overlay-preserving: when the project runs on `rlsbl dev sync` overlays, their `uv sync` excludes every overlaid package and the suite runs with `uv run --no-sync`. See [the dev workflow](dev-workflow.md) for why a bare sync would otherwise wipe the overlays it is about to test.
-
-## Untagged checks
-
-These 4 checks have no tag assignment and run only when explicitly requested via `--all` or `--name`. They are excluded from tag-based runs because they require specific project configurations (layer rules, workspace manifests) or have longer execution times:
-
-| Check | Severity | Description |
-| --- | --- | --- |
-| `layers-violations` | error | Dependency direction violates architectural layer rules defined in `workspace.toml` |
-| `deps-unused` | error | Declared dependencies that are never imported |
-| `deps-undeclared` | error | Imported packages that are not declared as dependencies |
-| `deps-stale` | error | Workspace dependency versions that are outdated relative to available versions |
+| Check | What it holds |
+| --- | --- |
+| `lifecycle-record-valid` | The [lifecycle-and-license record](lifecycle-and-license.md) exists (a missing one names `rlsbl transition license`, which writes it), passes every rule the record is judged by on the run's date against the declared names, and keeps every closed period and held registry name the record at each releasable's nearest release commit holds. |
+| `confidential-names` | In a public repository, no tracked file contains a name from the machine-local confidential-name index. |
+| `repository-visibility` | Whether the record makes the repository confidential agrees with GitHub's visibility: confidential with private, public with public. A private repository with no proprietary releasable is refused, naming `transition classify` and making the repository public. |
+| `private-repo-publishing` | A confidential or private repository's releasable and its committed workflows use no publishing feature that records the repository's identity publicly. |
+| `license-consistency` | Every manifest states the same license, and it is the license the record holds for the releasable on the run's date (npm's `UNLICENSED` stands for `proprietary`). |
 
 ## Framework checks
 
-Every check above is declared in rlsbl's own `checks.toml`, and so are the counts on this page. The checks below are not: [strictcli](https://github.com/stricttools/strictcli) registers them into the same registry when rlsbl builds its CLI, so they run under `rlsbl check --all` and under the tags they carry, but no rlsbl-side count includes them. They carry the framework's own tags (`test`, `effects`), and the three effects lints also carry `quality`, so `rlsbl check --tag quality` runs them.
+strictcli registers these into the same registry when rlsbl builds its command line, so they run under `rlsbl check --all` and their tags, are options like rlsbl's own, and are not counted on this page:
 
-| Check | Severity | Tags | Description |
+| Check | Severity | Tags | What it verifies |
 | --- | --- | --- | --- |
-| `cli-test-coverage` | error | `test` | Every registered command path appears in the committed coverage manifest (`.strictmetadata/.cli-test-coverage/manifest.json`), taken together with any per-process shard files under `.strictmetadata/.cli-test-coverage/shards/`. Failure names each uncovered command. It skips when neither the manifest nor a shard exists -- an installed rlsbl running checks from someone else's project reports that instead of listing its whole command surface as uncovered |
-| `effects-bypass` | error | `effects`, `quality` | No process, filesystem-mutation or network call reachable from a registered command handler is made directly. Each finding names the file, the line and the function being called, and the remedy is always the same: route it through `ctx.effects` |
-| `observe-allowlist-breadth` | warn | `effects`, `quality` | No `proc_observe_allowlist` prefix is a single token. A one-token prefix makes every invocation of that binary an observe, so it really executes under `--dry-run`, is never written to the would-do log, and is legal inside a `read_only` command. A warning, because the allowlist is a declared, source-visible choice |
-| `consequential-grant-agreement` | warn | `effects`, `quality` | Every command declaring a grant whose kind leaves this process (`proc_mutate` runs another program, `net_mutate` changes remote state) also declares itself consequential. A warning, because the two declarations can legitimately disagree -- making it an error would push consumers to declare `consequential` reflexively |
-
-## Target applicability
-
-Not every check applies to every release target. Each check declares its applicability as one of three categories, which determines whether it runs for a given project based on the project's detected targets:
-
-- **Universal** (`None`): runs for any target -- most project, release, and changelog checks
-- **Workspace-only** (`"workspace"`): runs only in monorepo workspaces, target-agnostic
-- **Target-specific** (`frozenset`): requires specific language targets with import scanners or AST analysis
-
-:-: table-feature-matrix
-
-### Excluded targets
-
-Some checks explicitly exclude specific targets where the compiler or language toolchain already enforces the same constraint natively, making rlsbl's check redundant. These exclusions prevent false positives and unnecessary warnings:
-
-| Check | Excluded target | Reason |
-| --- | --- | --- |
-| `circular-deps` | go | Go compiler rejects circular imports |
+| `cli-test-coverage` | error | `test` | Every registered command appears in the committed CLI test-coverage manifest under `.strictmetadata/.cli-test-coverage/`. It skips where no manifest exists, as for an installed rlsbl run in another project. |
+| `effects-bypass` | error | `effects`, `quality` | No process, file write, or network call reachable from a command handler bypasses the effects handle. |
+| `observe-allowlist-breadth` | warn | `effects`, `quality` | No observe allowlist prefix is a single token. |
+| `consequential-grant-agreement` | warn | `effects`, `quality` | Every command declaring a grant that leaves the process also declares itself consequential. |
 
 ## Check metadata
 
-Checks are declared in `rlsbl/data/checks.toml` with metadata that controls execution order, dependency resolution, and result severity, and from which `scripts/gen_options_registry.py` generates the options registry (`rlsbl/data/options.toml`). Each check entry has the following fields that the check runner uses to determine when and how to execute the check:
+Each entry of `checks.toml` carries:
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `tags` | array of strings | Which tags include this check (empty = untagged, only runs with `--all` or `--name`) |
-| `severity` | `"error"` or `"warn"` | Whether failure blocks (`fail`) or advises (`warn`) |
-| `fast` | bool | Whether the check completes quickly (used for prioritization) |
-| `pure` | bool | Whether the check starts only programs on the observe allowlist (see [Purity](#purity) below) |
-| `needs_network` | bool | Whether the check requires network access (e.g., GitHub API calls) |
-| `depends_on` | array of strings | Other checks that must pass first (skipped if dependency fails). The check's option requires the options of these checks |
-| `description` | string | One line saying what the check verifies; its option's description in the registry |
-| `subject` | string | The options subject file the check's option is filed under (`.strictmetadata/options/<subject>.toml`) |
-
-Checks are implemented via the `@app.error_check("<name>")` and `@app.warn_check("<name>")` decorators in the `rlsbl/checks/` package (one module per tag, e.g. `project.py`, `release.py`, `workspace.py`), which register the function with strictcli's check system. The name passed to the decorator must match the key in `checks.toml`, and the decorator chosen must match that entry's `severity`.
+| Field | Meaning |
+| --- | --- |
+| `description` | One line saying what the check verifies; also its option's description. |
+| `subject` | The options subject file its option is filed under (`.strictmetadata/options/<subject>.toml`). |
+| `tags` | The tags selecting it; none means it runs only under `--all` or `--name`. |
+| `severity` | `error` or `warn`. |
+| `fast` | Whether it completes quickly. |
+| `pure` | Whether it starts only programs the observe allowlist admits, or none. |
+| `needs_network` | Whether it needs the network to answer at all. |
+| `depends_on` | Checks that must pass first; their options are required by this check's option. |
+| `scope` | What the check answers for ([where a check run is scoped](#where-a-check-run-is-scoped)); absent for one releasable. |
 
 ### Purity
 
-**A pure check starts only read-only programs on the observe allowlist.** The allowlist is `rlsbl/observe_allowlist.py`, whose written standard is *no user-visible mutation*: ref updates, index writes and credential emission are refused there, so any program that reaches the list changes nothing a user would notice. A check that starts no program at all is trivially pure.
-
-A check is impure when it starts a program that is not on that list. Every impure check runs a tool that writes: `ruff` rewrites files, `uv sync` materializes an environment, the test suites build.
-
-Purity decides what a preview does. Under `rlsbl release run --dry-run` the preflight runs its pure checks for real and lists the impure ones as `would run: <name> (impure)` -- so a preview reports real findings from everything that can be run without changing anything, and is honest about the rest.
-
-This rule replaced an older one, "the check starts no program at all". That rule forced nine checks that spawn only read-only local git (the changelog validators, the two pre-push checks, `workspace-unregistered`, `go-companion-tags`) to be declared impure, and it quietly declared two checks pure that do spawn: the retired `local-tag` ran `git tag --list`, and `config-schema` can reach `go list` on its error path. All of them are pure under the current rule, and are now declared so deliberately rather than by accident.
-
-The declaration is verified, not trusted: `tests/test_check_purity.py` executes every pure-declared check under an effects observer and fails on any spawn whose argv matches no allowlist prefix.
-
-`needs_network` is orthogonal: it says whether a check needs the network to answer at all, never whether it may mutate. A pure check may be a network read.
+A pure check starts only read-only programs on the observe allowlist (`internal/previewapply`), whose written standard is no user-visible change, or no program at all. Every program an impure check starts (a member's tests, `uv sync --dry-run`, `npm pack --dry-run`, an external check) runs observed, so a check changes nothing in the repository either way. Purity decides what a preview does: under `--dry-run` the pure checks run and the impure ones are listed as would-run. `needs_network` is separate: a pure check may read the network.
 
 ## Examples
 
-### Running all checks before a release
-
 ```bash
-rlsbl check --all
-#   lock .......................... pass
-#   version-consistency ........... pass
-#   config-schema ................. pass
-#   license-file .................. pass
-#   scaffold-conflicts ............ pass
-#   cross-repo-path-sources ....... pass
-#   changelog-hashes .............. pass
-#   changelog-range ............... pass
-#   changelog-coverage ............ FAIL
-#     Uncovered commits:
-#       a1b2c3d  Add retry logic
-#       e4f5g6h  Fix timeout bug
-#   changelog-schema .............. pass
-#   changelog-user-facing ......... warn  No user-facing entries
-#   unpublished-refs ............. fail  v0.5.2: the ref v0.5.2 exists locally but not on origin
-#   test-suite ................... pass
-#
-#   12 passed, 1 failed, 2 warnings
-```
+# What is blocking the release?
+rlsbl failing-checks --hook pre-release
 
-### Investigating a specific check failure
-
-```bash
-# Run just the failing check to see detailed output
+# One check, with its full output and the fix it names
 rlsbl check --name changelog-coverage
-#   changelog-coverage ............ FAIL
-#     Uncovered commits:
-#       a1b2c3d  Add retry logic
-#       e4f5g6h  Fix timeout bug
-#     Fix: run `rlsbl changelog add --commits <hash> ...` for each
 
-# Fix it
-rlsbl changelog add --commits a1b2c3d --description "Add retry logic to HTTP client" --type feature
-rlsbl changelog add --commits e4f5g6h --description "Fix timeout crash on slow connections" --type fix
-
-# Verify the fix
-rlsbl check --name changelog-coverage
-#   changelog-coverage ............ pass
-```
-
-### Checking workspace integrity in a monorepo
-
-```bash
-rlsbl check --tag workspace
-#   workspace-ci-router ........... pass
-#   workspace-ci-synced ........... pass
-#   workspace-targets ............. pass
-#   workspace-unregistered ........ FAIL
-#     packages/new-lib/ has pyproject.toml but is not in workspace.toml
-#   workspace-stale-entries ....... pass
-#   dev-only-boundary ............. pass
-#   dead-workspace-packages ....... warn  library 'old-utils' not imported by any workspace package
-#
-#   Fix: run `rlsbl monorepo add packages/new-lib --target pypi --releasable new-lib`
-```
-
-### Pre-push check output
-
-```bash
-# git push runs `rlsbl failing-checks --hook pre-push`, which prints only the
-# error-level failures. The same selection as the full report:
-rlsbl check --hook pre-push
-#   prepush-changelog-coverage .... pass
-#   prepush-gitignore-guard ....... pass
-#   prepush-manual-warning ........ skip  (not a release branch push)
-#   test-suite .................... pass
-#   scaffold-conflicts ............ pass
+# Soften a check for this repository, with the reason on record
+rlsbl options set rlsbl:scaffold-gitignore-stale --current off --ideal warn --reason "members keep their own .gitignore until the next scaffold"
 ```
