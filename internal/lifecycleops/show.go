@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -226,66 +225,67 @@ func verdictOf(rule lifecycle.Rule, subject string, err error, holds string) Ver
 }
 
 // confidentialNamesVerdict compares the confidential-name index entry of
-// the repository's origin with the names the record makes confidential on
-// the date of on: a confidential repository's entry must hold them, and a
-// public repository must have none.
+// the repository, keyed by its record's open releasable-name identities,
+// with the names the record makes confidential on the date of on: a
+// confidential repository's entry must hold them, and a public repository
+// must have none.
 func (inv Invocation) confidentialNamesVerdict(repo git.Repo, rec *lifecycle.Record, on time.Time) (Verdict, error) {
 	rule := lifecycle.RuleConfidentialNames
 	v := Verdict{Rule: string(rule), Class: string(rule.Class())}
-	confidential := rec.Confidential(on)
-	configured, err := repo.RemoteConfigured(origin)
-	if err != nil {
-		return Verdict{}, err
-	}
-	if !configured {
-		if confidential {
-			v.Verdict, v.Detail = VerdictRefuses, "the repository is confidential, and the confidential-name index records its names under its origin remote, which this repository lacks; add it (`git remote add origin <url>`), and the next mutating rlsbl command run in the repository records them"
-		} else {
-			v.Verdict, v.Detail = VerdictNotApplicable, "the repository is public and has no origin remote, so the index holds no entry for it"
-		}
-		return v, nil
-	}
-	url, err := repo.RemoteURL(origin)
-	if err != nil {
-		return Verdict{}, err
-	}
-	normalized, err := index.NormalizeOrigin(url)
-	if err != nil {
-		return Verdict{}, err
-	}
 	if inv.IndexPath == "" {
 		return Verdict{}, errors.New("no confidential-name index path was given to the command")
+	}
+	names, err := repositoryNames(repo)
+	if err != nil {
+		return Verdict{}, err
+	}
+	update, err := index.Plan(rec, on, names...)
+	if err != nil {
+		v.Verdict, v.Detail = VerdictRefuses, err.Error()
+		return v, nil
 	}
 	idx, err := index.Load(inv.IndexPath)
 	if err != nil {
 		return Verdict{}, err
 	}
-	var held []string
-	var present bool
-	for _, e := range idx.Entries() {
-		if e.Origin == normalized {
-			held, present = e.Names, true
-		}
-	}
+	held := idx.Held(update.Subjects)
+	key := strings.Join(update.Subjects, ", ")
 	const fix = "the next mutating rlsbl command run in the repository brings the entry in step"
-	if !confidential {
-		if present {
-			v.Verdict, v.Detail = VerdictRefuses, fmt.Sprintf("the repository is public, but the index %s still holds names under %s (%s); %s", inv.IndexPath, normalized, strings.Join(held, ", "), fix)
+	if !update.Confidential() {
+		if len(held) > 0 {
+			v.Verdict, v.Detail = VerdictRefuses, fmt.Sprintf("the repository is public, but the index %s still holds names under %s (%s); %s", inv.IndexPath, describeEntries(held), strings.Join(heldNames(held), ", "), fix)
 		} else {
 			v.Verdict, v.Detail = VerdictNotApplicable, "the repository is public, and the index holds no entry for it"
 		}
 		return v, nil
 	}
-	want, err := rec.ConfidentialNames(on, path.Base(normalized))
-	if err != nil {
-		return Verdict{}, err
-	}
-	if !sameNames(held, want) {
-		v.Verdict, v.Detail = VerdictRefuses, fmt.Sprintf("the repository is confidential, and the index %s holds [%s] under %s where the record names [%s]; %s", inv.IndexPath, strings.Join(held, ", "), normalized, strings.Join(want, ", "), fix)
+	if len(held) != 1 || strings.Join(held[0].Subjects, ", ") != key || !sameNames(held[0].Names, update.Names) {
+		v.Verdict, v.Detail = VerdictRefuses, fmt.Sprintf("the repository is confidential, and the index %s holds [%s] under %s where the record names [%s] under %s; %s", inv.IndexPath, strings.Join(heldNames(held), ", "), describeEntries(held), strings.Join(update.Names, ", "), key, fix)
 		return v, nil
 	}
-	v.Verdict, v.Detail = VerdictHolds, fmt.Sprintf("the index %s holds the repository's names under %s, and publishing them is refused", inv.IndexPath, normalized)
+	v.Verdict, v.Detail = VerdictHolds, fmt.Sprintf("the index %s holds the repository's names under %s, and publishing them is refused", inv.IndexPath, key)
 	return v, nil
+}
+
+// describeEntries names index entries by their subjects.
+func describeEntries(entries []index.Entry) string {
+	if len(entries) == 0 {
+		return "no entry"
+	}
+	var parts []string
+	for _, e := range entries {
+		parts = append(parts, strings.Join(e.Subjects, ", "))
+	}
+	return strings.Join(parts, "; ")
+}
+
+// heldNames is every name the entries hold.
+func heldNames(entries []index.Entry) []string {
+	var out []string
+	for _, e := range entries {
+		out = append(out, e.Names...)
+	}
+	return out
 }
 
 // sameNames compares two name lists as the index stores them: trimmed,

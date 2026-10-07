@@ -3,6 +3,7 @@ package migration
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -613,7 +614,7 @@ func TestDisagreeingPublishModesWithinAReleasableAreRefused(t *testing.T) {
 	f.refused("disagree on publish_mode")
 }
 
-func TestAConfidentialRepositoryWithoutAnOriginIsRefusedUntilOneIsAdded(t *testing.T) {
+func TestAConfidentialRepositoryWithoutAnOriginIsIndexedByItsReleasableNames(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newFixture(t, "portal", "private")
 	f.repo.Git("remote", "remove", "origin")
@@ -621,28 +622,25 @@ func TestAConfidentialRepositoryWithoutAnOriginIsRefusedUntilOneIsAdded(t *testi
 	f.write(".rlsbl/config.json", `{"publish_mode": "none", "targets": ["npm"], "pipelines": {}, "github_repo": "owner/portal"}`+"\n")
 	f.commit("the old layout")
 	f.licenses = map[string]string{"portal": "proprietary"}
-	contains(t, f.refused("origin remote"), "git remote add origin")
-
-	f.repo.Git("remote", "add", "origin", "git@github.com:owner/portal.git")
 	f.migrate()
 	idx, err := index.Load(f.indexPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if entries := idx.Entries(); len(entries) != 1 || entries[0].Origin != "github.com/owner/portal" {
+	if entries := idx.Entries(); len(entries) != 1 || !slices.Equal(entries[0].Subjects, []string{"portal"}) || !slices.Contains(entries[0].Names, "portal") {
 		t.Fatalf("the confidential-name index entries: %+v", entries)
 	}
 }
 
-func TestAPublicRepositoryWithoutAnOriginHasNoIndexEntryToRemove(t *testing.T) {
+func TestAPublicRepositoryWithoutAnOriginRemovesTheEntryOfItsReleasableNames(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newFixture(t, "portal", "public")
 	f.repo.Git("remote", "remove", "origin")
 	f.write("package.json", `{"name": "portal", "version": "0.1.0", "license": "MIT"}`+"\n")
 	f.write(".rlsbl/config.json", `{"publish_mode": "none", "targets": ["npm"], "pipelines": {}, "github_repo": "owner/portal"}`+"\n")
 	f.commit("the old layout")
-	if plan := f.mustPlan(); plan.index != nil {
-		t.Fatalf("the plan changes the index under a synthesized origin: %+v", plan.index)
+	if plan := f.mustPlan(); plan.index == nil || plan.index.Confidential() || !slices.Equal(plan.index.Subjects, []string{"portal"}) {
+		t.Fatalf("the plan's index update: %+v", plan.index)
 	}
 }
 

@@ -53,7 +53,7 @@ subject = "portal"
 license = "proprietary"
 from = 2026-05-01
 reason = "the server work"
-`
+` + portalName
 
 const (
 	archiveRel    = ".strictmetadata/releases/portal/v0.1.0.toml"
@@ -99,11 +99,7 @@ func TestDeclassifySquashesEachProprietaryPeriodAndGoesPublic(t *testing.T) {
 	repo.Git("push", "-q", "origin", "main", "v0.1.0")
 
 	fx := &fixture{repo: repo, index: filepath.Join(t.TempDir(), "confidential-names.toml")}
-	origin, err := index.NormalizeOrigin("file://" + bare)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(fx.index, []byte(fmt.Sprintf("format_version = 1\n\n[[repositories]]\norigin = %q\nnames = [\"moonbeam\", \"portal\"]\n", origin)), 0o644); err != nil {
+	if err := os.WriteFile(fx.index, []byte("format_version = 1\n\n[[repositories]]\nsubjects = [\"portal\"]\nnames = [\"moonbeam\", \"portal\"]\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -192,7 +188,7 @@ func TestDeclassifySquashesEachProprietaryPeriodAndGoesPublic(t *testing.T) {
 	if l, ok := rec.LicenseOn("portal", today); !ok || l.License != "MIT" || !l.Open() {
 		t.Fatalf("portal's license is %+v", l)
 	}
-	if strings.Contains(fx.indexText(t), origin) {
+	if strings.Contains(fx.indexText(t), "[[repositories]]") {
 		t.Fatalf("the index keeps the repository:\n%s", fx.indexText(t))
 	}
 	// The run is archived and committed, and nothing is left in progress.
@@ -228,7 +224,7 @@ func TestDeclassifySquashesEachProprietaryPeriodAndGoesPublic(t *testing.T) {
 
 func TestDeclassifyRefusesLicensesThatDoNotNameEveryProprietaryReleasable(t *testing.T) {
 	hygiene.Isolate(t)
-	f := newFixture(t, "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-01-01\nreason = \"server\"\n")
+	f := newFixture(t, "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-01-01\nreason = \"server\"\n"+portalName)
 	f.repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
 	declassify := func(licenses map[string]string) (int, string) {
 		r := f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
@@ -259,7 +255,7 @@ func TestDeclassifyRefusesLicensesThatDoNotNameEveryProprietaryReleasable(t *tes
 func TestADryRunDeclassificationPrintsTheSquashesAndWritesNothing(t *testing.T) {
 	hygiene.Isolate(t)
 	repo := testsupport.NewRepo(t)
-	commitOn(t, repo, "2026-04-10", map[string]string{declarations.ReleasablesFile: portalDeclarations, lifecycle.RecordFile: "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-05-01\nreason = \"server\"\n", lifecycle.ManifestFile: "owner = \"strictspec\"\n"}, "the project")
+	commitOn(t, repo, "2026-04-10", map[string]string{declarations.ReleasablesFile: portalDeclarations, lifecycle.RecordFile: "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-05-01\nreason = \"server\"\n" + portalName, lifecycle.ManifestFile: "owner = \"strictspec\"\n"}, "the project")
 	first := commitOn(t, repo, "2026-05-02", map[string]string{"notes.txt": "one\n"}, "one")
 	commitOn(t, repo, "2026-05-03", map[string]string{"notes.txt": "two\n"}, "two")
 	repo.AddBareRemote("origin")
@@ -292,7 +288,7 @@ func readFile(t *testing.T, repo *testsupport.Repo, rel string) string {
 func TestDeclassifyRefusalsClearOnceFixed(t *testing.T) {
 	hygiene.Isolate(t)
 	repo := testsupport.NewRepo(t)
-	record := "format_version = 1\ncodenames = [\"moonbeam\"]\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-05-01\nreason = \"server\"\n"
+	record := "format_version = 1\ncodenames = [\"moonbeam\"]\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-05-01\nreason = \"server\"\n" + portalName
 	commitOn(t, repo, "2026-05-02", map[string]string{declarations.ReleasablesFile: portalDeclarations, lifecycle.RecordFile: record, lifecycle.ManifestFile: "owner = \"strictspec\"\n"}, "the project")
 	repo.AddBareRemote("origin")
 	newFakeSafegit(t)
@@ -343,7 +339,7 @@ func declassifyPreview(t *testing.T, record string) (*testsupport.Repo, func() (
 	}
 }
 
-const proprietaryPortal = "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-05-01\nreason = \"server\"\n"
+const proprietaryPortal = "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-05-01\nreason = \"server\"\n" + portalName
 
 // fakeSafegitVersion puts a safegit reporting version first on PATH.
 func fakeSafegitVersion(t *testing.T, version string) {
@@ -419,7 +415,7 @@ func TestDeclassifyRefusalsNamingAFixClearOnceItIsMade(t *testing.T) {
 
 func TestDeclassifyRefusesACodenameTheSquashMessageNamesUntilItIsRemoved(t *testing.T) {
 	hygiene.Isolate(t)
-	repo, preview := declassifyPreview(t, "format_version = 1\ncodenames = [\"squash\"]\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-05-01\nreason = \"server\"\n")
+	repo, preview := declassifyPreview(t, "format_version = 1\ncodenames = [\"squash\"]\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-05-01\nreason = \"server\"\n"+portalName)
 	if code, stderr := preview(); code != 1 || !strings.Contains(stderr, `Remove "squash" from the record's codenames`) {
 		t.Fatalf("a codename the squash message names: exit %d: %s", code, stderr)
 	}

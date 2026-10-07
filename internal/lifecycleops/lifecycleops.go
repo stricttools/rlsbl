@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -34,8 +33,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
 
-// origin is the remote the index keys a repository by and every push goes
-// to.
+// origin is the remote every push goes to.
 const origin = "origin"
 
 // Invocation is one run of a `transition` command.
@@ -113,50 +111,48 @@ func (w recordWriter) MkdirAll(path string) error {
 // is.
 type indexUpdate struct {
 	idx    *index.Index
-	origin string
-	// names is empty when the repository is public and its entry is
-	// removed.
-	names []string
+	update index.Update
 }
 
-// planIndex decides the index update for the record as it will be written.
-// A confidential repository without an origin remote is refused: the index
-// keys its names by the origin, so they could not be recorded. A public one
-// without an origin has no entry to remove.
+// planIndex decides the index update for the record as it will be written:
+// the repository's entry, keyed by the record's open releasable-name
+// identities, holds its names while it is confidential and is removed while
+// it is public. No remote is asked for; the origin, when one is configured,
+// only adds its name to the repository's names.
 func (inv Invocation) planIndex(repo git.Repo, rec *lifecycle.Record, on time.Time) (*indexUpdate, error) {
-	configured, err := repo.RemoteConfigured(origin)
-	if err != nil {
-		return nil, err
-	}
-	confidential := rec.Confidential(on)
-	if !configured {
-		if confidential {
-			return nil, fmt.Errorf("the repository is confidential, and the confidential-name index records a confidential repository's names under its origin remote, which this repository lacks; nothing was written. Add it (`git remote add origin <url>`) and run this again")
-		}
-		return nil, nil
-	}
-	url, err := repo.RemoteURL(origin)
-	if err != nil {
-		return nil, err
-	}
-	normalized, err := index.NormalizeOrigin(url)
-	if err != nil {
-		return nil, err
-	}
 	if inv.IndexPath == "" {
 		return nil, errors.New("no confidential-name index path was given to the command")
+	}
+	names, err := repositoryNames(repo)
+	if err != nil {
+		return nil, err
+	}
+	update, err := index.Plan(rec, on, names...)
+	if err != nil {
+		return nil, err
 	}
 	idx, err := index.Load(inv.IndexPath)
 	if err != nil {
 		return nil, err
 	}
-	u := &indexUpdate{idx: idx, origin: url}
-	if confidential {
-		if u.names, err = rec.ConfidentialNames(on, path.Base(normalized)); err != nil {
+	return &indexUpdate{idx: idx, update: update}, nil
+}
+
+// repositoryNames are the repository's own names, which its record protects
+// when no releasable carries a non-proprietary license: its directory's, and
+// its origin's when it has an origin remote.
+func repositoryNames(repo git.Repo) ([]string, error) {
+	configured, err := repo.RemoteConfigured(origin)
+	if err != nil {
+		return nil, err
+	}
+	url := ""
+	if configured {
+		if url, err = repo.RemoteURL(origin); err != nil {
 			return nil, err
 		}
 	}
-	return u, nil
+	return index.RepositoryNames(repo.Dir(), url)
 }
 
 // apply writes the index update through the effects handle.
@@ -164,19 +160,15 @@ func (u *indexUpdate) apply(e *strictcli.Effects) error {
 	if u == nil {
 		return nil
 	}
-	if len(u.names) > 0 {
-		return u.idx.Upsert(recordWriter{e}, u.origin, u.names)
-	}
-	return u.idx.Remove(recordWriter{e}, u.origin)
+	return u.idx.Apply(recordWriter{e}, u.update)
 }
 
 // RefreshIndex brings the confidential-name index entry of the repository
 // at root in line with its record as it stands on the date of on: upserted
-// under its origin while the record makes the repository confidential,
-// removed while it is public. It is rlsbl's part of the index rule, owed by
-// every mutating command that loads declarations; the writes go through
-// the effects handle. A confidential repository without an origin remote
-// is refused, as planIndex refuses it.
+// under its open releasable-name identities while the record makes the
+// repository confidential, removed while it is public. It is rlsbl's part of
+// the index rule, owed by every mutating command that loads declarations;
+// the writes go through the effects handle.
 func RefreshIndex(e *strictcli.Effects, root, indexPath string, on time.Time) error {
 	repo, err := git.Open(e, root)
 	if err != nil {
@@ -191,6 +183,21 @@ func RefreshIndex(e *strictcli.Effects, root, indexPath string, on time.Time) er
 		return err
 	}
 	return u.apply(e)
+}
+
+// RenameInIndex moves a renamed releasable's name in the confidential-name
+// index to its new name, merging it with the entry the new name keys
+// already, so the entry the old name keyed is not left behind. The writes
+// go through the effects handle.
+func RenameInIndex(e *strictcli.Effects, indexPath, old, new string) error {
+	if indexPath == "" {
+		return errors.New("no confidential-name index path was given to the command")
+	}
+	idx, err := index.Load(indexPath)
+	if err != nil {
+		return err
+	}
+	return idx.Rename(recordWriter{e}, old, new)
 }
 
 // recordPaths are the files a record write commits.

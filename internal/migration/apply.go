@@ -87,13 +87,7 @@ func Apply(e *strictcli.Effects, req Request, plan *Plan) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		w := effectsWriter{e: e}
-		if plan.index.remove {
-			err = idx.Remove(w, plan.index.origin)
-		} else {
-			err = idx.Upsert(w, plan.index.origin, plan.index.names)
-		}
-		if err != nil {
+		if err := idx.Apply(effectsWriter{e: e}, *plan.index); err != nil {
 			return "", fmt.Errorf("updating the confidential-name index %s: %w", req.IndexPath, err)
 		}
 	}

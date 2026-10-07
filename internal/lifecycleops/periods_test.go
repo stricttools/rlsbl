@@ -28,6 +28,19 @@ subject = "portal"
 license = "MIT"
 from = 2026-01-01
 reason = "first release"
+` + portalName
+
+// portalName is portal's releasable-name identity since the start of the
+// year, by which the confidential-name index keys the repository.
+const portalName = `
+[[identities]]
+subject = "portal"
+facet = "releasable-name"
+value = "portal"
+registry = ""
+tag_patterns = ["v*"]
+from = 2026-01-01
+reason = "first release"
 `
 
 func TestLifecycleClosesThePeriodAndOpensTheNewOne(t *testing.T) {
@@ -110,7 +123,7 @@ func TestLicenseRefusesProprietaryUntilClassifyMakesIt(t *testing.T) {
 	if l, ok := rec.LicenseOn("portal", today); !ok || !l.Proprietary() {
 		t.Fatalf("portal's license is %+v", l)
 	}
-	requireContains(t, f.indexText(t), `origin = "github.com/acme/portal"`, `"portal"`)
+	requireContains(t, f.indexText(t), `subjects = ["portal"]`, `"portal"`)
 	f.clean(t)
 }
 
@@ -124,7 +137,7 @@ func TestLicenseChangesALicenseAndRefusesTheLastProprietaryOne(t *testing.T) {
 	requireExit(t, r, 0)
 	requireContains(t, f.record(t), `license = "Apache-2.0"`, "until = 2026-06-01")
 
-	proprietary := "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-01-01\nreason = \"server\"\n"
+	proprietary := "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-01-01\nreason = \"server\"\n" + portalName
 	g := newFixture(t, proprietary)
 	g.repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
 	r = g.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
@@ -165,18 +178,36 @@ func TestClassifyRefusesAPublicRepositoryUntilTheOwnerMakesItPrivate(t *testing.
 	}
 }
 
-func TestAConfidentialRecordNeedsAnOriginUntilOneIsAdded(t *testing.T) {
+// A confidential repository without an origin remote is classified: the
+// index keys its names by its record's releasable-name identities.
+func TestAConfidentialRepositoryWithoutAnOriginIsKeyedByItsReleasableNames(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newFixture(t, mitSince)
 	testsupport.FakeSafegit(t)
 	testsupport.FakeGH(t, ghVisibility("private"))
 	r := f.run(t, false, func(inv lifecycleops.Invocation, dir string) error { return inv.Classify(dir, "portal", "server") })
+	requireExit(t, r, 0)
+	requireContains(t, f.indexText(t), `subjects = ["portal"]`, `"portal"`)
+}
+
+// A confidential record without a releasable-name identity has nothing to
+// key its names by, and is refused until the identity the refusal names is
+// recorded.
+func TestAConfidentialRecordNeedsAReleasableNameUntilOneIsRecorded(t *testing.T) {
+	hygiene.Isolate(t)
+	f := newFixture(t, strings.TrimSuffix(mitSince, portalName))
+	testsupport.FakeSafegit(t)
+	testsupport.FakeGH(t, ghVisibility("private"))
+	r := f.run(t, false, func(inv lifecycleops.Invocation, dir string) error { return inv.Classify(dir, "portal", "server") })
 	requireExit(t, r, 1)
-	requireContains(t, r.Stderr, "git remote add origin <url>")
+	requireContains(t, r.Stderr, "rlsbl transition identity --facet releasable-name")
 	if strings.Contains(f.record(t), "proprietary") {
 		t.Fatal("a refused classify wrote the record")
 	}
-	f.repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
+	r = f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
+		return inv.Identity(lifecycleops.IdentityRequest{Dir: dir, Subject: "portal", Facet: lifecycle.FacetReleasableName, Value: "portal", TagPatterns: []string{"v*"}, Reason: "its name"})
+	})
+	requireExit(t, r, 0)
 	r = f.run(t, false, func(inv lifecycleops.Invocation, dir string) error { return inv.Classify(dir, "portal", "server") })
 	requireExit(t, r, 0)
 }
@@ -212,6 +243,7 @@ func TestIdentityRecordsCurrentAndDeadIdentities(t *testing.T) {
 		t.Fatal(perr)
 	}
 	ids := rec.Identities()
+	ids = ids[1:] // portal's releasable-name identity, from the fixture
 	if len(ids) != 3 || !ids[0].Until.Equal(time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)) || !ids[1].Open() || ids[2].Subject != "gizmo" || ids[2].Open() {
 		t.Fatalf("identities %+v", ids)
 	}
@@ -282,7 +314,7 @@ func TestInitMinimalRecordWritesTheRecordAndRefusesManagedRepositories(t *testin
 
 func TestShowJudgesEveryRule(t *testing.T) {
 	hygiene.Isolate(t)
-	record := "format_version = 1\ncodenames = [\"moonbeam\"]\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-01-01\nreason = \"server\"\n\n[[lifecycle]]\nsubject = \"portal\"\nstatus = \"on-hold\"\nfrom = 2026-01-01\nreason = \"paused\"\n"
+	record := "format_version = 1\ncodenames = [\"moonbeam\"]\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-01-01\nreason = \"server\"\n\n[[lifecycle]]\nsubject = \"portal\"\nstatus = \"on-hold\"\nfrom = 2026-01-01\nreason = \"paused\"\n" + portalName
 	f := newFixture(t, record)
 	f.repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
 	testsupport.FakeGH(t, ghVisibility("public"))
@@ -347,7 +379,7 @@ func (f *fixture) confidentialNamesVerdict(t *testing.T) lifecycleops.Verdict {
 
 func TestShowReadsTheConfidentialNameIndexAndTheRefreshClearsAStaleEntry(t *testing.T) {
 	hygiene.Isolate(t)
-	confidential := "format_version = 1\ncodenames = [\"moonbeam\"]\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-01-01\nreason = \"server\"\n"
+	confidential := "format_version = 1\ncodenames = [\"moonbeam\"]\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-01-01\nreason = \"server\"\n" + portalName
 	f := newFixture(t, confidential)
 	f.repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
 	testsupport.FakeGH(t, ghVisibility("private"))
@@ -361,7 +393,7 @@ func TestShowReadsTheConfidentialNameIndexAndTheRefreshClearsAStaleEntry(t *test
 	}
 
 	// The repository goes public while the index keeps its entry.
-	public := "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"MIT\"\nfrom = 2026-01-01\nreason = \"open\"\n"
+	public := "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"MIT\"\nfrom = 2026-01-01\nreason = \"open\"\n" + portalName
 	f.repo.Write(lifecycle.RecordFile, public)
 	v = f.confidentialNamesVerdict(t)
 	if v.Verdict != lifecycleops.VerdictRefuses || !strings.Contains(v.Detail, "public") || !strings.Contains(v.Detail, "mutating rlsbl command") {
@@ -373,18 +405,16 @@ func TestShowReadsTheConfidentialNameIndexAndTheRefreshClearsAStaleEntry(t *test
 	}
 }
 
-func TestShowRefusesAConfidentialRepositoryWithoutAnOriginUntilOneIsAdded(t *testing.T) {
+func TestShowHoldsForAConfidentialRepositoryWithoutAnOrigin(t *testing.T) {
 	hygiene.Isolate(t)
-	f := newFixture(t, "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-01-01\nreason = \"server\"\n")
+	f := newFixture(t, "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-01-01\nreason = \"server\"\n"+portalName)
 	testsupport.FakeGH(t, ghVisibility("private"))
-	v := f.confidentialNamesVerdict(t)
-	if v.Verdict != lifecycleops.VerdictRefuses || !strings.Contains(v.Detail, "git remote add origin") {
-		t.Fatalf("a confidential repository without an origin: %+v", v)
+	if v := f.confidentialNamesVerdict(t); v.Verdict != lifecycleops.VerdictRefuses || !strings.Contains(v.Detail, "mutating rlsbl command") {
+		t.Fatalf("a confidential repository missing from the index: %+v", v)
 	}
-	f.repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
 	f.refreshIndex(t)
 	if v := f.confidentialNamesVerdict(t); v.Verdict != lifecycleops.VerdictHolds {
-		t.Fatalf("after adding the origin and the refresh: %+v", v)
+		t.Fatalf("after the refresh: %+v", v)
 	}
 }
 

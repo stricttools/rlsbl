@@ -324,7 +324,7 @@ func (inv Invocation) beginDeclassify(m managed, req DeclassifyRequest) (*declas
 	if err != nil {
 		return nil, err
 	}
-	normalized, err := index.NormalizeOrigin(url)
+	repoNames, err := index.RepositoryNames(m.root, url)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +335,7 @@ func (inv Invocation) beginDeclassify(m managed, req DeclassifyRequest) (*declas
 	if err := client.CheckAuth(); err != nil {
 		return nil, err
 	}
-	terms, err := rec.ConfidentialNames(on, path.Base(normalized))
+	terms, err := rec.ConfidentialNames(on, repoNames...)
 	if err != nil {
 		return nil, err
 	}

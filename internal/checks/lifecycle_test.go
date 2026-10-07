@@ -64,7 +64,7 @@ func TestARecordKeepsWhatItHeldAtTheNearestReleaseCommit(t *testing.T) {
 }
 
 // confidentialIndex holds the names of another, confidential repository.
-const confidentialIndex = "format_version = 1\n\n[[repositories]]\norigin = \"github.com/acme/secret\"\nnames = [\"gizmo\"]\n"
+const confidentialIndex = "format_version = 1\n\n[[repositories]]\nsubjects = [\"secret\"]\nnames = [\"gizmo\"]\n"
 
 func TestAConfidentialNameInATrackedFileFailsUntilItIsRemoved(t *testing.T) {
 	hygiene.Isolate(t)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/lifecycle/index"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
@@ -136,12 +137,17 @@ func runMonorepoRename(ctx *strictcli.Context, kw map[string]any) (any, error) {
 	}
 	now := time.Now()
 	old, new := strictcli.Get[string](kw, "old_name"), strictcli.Get[string](kw, "new_name")
+	indexPath, err := index.DefaultPath()
+	if err != nil {
+		return nil, err
+	}
 	out, err := monorepo.RenameReleasable(ctx.Effects(), repo, ws, monorepo.RenameRequest{
-		Old:    old,
-		New:    new,
-		DryRun: ctx.DryRun(),
-		Now:    now,
-		Say:    ctx.Out,
+		Old:       old,
+		New:       new,
+		DryRun:    ctx.DryRun(),
+		Now:       now,
+		IndexPath: indexPath,
+		Say:       ctx.Out,
 		Sync: func(renamed *workspace.Workspace) (workflows.SyncResult, error) {
 			return workflows.Sync(ctx.Effects(), renamed, workflows.SyncInputs{
 				Actions: actions,

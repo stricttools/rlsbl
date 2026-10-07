@@ -29,7 +29,9 @@ func TestReleaseInitWritesAndCommitsTheReleaseFile(t *testing.T) {
 
 func TestAMutatingCommandUpsertsAConfidentialRepositorysIndexEntry(t *testing.T) {
 	hygiene.Isolate(t)
-	requireIndexRefreshed(t, "proprietary", []string{"portal"})
+	// Every license is proprietary, so the repository's directory name is
+	// one of its names.
+	requireIndexRefreshed(t, "proprietary", []string{"portal", "repo"})
 }
 
 func TestAMutatingCommandRemovesAPublicRepositorysIndexEntry(t *testing.T) {
@@ -37,9 +39,12 @@ func TestAMutatingCommandRemovesAPublicRepositorysIndexEntry(t *testing.T) {
 	requireIndexRefreshed(t, "MIT", nil)
 }
 
-func TestAMutatingCommandRemovesTheIndexEntryOfARepositoryWithoutARecord(t *testing.T) {
+// A repository without a record holds no releasable-name identity, which
+// the index keys entries by, so it has no entry and the one portal keys is
+// another repository's.
+func TestAMutatingCommandInARepositoryWithoutARecordLeavesTheIndexAlone(t *testing.T) {
 	hygiene.Isolate(t)
-	requireIndexRefreshed(t, "", nil)
+	requireIndexRefreshed(t, "", []string{"oldname"})
 }
 
 // requireIndexRefreshed runs a mutating command in a repository whose
@@ -50,7 +55,7 @@ func requireIndexRefreshed(t *testing.T, license string, want []string) {
 	t.Helper()
 	repo := releaseCommandsProject(t)
 	if license != "" {
-		repo.Write(lifecycle.RecordFile, "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \""+license+"\"\nfrom = 2026-01-01\nreason = \"the license\"\n")
+		repo.Write(lifecycle.RecordFile, "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \""+license+"\"\nfrom = 2026-01-01\nreason = \"the license\"\n\n[[identities]]\nsubject = \"portal\"\nfacet = \"releasable-name\"\nvalue = \"portal\"\nregistry = \"\"\ntag_patterns = [\"v*\"]\nfrom = 2026-01-01\nreason = \"its name\"\n")
 		repo.Commit("the license", lifecycle.RecordFile)
 	}
 	repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
@@ -62,7 +67,7 @@ func requireIndexRefreshed(t *testing.T, license string, want []string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := idx.Upsert(diskWriter{}, "https://github.com/acme/portal.git", []string{"oldname"}); err != nil {
+	if err := idx.Upsert(diskWriter{}, []string{"portal"}, []string{"oldname"}); err != nil {
 		t.Fatal(err)
 	}
 	testsupport.FakeSafegit(t)
@@ -74,13 +79,11 @@ func requireIndexRefreshed(t *testing.T, license string, want []string) {
 		t.Fatal(err)
 	}
 	var got []string
-	for _, e := range idx.Entries() {
-		if e.Origin == "github.com/acme/portal" {
-			got = e.Names
-		}
+	for _, e := range idx.Held([]string{"portal"}) {
+		got = append(got, e.Names...)
 	}
 	if !slices.Equal(got, want) {
-		t.Fatalf("the index entry of acme/portal holds %q, want %q", got, want)
+		t.Fatalf("the index entry of portal holds %q, want %q", got, want)
 	}
 }
 

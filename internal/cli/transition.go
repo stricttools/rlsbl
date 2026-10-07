@@ -54,7 +54,7 @@ const transitionClassifyHelp = "Make a releasable proprietary: open a proprietar
 	"repository confidential, records its names in the machine-local confidential-name index, and from then on refuses every public " +
 	"output of the releasable (registry packages and writes, build attestations, public docs, blog posts). GitHub must already report the " +
 	"repository private; making it private is the owner's action outside rlsbl, and a public repository is refused naming it. A " +
-	"confidential repository needs an origin remote, which the index keys its names by. Run the quiet deprecate and yank of anything it " +
+	"confidential repository needs an open releasable-name identity, which the index keys its names by. Run the quiet deprecate and yank of anything it " +
 	"published before classifying it: afterwards no registry write is made for it."
 
 var transitionDeclassifyHelp = fmt.Sprintf("Take a confidential repository public. --license names, for every releasable whose license is "+

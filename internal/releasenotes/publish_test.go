@@ -320,7 +320,7 @@ func scanner(t *testing.T, confidential string) *publishrules.Scanner {
 		t.Fatal(err)
 	}
 	if confidential != "" {
-		if err := idx.Upsert(diskWriter{}, "https://github.com/acme/gadget.git", []string{confidential}); err != nil {
+		if err := idx.Upsert(diskWriter{}, []string{"gadget"}, []string{confidential}); err != nil {
 			t.Fatal(err)
 		}
 	}

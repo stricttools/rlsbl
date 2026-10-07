@@ -26,7 +26,7 @@ func gadgetIndex(t *testing.T) *index.Index {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := idx.Upsert(diskWriter{}, "https://github.com/acme/gadget.git", []string{"gadget", "moonbeam"}); err != nil {
+	if err := idx.Upsert(diskWriter{}, []string{"gadget"}, []string{"gadget", "moonbeam"}); err != nil {
 		t.Fatal(err)
 	}
 	return idx

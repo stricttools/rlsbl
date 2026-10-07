@@ -197,7 +197,7 @@ func TestANoticeNamingAConfidentialNameIsRefusedBeforeAnythingIsWritten(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := idx.Upsert(diskWriter{}, "https://github.com/acme/gadget.git", []string{"moonbeam"}); err != nil {
+	if err := idx.Upsert(diskWriter{}, []string{"gadget"}, []string{"moonbeam"}); err != nil {
 		t.Fatal(err)
 	}
 	testsupport.FakeSafegit(t)

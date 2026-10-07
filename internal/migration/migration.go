@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/lifecycle/index"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
 )
@@ -108,16 +109,10 @@ type Plan struct {
 	dirty []string
 	// index is the confidential-name index entry the run records, nil when
 	// the repository is public.
-	index *indexEntry
+	// index is the update of the repository's entry in the
+	// confidential-name index.
+	index *index.Update
 	d     *declarations.Releasables
-}
-
-// indexEntry is the repository's entry in the confidential-name index.
-type indexEntry struct {
-	origin string
-	names  []string
-	// remove is set for a public repository, whose entry is removed.
-	remove bool
 }
 
 // RefusedError is a run refused before anything was written: every problem
@@ -242,12 +237,12 @@ func (p *Plan) Report(dryRun bool) string {
 	for _, r := range p.removals {
 		fmt.Fprintf(&b, "%s %s through saferm (%d files)\n", remove, r.dir, len(r.files))
 	}
-	if p.index != nil {
-		if p.index.remove {
-			fmt.Fprintf(&b, "%s no confidential names: the repository is public, so its entry for %s in the confidential-name index is removed\n", verb, p.index.origin)
-		} else {
-			fmt.Fprintf(&b, "%s the confidential-name index entry for %s: %s\n", verb, p.index.origin, strings.Join(p.index.names, ", "))
-		}
+	switch {
+	case p.index == nil:
+	case p.index.Confidential():
+		fmt.Fprintf(&b, "%s the confidential-name index entry for %s: %s\n", verb, strings.Join(p.index.Subjects, ", "), strings.Join(p.index.Names, ", "))
+	case len(p.index.Subjects) > 0:
+		fmt.Fprintf(&b, "%s no confidential names: the repository is public, so its entry for %s in the confidential-name index is removed\n", verb, strings.Join(p.index.Subjects, ", "))
 	}
 	for _, n := range p.notes {
 		fmt.Fprintf(&b, "Note: %s\n", n)

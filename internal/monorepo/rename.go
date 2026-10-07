@@ -12,6 +12,7 @@ import (
 
 	"github.com/stricttools/strictcli/go/strictcli"
 	"github.com/stricttools/strictspec/go/lifecycle"
+	"github.com/stricttools/strictspec/go/lifecycle/index"
 
 	"github.com/stricttools/rlsbl/internal/changelog"
 	"github.com/stricttools/rlsbl/internal/declarations"
@@ -48,6 +49,9 @@ type RenameRequest struct {
 	DryRun   bool
 	// Now is the date the identities and periods change on.
 	Now time.Time
+	// IndexPath is the confidential-name index (index.DefaultPath in the
+	// binary), where the old name is moved to the new one.
+	IndexPath string
 	// Sync regenerates the workspace's routers from the renamed
 	// declarations without committing.
 	Sync func(ws *workspace.Workspace) (workflows.SyncResult, error)
@@ -139,6 +143,9 @@ func RenameReleasable(e *strictcli.Effects, repo git.Repo, ws *workspace.Workspa
 		return Renamed{}, err
 	}
 	if out.RenameCommit, err = r.findRenameCommit(); err != nil {
+		return Renamed{}, err
+	}
+	if err := r.renameInIndex(); err != nil {
 		return Renamed{}, err
 	}
 	if out.RenameCommit != "" {
@@ -292,6 +299,24 @@ func requireRenamableRecord(rec *lifecycle.Record, old string, rel declarations.
 	}
 	return fmt.Errorf("%s holds no open releasable-name identity of %q, and the rename closes it and opens one for the new name, so the record keeps which name owned which tags when. Record the identity the releasable has held, from the day it took the name:\n\n  [[identities]]\n  subject = %q\n  facet = %q\n  value = %q\n  registry = \"\"\n  tag_patterns = [%q]\n  from = <the day it took the name, YYYY-MM-DD>\n  reason = \"...\"\n",
 		lifecycle.RecordFile, old, old, lifecycle.FacetReleasableName, old, scheme.ListGlob())
+}
+
+// renameInIndex moves the old name to the new one in the
+// confidential-name index, which keys a repository's entry by its open
+// releasable-name identities, so the entry the old name keyed is not left
+// behind once the record closes that identity.
+func (r *renamer) renameInIndex() error {
+	if r.req.IndexPath == "" {
+		return errors.New("no confidential-name index path was given to the rename")
+	}
+	idx, err := index.Load(r.req.IndexPath)
+	if err != nil {
+		return err
+	}
+	if err := idx.Rename(recordWriter{r.e}, r.req.Old, r.req.New); err != nil {
+		return fmt.Errorf("the rename is committed; moving %s to %s in the confidential-name index %s: %w", r.req.Old, r.req.New, r.req.IndexPath, err)
+	}
+	return nil
 }
 
 // sayPlan prints what the rename would do.

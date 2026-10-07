@@ -11,6 +11,7 @@ import (
 
 	tomledit "github.com/stricttools/go-toml-edit"
 	"github.com/stricttools/strictspec/go/lifecycle"
+	"github.com/stricttools/strictspec/go/lifecycle/index"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/github"
@@ -142,8 +143,8 @@ func releasableNames(d *declarations.Releasables) []string {
 }
 
 // githubRepository is the repository GitHub knows this one as, and its
-// origin remote's URL, which the confidential-name index keys it by; the URL
-// is empty when the repository has no origin remote.
+// origin remote's URL, whose last path segment is one of the repository's
+// names; the URL is empty when the repository has no origin remote.
 func (b *builder) githubRepository(d *declarations.Releasables) (github.Repository, string, error) {
 	origin := ""
 	configured, err := b.repo.RemoteConfigured("origin")
@@ -259,21 +260,17 @@ func (b *builder) convertLifecycle(d *declarations.Releasables) {
 		}
 		b.addWrite(write{path: rel, sources: b.history.sources, change: change, data: w.writes[rel]})
 	}
-	names, err := rec.ConfidentialNames(now, repo.Name)
+	names, err := index.RepositoryNames(b.root, origin)
 	if err != nil {
 		b.p.add("%v", err)
 		return
 	}
-	switch {
-	case origin == "" && len(names) > 0:
-		b.p.add("the record makes the repository confidential, and the confidential-name index records a confidential repository's names under its origin remote, which this repository lacks. Add it (`git remote add origin <url>`), then migrate")
-	case origin == "":
-		// A public repository without an origin has no entry to remove.
-	case len(names) == 0:
-		b.plan.index = &indexEntry{origin: origin, remove: true}
-	default:
-		b.plan.index = &indexEntry{origin: origin, names: names}
+	update, err := index.Plan(rec, now, append(names, repo.Name)...)
+	if err != nil {
+		b.p.add("%v", err)
+		return
 	}
+	b.plan.index = &update
 }
 
 // firstCommitDate is the earliest committer date of the commits HEAD
