@@ -37,7 +37,10 @@ const releaseResumeHelp = "Continue the release in progress of the releasable th
 	"adopting nothing past the verdict tags the commit the state records, which must still be on the branch. Once the changelog is " +
 	"finalized, nothing is adopted any more: a resume finding commits it did not make refuses, naming them, until they are off the release " +
 	"branch. A failed deploy or post-release " +
-	"hook runs again. --dry-run reports what would be adopted and which steps would run, and writes nothing."
+	"hook runs again. Before anything is written, the resume is refused what release validation refuses about the lifecycle and " +
+	"publishing: a releasable or member on hold or retired, a repository whose visibility disagrees with the lifecycle-and-license record, an " +
+	"output the publishing rules forbid, and a deploy command on a releasable that may not deploy. --dry-run reports what would be adopted " +
+	"and which steps would run, and writes nothing."
 
 const releaseInitHelp = "Write the release file of the releasable the working directory selects, " +
 	".strictmetadata/releases/<releasable>/unreleased.toml, with bump and description blank (a release refuses it until both are filled in), " +

@@ -667,8 +667,9 @@ func refusePublishing(v *Validated, repo git.Repo, info github.RepositoryInfo, n
 	return publishingRules(v.Workspace, v.Releasable, v.Lifecycle, repo, "HEAD", info, now)
 }
 
-// RefuseRepublishing holds a command that makes a release publish again
-// (`rlsbl release retry`) to the refusals release validation applies:
+// RefuseRepublishing holds a command that makes a release publish again or
+// continues one (`rlsbl release retry`, `rlsbl release resume`) to the
+// refusals release validation applies:
 // lifecycle-allows-release for the releasable and its members, then the
 // publishing rules refusePublishing applies, over the declarations and the
 // workflows committed at rev, the tree whose workflows run.

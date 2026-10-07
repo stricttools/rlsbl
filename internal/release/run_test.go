@@ -483,3 +483,38 @@ func TestAResumeAfterTheChangelogIsFinalizedAdoptsNothing(t *testing.T) {
 		t.Fatalf("the resume failed once the commits were moved off: %v\n%s", err, out)
 	}
 }
+
+func TestAResumeIsRefusedWhatValidationRefusesSinceTheReleaseStopped(t *testing.T) {
+	hygiene.Isolate(t)
+	testsupport.FakeGH(t, answers(validationAnswers("public"), ciRun(42, "failure"))...)
+	repo := runRepo(t, "", "MIT", map[string]string{".github/workflows/ci.yml": ciWorkflow})
+	if out, err := releaseCommand(t, repo, false, false); err == nil {
+		t.Fatalf("the red verdict did not stop the release:\n%s", out)
+	}
+	tag := remoteRef(t, repo, "refs/tags/v0.5.0")
+	// The releasable is put on hold while the release is stopped.
+	active := runRecord("MIT")
+	held := strings.Replace(active, "status = \"active\"\nfrom = 2026-01-01\nreason = \"the plan\"\n", "status = \"active\"\nfrom = 2026-01-01\nuntil = 2026-06-01\nreason = \"the plan\"\n\n[[lifecycle]]\nsubject = \"portal\"\nstatus = \"on-hold\"\nfrom = 2026-06-01\nreason = \"paused\"\n", 1)
+	if held == active {
+		t.Fatal("the fixture record did not change")
+	}
+	repo.Write(recordPath, held)
+	put := repo.Commit("put portal on hold", recordPath)
+	addEntry(t, repo, "portal", put)
+	testsupport.FakeGH(t, answers(validationAnswers("public"), ciRun(43, "success"), releaseCreation("v0.5.0"))...)
+	out, err := releaseCommand(t, repo, true, false)
+	if err == nil || !strings.Contains(err.Error(), "on-hold") {
+		t.Fatalf("a resume of a releasable on hold was not refused: %v\n%s", err, out)
+	}
+	if remoteRef(t, repo, "refs/tags/v0.5.0") != tag {
+		t.Fatal("the refused resume tagged")
+	}
+	// The fix the refusal names: an active lifecycle period again.
+	repo.Write(recordPath, strings.Replace(held, "status = \"on-hold\"\nfrom = 2026-06-01\n", "status = \"on-hold\"\nfrom = 2026-06-01\nuntil = 2026-07-01\n", 1)+"\n[[lifecycle]]\nsubject = \"portal\"\nstatus = \"active\"\nfrom = 2026-07-01\nreason = \"resumed\"\n")
+	resumed := repo.Commit("portal is active again", recordPath)
+	addEntry(t, repo, "portal", resumed)
+	out, err = releaseCommand(t, repo, true, false)
+	if err != nil {
+		t.Fatalf("the resume failed once the releasable was active: %v\n%s", err, out)
+	}
+}

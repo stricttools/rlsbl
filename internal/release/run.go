@@ -392,17 +392,6 @@ func resumeIn(e *strictcli.Effects, s *Session, req RunRequest, releasable strin
 	if err := RequireAdoptedCovered(repo, ws, releasable, adopted, version); err != nil {
 		return err
 	}
-	if req.DryRun {
-		return previewResume(req, state, version, adopted, live)
-	}
-	base := map[string]string{}
-	if s.Checkout != nil {
-		base = s.Checkout.Environment()
-	}
-	env, err := releaseEnvironmentFile(ws.Declarations, s.LiveRoot, base)
-	if err != nil {
-		return err
-	}
 	gh, err := github.New(e)
 	if err != nil {
 		return err
@@ -417,11 +406,33 @@ func resumeIn(e *strictcli.Effects, s *Session, req RunRequest, releasable strin
 	if err != nil {
 		return err
 	}
-	reg, err := registry.New(registry.Reads(e))
+	record, err := lifecycle.Load(s.Root)
 	if err != nil {
 		return err
 	}
-	record, err := lifecycle.Load(s.Root)
+	// What was allowed when the release started may not be now: the
+	// releasable put on hold or retired, classified, or given a deploy
+	// command since. The steps left publish and deploy, so they are held to
+	// the rules release validation applies.
+	info, err := gh.Info(ghRepo)
+	if err != nil {
+		return &ValidationError{Message: fmt.Sprintf("GitHub could not be asked about %s (%v), and a resume must know whether the repository is public before it publishes; check `gh auth status` and run `"+runstate.ResumeInvocation+"` again", ghRepo, err)}
+	}
+	if err := RefuseRepublishing(ws, r, record, repo, "HEAD", info, req.Now()); err != nil {
+		return err
+	}
+	if req.DryRun {
+		return previewResume(req, state, version, adopted, live)
+	}
+	base := map[string]string{}
+	if s.Checkout != nil {
+		base = s.Checkout.Environment()
+	}
+	env, err := releaseEnvironmentFile(ws.Declarations, s.LiveRoot, base)
+	if err != nil {
+		return err
+	}
+	reg, err := registry.New(registry.Reads(e))
 	if err != nil {
 		return err
 	}
