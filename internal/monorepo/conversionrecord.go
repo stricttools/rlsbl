@@ -167,7 +167,6 @@ func moveTagNamespace(rec *lifecycle.Record, subject, oldGlob, newGlob string, o
 // closed identity is what old-repo-archived reads to ask that the old
 // repository is archived.
 func closeRepositoryURL(rec *lifecycle.Record, subject, url string, from, on time.Time, reason string) error {
-	day := on.UTC().Truncate(24 * time.Hour)
 	for _, id := range rec.Identities() {
 		if id.Subject != subject || id.Facet != lifecycle.FacetRepositoryURL || id.Pending() {
 			continue
@@ -182,9 +181,12 @@ func closeRepositoryURL(rec *lifecycle.Record, subject, url string, from, on tim
 			return nil
 		}
 	}
-	// A root commit dated after the conversion (a clock running ahead)
-	// cannot start the period after it ends.
-	if from.UTC().Truncate(24 * time.Hour).After(day) {
+	// A root commit dated after the conversion (a clock running ahead, or a
+	// commit made after midnight in its own zone while the conversion's date
+	// is still the day before) cannot start the period after it ends. The
+	// record keeps each time's date in the time's own zone, so the dates
+	// are compared that way.
+	if calendarDate(from).After(calendarDate(on)) {
 		from = on
 	}
 	return rec.AddIdentity(lifecycle.Identity{
@@ -195,6 +197,11 @@ func closeRepositoryURL(rec *lifecycle.Record, subject, url string, from, on tim
 		Period:      lifecycle.Period{From: from, Until: on},
 		Reason:      reason,
 	})
+}
+
+// calendarDate is t's date in t's own zone, the date the record keeps.
+func calendarDate(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 }
 
 // addEntries adds the moved entries to rec through its mutators, in date

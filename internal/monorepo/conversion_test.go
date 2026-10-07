@@ -236,3 +236,22 @@ func TestAConversionRefusesAMissingSafermUnlessAPlainRemovalIsAskedFor(t *testin
 		t.Fatalf("with saferm installed: %v", err)
 	}
 }
+
+func TestARepositoryStartedOnALaterLocalDateThanTheConversionStartsItsURLThere(t *testing.T) {
+	hygiene.Isolate(t)
+	rec, err := lifecycle.Parse([]byte("format_version = 1\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The root commit's own date is the 8th (00:30 at +02:00), the 7th in
+	// UTC; the conversion runs on the 7th. The record keeps each time's own
+	// date, so the period would end before it began.
+	started := time.Date(2026, 10, 8, 0, 30, 0, 0, time.FixedZone("", 2*60*60))
+	on := time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
+	if err := closeRepositoryURL(rec, "gizmo", "https://github.com/acme/gizmo", started, on, "absorbed"); err != nil {
+		t.Fatal(err)
+	}
+	if err := rec.Validate(on, []string{"gizmo"}); err != nil {
+		t.Fatalf("the closed repository-url identity is invalid: %v", err)
+	}
+}
