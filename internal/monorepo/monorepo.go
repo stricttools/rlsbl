@@ -2,8 +2,10 @@
 // writes a repository's first declarations, add and remove change its
 // members, list, status, outdated, graph, and impact report on them,
 // check-names asks the registries about their names, cleanup removes the
-// old layout's residue, and rename-releasable renames a releasable with its
-// state and its identities in the lifecycle-and-license record.
+// old layout's residue, rename-releasable renames a releasable with its
+// state and its identities in the lifecycle-and-license record, extract
+// moves a releasable out into a repository of its own, and absorb brings a
+// repository in as a member.
 //
 // Every command but init reads the declarations of the repository holding
 // the working directory and refuses a standalone layout: a standalone
