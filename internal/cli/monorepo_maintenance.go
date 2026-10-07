@@ -63,7 +63,7 @@ func registerMonorepoMaintenance(r *commandSet) {
 }
 
 func runMonorepoCleanup(ctx *strictcli.Context, kw map[string]any) (any, error) {
-	_, repo, ws, err := workingWorkspace(ctx, "cleanup")
+	_, repo, ws, err := loadMonorepoWorkspace(ctx, "cleanup")
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func renderCleanup(payload any) string {
 }
 
 func runMonorepoRename(ctx *strictcli.Context, kw map[string]any) (any, error) {
-	_, repo, ws, err := workingWorkspace(ctx, "rename-releasable")
+	_, repo, ws, err := loadMonorepoWorkspace(ctx, "rename-releasable")
 	if err != nil {
 		return nil, err
 	}

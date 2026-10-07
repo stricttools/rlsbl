@@ -52,7 +52,7 @@ func registerMonorepoReports(r *commandSet) {
 		path:    []string{"monorepo", "status"},
 		help:    monorepoStatusHelp,
 		effect:  readOnly,
-		payload: statusPayloadSchema(),
+		payload: monorepoStatusPayloadSchema(),
 		render:  renderMonorepoStatus,
 		run:     runMonorepoStatus,
 	})
@@ -119,9 +119,9 @@ func registerMonorepoReports(r *commandSet) {
 	})
 }
 
-// workingWorkspace loads the workspace holding the working directory for
+// loadMonorepoWorkspace loads the workspace holding the working directory for
 // the monorepo command named command, with a git handle on it.
-func workingWorkspace(ctx *strictcli.Context, command string) (string, git.Repo, *workspace.Workspace, error) {
+func loadMonorepoWorkspace(ctx *strictcli.Context, command string) (string, git.Repo, *workspace.Workspace, error) {
 	dir, err := os.Getwd()
 	if err != nil {
 		return "", git.Repo{}, nil, err
@@ -138,7 +138,7 @@ func workingWorkspace(ctx *strictcli.Context, command string) (string, git.Repo,
 }
 
 func runMonorepoStatus(ctx *strictcli.Context, kw map[string]any) (any, error) {
-	_, repo, ws, err := workingWorkspace(ctx, "status")
+	_, repo, ws, err := loadMonorepoWorkspace(ctx, "status")
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func runMonorepoStatus(ctx *strictcli.Context, kw map[string]any) (any, error) {
 	return monorepo.ReadStatus(repo, ws, fork)
 }
 
-func statusPayloadSchema() map[string]any {
+func monorepoStatusPayloadSchema() map[string]any {
 	coverage := objectSchema(map[string]any{"covered": integerSchema(), "total": integerSchema(), "exempted": integerSchema()})
 	return objectSchema(map[string]any{
 		"releasables": arraySchema(objectSchema(map[string]any{
@@ -226,7 +226,7 @@ type outdatedPayload struct {
 }
 
 func runMonorepoOutdated(ctx *strictcli.Context, kw map[string]any) (any, error) {
-	_, _, ws, err := workingWorkspace(ctx, "outdated")
+	_, _, ws, err := loadMonorepoWorkspace(ctx, "outdated")
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +291,7 @@ func depthOf(kw map[string]any) (int, error) {
 }
 
 func runMonorepoGraph(ctx *strictcli.Context, kw map[string]any) (any, error) {
-	dir, _, ws, err := workingWorkspace(ctx, "graph")
+	dir, _, ws, err := loadMonorepoWorkspace(ctx, "graph")
 	if err != nil {
 		return nil, err
 	}
@@ -365,7 +365,7 @@ func renderGraph(payload any) string {
 }
 
 func runMonorepoImpact(ctx *strictcli.Context, kw map[string]any) (any, error) {
-	_, repo, ws, err := workingWorkspace(ctx, "impact")
+	_, repo, ws, err := loadMonorepoWorkspace(ctx, "impact")
 	if err != nil {
 		return nil, err
 	}
@@ -434,7 +434,7 @@ type checkNamesPayload struct {
 }
 
 func runMonorepoCheckNames(ctx *strictcli.Context, kw map[string]any) (any, error) {
-	_, _, ws, err := workingWorkspace(ctx, "check-names")
+	_, _, ws, err := loadMonorepoWorkspace(ctx, "check-names")
 	if err != nil {
 		return nil, err
 	}
