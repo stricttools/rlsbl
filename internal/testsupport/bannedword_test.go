@@ -5,10 +5,12 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	tomledit "github.com/stricttools/go-toml-edit"
 	"github.com/stricttools/testisolation/go/hygiene"
 )
 
@@ -91,5 +93,93 @@ func TestTheBannedWordGuardFindsEveryPlace(t *testing.T) {
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("findings = %q, want %q", got, want)
+	}
+}
+
+// schemaKeywords are the words of strictspec's schema language that carry
+// the banned word; they are strictspec's to spell, and a text file's other
+// uses of the word are rlsbl's.
+var schemaKeywords = []string{"node-" + bannedWord + "-union", "datetime_" + bannedWord}
+
+// textFindings names every line of a listed text file carrying the banned
+// word outside strictspec's keywords, case-insensitively.
+func textFindings(t *testing.T, root string, files []string) []string {
+	t.Helper()
+	var findings []string
+	for _, rel := range files {
+		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, line := range strings.Split(string(data), "\n") {
+			line = strings.ToLower(line)
+			for _, k := range schemaKeywords {
+				line = strings.ReplaceAll(line, k, "")
+			}
+			if strings.Contains(line, bannedWord) {
+				findings = append(findings, fmt.Sprintf("%s:%d", rel, i+1))
+			}
+		}
+	}
+	return findings
+}
+
+// rlsblTextFiles are the text files rlsbl writes for its Go implementation:
+// the documentation pages and the schemas of the Go validators strictspec
+// generates.
+func rlsblTextFiles(t *testing.T, root string) []string {
+	t.Helper()
+	files, err := filepath.Glob(filepath.Join(root, ".strictmetadata", "docs", "*.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for _, f := range files {
+		rel, _ := filepath.Rel(root, f)
+		out = append(out, filepath.ToSlash(rel))
+	}
+	data, err := os.ReadFile(filepath.Join(root, "strictspec.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := tomledit.Unmarshal[struct {
+		FormatVersion int `toml:"format_version"`
+		Schemas       []struct {
+			Path    string `toml:"path"`
+			Targets []struct {
+				Lang    string `toml:"lang"`
+				Output  string `toml:"output"`
+				Package string `toml:"package"`
+			} `toml:"targets"`
+		} `toml:"schemas"`
+	}](data)
+	if err != nil {
+		t.Fatalf("strictspec.toml: %v", err)
+	}
+	for _, s := range manifest.Schemas {
+		for _, target := range s.Targets {
+			if target.Lang == "go" {
+				out = append(out, s.Path)
+				break
+			}
+		}
+	}
+	return out
+}
+
+func TestNoTextFileOfTheGoImplementationCarriesTheBannedWord(t *testing.T) {
+	hygiene.Isolate(t)
+	root := ModuleRoot(t)
+	if findings := textFindings(t, root, rlsblTextFiles(t, root)); len(findings) > 0 {
+		t.Fatalf("the word %q is banned from rlsbl's documentation pages and Go validator schemas, outside strictspec's own keywords (name the thing instead):\n  %s", bannedWord, strings.Join(findings, "\n  "))
+	}
+}
+
+func TestTheBannedWordGuardReadsTextFilesPastTheSchemaKeywords(t *testing.T) {
+	hygiene.Isolate(t)
+	root := t.TempDir()
+	WriteFile(t, filepath.Join(root, "a.schema.toml"), "type = \"node-"+bannedWord+"-union\"\ndatetime_"+bannedWord+" = \"offset\"\n# one "+strings.ToUpper(bannedWord)+" of union\n")
+	if got := textFindings(t, root, []string{"a.schema.toml"}); strings.Join(got, ",") != "a.schema.toml:3" {
+		t.Fatalf("findings = %q", got)
 	}
 }

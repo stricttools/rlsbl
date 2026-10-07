@@ -368,9 +368,9 @@ collection = "targets"
 field = "name"
 normalization = "none"
 
-# A string and a boolean are both scalars, and a node-kind-union selects its
-# arm by node category (scalar, record, or array), so it cannot tell a name
-# from false; declarations.Parse checks this value's type instead.
+# A string and a boolean are both scalars, and strictspec's union by node
+# category (scalar, record, or array) cannot tell a name from false;
+# declarations.Parse checks this value's type instead.
 [types.MemberReleasable]
 type = "opaque"
 consumer_check = "rlsbl-member-releasable"
