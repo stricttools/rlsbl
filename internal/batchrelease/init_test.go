@@ -144,6 +144,26 @@ func TestInitOfAReleasableWithNoTargetIsRefusedUntilItIsLeftOut(t *testing.T) {
 	}
 }
 
+func TestInitOfAReleasableOnHoldIsRefusedUntilItIsLeftOut(t *testing.T) {
+	hygiene.Isolate(t)
+	testsupport.FakeSafegit(t)
+	repo := workspaceRepo(t, nil)
+	repo.CommitFile(".strictmetadata/lifecycle-and-license/lifecycle-and-license.toml", "format_version = 1\n\n[[lifecycle]]\nsubject = \"gadget\"\nstatus = \"on-hold\"\nfrom = 2026-01-01\nreason = \"paused\"\n", "hold gadget")
+	withWidgetFeature(t, repo)
+	_, err := initBatch(t, repo, nil)
+	if err == nil || !strings.Contains(err.Error(), "on-hold") || !strings.Contains(err.Error(), "--releasables") {
+		t.Fatalf("a releasable on hold was given a table: %v", err)
+	}
+	if exists(t, repo.Path(batchFilePath)) {
+		t.Fatal("the refused init wrote the batch release file")
+	}
+	// The fix the refusal names: gadget left out with --releasables.
+	res, err := initBatch(t, repo, []string{"widget"})
+	if err != nil || !res.Written {
+		t.Fatalf("init: %+v %v", res, err)
+	}
+}
+
 func TestABatchReleaseFileThatCannotBeCommittedNamesTheCommitThatFinishesIt(t *testing.T) {
 	hygiene.Isolate(t)
 	repo := workspaceRepo(t, nil)

@@ -8,9 +8,11 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	tomledit "github.com/stricttools/go-toml-edit"
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/lifecycle"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
@@ -75,9 +77,16 @@ func Init(e *strictcli.Effects, liveRoot string, names []string, fork release.Fo
 	if err != nil {
 		return InitResult{}, err
 	}
+	record, err := lifecycle.Load(liveRoot)
+	if err != nil {
+		return InitResult{}, err
+	}
 	res := InitResult{Path: rel}
 	var tables, idle []string
 	for _, r := range selected {
+		if err := release.RefuseHeldLifecycle(record, ws, r, time.Now()); err != nil {
+			return InitResult{}, fmt.Errorf("%w\n  A batch release refuses a releasable it may not release, so no table is written for %s; leave it out by naming the other releasables with --releasables, then run `rlsbl monorepo release init` again", err, r.Name)
+		}
 		include, err := release.ReleasableTargets(ws, r)
 		if err != nil {
 			return InitResult{}, err

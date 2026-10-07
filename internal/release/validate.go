@@ -311,6 +311,12 @@ func refuseInProgress(repo git.Repo, liveRoot string, r declarations.Releasable)
 	return nil, &ValidationError{Message: strings.Join(parts, "")}
 }
 
+// RefuseHeldLifecycle is refuseHeldLifecycle, for the batch release file's
+// scaffolding: a table is never written for a releasable no release takes.
+func RefuseHeldLifecycle(record *lifecycle.Record, ws *workspace.Workspace, r declarations.Releasable, now time.Time) error {
+	return refuseHeldLifecycle(record, ws, r, now)
+}
+
 // refuseHeldLifecycle evaluates lifecycle-allows-release for the releasable
 // and every member versioned under it: a subject on hold or retired is not
 // released.

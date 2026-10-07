@@ -29,8 +29,8 @@ const monorepoReleaseRunHelp = "Release the releasables the batch release file .
 const monorepoReleaseInitHelp = "Write the batch release file .strictmetadata/batch-releases/unreleased.toml with one [releasables.<name>] table " +
 	"per releasable (the ones --releasables names, once per releasable, or every declared one), each with bump and description blank (a batch " +
 	"release refuses it until both are filled in), context blank, every target of the releasable's members in include, and exclude empty, and " +
-	"commit it. A releasable with no commit needing a changelog entry since its latest release is written commented out, and one with no target is " +
-	"refused. A batch release file nobody filled in yet is left as it is; one somebody filled in is refused, never overwritten."
+	"commit it. A releasable with no commit needing a changelog entry since its latest release is written commented out, and one with no target, " +
+	"or on hold or retired (it or a member), is refused, naming --releasables to leave it out. A batch release file nobody filled in yet is left as it is; one somebody filled in is refused, never overwritten."
 
 const monorepoReleaseOrderHelp = "Report every member of the workspace, each after the members it depends on (its manifests' dependencies on " +
 	"other members and its depends_on), and every releasable in the order a batch release releases them: by the latest position any of its members " +
