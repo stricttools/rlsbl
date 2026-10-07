@@ -27,7 +27,12 @@ type BatchPlanItem struct {
 // BatchPlan is the plan of a batch release in progress, items in release
 // order.
 type BatchPlan struct {
-	Items []BatchPlanItem
+	// BatchFile is the git blob id of the batch release file the plan was
+	// made from, which tells that file from a later one naming the same
+	// releasables; empty in a plan the record migration converted, which
+	// does not know it.
+	BatchFile string
+	Items     []BatchPlanItem
 }
 
 // Item is the plan's item for the releasable name, and false when the plan
@@ -52,6 +57,7 @@ type rawBatchPlanItem struct {
 
 type rawBatchPlan struct {
 	FormatVersion int64              `toml:"format_version,required"`
+	BatchFile     *string            `toml:"batch_file"`
 	Items         []rawBatchPlanItem `toml:"items,required"`
 }
 
@@ -71,6 +77,12 @@ func ParseBatchPlan(rel string, data []byte) (BatchPlan, error) {
 		problems = append(problems, "items plans no releasable")
 	}
 	plan := BatchPlan{}
+	if raw.BatchFile != nil {
+		if strings.TrimSpace(*raw.BatchFile) == "" {
+			problems = append(problems, "batch_file is empty; leave it out when the batch release file is not known")
+		}
+		plan.BatchFile = *raw.BatchFile
+	}
 	seen := map[string]bool{}
 	for i, it := range raw.Items {
 		for _, f := range []struct{ name, value string }{
@@ -107,6 +119,9 @@ func LoadBatchPlan(root string) (p BatchPlan, found bool, err error) {
 func RenderBatchPlan(p BatchPlan) []byte {
 	var b strings.Builder
 	fmt.Fprintf(&b, "format_version = %d\n", BatchPlanFormatVersion)
+	if p.BatchFile != "" {
+		fmt.Fprintf(&b, "batch_file = %s\n", quote(p.BatchFile))
+	}
 	for _, it := range p.Items {
 		b.WriteString("\n[[items]]\n")
 		fmt.Fprintf(&b, "name = %s\n", quote(it.Name))

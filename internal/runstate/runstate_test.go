@@ -259,6 +259,18 @@ func TestBatchPlans(t *testing.T) {
 	if _, err := runstate.ParseBatchPlan("batch-plan.toml", []byte(twice)); err == nil || !strings.Contains(err.Error(), "planned twice") {
 		t.Fatalf("got %v", err)
 	}
+	// The batch release file the plan was made from round-trips; an empty
+	// one is refused.
+	want.BatchFile = strings.Repeat("ab", 20)
+	_, err = mutating(t, false, func(e *strictcli.Effects) error { return runstate.SaveBatchPlan(e, root, want) })
+	must(t, err)
+	if got, _, err := runstate.LoadBatchPlan(root); err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("read back %+v (%v)", got, err)
+	}
+	empty := strings.Replace(string(runstate.RenderBatchPlan(want)), want.BatchFile, "", 1)
+	if _, err := runstate.ParseBatchPlan("batch-plan.toml", []byte(empty)); err == nil || !strings.Contains(err.Error(), "batch_file is empty") {
+		t.Fatalf("an empty batch_file was accepted: %v", err)
+	}
 }
 
 func TestTheLockRefusesASecondHolder(t *testing.T) {
