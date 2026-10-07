@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 
@@ -339,6 +340,49 @@ func TestANestedAcquireLeavesTheLockWithItsOuterHolder(t *testing.T) {
 			t.Errorf("the inner release dropped the outer holder's lock (stale %v, %v)", stale, err)
 		}
 		return outer.Release()
+	})
+	must(t, err)
+}
+
+// Two goroutines of one process acquiring the lock at once are both its
+// holders, as a nested acquire is: neither is refused as if another process
+// held it.
+func TestConcurrentAcquiresInOneProcessAreNotRefusedAsAnotherProcess(t *testing.T) {
+	hygiene.Isolate(t)
+	root := t.TempDir()
+	_, err := mutating(t, false, func(e *strictcli.Effects) error {
+		first, err := runstate.Acquire(e, root, runstate.AcquireOptions{Wait: runstate.RefuseWhenHeld})
+		if err != nil {
+			return err
+		}
+		if err := first.Release(); err != nil {
+			return err
+		}
+		for range 200 {
+			var start, done sync.WaitGroup
+			start.Add(1)
+			locks := make([]*runstate.Lock, 2)
+			errs := make([]error, 2)
+			for i := range locks {
+				done.Add(1)
+				go func() {
+					defer done.Done()
+					start.Wait()
+					locks[i], errs[i] = runstate.Acquire(e, root, runstate.AcquireOptions{Wait: runstate.RefuseWhenHeld})
+				}()
+			}
+			start.Done()
+			done.Wait()
+			for i, err := range errs {
+				if err != nil {
+					return err
+				}
+				if err := locks[i].Release(); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
 	})
 	must(t, err)
 }

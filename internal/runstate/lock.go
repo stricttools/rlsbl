@@ -88,13 +88,16 @@ func Acquire(e *strictcli.Effects, root string, o AcquireOptions) (*Lock, error)
 		return nil, errors.New("acquiring the lock: waiting for a holder needs OnWait, so the operator learns why nothing happens")
 	}
 	path := absolute(root, LockPath)
+	// heldMu is held from the look at locks until this process's holder is
+	// registered, so two goroutines acquiring at once cannot both miss the
+	// map and conflict through flock as two processes would; it is let go
+	// only while blocking on another process's holder.
 	heldMu.Lock()
+	defer heldMu.Unlock()
 	if h, ok := locks[path]; ok {
 		h.depth++
-		heldMu.Unlock()
 		return &Lock{path: path, took: true}, nil
 	}
-	heldMu.Unlock()
 	found, err := exists(root, LockPath)
 	if err != nil {
 		return nil, err
@@ -123,15 +126,16 @@ func Acquire(e *strictcli.Effects, root string, o AcquireOptions) (*Lock, error)
 			f.Close()
 			return nil, &HeldError{Path: LockPath}
 		}
+		heldMu.Unlock()
 		o.OnWait(LockPath)
-		if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX)
+		heldMu.Lock()
+		if err != nil {
 			f.Close()
 			return nil, fmt.Errorf("locking %s: %w", LockPath, err)
 		}
 	}
-	heldMu.Lock()
 	locks[path] = &held{file: f}
-	heldMu.Unlock()
 	return &Lock{path: path, took: true}, nil
 }
 
