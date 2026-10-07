@@ -58,7 +58,9 @@ func New(d Dependencies) (*strictcli.App, error) {
 		opts = append(opts, strictcli.WithSourceTreeRoot(root))
 	}
 	app := strictcli.NewApp("rlsbl", d.Version, appHelp, opts...)
-	newRegistry(app)
+	r := newRegistry(app)
+	registerNames(r)
+	registerDiscover(r)
 	return app, nil
 }
 
