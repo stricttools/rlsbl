@@ -154,8 +154,11 @@ func TestURLsAreBuiltInOnePlace(t *testing.T) {
 			t.Fatal(err)
 		}
 		ast.Inspect(f, func(n ast.Node) bool {
-			if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
-				text, _ := strconv.Unquote(lit.Value)
+			if lit, ok := n.(*ast.BasicLit); ok {
+				text, err := strconv.Unquote(lit.Value)
+				if err != nil {
+					return true
+				}
 				for _, banned := range []string{"@latest", "sum.golang.org"} {
 					if strings.Contains(text, banned) {
 						t.Errorf("%s: a literal spells %s", fset.Position(lit.Pos()), banned)

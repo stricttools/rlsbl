@@ -177,3 +177,23 @@ func TestRegistrationRules(t *testing.T) {
 		r.group([]string{"a"}, "A")
 	})
 }
+
+// A grant built by newGrant authorizes the effect class it names: a run
+// using it is accepted, and recorded under --dry-run.
+func TestNewGrantAuthorizesItsEffectClass(t *testing.T) {
+	hygiene.Isolate(t)
+	r := scratchRegistry()
+	r.add(command{
+		path:   []string{"publish"},
+		help:   "Publish",
+		effect: mutating,
+		grants: []strictcli.Grant{newGrant("publish", "publishing cannot be undone", strictcli.ProcMutate)},
+		run: func(ctx *strictcli.Context, _ map[string]any) (any, error) {
+			_, err := ctx.Effects().Run([]interface{}{"true"}, strictcli.UseGrant("publish"))
+			return nil, err
+		},
+	})
+	if res := r.app.Test([]string{"publish", "--dry-run"}); res.ExitCode != 0 {
+		t.Fatalf("exit %d: %s", res.ExitCode, res.Stderr)
+	}
+}
