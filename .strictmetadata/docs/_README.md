@@ -7,244 +7,155 @@ title = "README.md"
 
 # rlsbl
 
-rlsbl is a release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more. It is for developers and AI agents who ship a repository -- one project, several targets at once, or a monorepo of independently versioned packages -- to public package registries. Its distinctive property is that the version is pushed first as an untagged candidate and becomes a tag only after the repository's own CI passes on that exact commit, so a red build leaves no tag, no GitHub Release and nothing on any registry.
+rlsbl is a release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, and the Go module proxy. It is for developers and AI agents who ship a repository (one project, several targets at once, or a workspace of independently versioned releasables) to public package registries. Its distinctive property is that the version is pushed first as an untagged candidate and becomes a tag only after the repository's own CI passes on that commit, so a red build leaves no tag, no GitHub Release, and nothing on any registry.
 
 ## Install
 
-From PyPI:
+rlsbl is one Go binary.
 
 ```
-uv tool install rlsbl
+go install github.com/stricttools/rlsbl/cmd/rlsbl@latest
 ```
 
-From npm (wrapper):
+From npm or PyPI, which carry the prebuilt binary for Linux and macOS on x64 and arm64:
 
 ```
 npm i -g rlsbl
+uv tool install rlsbl
 ```
 
 ## Quick start
 
 ```
-rlsbl scaffold          # set up CI/CD, hooks, changelog, pipelines
-# ... develop, commit ...
-rlsbl release init      # scaffold .rlsbl/releases/unreleased.toml
-# ... edit bump type, targets, pipelines ...
-rlsbl release run       # bump, push the candidate, wait for CI, tag, publish
-rlsbl watch <sha>       # monitor CI for that release
+# declare the repository in .strictmetadata/releasables/releasables.toml
+rlsbl scaffold                                   # CI and publish workflows, git hooks
+rlsbl changelog add --commits <id> --description "..." --type feature
+rlsbl release init                               # write the release file
+# ... set its bump and description ...
+rlsbl release run --watch --approve-consequential
 ```
 
 ## Commands
 
-:-: target-count
-
-All commands auto-detect targets (versioning) from project files (`package.json`, `pyproject.toml`, `go.mod`) and pipelines (publishing) from `.rlsbl/config.json`. Targets handle version bumps; pipelines handle where releases are published.
-
 :-: table-commands
 
-Global flags: `--help`, `--version`, `--dry-run`, `--approve-consequential`, `--quiet`, `--verbose`.
+Framework flags on every command: `--help`, `--version`, `--dry-run`, `--approve-consequential`, `--quiet`, and `--verbose`, plus `--json` on every command that declares a payload. `--dry-run` records a mutating command's writes and programs as a would-do log instead of performing them. A consequential command asks for confirmation before it runs; `--approve-consequential` gives it, and without a terminal to ask on the missing confirmation is an error.
+
+## Declarations
+
+A repository declares what it is in `.strictmetadata/releasables/releasables.toml`: its layout (`standalone` or `workspace`), its release branches, its releasables (each with a name, a tag format, and a publish mode), and its members with their targets, publish pipelines, hooks, and checks. Nothing a release depends on is derived where it could be declared. Behavior switches are options under `.strictmetadata/options/`, and every other record rlsbl keeps (changelogs, release archives, the transition record, scaffold state, run state) lives in its own directory under `.strictmetadata/`. See [declarations](.strictmetadata/docs/declarations.md) and [the on-disk layout](.strictmetadata/docs/on-disk-layout.md).
 
 ## Release flow
 
-`rlsbl release run` reads `.rlsbl/releases/unreleased.toml` for the bump type, the
-description and the target selection, then:
+`rlsbl release run` reads the releasable's release file, `.strictmetadata/releases/<releasable>/unreleased.toml` (the bump, the description, the targets), and then:
 
-1. Verifies `gh` auth, refuses an uncommitted change to any path the release writes (naming it; every other uncommitted change is listed and left alone), computes the new version and confirms its tag does not exist, and enters the release checkout: a detached checkout of the branch tip under `.git/rlsbl/release-checkout`, where every step below runs, so nothing the release builds, tests or commits reads the working tree
-2. Validates the JSONL changelog and regenerates CHANGELOG.md from it
-3. Runs `.rlsbl/hooks/pre-checks.sh` (user-owned), the strictcli schema dump, `selfdoc gen` and `selfdoc check`, the built-in tests and lint, and `.rlsbl/hooks/pre-release.sh` (scaffold-managed) -- any non-zero aborts
-4. Writes the new version to every detected target file (and its own rlsbl version to `.rlsbl/version`, which names the rlsbl that last scaffolded or released the project, not the project's version), commits it with the tag string as the message, advances the branch to that commit by compare-and-swap (writing into the working tree only the files it changed), and pushes it **untagged**: the release candidate
-5. Waits in-process for the repository's own push-triggered CI to conclude on that exact commit
-6. Finalizes the changelog (renames `unreleased.jsonl` to the version's file, opens a fresh one, regenerates CHANGELOG.md), archives the release file, tags the **CI-verified commit**, pushes the finalization commits and the tags, and creates the GitHub Release with the version's changelog section as notes
-7. Uploads assets, runs each pipeline's `publish` (configured in `.rlsbl/config.json`), deploys, runs `.rlsbl/hooks/post-release.sh` (non-fatal), and prints `Watch CI: rlsbl watch <sha>`
+1. validates everything before writing anything: the changelog, the lifecycle-and-license record, the publishing rules of the repository's visibility, the version decision, `gh` and push access, the release branch, and every uncommitted change to a path the release writes;
+2. enters the release checkout, a detached checkout of the branch tip under `.git/rlsbl/release-checkout`, where everything below runs;
+3. runs the pre-checks hooks, the strictcli schema dump, `selfdoc gen` and `selfdoc check`, the preflight checks, the built-in tests, and the pre-release hooks;
+4. writes the new version, builds, scans the artifacts for secrets, checks every packed file comes from the releasable's members, commits, and pushes the commit **untagged**: the release candidate;
+5. waits for the repository's own CI to conclude on that commit;
+6. finalizes the changelog, archives the release with the commit it shipped from, tags the CI-verified commit, pushes, and creates the GitHub Release;
+7. publishes the pipelines that publish from this machine (CI pipelines publish from the workflow the Release starts), runs a server releasable's deploy command, and runs the post-release hooks.
 
-Everything above the candidate push is reversible; everything below it is not. A red
-CI verdict therefore leaves nothing behind but a commit on the branch -- no tag, no
-GitHub Release, no finalized changelog, nothing on any registry. Fix forward on the
-release branch and `rlsbl release resume` completes the *same* version; a failed
-release never burns it.
+Everything before the candidate push is reversible; a red CI verdict leaves nothing but a commit on the branch. Fix forward on the release branch and `rlsbl release resume` completes the same version: a failed release never burns it. See [the release workflow](.strictmetadata/docs/release-workflow.md).
 
-The step-by-step pipeline, including what each step does in monorepo and releasable
-mode, is in [.strictmetadata/docs/release-workflow.md](.strictmetadata/docs/release-workflow.md).
+## Changelog
 
-Use `--dry-run` to preview without changes: mutating operations are recorded and printed as a
-would-do log rather than performed. A small set of commands declares itself `consequential`
-(`release run`/`resume`/`retry`/`undo`/`abandon`/`deprecate`/`yank`/`scrub`/`reconcile`/`backfill`,
-`claim-name`, `deploy`, `transition record`, `rewrite project-name`, `upstream adopt-tags`,
-`secrets sync-npm-token`,
-`monorepo release run`/`mirror`/`absorb`/`extract`/`rename-releasable`) and asks
-for confirmation before running; pass `--approve-consequential` in non-interactive contexts
-(CI, AI agents), where the prompt is a hard error instead. Every other command runs without
-asking.
-
-Create the release file with `rlsbl release init`, which auto-detects project targets and scaffolds the TOML file.
-
-First release: if the release record holds no released version at all, `release` publishes the current version as-is (bump type is ignored). Once a release exists, version files naming a number above the latest release that the record holds nothing for (no archive, no tag) are refused -- that is what an abandoned attempt leaves behind -- and `rlsbl release abandon` records that number as never released, after which the next release bumps from it. Such a number below the latest release is refused as behind it: the version files must name at least the latest release.
-
-Pre-release versions (e.g. `1.0.0-beta.1`) are supported.
-
-## Scaffold
+Every commit since the last release needs a JSONL changelog entry, unless it carries the `Autogenerated: true` trailer or changes only rlsbl's own records:
 
 ```
-rlsbl scaffold                    # create or update CI/CD for all detected registries
-rlsbl scaffold --no-auto-commit   # skip auto-commit of scaffolded files
-rlsbl scaffold --no-auto-tag      # skip the rlsbl GitHub topic tag on this run
+rlsbl changelog add --commits a1b2c3d --description "Add retry logic to the HTTP client" --type feature
+rlsbl changelog add --commits e4f5a6b --no-user-facing
 ```
 
-Created files are committed automatically by default.
-
-| File | Purpose |
-|------|---------|
-| `.github/workflows/ci.yml` | CI workflow (lint, test) |
-| `.github/workflows/publish.yml` | Publish on GitHub Release (OIDC) |
-| `CHANGELOG.md` | Version changelog |
-| `LICENSE` | MIT license (author and year filled in) |
-| `.gitignore` | Standard ignores for the ecosystem |
-| `CLAUDE.md` | AI assistant instructions |
-| `.claude/settings.json` | Claude Code settings |
-| `.rlsbl/hooks/pre-checks.sh` | User-customizable pre-checks validation |
-| `.rlsbl/hooks/pre-release.sh` | User-customizable pre-release validation |
-| `.rlsbl/hooks/post-release.sh` | User-customizable post-release actions |
-| `.git/hooks/pre-push` | Captures push refs, runs `rlsbl failing-checks --hook pre-push` |
-| `.rlsbl/bases/` | Three-way merge bases for scaffold |
-
-**Three-way merge:** Bases are stored at scaffold time. On re-run, user customizations and template updates merge via `git merge-file`. Conflicts get git-style conflict markers.
-
-**User-owned files** (CHANGELOG.md, LICENSE, `.rlsbl/hooks/pre-checks.sh`, `.rlsbl/changes/unreleased.jsonl`) are never overwritten by a re-scaffold: there is no flag that makes scaffold clobber them.
-
-**Customizing CI without conflicts:** Instead of editing `ci.yml` or `publish.yml` (which can produce merge conflicts on re-scaffold), put extra jobs in a separate workflow file scaffold never touches:
-
-- `.github/workflows/ci-custom.yml` -- runs alongside `ci.yml`
-- `.github/workflows/publish-custom.yml` -- runs alongside `publish.yml`
-
-See [.strictmetadata/docs/ci-customization.md](.strictmetadata/docs/ci-customization.md) for an example.
-
-**Runs config migrations** when `.rlsbl/config-schema.json` exists.
+`CHANGELOG.md` and the GitHub Release notes are generated from the entries. See [the changelog](.strictmetadata/docs/changelog.md).
 
 ## Check system
 
 :-: check-count
 
-Checks are grouped by tag -- `--tag` runs one family, `--name` runs a single check, and `--all` runs everything, including the checks that carry no tag:
+Checks are grouped by tag: `--tag` runs one tag, `--name` one check, `--all` everything, and `--hook` the selection a git hook or the release runs.
 
 :-: table-check-tags
 
-What each tag's checks actually verify, one row per check with its severity, is in [.strictmetadata/docs/checks.md](.strictmetadata/docs/checks.md), which also says which tags the release pipeline runs on its own.
+What each check verifies is in [the check system](.strictmetadata/docs/checks.md). Every check is an option, `rlsbl:<check name>`, which a repository softens or switches off only through an options entry stating why.
 
 ```
-rlsbl check --all              # run all checks
-rlsbl check --tag changelog    # run checks by tag
-rlsbl check --name lock        # run a single check
+rlsbl check --all
+rlsbl check --tag changelog
+rlsbl failing-checks --hook pre-push
 ```
+
+## Scaffold
+
+`rlsbl scaffold` renders a member's release infrastructure from `releasables.toml` and keeps it current: its CI workflow, its publish workflow (a `wait-for-ci` job, then one job per pipeline publishing from CI), goreleaser configuration for a Go binary, the npm launcher for a Go binary shipped through npm, `.gitignore` lines, the `experiments/` and `screenshots/` scratch directories, stub `go.mod` files keeping private directories out of a Go module, a `LICENSE` from the lifecycle-and-license record, and the pre-push and post-rewrite git hooks. An existing file is merged three ways against the last rendering, so edits are kept; extra jobs belong in a workflow file scaffold never renders, such as `.github/workflows/ci-custom.yml`. See [scaffold](.strictmetadata/docs/scaffold.md).
 
 ## Undo
 
 ```
-rlsbl release undo                          # interactive: confirms once, then auto-pushes
-rlsbl release undo --approve-consequential  # non-interactive: skips the confirmation
+rlsbl release undo --approve-consequential
 ```
 
-Reverts the last release:
-
-1. Deletes the GitHub Release
-2. Deletes the git tag (remote + local)
-3. Reverts the version bump commit (if HEAD matches the tag)
-4. Pushes the revert commit (the single confirmation covers the whole rollback)
-
-On partial failure, prints a structured summary table with remediation commands for each failed step.
+Reverts the latest release when it is provably unpublished (the registries' package listings, origin's Go tags, and its publish runs must show it absent): deletes the GitHub Release and the tags here and on origin, reverts the version-bump commit, restores the changelog entries and the release file, and pushes. For a version a registry already served, `rlsbl release deprecate` and `rlsbl release yank` mark it instead.
 
 ## Who writes which ref namespace
 
-Each namespace has one routine writer -- the flow that puts refs there while
-shipping -- and a named set of repair and retraction surfaces for correcting or
-withdrawing what already shipped:
+Release branches on origin are written only by releases; there is no other push path, and the pre-push hook refuses a manual push to a release branch. Tags and GitHub Releases are written by the release, and repaired from the record by `rlsbl release reconcile`. History is rewritten only by `rlsbl release scrub` (and `rlsbl transition declassify`), which repairs every record and Release in the same pass. The full table, with every repair and retraction command, is in [the release workflow](.strictmetadata/docs/release-workflow.md#who-writes-which-ref-namespace).
 
-| Namespace | Routine writer |
-|-----------|------------|
-| `origin` branch heads | Releases. `rlsbl release run` pushes the untagged candidate and, after CI, the finalization commits; there is no dev-branch push path. |
-| `origin` tags and their GitHub Releases | The release's tag step, repaired by `rlsbl release reconcile` when a rewrite or a partial release left them wrong -- both composing the Release through one module, so the notes and the `rlsbl-ci-sha` marker match either way. |
-| A subtree mirror's `main` | The mirror reconciler's converge (`rlsbl monorepo mirror`, and the release's mirror step, which calls the same code). Force-with-lease is its routine write; a commit it cannot account for is a contract violation it refuses. |
-| A subtree mirror's tags and their GitHub Releases | The mirror publication module, driven by the release's mirror step or by `rlsbl monorepo mirror` materializing a version the mirror is missing. A mirror's scaffold renders no publish workflow and every convergence sweeps one that arrived another way, so the mirror never releases itself. |
-| Rewritten history on any of the above | `rlsbl release scrub`, the one sanctioned rewrite: it force-pushes, remaps the changelog hashes, re-points the tags and rewrites each tag's Release document in a single pass -- in place, never delete-then-create. |
-| A fork's inherited tags, `refs/tags-of/<host>/<owner>/<repo>/<tag>`, here and on origin | `rlsbl upstream adopt-tags`, moving each tag the fork inherited from its declared upstream out of `refs/tags` with its object unchanged; a kept ref is never rewritten. |
-| A fork's upstream branch, `refs/upstream/<host>/<owner>/<repo>/<branch>`, local only | The operator's `git fetch --no-tags` that the changelog checks print when it is missing; rlsbl only reads it. |
+## Workspaces
 
-The repair and retraction surfaces, in full: `rlsbl release undo` (deletes the
-Release and the tag, reverts the version-bump commit and pushes the branch),
-`rlsbl release reconcile` (re-pushes moved tags, writes their Release documents
-in place and creates only the absent ones),
-`rlsbl release scrub` (the rewrite), `rlsbl release edit` (re-syncs one
-Release's notes), `rlsbl release deprecate` and `rlsbl release yank` (rewrite a
-Release body and set its pre-release flag; `yank` also performs the registry's
-removal), `rlsbl changelog amend`, `rlsbl changelog edit` and
-`rlsbl changelog remove` (re-sync a released
-version's Release notes), `rlsbl monorepo rename-releasable` (pushes one
-boundary alias tag), and `rlsbl upstream adopt-tags` (deletes a fork's
-inherited tags from `refs/tags` here and on origin, after keeping each under
-`refs/tags-of/`). A write from anywhere else is not rlsbl's.
+A workspace holds several members versioned under one or more releasables:
 
-## Pre-push hook
+```
+rlsbl monorepo init --root-member root-dev-node --release-branch main
+rlsbl monorepo add packages/core --releasable core --tag-format '{name}@v{version}' --publish-mode ci
+rlsbl monorepo sync                  # regenerate the CI router and publish router
+rlsbl monorepo graph --format tree   # the dependency graph; --json for the document
+rlsbl monorepo release run --watch --approve-consequential
+```
 
-The `.git/hooks/pre-push` hook captures push refs from git and runs `rlsbl failing-checks --hook pre-push`: the checks `[hooks.pre-push]` in rlsbl's `checks.toml` selects (the `prepush` tag), blocking only on error-level failures, so a check an options entry softened to `warn` never blocks a push. It enforces:
+See [workspaces](.strictmetadata/docs/monorepo.md) and [repository conversions](.strictmetadata/docs/conversions.md) for `extract`, `absorb`, and renames.
 
-1. **Changelog coverage** -- every pushed commit must have a JSONL entry
-2. **Gitignore guard** -- rlsbl-managed files must not be gitignored
-3. **Manual push guard** -- hard error when pushing to a release branch outside `rlsbl release`
-4. **Test suite** -- runs project tests (single-project) or affected project tests (monorepo)
+## Lifecycle and license
 
-The hook is namespace-aware: it enforces on `refs/heads/*` and exits 0 for `refs/tags/*` (release tags, pushed by rlsbl itself) and `refs/backups/*` (tool-owned backup slots). Release-internal pushes run `git push --no-verify` and never invoke the hook, so there is no environment-variable bypass to leak.
-
-Old hooks that call `rlsbl pre-push-check` no longer work: the command was removed and now exits non-zero with an error, which blocks the push. Run `rlsbl scaffold` to install the current hook.
-
-To reinstall, run `rlsbl scaffold` -- it writes the current hook (and upgrades any previously shipped version in place).
+Each repository keeps a record of every releasable's dated lifecycle (active, on hold, retired), license, and identities in `.strictmetadata/lifecycle-and-license/lifecycle-and-license.toml`. A releasable whose license is `proprietary` makes the repository confidential: it must be private on GitHub, publishes nothing anywhere public, and its names are kept out of every public commit, page, and artifact. The `rlsbl transition` commands write the record. See [lifecycle and license](.strictmetadata/docs/lifecycle-and-license.md).
 
 ## Ecosystem tagging
 
-`scaffold` and `release` add an `"rlsbl"` keyword to project manifests and set the `rlsbl` topic on the GitHub repository, making projects discoverable via `rlsbl discover`.
+While the `rlsbl:ecosystem-tagging` option is on (its default), scaffold and the release add an `rlsbl` keyword to npm and PyPI manifests and the `rlsbl` topic to the GitHub repository, so `rlsbl discover` finds the project. A repository opts out with an options entry:
 
-To disable:
-
-| Method | Scope |
-|--------|-------|
-| `--no-auto-tag` flag | Single invocation |
-| `{"tag": false}` in `.rlsbl/config.json` | This project |
-| `{"tag": false}` in `~/.rlsbl/config.json` | All projects |
-
-## Monorepo
-
-Manage multi-package workspaces with `rlsbl monorepo`:
-
-- `monorepo init` / `monorepo add` / `monorepo remove` -- workspace management
-- `monorepo sync` -- synchronize CI workflows
-- `monorepo graph` -- export dependency graph (DOT, text, or `--json` payload)
-- `monorepo snapshot` -- committed JSON artifact of workspace state
-- `monorepo impact` -- change analysis across the dependency graph
-- `monorepo release run` -- batch release in topological order
-
-Supports architectural layer rules via `[layers]` in `workspace.toml` for enforcing dependency direction.
+```
+rlsbl options set rlsbl:ecosystem-tagging --current off --ideal off --reason "..."
+```
 
 ## Environment variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `RLSBL_VERSION` | -- | Set when running pre-release and post-release hooks; contains the version being released |
-| `RLSBL_RELEASE_BIN` | -- | Set for every hook and step of a release; the release's own directory for binaries, first on `PATH`, where a hook can build a tool the release must run in its unreleased form |
-| `RLSBL_DIST_DIR` | -- | Set when running `custom_assets` build commands; points to the distribution directory for output files |
-| `GITHUB_TOKEN` | -- | Used by `gh` CLI for GitHub API calls; `discover` works unauthenticated for public repos |
+| Variable | Set for | Meaning |
+| --- | --- | --- |
+| `RLSBL_VERSION`, `RLSBL_PREV_VERSION`, `RLSBL_BUMP_TYPE`, `RLSBL_DESCRIPTION` | release hooks | The version being released, the previous one, the bump, and the description. |
+| `RLSBL_PACKAGE` | a member's release hooks | The member's name. |
+| `RLSBL_RELEASE_BIN` | every process of a release | The release's own directory for binaries, first on `PATH`. |
+| `RLSBL_PROJECT_ROOT`, `RLSBL_LAST_TAG`, `RLSBL_UNRELEASED_RANGE` | external checks | The repository root, the releasable's latest release tag, and the commits since it. |
+| `RLSBL_PUSH_STDIN` | the pre-push checks | git's pushed ref lines, exported by the pre-push hook. |
+| `NPM_TOKEN`, `PYPI_TOKEN` | local publishing | The token a local npm or PyPI pipeline publishes with. |
+| `UV_NO_SYNC` | `rlsbl dev sync` | Must be `1`, so a bare `uv run` does not wipe the overlays. |
 
 ## First publish
 
 | Registry | Setup | Then |
-|----------|-------|------|
-| npm | Add `NPM_TOKEN` secret to GitHub repo (Settings > Secrets > Actions) | CI publishes on GitHub Release |
-| PyPI | Set up [Trusted Publishing](https://docs.pypi.org/trusted-publishers/) (OIDC, no tokens needed) | CI publishes via OIDC |
-| Go | Push tag -- Go modules are published by the tag itself | `pkg.go.dev` indexes automatically |
+| --- | --- | --- |
+| npm | Add the `NPM_TOKEN` Actions secret (`rlsbl secrets sync-npm-token` keeps it current). | The publish workflow publishes on the GitHub Release. |
+| PyPI | Register the repository as a [trusted publisher](https://docs.pypi.org/trusted-publishers/); no token. | The publish workflow publishes through OIDC. |
+| Go | Nothing: a Go module is published by its tag. | The publish workflow asks the module proxy for a library; goreleaser attaches a binary's archives to the Release. |
 
 ## Requirements
 
-- Python 3.11+
-- [GitHub CLI](https://cli.github.com) (`gh`), installed and authenticated
-- git
-- Node 24+ (for npm CI/publish templates)
+- git, and the [GitHub CLI](https://cli.github.com) (`gh`), authenticated
+- safegit, through which rlsbl makes every commit, and saferm, through which it deletes
+- strictcode, which every release runs
+- gitleaks, for the release's secret scan
+- each target's own tools: `go`, `npm`, or `uv`
+- git-filter-repo, for `monorepo extract` and `monorepo absorb`
 
 ## License
 

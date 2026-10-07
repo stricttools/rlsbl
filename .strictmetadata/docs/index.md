@@ -1,42 +1,37 @@
 +++
-description = "Documentation index for rlsbl, a release orchestration CLI for version bumps, JSONL changelogs, CI scaffolding, and GitHub Releases for npm, PyPI, and Go."
+description = "Documentation index for rlsbl, a release orchestration CLI written in Go that bumps versions, validates a JSONL changelog, tags only the commit CI verified, publishes to npm, PyPI, and the Go module proxy, and scaffolds CI."
 +++
 
 # rlsbl
 
-rlsbl is a release orchestration CLI that handles version bumping, structured JSONL changelogs, CI scaffolding, tagging, and GitHub Releases across every ecosystem its [release targets](targets.md) cover. It supports single-target projects, multi-target projects, and monorepo workspaces with independent versioning.
+rlsbl releases repositories: it bumps versions, validates a structured JSONL changelog, pushes the release commit untagged and tags it only once the repository's own CI passed on it, creates the GitHub Release, and publishes to npm, PyPI, and the Go module proxy. It scaffolds the CI and publish workflows that go with it, and handles single projects and workspaces of independently versioned releasables alike. Every record it keeps lives under `.strictmetadata/`.
 
 ## Getting started
 
-Install rlsbl via `uv tool install rlsbl` (Python) or `npx rlsbl` (npm wrapper). Initialize a project with `rlsbl scaffold` to generate CI workflows, git hooks, and changelog infrastructure. See the [README](https://github.com/stricttools/rlsbl#readme) for full installation instructions and quick start examples. Key commands:
+Install rlsbl with `go install github.com/stricttools/rlsbl/cmd/rlsbl@latest`, `npm i -g rlsbl`, or `uv tool install rlsbl` (the npm and PyPI packages carry the prebuilt binary). Then:
 
-- `rlsbl scaffold` -- set up a new project
-- `rlsbl release run --watch --approve-consequential` -- perform a release
-- `rlsbl status` -- check current state
+- declare the repository in `.strictmetadata/releasables/releasables.toml` ([declarations](declarations.md)), or `rlsbl monorepo init` for a workspace;
+- `rlsbl scaffold` to render its workflows and hooks;
+- `rlsbl changelog add` for each change, `rlsbl release init`, then `rlsbl release run --watch --approve-consequential`.
 
 ## Guides
 
-- [Release workflow](release-workflow.md) -- end-to-end release process, bump types, release file format
-- [Changelog system](changelog.md) -- JSONL entries, validation, coverage enforcement
-- [Scaffold and templates](scaffold.md) -- CI/CD generation, three-way merge, hooks
-- [Check system](checks.md) -- 57 diagnostic checks across 6 primary tags
-- [Deployment](deploy.md) -- deploy targets, post-release hooks, Cloudflare Pages
-- [Development workflow](dev-workflow.md) -- editable installs, pre-push hook, local testing
-- [Utility commands](utilities.md) -- status, discover, and other helpers
-
-## Architecture
-
-- [Import scanning](import-scanning.md) -- tree-sitter-based dependency detection
-- [Dependency validation](dep-validation.md) -- cross-project dependency checks
-- [Pipeline architecture](pipelines.md) -- publish pipeline types, asset uploads, configuration
-- [Layer enforcement](layers.md) -- architectural layer rules for monorepos
+- [Release workflow](release-workflow.md): the release file, validation, the release checkout, the step table, the CI verdict, resume, the version fates, and the commands on past releases
+- [Changelog](changelog.md): JSONL entries, validation and coverage, fork coverage, and the generated `CHANGELOG.md`
+- [Check system](checks.md): every check by tag, options, the strictcode check, and purity
+- [Scaffold](scaffold.md): the rendered workflows and hooks, scratch directories, private paths, and the three-way merge
+- [Development workflow](dev-workflow.md): local installs, editable overlays, watching CI, and the pre-push hook
+- [Utility commands](utilities.md): status, unreleased, targets, discover, names, secrets, and rewrites
 
 ## Reference
 
-- [Configuration](configuration.md) -- `.rlsbl/config.json` format and all keys
-- [Release targets](targets.md) -- every supported ecosystem, and what each one supports
-- [Monorepo](monorepo.md) -- workspace management, subtree publishing, batch releases
-- [Repository conversions](conversions.md) -- extracting a releasable into its own repository, absorbing one in
-- [CI customization](ci-customization.md) -- custom workflow files that survive scaffold
-- [CLI reference](cli-index.md) -- all commands and options (auto-generated)
-- [API reference](gen-index.md) -- module documentation (auto-generated)
+- [Declarations](declarations.md): `releasables.toml` and `test-runner.toml`, key by key
+- [On-disk layout](on-disk-layout.md): every `.strictmetadata/` directory rlsbl owns, residue of the old layout, and the record migration
+- [Lifecycle and license](lifecycle-and-license.md): the record of each releasable's lifecycle, license, and identities, confidential repositories, and the `transition` commands
+- [Release targets](targets.md): go, npm, and pypi, version files, companion tags, and the support matrix
+- [Pipelines](pipelines.md): publishing from CI or locally, Go binaries on npm and PyPI, and private-repository rules
+- [Workspaces](monorepo.md): members, releasables, the dependency graph, the CI router, and batch releases
+- [Repository conversions](conversions.md): extract, absorb, renames, and the transition record
+- [CI customization](ci-customization.md): workflow files scaffold never touches
+- [CLI reference](cli-index.md): every command and flag (generated)
+- [API reference](gen-index.md): the Go packages (generated)
