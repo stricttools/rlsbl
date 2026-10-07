@@ -692,3 +692,65 @@ func (w Watcher) DispatchRunAll(branch, commit string) (github.WorkflowRun, erro
 	}
 	return github.WorkflowRun{}, fmt.Errorf("%s was dispatched with %s=true on %s, and no dispatched run appeared for the candidate %s within %s. The candidate is on the remote, untagged; nothing was tagged, released, or finalized. A dispatch resolves the ref when it is made, so a commit pushed to %s in between takes the run instead: check `gh run list --workflow %s --repo %s`, make %s point at the candidate again, and resume", workflows.RouterFile, workflows.RunAllInput, branch, commit, time.Duration(RunAllAttempts)*RunAllInterval, branch, workflows.RouterFile, w.Repo, branch)
 }
+
+// The watch command's bounds: how long a commit's runs may take to appear,
+// and how long one run is watched.
+const (
+	WatchDiscovery = 120 * time.Second
+	WatchTimeout   = time.Hour
+)
+
+// WatchCommit watches every CI run on the commit, then the runs that
+// started after the first listing, each run again once when its failure
+// allows. A commit on which no run appears within WatchDiscovery is an
+// error naming the command to run once GitHub has started them.
+func (w Watcher) WatchCommit(commit, label string) ([]RunResult, error) {
+	runs, err := w.discover(commit, WatchDiscovery)
+	if len(runs) == 0 {
+		detail := ""
+		if err != nil {
+			detail = fmt.Sprintf(" (the last listing failed: %v)", err)
+		}
+		return nil, fmt.Errorf("no CI run appeared for %s within %s%s; GitHub may not have started them yet: run `rlsbl watch %s` again, and when a release's runs never start, `rlsbl release retry` starts its publish workflows", short(commit), WatchDiscovery, detail, commit)
+	}
+	w.Log(fmt.Sprintf("%s: found %d CI runs, watching them", label, len(runs)))
+	retried := map[string]bool{}
+	known := map[int64]bool{}
+	var results []RunResult
+	for _, r := range runs {
+		known[r.ID] = true
+		results = append(results, w.Watch(r, label, WatchTimeout, retried))
+	}
+	w.Sleep(lateRunPause)
+	again, err := w.GH.Runs(w.Repo, github.RunQuery{Commit: commit, Limit: runListingLimit})
+	if err != nil {
+		return results, fmt.Errorf("listing the CI runs of %s again for runs started late: %w", short(commit), err)
+	}
+	for _, r := range again {
+		if !known[r.ID] {
+			w.Log(fmt.Sprintf("%s: [%s] started late, watching it", label, r.Name))
+			results = append(results, w.Watch(r, label, WatchTimeout, retried))
+		}
+	}
+	return results, nil
+}
+
+// WatchRunIDs watches the named runs, each run again once when its failure
+// allows. A run id GitHub cannot answer about is an error before anything
+// is watched.
+func (w Watcher) WatchRunIDs(ids []int64, label string) ([]RunResult, error) {
+	var runs []github.WorkflowRun
+	for _, id := range ids {
+		r, err := w.GH.Run(w.Repo, id)
+		if err != nil {
+			return nil, fmt.Errorf("the run %d of %s could not be read: %w", id, w.Repo, err)
+		}
+		runs = append(runs, r)
+	}
+	retried := map[string]bool{}
+	var results []RunResult
+	for _, r := range runs {
+		results = append(results, w.Watch(r, label, WatchTimeout, retried))
+	}
+	return results, nil
+}

@@ -244,3 +244,29 @@ func TestTheCIWaitReadsTheReleasingProjectsOwnChecks(t *testing.T) {
 		}
 	})
 }
+
+func TestAWatchedCommitWithoutRunsFailsNamingTheWatchAgain(t *testing.T) {
+	hygiene.Isolate(t)
+	list := []string{"run", "list", "--repo", "acme/portal", "--commit", sha, "--limit", "100", "--json", "databaseId,name,workflowName,status,conclusion,headBranch,headSha,event"}
+	testsupport.FakeGH(t, testsupport.GHAnswer{Args: list, Stdout: "[]"})
+	withWatcher(t, func(w Watcher) {
+		if _, err := w.WatchCommit(sha, "portal"); err == nil || !strings.Contains(err.Error(), "rlsbl watch "+sha) {
+			t.Fatalf("got %v", err)
+		}
+	})
+}
+
+func TestNamedRunsAreReadThenWatched(t *testing.T) {
+	hygiene.Isolate(t)
+	view := []string{"run", "view", "5", "--repo", "acme/portal", "--json", "databaseId,name,workflowName,status,conclusion,headBranch,headSha,event"}
+	testsupport.FakeGH(t,
+		testsupport.GHAnswer{Args: view, Stdout: `{"databaseId": 5, "name": "CI"}`},
+		testsupport.GHAnswer{Args: watch5},
+	)
+	withWatcher(t, func(w Watcher) {
+		results, err := w.WatchRunIDs([]int64{5}, "runs 5")
+		if err != nil || len(results) != 1 || !results[0].Passed || results[0].Name != "CI" {
+			t.Fatalf("got %+v, %v", results, err)
+		}
+	})
+}
