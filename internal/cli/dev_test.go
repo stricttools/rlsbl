@@ -16,8 +16,8 @@ import (
 // calls.txt beside it.
 const recordingProgram = "#!/bin/sh\nprintf '%s\\n' \"${0##*/} $*\" >> \"${0%/*}/calls.txt\"\n"
 
-// fakePrograms makes PATH, for the rest of the test, one directory holding
-// a recording fake of each named program and nothing else, and returns the
+// fakePrograms puts first on PATH, for the rest of the test, a directory
+// holding a recording fake of each named program, and returns the
 // directory.
 func fakePrograms(t *testing.T, names ...string) string {
 	t.Helper()
@@ -27,7 +27,10 @@ func fakePrograms(t *testing.T, names ...string) string {
 			t.Fatal(err)
 		}
 	}
-	t.Setenv("PATH", dir)
+	// Put first, the fakes shadow the programs they name; git stays
+	// reachable for the confidential-name index refresh every mutating
+	// command makes.
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	return dir
 }
 

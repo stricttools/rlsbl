@@ -168,6 +168,29 @@ func (u *indexUpdate) apply(e *strictcli.Effects) error {
 	return u.idx.Remove(recordWriter{e}, u.origin)
 }
 
+// RefreshIndex brings the confidential-name index entry of the repository
+// at root in line with its record as it stands on the date of on: upserted
+// under its origin while the record makes the repository confidential,
+// removed while it is public. It is rlsbl's part of the index rule, owed by
+// every mutating command that loads declarations; the writes go through
+// the effects handle. A confidential repository without an origin remote
+// is refused, as planIndex refuses it.
+func RefreshIndex(e *strictcli.Effects, root, indexPath string, on time.Time) error {
+	repo, err := git.Open(e, root)
+	if err != nil {
+		return err
+	}
+	rec, err := lifecycle.Load(root)
+	if err != nil {
+		return err
+	}
+	u, err := Invocation{E: e, IndexPath: indexPath}.planIndex(repo, rec, on)
+	if err != nil {
+		return err
+	}
+	return u.apply(e)
+}
+
 // recordPaths are the files a record write commits.
 var recordPaths = []string{lifecycle.RecordFile, lifecycle.ManifestFile}
 

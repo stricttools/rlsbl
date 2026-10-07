@@ -4,10 +4,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/lifecycle/index"
+
+	"github.com/stricttools/rlsbl/internal/declarations"
+	"github.com/stricttools/rlsbl/internal/git"
+	"github.com/stricttools/rlsbl/internal/lifecycleops"
 )
 
 // effect is a command's classification.
@@ -160,6 +169,10 @@ func (r *commandSet) add(c command) {
 	opts = append(opts, c.options...)
 	handler := func(ctx *strictcli.Context, kw map[string]interface{}) strictcli.Outcome {
 		payload, err := c.run(ctx, kw)
+		if c.effect == mutating && !ctx.DryRun() {
+			// Even a command that failed may have written the record.
+			err = errors.Join(err, refreshIndex(ctx))
+		}
 		if payload != nil {
 			if c.payload == nil {
 				err = errors.Join(err, fmt.Errorf("command %q returned a payload but declares none", key))
@@ -192,6 +205,55 @@ func (r *commandSet) add(c command) {
 		panic(fmt.Sprintf("cli: command %q is registered before its group", key))
 	}
 	parent.Command(name, c.help, handler, opts...)
+}
+
+// refreshIndex brings the confidential-name index in line with the record
+// of the repository holding the working directory, after a mutating
+// command: every mutating command that loads declarations owes it. Outside
+// a git repository, or in one declaring no releasables, the command loaded
+// no declarations and nothing is owed.
+func refreshIndex(ctx *strictcli.Context) error {
+	dir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	root, inRepository, err := enclosingRepository(dir)
+	if err != nil || !inRepository {
+		return err
+	}
+	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(declarations.ReleasablesFile))); errors.Is(err, fs.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	path, err := index.DefaultPath()
+	if err != nil {
+		return err
+	}
+	if err := lifecycleops.RefreshIndex(ctx.Effects(), root, path, time.Now()); err != nil {
+		return fmt.Errorf("updating the confidential-name index %s: %w", path, err)
+	}
+	return nil
+}
+
+// enclosingRepository is the root of the git repository holding dir, with
+// symbolic links resolved as declarations.FindRepositoryRoot resolves them,
+// and false when no repository holds it.
+func enclosingRepository(dir string) (string, bool, error) {
+	resolved, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return "", false, err
+	}
+	for {
+		if git.IsRepositoryRoot(resolved) {
+			return resolved, true, nil
+		}
+		parent := filepath.Dir(resolved)
+		if parent == resolved {
+			return "", false, nil
+		}
+		resolved = parent
+	}
 }
 
 // plainJSON turns a payload of typed values into the plain maps, slices, and
