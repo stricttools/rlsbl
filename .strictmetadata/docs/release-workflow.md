@@ -23,11 +23,11 @@ rlsbl changelog add --commits <fix> --description "..." --type fix
 rlsbl release resume --watch --approve-consequential
 ```
 
-`--watch` or `--no-watch` is required, with no default: `--watch` watches the publish runs to completion in-process after the release, and `--no-watch` prints the `rlsbl watch <sha>` that watches them. `--push-timeout`, `--ci-timeout`, `--check-timeout`, and `--hook-timeout` override the declared [timeouts](declarations.md#top-level-keys) for one run. In a workspace, `--releasable` names the releasable where the working directory selects none (the workspace root), and is refused where it selects one. `release run` and `release resume` are consequential: `--approve-consequential` skips the confirmation, which a non-interactive run cannot answer.
+`--watch` or `--no-watch` is required, with no default: `--watch` watches the CI runs of the release commit (the publish runs the Release started among them) to completion in-process after the release, then asks the npm and PyPI package listings whether they list the version, asking again over a short wait while they catch up; `--no-watch` says the outcome was not verified and prints the `rlsbl watch <sha>` that watches the runs. `--push-timeout`, `--ci-timeout`, `--check-timeout`, and `--hook-timeout` override the declared [timeouts](declarations.md#top-level-keys) for one run. In a workspace, `--releasable` names the releasable where the working directory selects none (the workspace root), and is refused where it selects one. `release run` and `release resume` are consequential: `--approve-consequential` skips the confirmation, which a non-interactive run cannot answer.
 
 ## The release file
 
-The release file, `.strictmetadata/releases/<releasable>/unreleased.toml`, states what the next release is. `rlsbl release init` writes it with the releasable's targets in `include`, for the bump and the description to be filled in:
+The release file, `.strictmetadata/releases/<releasable>/unreleased.toml`, states what the next release is. `rlsbl release init` writes it, with `bump` and `description` blank for a person to fill in, `context` blank, every target of the releasable's members in `include`, and `exclude` empty, and commits it. A release file nobody filled in yet is left as it is, one somebody filled in is refused rather than overwritten, and a member versioned under no releasable is refused, naming `rlsbl monorepo release init`. A filled-in file reads:
 
 ```toml
 format_version = 2
@@ -123,7 +123,7 @@ Once validation and the pre-release pipeline pass, every step records its outcom
 | `deployed` | Runs the releasable's `deploy_command`, `{version}` replaced, from the repository root, with the check timeout. A server releasable's deploy that fails leaves the release resumable, and `rlsbl release resume --watch` runs it again for the same version. | yes |
 | `post-release-hooks-run` | Runs every `post_release` hook. | no |
 
-The tag points at the commit CI verified, not at `HEAD`: the finalization commits sit on top of it and are pushed with it. After the steps, the release confirms that every workflow a published Release starts shows a run for the tag, then watches the runs (`--watch`) or prints the command that does.
+The tag points at the commit CI verified, not at `HEAD`: the finalization commits sit on top of it and are pushed with it. After the steps, the release confirms that every workflow a published Release starts shows a run for the tag, then watches the runs and asks the registries' package listings for the version (`--watch`), or prints the command that watches them (`--no-watch`).
 
 A failure before the candidate push leaves nothing to undo: the attempt existed only in the checkout, the branch and working tree are as they were, and a fresh release's state file is deleted. When the candidate push is refused after the advance, the advance is taken back by the same compare-and-swap, restoring only the files it wrote. There is no `git reset --hard` anywhere in a release.
 

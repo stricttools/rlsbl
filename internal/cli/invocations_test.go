@@ -43,6 +43,7 @@ type schemaFlag struct {
 	Help      string         `json:"help"`
 	Negatable *bool          `json:"negatable"`
 	Presence  string         `json:"presence"`
+	Nullable  *bool          `json:"nullable"`
 	ElectBy   *string        `json:"elect_by"`
 	Choices   []schemaChoice `json:"choices"`
 }
@@ -69,7 +70,7 @@ func helpDocument(t *testing.T) *schemaNode {
 }
 
 // flagNames adds to names every flag spelling the flags accept: each flag,
-// its negation when negatable, and each choice of a flag elected by member
+// its negation when negatable, its clearing when nullable, and each choice of a flag elected by member
 // flags, with the flags the choices carry (a choice's own value flag, named
 // value, is the choice's spelling).
 func flagNames(flags []schemaFlag, names map[string]bool) {
@@ -77,6 +78,9 @@ func flagNames(flags []schemaFlag, names map[string]bool) {
 		names[f.Name] = true
 		if f.Negatable != nil && *f.Negatable {
 			names["no-"+f.Name] = true
+		}
+		if f.Nullable != nil && *f.Nullable {
+			names["unset-"+f.Name] = true
 		}
 		if f.ElectBy != nil && *f.ElectBy == "member-flags" {
 			for _, c := range f.Choices {
@@ -349,7 +353,7 @@ func TestTheCommandLineGuardFindsAnUnknownCommandAndFlag(t *testing.T) {
 	texts := map[string]string{
 		"a": "run `rlsbl release reconcile --apply`",
 		"b": "run `rlsbl transition record --fact x`",
-		"c": "run `rlsbl changelog edit --id <id> --no-user-facing --dry-run`",
+		"c": "run `rlsbl changelog edit --id <id> --no-user-facing --unset-type --dry-run`",
 		"d": "run `rlsbl release %s` or `rlsbl watch %s`",
 		"e": "with the Python rlsbl 0.131.0, `rlsbl release reconcile --apply`",
 		"f": "```\nrlsbl monorepo add tools/cli --releasable false --frobnicate\n```",
