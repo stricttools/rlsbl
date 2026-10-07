@@ -2,32 +2,59 @@ package cli
 
 import (
 	"os"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/lifecycle/index"
 
 	"github.com/stricttools/rlsbl/internal/checks"
 	"github.com/stricttools/rlsbl/internal/options"
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
 
+// pushStdinEnv carries the pre-push hook's ref lines to the checks the hook
+// selects; the hook reads git's stdin and exports it here.
+const pushStdinEnv = "RLSBL_PUSH_STDIN"
+
 // registerChecks registers rlsbl's checks, the provider of the external
-// checks members declare, and the resolver giving each check the value the
+// checks members declare, the resolver giving each check the value the
 // repository's options assign it for the member the working directory lies
-// in.
-//
-// strictcli's check context factory takes no argument, so the `check` and
-// `failing-checks` commands cannot hand rlsbl's checks the dispatch's
-// effects handle, which every check needs; no factory is set until
-// strictcli offers one that receives the dispatch, and a command that runs
-// checks builds the context with checks.NewContext from its own handle.
+// in, and the factory building the context the `check` and `failing-checks`
+// commands run the checks with. A command that runs checks itself builds
+// the context with checks.NewContext from its own handle.
 func registerChecks(app *strictcli.App) error {
 	if err := checks.Register(app); err != nil {
 		return err
 	}
 	values := &checkValues{}
 	app.SetCheckValueResolver(values.value)
+	app.SetCheckContext(checkContext)
 	return nil
+}
+
+// checkContext is the context of a `check` or `failing-checks` run: the
+// working directory, over the dispatch's effects handle, with the pushed
+// refs when the pre-push hook runs it. A home directory or index location
+// that cannot be found is left unstated, so only the checks that read them
+// refuse.
+func checkContext(ctx *strictcli.Context) (strictcli.CheckContext, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	in := checks.Inputs{Dir: dir, Now: time.Now()}
+	if home, err := os.UserHomeDir(); err == nil {
+		in.Home = home
+	}
+	if path, err := index.DefaultPath(); err == nil {
+		in.IndexPath = path
+	}
+	if lines, ok := ctx.InfraValue(pushStdinEnv); ok {
+		in.PushLines = strings.Split(lines, "\n")
+	}
+	return checks.NewContext(ctx.Effects(), in)
 }
 
 // checkValues resolves check values from the options of the repository the

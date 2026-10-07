@@ -53,6 +53,7 @@ func New(d Dependencies) (*strictcli.App, error) {
 		strictcli.WithChecksEmbed(checks.Registry),
 		strictcli.WithProcObserveAllowlist(previewapply.Prefixes()),
 		strictcli.WithHTTPClient(d.HTTPClient),
+		strictcli.WithHandshakeEnv(pushStdinEnv, "Pre-push ref lines (`<local ref> <local sha> <remote ref> <remote sha>`) for the checks the pre-push hook selects, exported by the hook from git's stdin."),
 	}
 	if root, ok := sourceTreeRoot(); ok {
 		opts = append(opts, strictcli.WithSourceTreeRoot(root))
