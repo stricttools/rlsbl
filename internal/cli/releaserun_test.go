@@ -37,14 +37,22 @@ func TestAMutatingCommandRemovesAPublicRepositorysIndexEntry(t *testing.T) {
 	requireIndexRefreshed(t, "MIT", nil)
 }
 
+func TestAMutatingCommandRemovesTheIndexEntryOfARepositoryWithoutARecord(t *testing.T) {
+	hygiene.Isolate(t)
+	requireIndexRefreshed(t, "", nil)
+}
+
 // requireIndexRefreshed runs a mutating command in a repository whose
-// license is license and whose index entry holds a stale name, and fails
-// the test unless the entry holds want afterwards (none: removed).
+// license is license (no record when it is empty) and whose index entry
+// holds a stale name, and fails the test unless the entry holds want
+// afterwards (none: removed).
 func requireIndexRefreshed(t *testing.T, license string, want []string) {
 	t.Helper()
 	repo := releaseCommandsProject(t)
-	repo.Write(lifecycle.RecordFile, "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \""+license+"\"\nfrom = 2026-01-01\nreason = \"the license\"\n")
-	repo.Commit("the license", lifecycle.RecordFile)
+	if license != "" {
+		repo.Write(lifecycle.RecordFile, "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \""+license+"\"\nfrom = 2026-01-01\nreason = \"the license\"\n")
+		repo.Commit("the license", lifecycle.RecordFile)
+	}
 	repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
 	path, err := index.DefaultPath()
 	if err != nil {
