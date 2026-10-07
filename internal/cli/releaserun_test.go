@@ -86,3 +86,13 @@ func (diskWriter) WriteFile(path string, data []byte) error {
 	return os.WriteFile(path, data, 0o644)
 }
 func (diskWriter) MkdirAll(path string) error { return os.MkdirAll(path, 0o755) }
+
+func TestAReleaseWithoutAHomeDirectoryIsRefused(t *testing.T) {
+	hygiene.Isolate(t)
+	releaseCommandsProject(t)
+	t.Setenv("HOME", "")
+	r := appWith(t, testsupport.NewFakeHTTP(t)).Test([]string{"release", "run", "--no-watch", "--dry-run"})
+	if r.ExitCode == 0 || !strings.Contains(r.Stderr, "home directory") {
+		t.Fatalf("a release without a home directory was not refused: exit %d:\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
+	}
+}

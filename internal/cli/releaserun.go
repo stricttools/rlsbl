@@ -160,9 +160,13 @@ func releaseRunRequest(ctx *strictcli.Context, kw map[string]any, version string
 		Log:          ctx.Info,
 		Warn:         ctx.Warn,
 	}
-	if home, err := os.UserHomeDir(); err == nil {
-		req.Home = home
+	// The preflight checks read files under the home directory; a release
+	// that cannot name it does not run them against nothing.
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return release.RunRequest{}, fmt.Errorf("the home directory, whose files the release's checks read, cannot be found: %w", err)
 	}
+	req.Home = home
 	t := &req.Timeouts
 	t.Push, t.PushGiven = strictcli.GetOpt[int](kw, "push_timeout")
 	t.CI, t.CIGiven = strictcli.GetOpt[int](kw, "ci_timeout")
