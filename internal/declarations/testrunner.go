@@ -12,7 +12,7 @@ import (
 )
 
 // SandboxVariable is the environment variable the runner always exports;
-// the testisolation floor reads it to lift its refusal of a bare test run.
+// testisolation reads it to lift its refusal of a bare test run.
 const SandboxVariable = "TESTISOLATION_SANDBOX"
 
 // The caches the runner script knows how to bind into the sandbox.
@@ -158,7 +158,7 @@ func (t *TestRunner) problems() []string {
 	sort.Strings(names)
 	for _, name := range names {
 		if name == SandboxVariable {
-			add(fmt.Sprintf("extra_env declares %s, which the runner always exports (the testisolation floor reads it); delete it", SandboxVariable))
+			add(fmt.Sprintf("extra_env declares %s, which the runner always exports (testisolation reads it); delete it", SandboxVariable))
 		}
 		if strings.TrimSpace(t.ExtraEnv[name]) == "" {
 			add(fmt.Sprintf("extra_env.%s is blank", name))

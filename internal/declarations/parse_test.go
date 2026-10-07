@@ -195,7 +195,7 @@ func TestAnUnknownKeyIsRefusedAtEveryLevel(t *testing.T) {
 		{"hooks", "post_release = [\"echo done\"] }", "post_release = [\"echo done\"], post_publish = [\"x\"] }"},
 		{"hook command", "dir = \"cmd\",", "dir = \"cmd\", shell = \"bash\","},
 		{"member", "dev_only = true\n", "dev_only = true\nwatch = [\"src\"]\n"},
-		{"target", "{ name = \"npm\", path = \"web\" }", "{ name = \"npm\", path = \"web\", provenance = true }"},
+		{"target", "{ name = \"npm\", path = \"web\" }", "{ name = \"npm\", path = \"web\", attest = true }"},
 		{"external", "cwd = \"docs\" }", "cwd = \"docs\", style = \"freeform\" }"},
 		{"test settings", "go_command = \"scripts/suite.sh\" }", "go_command = \"scripts/suite.sh\", markers = \"x\" }"},
 		{"pipeline", "homebrew_tap = \"homebrew-tap\"\n", "homebrew_tap = \"homebrew-tap\"\nassets = true\n"},

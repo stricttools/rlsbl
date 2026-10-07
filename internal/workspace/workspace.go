@@ -103,12 +103,12 @@ func (w *Workspace) MembersOf(releasable string) []declarations.Member {
 // refused.
 func (w *Workspace) RelativePath(abs string) (string, error) {
 	resolved := abs
-	if real, err := filepath.EvalSymlinks(abs); err == nil {
-		resolved = real
+	if target, err := filepath.EvalSymlinks(abs); err == nil {
+		resolved = target
 	}
 	root := w.Root
-	if real, err := filepath.EvalSymlinks(root); err == nil {
-		root = real
+	if target, err := filepath.EvalSymlinks(root); err == nil {
+		root = target
 	}
 	rel, err := filepath.Rel(root, resolved)
 	if err != nil {
