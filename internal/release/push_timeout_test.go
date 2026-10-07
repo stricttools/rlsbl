@@ -6,11 +6,13 @@ import (
 	"testing"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/testisolation/go/hygiene"
 )
 
 // A push is taken as timed out when its error matches strictcli's timeout
 // error, however it is worded, and never because its text reads like one.
 func TestAPushTimedOutOnlyWhenItsErrorIsStrictclisTimeout(t *testing.T) {
+	hygiene.Isolate(t)
 	timedOut := fmt.Errorf("git push in /repo: %w", fmt.Errorf("the push was stopped: %w", strictcli.ErrTimedOut))
 	if !pushTimedOut(timedOut) {
 		t.Errorf("a push whose error matches strictcli.ErrTimedOut was not taken as timed out: %v", timedOut)
