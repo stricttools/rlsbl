@@ -22,7 +22,10 @@ func portalRepo(t *testing.T) (repo *testsupport.Repo, change string) {
 	t.Helper()
 	repo = testsupport.NewRepo(t)
 	repo.Write(declarations.ReleasablesFile, standalone)
-	repo.Commit("the project", declarations.ReleasablesFile)
+	// A scaffolded repository commits the run-state directory's .gitignore,
+	// so the lock a command takes leaves nothing untracked.
+	repo.Write(declarations.ReleaseStateDir+"/.gitignore", "*\n!.gitignore\n")
+	repo.Commit("the project", declarations.ReleasablesFile, declarations.ReleaseStateDir+"/.gitignore")
 	change = repo.CommitFile("a.txt", "a\n", "a change")
 	return repo, change
 }
