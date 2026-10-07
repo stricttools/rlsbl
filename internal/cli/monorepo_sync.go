@@ -70,6 +70,7 @@ func registerMonorepoSync(r *commandSet) {
 					return scaffold.MemberPublishWorkflow(ctx.Effects(), w, root, gh, now)
 				},
 				AutoCommit: strictcli.Get[bool](kw, "auto_commit"),
+				DryRun:     ctx.DryRun(),
 			})
 			if err != nil {
 				return nil, err
