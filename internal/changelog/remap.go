@@ -120,7 +120,8 @@ type RemapReport struct {
 // directory (Dirs) through rewrites, a map from old full ids to new ones
 // (git.ParseRewriteMap reads one). Only files holding a mapped id are
 // written; every other line keeps its bytes, and each file keeps its mode
-// (a released file stays read-only).
+// (a released file stays read-only). An entry whose commits map to one
+// commit (a squash folds several into one) names it once.
 func Remap(e *strictcli.Effects, root string, rewrites map[string]string) (RemapReport, error) {
 	report := RemapReport{Unmapped: map[string][]string{}, Ambiguous: map[string][]string{}}
 	dirs, err := Dirs(root)
@@ -170,7 +171,9 @@ func remapFile(e *strictcli.Effects, root string, f *File, rewrites map[string]s
 		if !changed {
 			continue
 		}
-		entry.Commits = commits
+		// A squash maps several commits to one, so an entry naming two
+		// folded commits names the squash commit once.
+		entry.Commits = dedupe(commits)
 		if err := Validate(entry); err != nil {
 			return RemappedFile{}, fmt.Errorf("line %d of %s: %w", l.Number, f.Path, err)
 		}

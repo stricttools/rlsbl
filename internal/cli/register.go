@@ -50,6 +50,9 @@ type command struct {
 	payload map[string]any
 	// render is the human rendering of the payload, required with payload.
 	render func(payload any) string
+	// options are further declarations the fields above do not carry: flag
+	// constraints and update declarations.
+	options []strictcli.CmdOption
 	// run performs the command and returns its payload (nil for a command
 	// declaring none). A non-nil error ends the command with exit status 1
 	// and the error on stderr, or with the status an *exitStatus states; a
@@ -154,6 +157,7 @@ func (r *commandSet) add(c command) {
 	if c.payload != nil {
 		opts = append(opts, strictcli.PayloadSchema(c.payload), strictcli.PayloadRenderer(c.render))
 	}
+	opts = append(opts, c.options...)
 	handler := func(ctx *strictcli.Context, kw map[string]interface{}) strictcli.Outcome {
 		payload, err := c.run(ctx, kw)
 		if payload != nil {
