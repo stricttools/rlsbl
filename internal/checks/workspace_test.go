@@ -1,7 +1,6 @@
 package checks
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -214,12 +213,4 @@ func TestMemberPytestConfigSkipsWithoutAConftest(t *testing.T) {
 	hygiene.Isolate(t)
 	r := workspaceRepo(t)
 	mustStatus(t, runCheck(t, inputs(t, r.Dir), "member-pytest-config"), "skip")
-}
-
-func TestMixedTagSchemesHasNothingToFindWhenEveryFormatIsDeclared(t *testing.T) {
-	hygiene.Isolate(t)
-	r := workspaceRepo(t)
-	got := runCheck(t, inputs(t, r.Dir), "mixed-tag-schemes")
-	mustStatus(t, got, "pass")
-	mustMention(t, got, fmt.Sprintf("declares its tag_format in %s", ".strictmetadata/releasables/releasables.toml"))
 }

@@ -36,7 +36,6 @@ func workspaceChecks() []check {
 		errorCheck("workspace-unbuildable", checkWorkspaceUnbuildable),
 		errorCheck("releasable-residue", checkReleasableResidue),
 		errorCheck("member-pytest-config", checkMemberPytestConfig),
-		errorCheck("mixed-tag-schemes", checkMixedTagSchemes),
 	}
 }
 
@@ -454,6 +453,3 @@ func checkMemberPytestConfig(c *Context, r *strictcli.ErrorReporter) strictcli.C
 	return reportErrors(r, problems, fmt.Sprintf("%d member(s) with tests but no [tool.pytest.ini_options] of their own under an enclosing conftest.py", len(problems)), "every member with tests under an enclosing conftest.py pins its own pytest configuration")
 }
 
-func checkMixedTagSchemes(c *Context, r *strictcli.ErrorReporter) strictcli.CheckOutcome {
-	return r.Passed(fmt.Sprintf("every releasable declares its tag_format in %s, which alone decides its tags, and a member versioned under none owns no tag, so no member can mix two tag schemes", declarations.ReleasablesFile))
-}

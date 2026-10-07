@@ -373,17 +373,6 @@ needs_network = false
 depends_on = []
 scope = "workspace:non_dev_node"
 
-[checks.mixed-tag-schemes]
-description = "No member directory mixes Go's path-based tags with @-style tags."
-subject = "workspace"
-tags = ["workspace"]
-severity = "error"
-fast = true
-pure = true
-needs_network = false
-depends_on = []
-scope = "workspace"
-
 [checks.name-consistency]
 description = "Every detected target reports the same package name."
 subject = "project"

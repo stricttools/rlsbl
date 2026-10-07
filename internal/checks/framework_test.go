@@ -27,7 +27,7 @@ var keptChecks = []string{
 	"go-companion-tags", "go-deprecation-published", "go-module-identity", "go-module-major-suffix",
 	"go-toolchain-declared", "go-workspace-replace", "go-workspace-require-current", "ldflags-symbol",
 	"license-consistency", "license-file", "lifecycle-record-valid", "lock", "member-pytest-config",
-	"mixed-tag-schemes", "name-consistency", "nested-member-runner-exclusion",
+	"name-consistency", "nested-member-runner-exclusion",
 	"nested-member-upload-contents", "nested-member-uv-sources", "npm-private-mismatch",
 	"npm-token-synced", "old-repo-archived", "path-tag-format-go-member", "prepush-changelog-coverage",
 	"prepush-gitignore-guard", "prepush-manual-warning", "private-repo-publishing",
