@@ -92,6 +92,24 @@ func TestAnArchiveThatCannotBeReadStopsGeneration(t *testing.T) {
 	}
 }
 
+func TestVersionSectionIsTheSectionTheDocumentRenders(t *testing.T) {
+	hygiene.Isolate(t)
+	root := t.TempDir()
+	writeReleased(t, root, "portal", "1.0.0", feature("1", "First thing", sha1))
+	writeArchive(t, root, "portal", "1.0.0", "recorded", strings.Repeat("a", 40), "The first release")
+	got, err := changelog.VersionSection(root, "portal", version(t, "1.0.0"), 2)
+	mustNotFail(t, err)
+	if got != "## 1.0.0\n\nThe first release\n\n### Features\n\n- First thing\n" {
+		t.Fatalf("got:\n%s", got)
+	}
+	document, err := changelog.Document(root, "portal", nil)
+	mustNotFail(t, err)
+	requireContains(t, document, got)
+	if _, err := changelog.VersionSection(root, "portal", version(t, "2.0.0"), 2); err == nil || !strings.Contains(err.Error(), "2.0.0.jsonl") {
+		t.Fatalf("a version without a changelog file: %v", err)
+	}
+}
+
 func TestANeverReleasedVersionIsAnnotated(t *testing.T) {
 	hygiene.Isolate(t)
 	root := t.TempDir()

@@ -125,6 +125,14 @@ func TestCoverageAsksForTheCommitsThatAreNeitherCoveredNorExempt(t *testing.T) {
 		if len(c.Uncovered) != 0 {
 			t.Errorf("an abbreviated id did not cover its commit: %+v", c)
 		}
+		unknown := &changelog.File{Path: empty.Path, Lines: []changelog.Line{{Number: 1, Entry: feature("2", "Gone", strings.Repeat("d", 40), r.change[:10])}}}
+		covered, err := s.CoveredCommits(unknown)
+		if err != nil {
+			return err
+		}
+		if len(covered) != 1 || !covered[r.change] {
+			t.Errorf("covered %v: want the full id of the one commit that resolves", covered)
+		}
 		return nil
 	}))
 }

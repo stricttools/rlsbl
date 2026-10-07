@@ -148,21 +148,31 @@ func (c Coverage) Notes() []string {
 	return notes
 }
 
-// CoverageOf checks that every unreleased commit in the subject's scope
-// that is not exempt appears in at least one of f's entries.
-func (s Subject) CoverageOf(f *File, rng Range) (Coverage, error) {
+// CoveredCommits are the full ids of the commits f's entries name; an id
+// that resolves to no commit of the repository covers nothing.
+func (s Subject) CoveredCommits(f *File) (map[string]bool, error) {
 	res := newResolver(s.Repo)
 	covered := map[string]bool{}
 	for _, l := range f.Lines {
 		for _, h := range l.Entry.Commits {
 			full, err := res.resolve(h)
 			if err != nil {
-				return Coverage{}, err
+				return nil, err
 			}
 			if full != "" {
 				covered[full] = true
 			}
 		}
+	}
+	return covered, nil
+}
+
+// CoverageOf checks that every unreleased commit in the subject's scope
+// that is not exempt appears in at least one of f's entries.
+func (s Subject) CoverageOf(f *File, rng Range) (Coverage, error) {
+	covered, err := s.CoveredCommits(f)
+	if err != nil {
+		return Coverage{}, err
 	}
 	n, err := CommitsNeedingEntries(s.Repo, rng.Commits, s.Scope(), covered)
 	if err != nil {
