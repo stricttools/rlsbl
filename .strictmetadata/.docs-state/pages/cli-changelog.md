@@ -42,7 +42,7 @@ Write the releasable's CHANGELOG.md from its changelog files and release archive
 
 ## changelog amend
 
-Append an entry to a released version's read-only <version>.jsonl, which stays read-only, regenerate CHANGELOG.md, commit both, and rewrite that version's GitHub Release from the record (as `rlsbl release edit <version>` does). The entry's checks are changelog add's; --no-validate-hashes takes the commits as given, unresolved and unchecked against the scope, for an old commit a rewrite took away. A version without a release archive, or with one stating no fate, is refused before anything is written; a version recorded never released has no GitHub Release to rewrite. --id is refused: an amend adds a new entry, whose id is minted.
+Append an entry to a released version's read-only <version>.jsonl, which stays read-only, regenerate CHANGELOG.md, commit both, and rewrite that version's GitHub Release from the record (as `rlsbl release edit <version>` does). The entry's checks are changelog add's; --no-validate-hashes takes the commits as given, unresolved and unchecked against the scope, for an old commit a rewrite took away. A version without a release archive, or with one stating no fate, is refused before anything is written; a version recorded never released has no GitHub Release to rewrite.
 
 **Effect:** mutating
 
@@ -52,7 +52,6 @@ Append an entry to a released version's read-only <version>.jsonl, which stays r
 | --- | --- | --- | --- | --- | --- |
 | `--version` |  | str | required |  | The released version whose file is amended, bare (0.39.0) |
 | `--commits` |  | str | required |  | Comma-separated commit ids the entry describes |
-| `--id` |  | str | optional |  | Refused: the amend adds a new entry, whose id is minted; `rlsbl changelog edit --id` changes an existing one |
 | `--description` |  | str | optional |  | The change in one line of markdown (required for a user-facing entry) |
 | `--type` |  | str | optional |  | What the change is (required for a user-facing entry) Values: `feature` (a new capability users can reach), `fix` (a user-visible defect that no longer happens), `breaking` (a change that requires action from users). |
 | `--user-facing`, `--no-user-facing` |  | bool | optional |  | Whether CHANGELOG.md and the release notes show the entry (user-facing when neither form is passed) |

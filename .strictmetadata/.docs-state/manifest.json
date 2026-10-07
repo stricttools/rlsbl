@@ -9778,6 +9778,11 @@
         },
         {
           "level": 3,
+          "text": "`Scratch`",
+          "anchor": "scratch"
+        },
+        {
+          "level": 3,
           "text": "`Build`",
           "anchor": "build"
         },
@@ -11338,7 +11343,7 @@
       ]
     }
   ],
-  "last_gen": "2026-10-07T22:27:18.191826+00:00",
+  "last_gen": "2026-10-07T23:34:45.948386+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
