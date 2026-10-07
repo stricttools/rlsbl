@@ -230,7 +230,8 @@
   },
   "en/release-workflow.md": {
     "content": "65810f6e9ab791b3e4faa8fef54258fd21d8e93e15f6d5c520ecb3d249dbb3e8",
-    "description": "64e86f4f84fef65a44e6b2bece123f279c0ce35670b5df81beb2cfe8304f74b8"
+    "description": "64e86f4f84fef65a44e6b2bece123f279c0ce35670b5df81beb2cfe8304f74b8",
+    "source_docstring": "0998f186e8a9850589e938859db694b132aaeacda3864775a912477466446a4b"
   },
   "en/rlsbl-__main__.md": {
     "content": "9492c626f355ccbe1313ba9976c5a812a6e1e4a636617657a287f2d3a59f4d99",
