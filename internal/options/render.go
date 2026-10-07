@@ -125,8 +125,8 @@ func isAdoption(name string) bool {
 	return false
 }
 
-// declarations are every option rlsbl declares, sorted by name.
-func declarations(checksTOML []byte) ([]declaration, error) {
+// allDeclarations are every option rlsbl declares, sorted by name.
+func allDeclarations(checksTOML []byte) ([]declaration, error) {
 	doc, err := tomledit.Unmarshal[checksDocument](checksTOML)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", ChecksFile, err)
@@ -185,7 +185,7 @@ func declarations(checksTOML []byte) ([]declaration, error) {
 // are not checks. The rendering is refused when strictspec refuses it, so a
 // registry the generator writes is one rlsbl can load.
 func RenderRegistry(checksTOML []byte) ([]byte, error) {
-	decls, err := declarations(checksTOML)
+	decls, err := allDeclarations(checksTOML)
 	if err != nil {
 		return nil, err
 	}

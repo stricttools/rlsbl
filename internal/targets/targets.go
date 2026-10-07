@@ -104,16 +104,16 @@ type Target interface {
 	CompanionTags(memberPath string, version semver.Version) []string
 }
 
-// registry is every target rlsbl supports, in name order.
-var registry = []Target{goTarget{}, npmTarget{}, pypiTarget{}}
+// supported is every target rlsbl supports, in name order.
+var supported = []Target{goTarget{}, npmTarget{}, pypiTarget{}}
 
 // All are the supported targets, in name order.
-func All() []Target { return append([]Target(nil), registry...) }
+func All() []Target { return append([]Target(nil), supported...) }
 
 // Names are the supported targets' names, in name order.
 func Names() []string {
-	names := make([]string, len(registry))
-	for i, t := range registry {
+	names := make([]string, len(supported))
+	for i, t := range supported {
 		names[i] = t.Name()
 	}
 	return names
@@ -122,7 +122,7 @@ func Names() []string {
 // Get is the target named name; a name rlsbl does not support is refused,
 // naming every target it does.
 func Get(name string) (Target, error) {
-	for _, t := range registry {
+	for _, t := range supported {
 		if t.Name() == name {
 			return t, nil
 		}
@@ -134,7 +134,7 @@ func Get(name string) (Target, error) {
 // with an empty path (the directory itself).
 func Detect(dir string) ([]declarations.Target, error) {
 	var found []declarations.Target
-	for _, t := range registry {
+	for _, t := range supported {
 		ok, err := t.Detect(dir)
 		if err != nil {
 			return nil, err
