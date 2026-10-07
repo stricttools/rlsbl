@@ -16,6 +16,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/changelog"
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
+	"github.com/stricttools/rlsbl/internal/release"
 	"github.com/stricttools/rlsbl/internal/releaserecord"
 	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/saferm"
@@ -26,10 +27,6 @@ import (
 
 // Remote is the remote the rename pushes its boundary alias tag to.
 const Remote = "origin"
-
-// shippedPushTimeout bounds the alias tag's push when the declarations
-// declare no push timeout.
-const shippedPushTimeout = 300 * time.Second
 
 // RenameCommitMessage is the message of the rename's commit, which a run
 // completing an interrupted one finds it by.
@@ -645,9 +642,9 @@ func (r *renamer) aliasCurrentVersion(ws *workspace.Workspace) (tag, status stri
 		return "", "", err
 	}
 	if !haveRemote {
-		timeout := shippedPushTimeout
-		if s := ws.Declarations.Timeouts.PushSeconds; s > 0 {
-			timeout = time.Duration(s) * time.Second
+		timeout, err := release.PushTimeout(ws.Declarations, 0, false)
+		if err != nil {
+			return "", "", err
 		}
 		if err := r.repo.Push(Remote, git.RefUpdate{Ref: "refs/tags/" + newTag, New: local}, timeout); err != nil {
 			return "", "", err

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
@@ -22,6 +21,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/github"
 	"github.com/stricttools/rlsbl/internal/historyrewrite"
+	"github.com/stricttools/rlsbl/internal/release"
 	"github.com/stricttools/rlsbl/internal/releaserecord"
 	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/semver"
@@ -397,7 +397,7 @@ func (inv Invocation) beginDeclassify(m managed, req DeclassifyRequest) (*declas
 	if err := inv.saveState(m.root, state); err != nil {
 		return nil, err
 	}
-	if err := removeReleaseCheckout(m.repo, inv.Say); err != nil {
+	if err := release.RemoveCheckout(m.repo, inv.Say); err != nil {
 		return nil, err
 	}
 	return state, nil
@@ -440,33 +440,6 @@ func requireSafegit(e *strictcli.Effects) error {
 	if semver.Compare(found, safegitSquashMinimum) < 0 {
 		return fmt.Errorf("safegit %s is installed, and %s", found, install)
 	}
-	return nil
-}
-
-// removeReleaseCheckout removes the release checkout, whose detached HEAD
-// pins the history as it was before the rewrite, so the folded commits
-// can be pruned. The next release creates it afresh.
-func removeReleaseCheckout(repo git.Repo, say func(string)) error {
-	common, err := repo.CommonDir()
-	if err != nil {
-		return err
-	}
-	checkout := filepath.Join(common, "rlsbl", "release-checkout")
-	resolved := checkout
-	if p, err := filepath.EvalSymlinks(checkout); err == nil {
-		resolved = p
-	}
-	worktrees, err := repo.Worktrees()
-	if err != nil {
-		return err
-	}
-	if !slices.Contains(worktrees, resolved) {
-		return nil
-	}
-	if err := repo.RemoveWorktree(checkout); err != nil {
-		return err
-	}
-	say("Removed the release checkout at " + checkout + ": it pinned the history as it was before the rewrite. The next release creates it afresh.")
 	return nil
 }
 
