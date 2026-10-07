@@ -736,3 +736,16 @@ func TestAnIdentityBeginsAtTheEarliestCommitterDateWhereverItSitsInTheHistory(t 
 	}
 	t.Fatalf("no releasable-name identity for portal: %+v", rec.Identities())
 }
+
+func TestARefusedDryRunPrintsThePerFilePlanBesideTheRefusals(t *testing.T) {
+	hygiene.Isolate(t)
+	f := standalone(t)
+	f.write(".rlsbl/releases/in-progress.json", "{}\n")
+	f.commit("a release in progress")
+	r := testsupport.RunCommand(t, commandOptions(true), func(ctx *strictcli.Context) error { return Run(ctx, f.request()) })
+	if r.ExitCode == 0 || !strings.Contains(r.Stderr, "records a release in progress") {
+		t.Fatalf("the dry run was not refused: exit %d\n%s", r.ExitCode, r.Stderr)
+	}
+	contains(t, r.Stdout, "Would write .strictmetadata/releases/portal/v0.1.0.toml <- .rlsbl/releases/v0.1.0.toml")
+	contains(t, r.Stdout, "stops at the refusals")
+}

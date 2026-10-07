@@ -215,6 +215,7 @@ func (b *builder) build() error {
 	b.planRemovals(dirs)
 	b.addManifests()
 	if err := b.p.err(); err != nil {
+		err.Plan = b.plan
 		return err
 	}
 	return b.checkUncommitted()

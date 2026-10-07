@@ -17,6 +17,7 @@
 package migration
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"path"
@@ -123,6 +124,9 @@ type indexEntry struct {
 // found, each naming what to do.
 type RefusedError struct {
 	Problems []string
+	// Plan is what the conversions planned up to the refusals, nil when
+	// the refusal came before any; a dry run prints it.
+	Plan *Plan
 }
 
 func (e *RefusedError) Error() string {
@@ -138,7 +142,7 @@ func (p *problems) add(format string, args ...any) {
 	p.list = append(p.list, fmt.Sprintf(format, args...))
 }
 
-func (p *problems) err() error {
+func (p *problems) err() *RefusedError {
 	if len(p.list) == 0 {
 		return nil
 	}
@@ -162,6 +166,10 @@ func dedupe(sorted []string) []string {
 func Run(ctx *strictcli.Context, req Request) error {
 	plan, err := Build(ctx.Effects(), req)
 	if err != nil {
+		var refused *RefusedError
+		if ctx.DryRun() && errors.As(err, &refused) && refused.Plan != nil {
+			ctx.Out(refused.Plan.Report(true) + "\nThe plan above stops at the refusals: a conversion they stop is not listed.")
+		}
 		return err
 	}
 	ctx.Out(plan.Report(ctx.DryRun()))
