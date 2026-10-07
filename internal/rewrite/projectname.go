@@ -10,7 +10,6 @@ import (
 
 	"github.com/stricttools/strictcli/go/strictcli"
 	"github.com/stricttools/strictspec/go/lifecycle"
-	"github.com/stricttools/strictspec/go/strictspec"
 
 	"github.com/stricttools/rlsbl/internal/changelog"
 	"github.com/stricttools/rlsbl/internal/declarations"
@@ -20,6 +19,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/releaserecord"
 	"github.com/stricttools/rlsbl/internal/semver"
 	"github.com/stricttools/rlsbl/internal/targets"
+	"github.com/stricttools/rlsbl/internal/upstream"
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
 
@@ -192,23 +192,6 @@ func (p *ProjectRename) refuseDirtyTree(repo git.Repo) error {
 	return nil
 }
 
-// upstreamURL is the URL of the repository this one is a fork of, from its
-// declared upstream, or empty when it declares none.
-func upstreamURL(root string) (string, error) {
-	u, found, diags, err := strictspec.LoadUpstream(root)
-	if err != nil || !found {
-		return "", err
-	}
-	if len(diags) > 0 {
-		var lines []string
-		for _, d := range diags {
-			lines = append(lines, d.Code+": "+d.Message)
-		}
-		return "", fmt.Errorf("%s is refused:\n  %s", strictspec.UpstreamFile, strings.Join(lines, "\n  "))
-	}
-	return fmt.Sprintf("https://%s/%s/%s", u.Host, u.Owner, u.Repo), nil
-}
-
 // decideEffectiveVersion asks the release record what the next release
 // ships, as `release run` decides it, so a state the release refuses is
 // refused here too. One state is answered differently: version files naming
@@ -243,11 +226,11 @@ func (p *ProjectRename) decideEffectiveVersion(repo git.Repo) error {
 	if err != nil {
 		return err
 	}
-	upstream, err := upstreamURL(p.Root)
+	forkOf, err := upstream.URLOf(p.Root)
 	if err != nil {
 		return err
 	}
-	p.record = releaserecord.New(repo, p.releasable.Name, scheme, upstream)
+	p.record = releaserecord.New(repo, p.releasable.Name, scheme, forkOf)
 	head, err := repo.Head()
 	if err != nil {
 		return err
