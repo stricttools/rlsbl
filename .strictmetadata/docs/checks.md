@@ -26,7 +26,7 @@ rlsbl failing-checks --hook pre-push # only the error-level failures
 | Hook | Selection | Run by |
 | --- | --- | --- |
 | `pre-push` | tag `prepush` | the installed `.git/hooks/pre-push`, as `rlsbl failing-checks --hook pre-push` |
-| `pre-release` | tag `preflight` | the preflight of `rlsbl release run`, which blocks on error-level failures only |
+| `pre-release` | tag `preflight` | the preflight of `rlsbl release run --watch`, which blocks on error-level failures only |
 
 ### Where a check run is scoped
 

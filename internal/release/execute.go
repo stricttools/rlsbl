@@ -869,7 +869,7 @@ func (x *execution) epilogue() error {
 		}
 	}
 	if len(failing) > 0 {
-		return fmt.Errorf("%s is tagged and released, and CI on it did not pass: %s. The tag and the Release exist, so nothing is released again: fix what failed and start the publish workflows at the tag again with `rlsbl release retry`", x.state.Tag, strings.Join(failing, ", "))
+		return fmt.Errorf("%s is tagged and released, and CI on it did not pass: %s. The tag and the Release exist, so nothing is released again: fix what failed and start the publish workflows at the tag again with `rlsbl release retry --watch`", x.state.Tag, strings.Join(failing, ", "))
 	}
 	return x.verifyPublication()
 }
@@ -948,7 +948,7 @@ func (x *execution) verifyPublication() error {
 			return nil
 		}
 	}
-	return fmt.Errorf("%s is tagged and released, CI passed, and the registries do not list %s for %s: the publish never reached them. The tag and the Release exist, so nothing is released again: inspect the publish workflow's run for %s, fix the cause, and start it again with `rlsbl release retry`; if %s must not ship at all, `rlsbl release yank %s`", x.state.Tag, version, strings.Join(missing, ", "), x.state.Tag, version, version)
+	return fmt.Errorf("%s is tagged and released, CI passed, and the registries do not list %s for %s: the publish never reached them. The tag and the Release exist, so nothing is released again: inspect the publish workflow's run for %s, fix the cause, and start it again with `rlsbl release retry --watch`; if %s must not ship at all, `rlsbl release yank %s`", x.state.Tag, version, strings.Join(missing, ", "), x.state.Tag, version, version)
 }
 
 // preview is the rest of a release under --dry-run: the version-bumped plan,

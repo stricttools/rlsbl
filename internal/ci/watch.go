@@ -675,7 +675,7 @@ const (
 func (w Watcher) DispatchRunAll(branch, commit string) (github.WorkflowRun, error) {
 	w.Log(fmt.Sprintf("dispatching %s on %s with %s=true, so every member's CI runs on %s", workflows.RouterFile, branch, workflows.RunAllInput, short(commit)))
 	if err := w.GH.DispatchWorkflow(w.Repo, workflows.RouterFile, branch, map[string]string{workflows.RunAllInput: "true"}); err != nil {
-		return github.WorkflowRun{}, fmt.Errorf("%s could not be dispatched with %s=true on %s: %w. The candidate is on the remote, untagged; nothing was tagged, released, or finalized. A router generated before the %s input existed refuses the input: regenerate it with `rlsbl monorepo sync`, commit it, and resume", workflows.RouterFile, workflows.RunAllInput, branch, err, workflows.RunAllInput)
+		return github.WorkflowRun{}, fmt.Errorf("%s could not be dispatched with %s=true on %s: %w. The candidate is on the remote, untagged; nothing was tagged, released, or finalized. A router generated before the %s input existed refuses the input: regenerate and commit it with `rlsbl monorepo sync --auto-commit`, and resume", workflows.RouterFile, workflows.RunAllInput, branch, err, workflows.RunAllInput)
 	}
 	for attempt := 1; attempt <= RunAllAttempts; attempt++ {
 		runs, err := w.GH.Runs(w.Repo, github.RunQuery{Commit: commit, Workflow: workflows.RouterFile, Event: "workflow_dispatch", Limit: runListingLimit})
@@ -712,7 +712,7 @@ func (w Watcher) WatchCommit(commit, label string) ([]RunResult, error) {
 		if err != nil {
 			detail = fmt.Sprintf(" (the last listing failed: %v)", err)
 		}
-		return nil, fmt.Errorf("no CI run appeared for %s within %s%s; GitHub may not have started them yet: run `rlsbl watch %s` again, and when a release's runs never start, `rlsbl release retry` starts its publish workflows", short(commit), WatchDiscovery, detail, commit)
+		return nil, fmt.Errorf("no CI run appeared for %s within %s%s; GitHub may not have started them yet: run `rlsbl watch %s` again, and when a release's runs never start, `rlsbl release retry --watch` starts its publish workflows", short(commit), WatchDiscovery, detail, commit)
 	}
 	w.Log(fmt.Sprintf("%s: found %d CI runs, watching them", label, len(runs)))
 	retried := map[string]bool{}

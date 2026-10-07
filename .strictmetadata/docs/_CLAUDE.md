@@ -28,7 +28,7 @@ Everything rlsbl owns is under `.strictmetadata/` ([on-disk layout](.strictmetad
 
 - Run `rlsbl release init` to write `.strictmetadata/releases/<releasable>/unreleased.toml`, then set its `bump` (`patch`, `minor`, `major`, or `infra`) and `description`.
 - Run `rlsbl release run --watch --approve-consequential`. It runs in the release checkout (`.git/rlsbl/release-checkout`), a detached checkout of the branch tip: an uncommitted change to a path the release writes refuses it by name, every other uncommitted change is listed and left alone, and the branch advances only by compare-and-swap from where the release started.
-- The commit is pushed untagged and tagged only after the repository's own CI passed on it. After a red verdict, commit the fix on the release branch, add its changelog entry, and run `rlsbl release resume`; never start a new release to get past it.
+- The commit is pushed untagged and tagged only after the repository's own CI passed on it. After a red verdict, commit the fix on the release branch, add its changelog entry, and run `rlsbl release resume --watch`; never start a new release to get past it.
 - `rlsbl release abandon` records a stopped attempt's version as never released.
 - CI publishes from the publish workflow the GitHub Release starts. Never publish by hand.
 - `--watch`/`--no-watch` is required on `release run`, `release resume`, `release retry`, and `monorepo release run`, with no default.
@@ -54,7 +54,7 @@ Then the release's steps, from the version bump to the post-release hooks, each 
 
 | Namespace | Routine writer | Never written by |
 | --- | --- | --- |
-| `origin` branch heads | Releases: `rlsbl release run` pushes the untagged candidate and, after CI, the finalization commits. | Anything else. There is no push command, and the pre-push hook refuses a manual push to a release branch. (`rlsbl release undo` also pushes the branch, as a retraction.) |
+| `origin` branch heads | Releases: `rlsbl release run --watch` pushes the untagged candidate and, after CI, the finalization commits. | Anything else. There is no push command, and the pre-push hook refuses a manual push to a release branch. (`rlsbl release undo` also pushes the branch, as a retraction.) |
 | `origin` tags and their GitHub Releases | The release's tag and Release steps. `rlsbl release reconcile` repairs them from the record. | Hand-made tags. A shipped tag is never moved, except to follow its commit through a rewrite the records explain. |
 | Rewritten history | `rlsbl release scrub` (and `rlsbl transition declassify`), through safegit: force-push, re-pointed tags, and each Release rewritten in place. | A bare `git push --force`; after an out-of-band rewrite, `rlsbl release reconcile` and `rlsbl changelog remap --from-journal` repair the records. |
 | A fork's inherited tags, `refs/tags-of/<host>/<owner>/<repo>/<tag>` | `rlsbl upstream adopt-tags`. | Anything else. |

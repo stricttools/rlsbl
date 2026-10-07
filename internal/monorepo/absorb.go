@@ -933,7 +933,7 @@ func (arr *arrival) nextSteps() []string {
 		fmt.Sprintf("run `rlsbl monorepo cleanup` to remove the arriving repository's own records under %s", arr.req.Dest),
 	}
 	for _, f := range arr.publishers {
-		steps = append(steps, fmt.Sprintf("%s authorizes publishing for a repository, not for the package, so it did not follow the code: register this repository at %s before the next release (a publish that fails for want of it is recovered with `rlsbl release retry`, not a new version)", f.RegistryDisplayName, f.PublisherSetupURL))
+		steps = append(steps, fmt.Sprintf("%s authorizes publishing for a repository, not for the package, so it did not follow the code: register this repository at %s before the next release (a publish that fails for want of it is recovered with `rlsbl release retry --watch`, not a new version)", f.RegistryDisplayName, f.PublisherSetupURL))
 	}
 	return steps
 }

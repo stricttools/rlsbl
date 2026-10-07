@@ -42,6 +42,7 @@ type schemaFlag struct {
 	Name      string         `json:"name"`
 	Help      string         `json:"help"`
 	Negatable *bool          `json:"negatable"`
+	Presence  string         `json:"presence"`
 	ElectBy   *string        `json:"elect_by"`
 	Choices   []schemaChoice `json:"choices"`
 }
@@ -142,7 +143,9 @@ func splitCommandLine(line string) []string {
 
 // commandLineProblem is what is wrong with the command line rlsbl args
 // names, or "" when the help document registers it with every flag it
-// passes. A token formatted at run time (holding %) ends the check.
+// passes, and with the choice each of its required boolean flags demands
+// spelled (--watch or --no-watch, say), so the line runs as printed. A
+// token formatted at run time (holding %) ends the check.
 func commandLineProblem(doc *schemaNode, args []string) string {
 	node, path := doc, "rlsbl"
 	isCommand := false
@@ -181,7 +184,27 @@ func commandLineProblem(doc *schemaNode, args []string) string {
 		}
 		return fmt.Sprintf("`%s` has no command %q", path, tok)
 	}
+	if isCommand {
+		for _, f := range node.Flags {
+			if f.Presence != "required" || f.Negatable == nil || !*f.Negatable {
+				continue
+			}
+			if !spellsFlag(args, f.Name) && !spellsFlag(args, "no-"+f.Name) {
+				return fmt.Sprintf("`%s` requires --%s or --no-%s, which the line does not spell", path, f.Name, f.Name)
+			}
+		}
+	}
 	return ""
+}
+
+// spellsFlag is whether args pass the flag name.
+func spellsFlag(args []string, name string) bool {
+	for _, a := range args {
+		if a == "--"+name || strings.HasPrefix(a, "--"+name+"=") {
+			return true
+		}
+	}
+	return false
 }
 
 // commandSpan is a code span naming an rlsbl command line.

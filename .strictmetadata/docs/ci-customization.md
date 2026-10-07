@@ -39,4 +39,4 @@ Scaffold three-way merges template updates into the files it manages ([the three
 
 ## In a workspace
 
-GitHub reads workflows only at the repository root, so a member's own workflows run through the routers `rlsbl monorepo sync` generates. The CI router inlines a member's `ci.yml` and every `ci-*.yml`, so a member's `ci-custom.yml` is inlined like its `ci.yml`, filtered by the member's path filter and named `<member prefix> / <job>`. The publish router inlines only a member's `publish.yml`. Workflows for the whole repository go in the root's `.github/workflows/` under names the routers do not generate.
+GitHub reads workflows only at the repository root, so a member's own workflows run through the routers `rlsbl monorepo sync --auto-commit` generates. The CI router inlines a member's `ci.yml` and every `ci-*.yml`, so a member's `ci-custom.yml` is inlined like its `ci.yml`, filtered by the member's path filter and named `<member prefix> / <job>`. The publish router inlines only a member's `publish.yml`. Workflows for the whole repository go in the root's `.github/workflows/` under names the routers do not generate.

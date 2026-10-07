@@ -4,9 +4,9 @@ description = "The rlsbl release flow: the release file, validation and its refu
 
 # Release workflow
 
-`rlsbl release run` releases one releasable: it validates everything it can before writing anything, writes the new version, commits it, **pushes that commit to the release branch untagged and waits for the repository's own CI to conclude on it**, and only then finalizes the changelog, archives the release, tags the commit CI verified, pushes, creates the GitHub Release, and publishes.
+`rlsbl release run --watch` releases one releasable: it validates everything it can before writing anything, writes the new version, commits it, **pushes that commit to the release branch untagged and waits for the repository's own CI to conclude on it**, and only then finalizes the changelog, archives the release, tags the commit CI verified, pushes, creates the GitHub Release, and publishes.
 
-This ordering is the property the whole flow rests on: the tag, the GitHub Release, the finalized changelog, and every registry write happen after a green CI verdict on the commit being released. A red verdict leaves nothing behind but the candidate commit on the branch: no tag, no Release, no finalized changelog, nothing on any registry. The version is never burnt by a failure; the fix is committed on the release branch and `rlsbl release resume` completes the same version.
+This ordering is the property the whole flow rests on: the tag, the GitHub Release, the finalized changelog, and every registry write happen after a green CI verdict on the commit being released. A red verdict leaves nothing behind but the candidate commit on the branch: no tag, no Release, no finalized changelog, nothing on any registry. The version is never burnt by a failure; the fix is committed on the release branch and `rlsbl release resume --watch` completes the same version.
 
 ## Quick reference
 
@@ -56,7 +56,7 @@ The fields the release itself records (`release_commit`, `released_trees`, the f
 Before it writes anything, the release refuses, each refusal naming its fix:
 
 - a working directory that selects no releasable, or a member versioned under none;
-- an unfinished release: an `in-progress.toml` names `rlsbl release resume` or `rlsbl release abandon`, by its version's fate;
+- an unfinished release: an `in-progress.toml` names `rlsbl release resume --watch` or `rlsbl release abandon`, by its version's fate;
 - a releasable, or a member versioned under it, whose lifecycle is `on-hold` or `retired`;
 - a missing or unreadable release file, a target it includes that no member of the releasable has, and a bump the user-facing rule refuses;
 - an environment file that cannot be read;
@@ -71,7 +71,7 @@ Before it writes anything, the release refuses, each refusal naming its fix:
 
 ## The release checkout
 
-A release never runs in the working tree. `rlsbl release run`, `rlsbl release resume`, and `rlsbl monorepo release run` check out the commit the release branch points at into the **release checkout**, a detached `git worktree` at `<git common dir>/rlsbl/release-checkout`, and run there: the producers, the hooks, the tests and checks, the version bump, the build, and every commit the release makes. The checkout is reused from release to release: each release resets it to the commit it starts from and removes its untracked files, keeping ignored ones so dependency environments and build caches stay warm. `rlsbl release scrub` removes it before rewriting history.
+A release never runs in the working tree. `rlsbl release run --watch`, `rlsbl release resume --watch`, and `rlsbl monorepo release run --watch` check out the commit the release branch points at into the **release checkout**, a detached `git worktree` at `<git common dir>/rlsbl/release-checkout`, and run there: the producers, the hooks, the tests and checks, the version bump, the build, and every commit the release makes. The checkout is reused from release to release: each release resets it to the commit it starts from and removes its untracked files, keeping ignored ones so dependency environments and build caches stay warm. `rlsbl release scrub` removes it before rewriting history.
 
 Its commits reach the release branch only by a **compare-and-swap advance** (`git update-ref <branch> <new> <old>`): the branch moves only from the commit this release last left it at, and a branch another session moved meanwhile is refused, naming the commits that appeared. Only the files the release's own commits change are written into the working tree; each must be free of uncommitted changes, or the advance refuses, naming it.
 
@@ -106,7 +106,7 @@ The preflight always runs every check it selects, built-in and external alike, w
 
 ## The release steps
 
-Once validation and the pre-release pipeline pass, every step records its outcome in `.strictmetadata/.release-state/<releasable>/in-progress.toml`. A fatal step's failure stops the release with its state kept, so `rlsbl release resume` continues from it; the one non-fatal step's failure is recorded and named in the closing summary.
+Once validation and the pre-release pipeline pass, every step records its outcome in `.strictmetadata/.release-state/<releasable>/in-progress.toml`. A fatal step's failure stops the release with its state kept, so `rlsbl release resume --watch` continues from it; the one non-fatal step's failure is recorded and named in the closing summary.
 
 | Step | What it does | Fatal |
 | --- | --- | --- |
@@ -120,7 +120,7 @@ Once validation and the pre-release pipeline pass, every step records its outcom
 | `pushed` | Pushes the finalization commits, then the tags one per push, the primary tag first: GitHub creates no events for a push of more than three tags. | yes |
 | `github-release-created` | Creates the GitHub Release on the pushed tag, with the version's changelog section as its notes and the `rlsbl-ci-sha` marker naming the release commit. | yes |
 | `pipelines-published` | Publishes the pipelines that publish from this machine ([pipelines](pipelines.md#publishing-from-this-machine)); CI pipelines publish from the publish workflow the Release starts. | yes |
-| `deployed` | Runs the releasable's `deploy_command`, `{version}` replaced, from the repository root, with the check timeout. A server releasable's deploy that fails leaves the release resumable, and `rlsbl release resume` runs it again for the same version. | yes |
+| `deployed` | Runs the releasable's `deploy_command`, `{version}` replaced, from the repository root, with the check timeout. A server releasable's deploy that fails leaves the release resumable, and `rlsbl release resume --watch` runs it again for the same version. | yes |
 | `post-release-hooks-run` | Runs every `post_release` hook. | no |
 
 The tag points at the commit CI verified, not at `HEAD`: the finalization commits sit on top of it and are pushed with it. After the steps, the release confirms that every workflow a published Release starts shows a run for the tag, then watches the runs (`--watch`) or prints the command that does.
@@ -150,11 +150,11 @@ A green workflow run does not by itself show that the releasing project's own CI
 
 ### Resuming adopts the branch
 
-A stopped release leaves its branch open, and work continues there: the fix committed after a red verdict, and whatever else another session commits beside it. `rlsbl release resume` takes the branch as it stands: it pins again at the current tip, so every commit since the original pin is adopted, pushed as the new candidate, judged by CI, and contained in the tagged commit. The version stays the one the state file records, and the steps already done keep their outcomes, except that adopting past the CI verdict drops it: the tip is a new candidate.
+A stopped release leaves its branch open, and work continues there: the fix committed after a red verdict, and whatever else another session commits beside it. `rlsbl release resume --watch` takes the branch as it stands: it pins again at the current tip, so every commit since the original pin is adopted, pushed as the new candidate, judged by CI, and contained in the tagged commit. The version stays the one the state file records, and the steps already done keep their outcomes, except that adopting past the CI verdict drops it: the tip is a new candidate.
 
 Adoption has one condition, checked before anything changes: every adopted commit the release did not create has a changelog entry, or needs none under the rules [changelog coverage](changelog.md#validation) applies. An uncovered commit is refused by id and subject, with the `rlsbl changelog add` that records it. Read `git log` before resuming: another session's commit on the branch ships under this version.
 
-While a state file exists, `rlsbl release run` refuses and names `rlsbl release resume`.
+While a state file exists, `rlsbl release run --watch` refuses and names `rlsbl release resume --watch`.
 
 ### Abandoning an attempt
 
@@ -201,7 +201,7 @@ A GitHub Release starts the publish workflow, which would race CI on the same co
 
 The limits are the job's env (`WAIT_TIMEOUT_MINUTES`, `WAIT_GRACE_MINUTES`, `WAIT_POLL_SECONDS`), and the job's own `timeout-minutes` must be raised with the timeout. Same-named check runs count as the newest one, except that a skip never outranks a verdict of the same job. Under rlsbl's ordering CI already went green on the commit before it was tagged, so the job confirms rather than waits.
 
-A publish run that failed for reasons outside the code (a registry outage, an expired token) is run again at the tag, never at a branch: `rlsbl release retry`, or `gh workflow run publish.yml --ref <tag>`. Publish workflows queue one run per tag and never cancel one in flight.
+A publish run that failed for reasons outside the code (a registry outage, an expired token) is run again at the tag, never at a branch: `rlsbl release retry --watch`, or `gh workflow run publish.yml --ref <tag>`. Publish workflows queue one run per tag and never cancel one in flight.
 
 ## Who writes which ref namespace
 
@@ -232,7 +232,7 @@ The repair and retraction commands:
 | Command | What it does |
 | --- | --- |
 | `rlsbl release edit [version]` | Rewrites a version's GitHub Release in place from the record: the notes its changelog holds, the notices its archive records on top, the `rlsbl-ci-sha` marker, and the pre-release flag (set when a notice is recorded). Defaults to the latest release. |
-| `rlsbl release retry` | Dispatches the latest release's workflows again at its tag, from `.strictmetadata/.release-state/<releasable>/retry.toml` (written, when missing, naming every workflow of the tagged tree with a `workflow_dispatch` trigger). A ref other than the tag is refused. A dispatch that fails leaves the file holding the workflows not yet dispatched, so no workflow is dispatched twice. |
+| `rlsbl release retry --watch` | Dispatches the latest release's workflows again at its tag, from `.strictmetadata/.release-state/<releasable>/retry.toml` (written, when missing, naming every workflow of the tagged tree with a `workflow_dispatch` trigger). A ref other than the tag is refused. A dispatch that fails leaves the file holding the workflows not yet dispatched, so no workflow is dispatched twice. |
 | `rlsbl release undo [--version <v>]` | Reverts a release that is provably unpublished: the registries' package listings, origin's Go module tags, and the publish runs of its tag must show it absent and none may show it published. Without `--version` the latest release, its version-bump commit reverted; with it an earlier one, its commits left. An audit line is committed to `undo-audits.jsonl` before the first deletion. |
 | `rlsbl release deprecate <version> --reason <text> [--use <version>]` | Records `> **Deprecated:** <reason>. Use v<use> instead.` in the archive's `release_notices`, commits it, and rewrites the Release with the notice on top, marked pre-release. |
 | `rlsbl release yank <version> --reason <text> [--use <version>]` | For each published package: npm deprecates the version, a Go module gains a `retract` line (committed, published by the next release), and PyPI is yanked by hand, the command exiting 1 naming the steps until PyPI's project document shows the files yanked. Records the yank notice and rewrites the Release. Nothing is ever unpublished, and a proprietary releasable is refused. |
@@ -289,6 +289,6 @@ rlsbl release init                     # then set bump = "minor" and the descrip
 rlsbl release run --watch --approve-consequential
 ```
 
-When CI goes red on the candidate there is nothing to undo: fix the failure on the release branch, record the fix, and run `rlsbl release resume`. Do not start a new release at a higher version to get past a red CI, and do not run CI again on the same commit expecting another answer. A timeout verdict differs only in that the runs may still be going: check them with `rlsbl watch <sha>` before deciding anything needs fixing.
+When CI goes red on the candidate there is nothing to undo: fix the failure on the release branch, record the fix, and run `rlsbl release resume --watch`. Do not start a new release at a higher version to get past a red CI, and do not run CI again on the same commit expecting another answer. A timeout verdict differs only in that the runs may still be going: check them with `rlsbl watch <sha>` before deciding anything needs fixing.
 
 `rlsbl release undo` is for a release that completed and turned out wrong, never for a CI failure. For a version a registry already served, prefer `rlsbl release deprecate` or `rlsbl release yank`: an undo cannot take back what a registry handed out.

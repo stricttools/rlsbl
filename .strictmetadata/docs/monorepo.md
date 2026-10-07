@@ -40,7 +40,7 @@ Every workspace declares the repository root as a member, `path = "."`, named `r
 | dev node | `dev_only = true`, `releasable = false` | The root's files need no changelog entry and stand outside every releasable. |
 | versioned | `releasable = "<name>"` | The root's files are covered by that releasable's changelog. A releasable owning the root member and publishing from CI declares `publish_ci_check_pattern`. |
 
-`rlsbl scaffold` does not scaffold the root member: `rlsbl monorepo sync` generates its workflows, and a root member publishing from CI has its publish jobs rendered from scaffold's templates into the publish router.
+`rlsbl scaffold` does not scaffold the root member: `rlsbl monorepo sync --auto-commit` generates its workflows, and a root member publishing from CI has its publish jobs rendered from scaffold's templates into the publish router.
 
 ## Nested members
 
@@ -95,7 +95,7 @@ The report names the members the change touches, the members depending on them d
 
 ## The CI router and the publish router
 
-GitHub Actions reads workflows only from the repository root, so `rlsbl monorepo sync` regenerates two routers in `.github/workflows/`:
+GitHub Actions reads workflows only from the repository root, so `rlsbl monorepo sync --auto-commit` regenerates two routers in `.github/workflows/`:
 
 - **`ci-router.yml`** inlines every member's own CI jobs (its `.github/workflows/ci.yml` and `ci-*.yml`) under keys and names prefixed with the member and file, and runs each member's jobs when its path filter matched the push, or when the router is dispatched with `run_all=true`.
 - **`publish.yml`** inlines the publish jobs of every member whose releasable publishes from CI, each run only for its releasable's tags, behind one `wait-for-ci` job that holds every publish until the releasing project's CI passed on the release commit ([the publish workflow](release-workflow.md#the-publish-workflow)).
@@ -113,7 +113,7 @@ Each member's filter is derived from the workspace, never declared. It holds:
 - the changelog file every release of its releasable writes;
 - a negated exclude of every member nested in its territory, except one holding a member it depends on (for the root member, `**` narrowed by every other member's territory).
 
-The filter step declares `predicate-quantifier: some-with-excludes`: under the action's default a negated pattern matches everything outside itself. The `router-filters-fresh` check compares the committed filters with a fresh derivation; `rlsbl monorepo sync` regenerates them.
+The filter step declares `predicate-quantifier: some-with-excludes`: under the action's default a negated pattern matches everything outside itself. The `router-filters-fresh` check compares the committed filters with a fresh derivation; `rlsbl monorepo sync --auto-commit` regenerates them.
 
 Every release of a releasable writes its changelog file, which every member's filter holds, so a release commit runs the CI jobs of every member of the releasable, including members whose code did not change. That is the accepted cost: neither the release's CI check nor the publish workflow's `wait-for-ci` job reads a skipped check run as a pass, since a skipped check proves nothing about the commit.
 
@@ -131,7 +131,7 @@ The release dispatches it itself when it can see the case coming: a resumed rele
 
 ## Batch releases
 
-`rlsbl monorepo release run` releases several releasables in one flow, in topological order, each through the single-releasable [release](release-workflow.md) from one representative member, in the release checkout, under one CI wait.
+`rlsbl monorepo release run --watch` releases several releasables in one flow, in topological order, each through the single-releasable [release](release-workflow.md) from one representative member, in the release checkout, under one CI wait.
 
 1. `rlsbl monorepo release init --releasables <names>` writes `.strictmetadata/batch-releases/unreleased.toml`, one `[releasables.<name>]` table per releasable with its targets, for the bump and description to be filled in.
 2. Edit each table: `bump`, `description`, and optionally `context`, `include`, `exclude`, as in a single release file.
@@ -152,7 +152,7 @@ The release dispatches it itself when it can see the case coming: a resumed rele
 
 | Command | What it does |
 | --- | --- |
-| `rlsbl monorepo sync` | Regenerates the routers. |
+| `rlsbl monorepo sync --auto-commit` | Regenerates the routers. |
 | `rlsbl monorepo cleanup` | Removes the old layout's residue through saferm ([residue](on-disk-layout.md#residue-of-the-old-layout)). |
 | `rlsbl monorepo rename-releasable <old> <new>` | Renames a releasable: its declarations, its directories, its record entries, and its routers, in one commit; when the tag format holds `{name}`, past archives record their old tag in `shipped_as` and one boundary alias tag is pushed at the current version ([renaming a releasable](conversions.md#renaming-a-releasable)). |
 | `rlsbl monorepo extract`, `rlsbl monorepo absorb` | Move a releasable out of the workspace into its own repository, or a repository in ([repository conversions](conversions.md)). |

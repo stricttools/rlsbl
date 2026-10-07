@@ -29,7 +29,7 @@ func routerChecks() []check {
 }
 
 // syncFix regenerates the routers.
-const syncFix = "regenerate the routers with `rlsbl monorepo sync` and commit the result"
+const syncFix = "regenerate the routers and commit them with `rlsbl monorepo sync --auto-commit`"
 
 // routerText is the committed CI router; found is false without one.
 func routerText(c *Context) (string, bool) {
@@ -104,7 +104,7 @@ func checkWorkspaceCISynced(c *Context, r *strictcli.ErrorReporter) strictcli.Ch
 			panic(unanswered(err.Error()))
 		}
 		if len(prefixes) == 0 {
-			r.Note(fmt.Sprintf("%s: no CI workflow of its own (.github/workflows/ci*.yml), so `rlsbl monorepo sync` inlines nothing for it", m.Name))
+			r.Note(fmt.Sprintf("%s: no CI workflow of its own (.github/workflows/ci*.yml), so monorepo sync inlines nothing for it", m.Name))
 			continue
 		}
 		need = append(need, required{m.Name, prefixes})

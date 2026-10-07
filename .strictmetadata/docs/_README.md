@@ -47,7 +47,7 @@ A repository declares what it is in `.strictmetadata/releasables/releasables.tom
 
 ## Release flow
 
-`rlsbl release run` reads the releasable's release file, `.strictmetadata/releases/<releasable>/unreleased.toml` (the bump, the description, the targets), and then:
+`rlsbl release run --watch` reads the releasable's release file, `.strictmetadata/releases/<releasable>/unreleased.toml` (the bump, the description, the targets), and then:
 
 1. validates everything before writing anything: the changelog, the lifecycle-and-license record, the publishing rules of the repository's visibility, the version decision, `gh` and push access, the release branch, and every uncommitted change to a path the release writes;
 2. enters the release checkout, a detached checkout of the branch tip under `.git/rlsbl/release-checkout`, where everything below runs;
@@ -57,7 +57,7 @@ A repository declares what it is in `.strictmetadata/releasables/releasables.tom
 6. finalizes the changelog, archives the release with the commit it shipped from, tags the CI-verified commit, pushes, and creates the GitHub Release;
 7. publishes the pipelines that publish from this machine (CI pipelines publish from the workflow the Release starts), runs a server releasable's deploy command, and runs the post-release hooks.
 
-Everything before the candidate push is reversible; a red CI verdict leaves nothing but a commit on the branch. Fix forward on the release branch and `rlsbl release resume` completes the same version: a failed release never burns it. See [the release workflow](.strictmetadata/docs/release-workflow.md).
+Everything before the candidate push is reversible; a red CI verdict leaves nothing but a commit on the branch. Fix forward on the release branch and `rlsbl release resume --watch` completes the same version: a failed release never burns it. See [the release workflow](.strictmetadata/docs/release-workflow.md).
 
 ## Changelog
 
@@ -109,7 +109,7 @@ A workspace holds several members versioned under one or more releasables:
 ```
 rlsbl monorepo init --root-member root-dev-node --release-branch main
 rlsbl monorepo add packages/core --releasable core --tag-format '{name}@v{version}' --publish-mode ci
-rlsbl monorepo sync                  # regenerate the CI router and publish router
+rlsbl monorepo sync --auto-commit    # regenerate and commit the CI router and publish router
 rlsbl monorepo graph --format tree   # the dependency graph; --json for the document
 rlsbl monorepo release run --watch --approve-consequential
 ```

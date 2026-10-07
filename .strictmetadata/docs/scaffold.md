@@ -30,7 +30,7 @@ While `rlsbl:ecosystem-tagging` is on (its default), the npm and PyPI manifests 
 
 `CHANGELOG.md` and `unreleased.jsonl` are not scaffolded: the first `rlsbl changelog add` creates the changelog directory and file, and `rlsbl changelog generate` writes `CHANGELOG.md`.
 
-In a workspace, the root member is not scaffolded: `rlsbl monorepo sync` generates its workflows. Scaffolding any other member ends by regenerating the workspace's CI router and publish router from the members' workflows, as `rlsbl monorepo sync` does, committed with the same choice as the scaffold; under `--dry-run` that step is named, not previewed. `--skip-shared` leaves the files every member gets (the `.gitignore`, scratch directories, stub `go.mod` files, `LICENSE`, and the test runner) as they are.
+In a workspace, the root member is not scaffolded: `rlsbl monorepo sync --auto-commit` generates its workflows. Scaffolding any other member ends by regenerating the workspace's CI router and publish router from the members' workflows, as monorepo sync does, committed with the same choice as the scaffold; under `--dry-run` that step is named, not previewed. `--skip-shared` leaves the files every member gets (the `.gitignore`, scratch directories, stub `go.mod` files, `LICENSE`, and the test runner) as they are.
 
 ## The scaffold state and the three-way merge
 

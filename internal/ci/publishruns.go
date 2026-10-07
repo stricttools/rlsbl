@@ -149,7 +149,7 @@ func (p PublishRuns) Preflight(commit string, publishes bool) error {
 		}
 	}
 	if publishes && len(starting) == 0 {
-		return fmt.Errorf("the release publishes from CI, and no workflow in %s at %s starts when a GitHub Release is published, so nothing would publish it; run `rlsbl scaffold` (`rlsbl monorepo sync` in a workspace) to generate the publish workflow, commit it, and run the release again", publishrules.WorkflowsDir, short(commit))
+		return fmt.Errorf("the release publishes from CI, and no workflow in %s at %s starts when a GitHub Release is published, so nothing would publish it; run `rlsbl scaffold` (`rlsbl monorepo sync --auto-commit` in a workspace) to generate the publish workflow, commit it, and run the release again", publishrules.WorkflowsDir, short(commit))
 	}
 	if len(starting) == 0 {
 		return nil
@@ -293,7 +293,7 @@ func (p PublishRuns) ConfirmRunsStarted(tag, sha string, discovery, interval tim
 	} else {
 		lines = append(lines, "  Nothing rlsbl can read explains it: the event may have been dropped or throttled, and a private repository out of Actions minutes starts nothing.")
 	}
-	lines = append(lines, fmt.Sprintf("  The tag and the Release exist, so nothing needs releasing again. Fix the cause, start the workflows at the tag with `rlsbl release retry`, and confirm with `rlsbl watch %s`.", sha))
+	lines = append(lines, fmt.Sprintf("  The tag and the Release exist, so nothing needs releasing again. Fix the cause, start the workflows at the tag with `rlsbl release retry --watch`, and confirm with `rlsbl watch %s`.", sha))
 	return errors.New(strings.Join(lines, "\n"))
 }
 

@@ -52,7 +52,7 @@ import (
 
 // WorkspaceRootSkip is what scaffold says at a workspace's root, which it
 // does not scaffold.
-const WorkspaceRootSkip = "Skipping: rlsbl scaffold does not scaffold a workspace's root member. Its CI and publish workflows are the ones `rlsbl monorepo sync` generates, and its other files are written by hand."
+const WorkspaceRootSkip = "Skipping: rlsbl scaffold does not scaffold a workspace's root member. Its CI and publish workflows are the ones `rlsbl monorepo sync --auto-commit` generates, and its other files are written by hand."
 
 // Inputs are one scaffold run.
 type Inputs struct {
@@ -412,7 +412,7 @@ func syncWorkspace(e *strictcli.Effects, ws *workspace.Workspace, in Inputs) err
 		// The routers are read from the member's workflows on disk, which a
 		// dry run did not write, so a preview of the sync would describe the
 		// workflows as they were.
-		in.Say("Would regenerate the workspace's CI router and publish router from the member's workflows, as `rlsbl monorepo sync` does.")
+		in.Say("Would regenerate the workspace's CI router and publish router from the member's workflows, as monorepo sync does.")
 		return nil
 	}
 	actions, err := ActionVersions()

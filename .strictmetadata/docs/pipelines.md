@@ -38,7 +38,7 @@ The `ci-publish-secrets` check asks GitHub whether each secret a CI pipeline aut
 
 ## Publishing from CI
 
-A releasable with `publish_mode = "ci"` gets `.github/workflows/publish.yml` from `rlsbl scaffold` (in a workspace, the publish router `rlsbl monorepo sync` generates). It runs on `release: published` and on `workflow_dispatch`, starts with the [wait-for-ci job](release-workflow.md#the-publish-workflow), and has one job per pipeline publishing from CI:
+A releasable with `publish_mode = "ci"` gets `.github/workflows/publish.yml` from `rlsbl scaffold` (in a workspace, the publish router `rlsbl monorepo sync --auto-commit` generates). It runs on `release: published` and on `workflow_dispatch`, starts with the [wait-for-ci job](release-workflow.md#the-publish-workflow), and has one job per pipeline publishing from CI:
 
 - **go `library`**: asks the Go module proxy for the new version, so the module is listed and `pkg.go.dev` indexes it.
 - **go `binary`**: builds the binaries with goreleaser (`.goreleaser.yml`, which scaffold renders), scans them for secrets with gitleaks, and attaches the release archives to the GitHub Release; with `homebrew_tap`, goreleaser publishes the formula too.

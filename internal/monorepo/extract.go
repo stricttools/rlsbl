@@ -1149,7 +1149,7 @@ func (dep *departure) nextSteps() []string {
 		fmt.Sprintf("review the routers regenerated in %s before the next release there", dep.ws.Root),
 	}
 	for _, f := range dep.publishers {
-		steps = append(steps, fmt.Sprintf("%s authorizes publishing for a repository, not for the package, so it does not follow the code: register the new repository at %s before its first release there (a publish that fails for want of it is recovered with `rlsbl release retry`, not a new version)", f.RegistryDisplayName, f.PublisherSetupURL))
+		steps = append(steps, fmt.Sprintf("%s authorizes publishing for a repository, not for the package, so it does not follow the code: register the new repository at %s before its first release there (a publish that fails for want of it is recovered with `rlsbl release retry --watch`, not a new version)", f.RegistryDisplayName, f.PublisherSetupURL))
 	}
 	return steps
 }

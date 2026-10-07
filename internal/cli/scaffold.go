@@ -25,9 +25,9 @@ const scaffoldHelp = "Render the release infrastructure of the member whose dire
 	"commit); a conflict is written with git's markers, left uncommitted, and fails the command. A file scaffold managed and no longer renders is " +
 	"removed through saferm while unmodified. Everything is planned and every refusal made before anything is written; the managed files and their " +
 	"hashes are recorded in .strictmetadata/.scaffold-state/scaffold-state.toml. While rlsbl:ecosystem-tagging is on, the npm and PyPI manifests " +
-	"gain the rlsbl keyword and the repository the rlsbl topic. A workspace's root member is not scaffolded: `rlsbl monorepo sync` generates its " +
+	"gain the rlsbl keyword and the repository the rlsbl topic. A workspace's root member is not scaffolded: `rlsbl monorepo sync --auto-commit` generates its " +
 	"workflows. Scaffolding any other member of a workspace ends by regenerating the workspace's CI router and publish router from the members' " +
-	"workflows, as `rlsbl monorepo sync` does, committed with the same choice as the scaffold; under --dry-run that step is named, not previewed."
+	"workflows, as monorepo sync does, committed with the same choice as the scaffold; under --dry-run that step is named, not previewed."
 
 // registerScaffold registers scaffold; version is this rlsbl's, which the
 // scaffold state records.

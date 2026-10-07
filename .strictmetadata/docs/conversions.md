@@ -43,7 +43,7 @@ A departing member's dependency on a member that stays is reported in the plan, 
 
 ### After an extract
 
-The printed next steps: create the remote repository and add it as `origin` there; run `rlsbl scaffold` there for its workflows and hooks; review the regenerated routers here. A departing target whose publisher is authorized per repository (PyPI's trusted publishing) needs the new repository registered before its next release, and a publish that failed for want of it is retried with `rlsbl release retry`, never by burning a version.
+The printed next steps: create the remote repository and add it as `origin` there; run `rlsbl scaffold` there for its workflows and hooks; review the regenerated routers here. A departing target whose publisher is authorized per repository (PyPI's trusted publishing) needs the new repository registered before its next release, and a publish that failed for want of it is retried with `rlsbl release retry --watch`, never by burning a version.
 
 Extract keeps no state and has no resume: everything before the source's commit is undone by deleting the target directory, and a failure in the source's step restores every path it changed. Fix the cause, delete the target directory, and run it again.
 
