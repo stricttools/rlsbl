@@ -17,3 +17,7 @@ context = "The release checkout sits inside the live repository, so Go found the
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
+candidate_sha = "ddc1aa61df0e2f04290ddba1c1c44c82e085e53d"
+
+[tree_hashes]
+"." = "eafa0698232744c4109238abe6257c4a3fcb2042"
