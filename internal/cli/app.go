@@ -64,7 +64,7 @@ func New(d Dependencies) (*strictcli.App, error) {
 	registerRewrite(r)
 	registerScaffold(r, d.Version)
 	registerWatch(r)
-	registerMonorepo(r)
+	registerMonorepo(r, d.Version)
 	registerStatus(r)
 	registerUnreleased(r)
 	registerTargets(r)
