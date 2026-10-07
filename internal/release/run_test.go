@@ -465,31 +465,69 @@ func TestAReleasePushNeverOverwritesACommitOriginGainedDuringTheRelease(t *testi
 	requireContains(t, err.Error(), "only fast-forwards")
 }
 
-func TestAResumeAfterTheChangelogIsFinalizedAdoptsNothing(t *testing.T) {
-	hygiene.Isolate(t)
-	keys, _, ready := failingDeploy(t)
-	testsupport.FakeGH(t, answers(validationAnswers("private"), releaseCreation("v0.5.0"))...)
-	repo := runRepo(t, keys, "proprietary", nil)
-	if out, err := releaseCommand(t, repo, false, false); err == nil {
-		t.Fatalf("the failing deploy did not stop the release:\n%s", out)
+// failingArchiveCommit is a commit-msg hook in repo refusing the release's
+// archive commit until the file it returns exists, so a release stops
+// after its changelog was finalized and before anything was tagged.
+func failingArchiveCommit(t *testing.T, repo *testsupport.Repo) (ready string) {
+	t.Helper()
+	ready = filepath.Join(t.TempDir(), "ready")
+	hook := fmt.Sprintf("#!/bin/sh\nif grep -q 'finalize release file' \"$1\" && [ ! -e %q ]; then echo 'the archive commit is refused' >&2; exit 1; fi\n", ready)
+	hooks := strings.TrimSpace(repo.Git("rev-parse", "--git-path", "hooks"))
+	if !filepath.IsAbs(hooks) {
+		hooks = repo.Path(hooks)
 	}
-	released := repo.Head()
+	mustNotFail(t, os.MkdirAll(hooks, 0o755))
+	mustNotFail(t, os.WriteFile(filepath.Join(hooks, "commit-msg"), []byte(hook), 0o755))
+	return ready
+}
+
+func TestAResumeAfterTheChangelogIsFinalizedLeavesLaterCommitsForTheNextRelease(t *testing.T) {
+	hygiene.Isolate(t)
+	testsupport.FakeGH(t, validationAnswers("public")...)
+	repo := runRepo(t, "", "MIT", nil)
+	ready := failingArchiveCommit(t, repo)
+	if out, err := releaseCommand(t, repo, false, false); err == nil || !strings.Contains(err.Error(), "finalize release file for 0.5.0") {
+		t.Fatalf("the refused archive commit did not stop the release: %v\n%s", err, out)
+	}
+	state, found := loadState(t, repo)
+	if !found || !state.Completed(release.StepChangelogFinalized) || state.Completed(release.StepTagged) {
+		t.Fatalf("the stopped release's state: %+v", state)
+	}
+	candidate := state.ReleaseCommit
 	late := repo.CommitFile("late.txt", "late\n", "a commit after the release stopped")
 	addEntry(t, repo, "portal", late)
-	if err := os.WriteFile(ready, nil, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	testsupport.FakeGH(t, validationAnswers("private")...)
+	mustNotFail(t, os.WriteFile(ready, nil, 0o644))
+	testsupport.FakeGH(t, answers(validationAnswers("public"), releaseCreation("v0.5.0"))...)
 	out, err := releaseCommand(t, repo, true, false)
-	if err == nil {
-		t.Fatalf("a resume past the finalized changelog adopted commits:\n%s", out)
-	}
-	requireContains(t, err.Error(), "changelog-finalized", late[:12], "move them off the release branch")
-	// The fix the refusal names: the commits moved off the release branch.
-	repo.Git("reset", "-q", "--hard", released)
-	out, err = releaseCommand(t, repo, true, false)
 	if err != nil {
-		t.Fatalf("the resume failed once the commits were moved off: %v\n%s", err, out)
+		t.Fatalf("a resume past the finalized changelog did not finish the release: %v\n%s", err, out)
+	}
+	if got := strings.TrimSpace(repo.Git("rev-parse", "v0.5.0^{commit}")); got != candidate {
+		t.Errorf("v0.5.0 tags %s, not the recorded candidate %s", got, candidate)
+	}
+	if remoteRef(t, repo, "refs/tags/v0.5.0") != candidate {
+		t.Errorf("origin's v0.5.0 is not the recorded candidate")
+	}
+	if remoteRef(t, repo, "refs/heads/main") != repo.Head() {
+		t.Errorf("origin's main is not the working tree's")
+	}
+	if _, _, code := testsupport.RunGit(t, repo.Dir, "merge-base", "--is-ancestor", late, "HEAD"); code != 0 {
+		t.Errorf("the later commit is no longer on main")
+	}
+	if strings.Contains(read(t, repo.Path(".strictmetadata/changelog/portal/0.5.0.jsonl")), late) {
+		t.Errorf("the released changelog carries the later commit's entry")
+	}
+	if !strings.Contains(read(t, repo.Path(".strictmetadata/changelog/portal/unreleased.jsonl")), late) {
+		t.Errorf("the later commit's entry is not left unreleased")
+	}
+	if !strings.Contains(out, late[:12]) {
+		t.Errorf("the resume did not name the commit it left for the next release:\n%s", out)
+	}
+	if _, found := loadState(t, repo); found {
+		t.Errorf("the in-progress state was left behind")
+	}
+	if changes(t, repo.Dir) != "" {
+		t.Errorf("the resume left the working tree changed:\n%s", changes(t, repo.Dir))
 	}
 }
 

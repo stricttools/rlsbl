@@ -154,6 +154,8 @@ A stopped release leaves its branch open, and work continues there: the fix comm
 
 Adoption has one condition, checked before anything changes: every adopted commit the release did not create has a changelog entry, or needs none under the rules [changelog coverage](changelog.md#validation) applies. An uncovered commit is refused by id and subject, with the `rlsbl changelog add` that records it. Read `git log` before resuming: another session's commit on the branch ships under this version.
 
+Once the release has finalized its changelog, the released version's changelog and the candidate CI verified are settled, and nothing is adopted any more: a resume finishes the release on the candidate the state records, and the commits made since it stopped stay on the branch, unreleased, their changelog entries waiting in `unreleased.jsonl` for the next release. The resume names them.
+
 While a state file exists, `rlsbl release run --watch` refuses and names `rlsbl release resume --watch`.
 
 ### Abandoning an attempt

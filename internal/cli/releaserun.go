@@ -35,8 +35,8 @@ const releaseResumeHelp = "Continue the release in progress of the releasable th
 	"every adopted commit, and refused otherwise before anything is written, naming the `rlsbl changelog add` that records each. A resume " +
 	"adopting commits after the CI verdict pushes the tip as the candidate and waits for CI again, so the tag is put on what CI verified; one " +
 	"adopting nothing past the verdict tags the commit the state records, which must still be on the branch. Once the changelog is " +
-	"finalized, nothing is adopted any more: a resume finding commits it did not make refuses, naming them, until they are off the release " +
-	"branch. A failed deploy or post-release " +
+	"finalized, nothing is adopted any more: the resume finishes the release on the candidate the state records, and the commits made " +
+	"since it stopped stay on the branch, named, for the next release. A failed deploy or post-release " +
 	"hook runs again. Before anything is written, the resume is refused what release validation refuses about the lifecycle and " +
 	"publishing: a releasable or member on hold or retired, a repository whose visibility disagrees with the lifecycle-and-license record, an " +
 	"output the publishing rules forbid, and a deploy command on a releasable that may not deploy. --dry-run reports what would be adopted " +

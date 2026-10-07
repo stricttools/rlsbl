@@ -383,12 +383,13 @@ func resumeIn(e *strictcli.Effects, s *Session, req RunRequest, releasable strin
 	if err != nil {
 		return err
 	}
-	if len(adopted) > 0 && state.Completed(StepChangelogFinalized) {
-		return &ValidationError{Message: strings.Join(append(append([]string{
-			fmt.Sprintf("the release of %s %s recorded %s, and commits it did not make appeared on %s since it stopped:", releasable, state.Version, StepChangelogFinalized, branch)},
-			subjectLines(live, adopted)...),
-			"",
-			fmt.Sprintf("The released changelog and the release archive of %s are committed for the candidate %s, so a resume adopts nothing any more: these commits belong to the next release. To resume, move them off the release branch first, then run `%s`.", state.Version, short(state.ReleaseCommit), runstate.ResumeInvocation)), "\n")}
+	// Once the changelog is finalized, the released version's changelog and
+	// the candidate CI verified are settled: commits made since belong to
+	// the next release, which their changelog entries wait for, and the
+	// resume finishes this one without them.
+	var deferred []string
+	if state.Completed(StepChangelogFinalized) {
+		deferred, adopted = adopted, nil
 	}
 	if err := RequireAdoptedCovered(repo, ws, releasable, adopted, version); err != nil {
 		return err
@@ -423,7 +424,13 @@ func resumeIn(e *strictcli.Effects, s *Session, req RunRequest, releasable strin
 		return err
 	}
 	if req.DryRun {
-		return previewResume(req, state, version, adopted, live)
+		return previewResume(req, state, version, adopted, deferred, live)
+	}
+	if len(deferred) > 0 {
+		req.Log(fmt.Sprintf("The changelog of %s is finalized, so the commits made since it stopped are left for the next release:", state.Version))
+		for _, line := range subjectLines(live, deferred) {
+			req.Log(line)
+		}
 	}
 	base := map[string]string{}
 	if s.Checkout != nil {
@@ -507,8 +514,14 @@ func resumeIn(e *strictcli.Effects, s *Session, req RunRequest, releasable strin
 
 // previewResume reports what a resume would adopt and the steps it would
 // take, writing nothing.
-func previewResume(req RunRequest, state runstate.InProgress, v semver.Version, adopted []string, live git.Repo) error {
+func previewResume(req RunRequest, state runstate.InProgress, v semver.Version, adopted, deferred []string, live git.Repo) error {
 	req.Log(fmt.Sprintf("Would resume the release of %s %s (%s) on %s", state.Releasable, v, state.Tag, state.Branch))
+	if len(deferred) > 0 {
+		req.Log(fmt.Sprintf("Would leave the commits made since it stopped for the next release, since the changelog of %s is finalized:", v))
+		for _, line := range subjectLines(live, deferred) {
+			req.Log(line)
+		}
+	}
 	if len(adopted) > 0 {
 		req.Log("Would adopt the commits made since it stopped:")
 		for _, line := range subjectLines(live, adopted) {
