@@ -47,7 +47,6 @@ func TestEmptyArgumentsAreRefused(t *testing.T) {
 	for _, argv := range [][]string{
 		{"release", "edit", ""},
 		{"release", "undo", "--version", "", "--approve-consequential"},
-		{"release", "undo", "--target", "", "--approve-consequential"},
 		{"release", "deprecate", "", "--approve-consequential"},
 		{"release", "yank", "0.4.0", "--reason", "", "--approve-consequential"},
 		{"release", "deprecate", "0.4.0", "--use", "", "--approve-consequential"},
@@ -75,7 +74,6 @@ func TestTheOperationsThroughTheApplication(t *testing.T) {
 		{[]string{"release", "edit", "0.9.0"}, "has no release archive"},
 		{[]string{"release", "deprecate", "v0.4.0", "--approve-consequential"}, `carries a leading "v"`},
 		{[]string{"release", "abandon", "--approve-consequential"}, "there is nothing to abandon"},
-		{[]string{"release", "undo", "--target", "npm", "--approve-consequential"}, "--target selects nothing"},
 		{[]string{"release", "retry", "--no-watch", "--approve-consequential"}, "holds no workflow with a workflow_dispatch trigger"},
 	} {
 		r := app.Test(c.argv)

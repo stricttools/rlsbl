@@ -126,15 +126,11 @@ func registerReleaseOps(r *commandSet) {
 		// commits on the release branch: only a person decides that.
 		consequential: true,
 		flags: []strictcli.Flag{
-			strictcli.StringFlag("target", "Refused: the version comes from the release archives, and the evidence is read from every target", strictcli.Optional()),
 			strictcli.StringFlag("version", "An earlier release to undo, bare (0.3.0), without reverting its commits; the latest release when omitted", strictcli.Optional()),
 		},
 		run: func(ctx *strictcli.Context, kw map[string]any) (any, error) {
 			req := releaseops.UndoRequest{Now: time.Now}
 			var given bool
-			if req.Target, given = strictcli.GetOpt[string](kw, "target"); given && req.Target == "" {
-				return nil, emptyArgument("--target")
-			}
 			if req.Version, given = strictcli.GetOpt[string](kw, "version"); given && req.Version == "" {
 				return nil, emptyArgument("--version")
 			}

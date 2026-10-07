@@ -29,10 +29,6 @@ type UndoRequest struct {
 	// Version names an earlier release to undo, and is empty for the
 	// latest release.
 	Version string
-	// Target is the --target flag, empty when not passed. Undo reads the
-	// version from the release archives and the evidence from every target
-	// of the releasable, so a target selects nothing and is refused.
-	Target string
 	// Now is the clock the audit line is stamped with.
 	Now func() time.Time
 }
@@ -89,9 +85,6 @@ type undoPlan struct {
 // writes nothing, and an audit line recording the plan and its evidence is
 // written and committed before the first deletion.
 func Undo(ctx *strictcli.Context, req UndoRequest) (err error) {
-	if req.Target != "" {
-		return fmt.Errorf("--target selects nothing in `release undo`: the version comes from the release archives, and the evidence is read from every target of the releasable, so one target cannot narrow it. Run the undo without --target")
-	}
 	if req.Now == nil {
 		return errors.New("an undo needs a clock to stamp its audit line with")
 	}

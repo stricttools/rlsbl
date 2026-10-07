@@ -66,7 +66,7 @@ func TestAmendRewritesTheReleaseAndAFailedRewriteNamesReleaseEdit(t *testing.T) 
 	}
 }
 
-func TestAmendRefusesIDAndEditTakesIt(t *testing.T) {
+func TestAmendDeclaresNoIDAndEditTakesIt(t *testing.T) {
 	hygiene.Isolate(t)
 	repo := releaseCommandsProject(t)
 	testsupport.FakeSafegit(t)
@@ -74,7 +74,7 @@ func TestAmendRefusesIDAndEditTakesIt(t *testing.T) {
 	app := appWith(t, testsupport.NewFakeHTTP(t))
 	id := strings.Repeat("0", 47) + "1"
 	r := app.Test([]string{"changelog", "amend", "--version", "0.4.0", "--commits", more, "--id", id, "--no-user-facing"})
-	if r.ExitCode != 1 || !strings.Contains(r.Stderr, "rlsbl changelog edit --id <id>") {
+	if r.ExitCode == 0 || !strings.Contains(r.Stderr, "--id") {
 		t.Fatalf("exit %d:\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
 	}
 	r = app.Test([]string{"changelog", "add", "--commits", more, "--no-user-facing"})

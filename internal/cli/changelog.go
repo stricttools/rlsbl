@@ -37,7 +37,7 @@ const changelogAmendHelp = "Append an entry to a released version's read-only <v
 	"CHANGELOG.md, commit both, and rewrite that version's GitHub Release from the record (as `rlsbl release edit <version>` does). The " +
 	"entry's checks are changelog add's; --no-validate-hashes takes the commits as given, unresolved and unchecked against the scope, for an " +
 	"old commit a rewrite took away. A version without a release archive, or with one stating no fate, is refused before anything is written; " +
-	"a version recorded never released has no GitHub Release to rewrite. --id is refused: an amend adds a new entry, whose id is minted."
+	"a version recorded never released has no GitHub Release to rewrite."
 
 const changelogEditHelp = "Change one existing entry, in unreleased.jsonl or a released version's file, as a sparse update: " +
 	"--description, --type, and --user-facing write those fields, --unset-description and --unset-type clear them, and every field not named " +
@@ -122,7 +122,6 @@ func registerChangelog(r *commandSet) {
 		flags: []strictcli.Flag{
 			strictcli.StringFlag("version", "The released version whose file is amended, bare (0.39.0)", strictcli.Required()),
 			strictcli.StringFlag("commits", "Comma-separated commit ids the entry describes", strictcli.Required()),
-			strictcli.StringFlag("id", "Refused: the amend adds a new entry, whose id is minted; `rlsbl changelog edit --id` changes an existing one", strictcli.Optional()),
 			strictcli.StringFlag("description", "The change in one line of markdown (required for a user-facing entry)", strictcli.Optional()),
 			strictcli.StringFlag("type", "What the change is (required for a user-facing entry)", strictcli.Optional(), entryTypeChoices),
 			strictcli.BoolFlag("user-facing", "Whether CHANGELOG.md and the release notes show the entry (user-facing when neither form is passed)", strictcli.Optional()),
@@ -236,9 +235,6 @@ func runChangelogAdd(ctx *strictcli.Context, kw map[string]any) (any, error) {
 }
 
 func runChangelogAmend(ctx *strictcli.Context, kw map[string]any) (any, error) {
-	if _, given := strictcli.GetOpt[string](kw, "id"); given {
-		return nil, fmt.Errorf("--id selects nothing here: `changelog amend` adds a new entry, whose id is minted when it is written. To change an existing entry, run `rlsbl changelog edit --id <id>`")
-	}
 	if err := requireNonEmpty(kw, "version"); err != nil {
 		return nil, err
 	}

@@ -65,7 +65,7 @@ Every changelog command holds the release lock around its reads and writes, so t
 | Command | What it does | Which file |
 | --- | --- | --- |
 | `rlsbl changelog add` | Appends a new entry. | `unreleased.jsonl` |
-| `rlsbl changelog amend --version <v>` | Appends a new entry to a released version. `--no-validate-hashes` takes the commits as given, for an old commit a rewrite took away. `--id` is refused: the new entry's id is minted. | `<v>.jsonl` |
+| `rlsbl changelog amend --version <v>` | Appends a new entry to a released version. `--no-validate-hashes` takes the commits as given, for an old commit a rewrite took away. The new entry's id is minted. | `<v>.jsonl` |
 | `rlsbl changelog edit` | Changes one entry's description, type, or user-facing value. | any |
 | `rlsbl changelog remove` | Deletes one entry. | any |
 | `rlsbl changelog remap` | Rewrites stale commit ids through a map of old commits to new. | every changelog file |

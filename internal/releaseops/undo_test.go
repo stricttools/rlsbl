@@ -242,16 +242,6 @@ func TestVersionNamingTheLatestReleaseIsRefusedUntilItIsOmitted(t *testing.T) {
 	requireExit(t, undo(t, p, testsupport.NewFakeHTTP(t, npmDocument("0.3.0")), true, releaseops.UndoRequest{}), 0)
 }
 
-func TestTargetIsRefused(t *testing.T) {
-	hygiene.Isolate(t)
-	p := portalWithTwoReleases(t)
-	r := undo(t, p, nil, true, releaseops.UndoRequest{Target: "npm"})
-	requireExit(t, r, 1)
-	requireContains(t, r.Stderr, "--target selects nothing", "without --target")
-	undoGH(t, "v0.4.0")
-	requireExit(t, undo(t, p, testsupport.NewFakeHTTP(t, npmDocument("0.3.0")), true, releaseops.UndoRequest{}), 0)
-}
-
 func TestUndoRefusesOffAReleaseBranchUntilItIsCheckedOut(t *testing.T) {
 	hygiene.Isolate(t)
 	p := portalWithTwoReleases(t)
