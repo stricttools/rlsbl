@@ -69,4 +69,8 @@ func TestMonorepoSyncUnderDryRunWritesAndCommitsNothing(t *testing.T) {
 	if status := repo.Git("status", "--porcelain"); status != "" {
 		t.Fatalf("a dry run changed the tree:\n%s", status)
 	}
+	// What the preview says names what the sync would do, never what it did.
+	if !strings.Contains(r.Stdout, "Would write .github/workflows/ci-router.yml") || strings.Contains(r.Stdout, "Wrote ") {
+		t.Fatalf("the preview does not say what it would write:\n%s", r.Stdout)
+	}
 }

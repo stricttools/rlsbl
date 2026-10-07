@@ -72,6 +72,8 @@ type SyncResult struct {
 	Written     []string     `json:"written"`
 	Removed     []string     `json:"removed"`
 	Committed   bool         `json:"committed"`
+	// DryRun is whether the writes and removals were previewed and not made.
+	DryRun bool `json:"dry_run"`
 }
 
 // SyncCommitMessage is the message of sync's commit.
@@ -173,7 +175,7 @@ func Sync(e *strictcli.Effects, w *workspace.Workspace, in SyncInputs) (SyncResu
 	if !w.IsWorkspace() {
 		return SyncResult{}, fmt.Errorf("`monorepo sync` generates a workspace's routers, and %s declares a standalone layout; a standalone repository's workflows are rendered by `rlsbl scaffold`", declarations.ReleasablesFile)
 	}
-	result := SyncResult{}
+	result := SyncResult{DryRun: in.DryRun}
 	names, err := ImportNames(w)
 	if err != nil {
 		return SyncResult{}, err

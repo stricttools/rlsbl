@@ -275,6 +275,8 @@ type graphPayload struct {
 	monorepo.Graph
 	Format string  `json:"format"`
 	Output *string `json:"output"`
+	// DryRun is whether the write to Output was previewed and not made.
+	DryRun bool `json:"dry_run"`
 }
 
 // depthOf is an optional --depth: -1 (any distance) when not passed, and a
@@ -303,7 +305,7 @@ func runMonorepoGraph(ctx *strictcli.Context, kw map[string]any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	p := graphPayload{Graph: g, Format: strictcli.Get[string](kw, "format")}
+	p := graphPayload{Graph: g, Format: strictcli.Get[string](kw, "format"), DryRun: ctx.DryRun()}
 	if output := optionalString(kw, "output"); output != "" {
 		text, err := g.Render(p.Format)
 		if err != nil {
@@ -344,8 +346,9 @@ func graphPayloadSchema() map[string]any {
 			"constraint": stringSchema(),
 			"scope":      stringSchema(),
 		})),
-		"format": map[string]any{"type": "string", "enum": []any{monorepo.FormatDot, monorepo.FormatTree}},
-		"output": nullableStringSchema(),
+		"format":  map[string]any{"type": "string", "enum": []any{monorepo.FormatDot, monorepo.FormatTree}},
+		"output":  nullableStringSchema(),
+		"dry_run": booleanSchema(),
 	})
 }
 
@@ -353,6 +356,9 @@ func renderGraph(payload any) string {
 	p, err := decodePayload[graphPayload](payload)
 	if err != nil {
 		return renderJSON(payload)
+	}
+	if p.Output != nil && p.DryRun {
+		return "Would write the graph to " + *p.Output
 	}
 	if p.Output != nil {
 		return "Wrote the graph to " + *p.Output

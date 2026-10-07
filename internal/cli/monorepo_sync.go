@@ -103,8 +103,9 @@ func syncPayloadSchema() map[string]any {
 			"written":   strs,
 			"removed":   strs,
 			"committed": map[string]any{"type": "boolean"},
+			"dry_run":   map[string]any{"type": "boolean"},
 		},
-		"required":             []any{"import_names", "written", "removed", "committed"},
+		"required":             []any{"import_names", "written", "removed", "committed", "dry_run"},
 		"additionalProperties": false,
 	}
 }
@@ -114,19 +115,25 @@ func renderSync(payload any) string {
 	if err != nil {
 		return renderJSON(payload)
 	}
+	declared, wrote, removed := "Declared", "Wrote", "Removed"
+	if p.DryRun {
+		declared, wrote, removed = "Would declare", "Would write", "Would remove"
+	}
 	var lines []string
 	for _, n := range p.ImportNames {
-		lines = append(lines, fmt.Sprintf("Declared import_name %q for %s", n.ImportName, n.Member))
+		lines = append(lines, fmt.Sprintf("%s import_name %q for %s", declared, n.ImportName, n.Member))
 	}
 	for _, f := range p.Written {
-		lines = append(lines, "Wrote "+f)
+		lines = append(lines, wrote+" "+f)
 	}
 	for _, f := range p.Removed {
-		lines = append(lines, "Removed "+f)
+		lines = append(lines, removed+" "+f)
 	}
 	switch {
 	case len(lines) == 0:
 		lines = append(lines, "The routers are current; nothing was written.")
+	case p.DryRun:
+		lines = append(lines, "Nothing would be committed: a preview makes no commit.")
 	case p.Committed:
 		lines = append(lines, "Committed: "+workflows.SyncCommitMessage)
 	default:

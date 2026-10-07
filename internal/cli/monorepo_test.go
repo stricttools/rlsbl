@@ -131,6 +131,13 @@ func TestMonorepoGraphThroughTheApplication(t *testing.T) {
 	if err != nil || !strings.HasPrefix(string(data), "digraph dependencies {") {
 		t.Fatalf("graph.dot: %v\n%s", err, data)
 	}
+	r = app.Test([]string{"monorepo", "graph", "--format", "dot", "--output", "preview.dot", "--dry-run"})
+	if r.ExitCode != 0 || !strings.Contains(r.Stdout, "Would write the graph to preview.dot") || strings.Contains(r.Stdout, "Wrote ") {
+		t.Fatalf("a dry run's graph output: exit %d\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
+	}
+	if _, err := os.Stat(repo.Path("preview.dot")); !os.IsNotExist(err) {
+		t.Fatalf("a dry run wrote preview.dot: %v", err)
+	}
 	if r := app.Test([]string{"monorepo", "graph", "--format", "tree", "--root", "gadget", "--depth=-1"}); r.ExitCode != 1 || !strings.Contains(r.Stderr, "--depth must not be negative") {
 		t.Fatalf("a negative depth: exit %d: %s", r.ExitCode, r.Stderr)
 	}
