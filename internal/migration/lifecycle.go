@@ -142,7 +142,8 @@ func releasableNames(d *declarations.Releasables) []string {
 }
 
 // githubRepository is the repository GitHub knows this one as, and its
-// origin as the confidential-name index keys it.
+// origin remote's URL, which the confidential-name index keys it by; the URL
+// is empty when the repository has no origin remote.
 func (b *builder) githubRepository(d *declarations.Releasables) (github.Repository, string, error) {
 	origin := ""
 	configured, err := b.repo.RemoteConfigured("origin")
@@ -157,9 +158,6 @@ func (b *builder) githubRepository(d *declarations.Releasables) (github.Reposito
 	repo, err := github.ResolveRepository(d.GitHubRepository, origin)
 	if err != nil {
 		return github.Repository{}, "", fmt.Errorf("the migration reads GitHub's visibility of the repository, and cannot name it: %w. Add the origin remote, then migrate", err)
-	}
-	if origin == "" {
-		origin = "https://github.com/" + repo.String()
 	}
 	return repo, origin, nil
 }
@@ -266,9 +264,14 @@ func (b *builder) convertLifecycle(d *declarations.Releasables) {
 		b.p.add("%v", err)
 		return
 	}
-	if len(names) == 0 {
+	switch {
+	case origin == "" && len(names) > 0:
+		b.p.add("the record makes the repository confidential, and the confidential-name index records a confidential repository's names under its origin remote, which this repository lacks. Add it (`git remote add origin <url>`), then migrate")
+	case origin == "":
+		// A public repository without an origin has no entry to remove.
+	case len(names) == 0:
 		b.plan.index = &indexEntry{origin: origin, remove: true}
-	} else {
+	default:
 		b.plan.index = &indexEntry{origin: origin, names: names}
 	}
 }

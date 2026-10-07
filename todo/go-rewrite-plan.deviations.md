@@ -542,6 +542,7 @@ Append-only companion to `todo/go-rewrite-plan.md`. Each entry records an implem
 - Old JSON records that name a field with the word rlsbl's sources may not spell (the first transition record's event key and an external check's form key) are read through a constant spelled from two literals in `internal/migration`, the exception the word guard leaves room for.
 - `scripts/list-rlsbl-repositories.sh` takes an optional `--root` (the walk's start, `~/Projects` when absent) and leaves out a marker its own repository ignores (a scratch copy of another repository).
 - A releasable's customized hook script is declared to run from the representative member's directory, where a releasable's hooks run: `bash <path>` relative to the depth its members share, or, when its members sit at several depths, `bash "$(git rev-parse --show-toplevel)/<path>"`, since no one relative path reaches the script from every member.
+- A repository without an origin remote is refused when its migrated record makes it confidential, naming `git remote add origin`, as the `transition` commands refuse it; a public one without an origin has no index entry to remove, and none is keyed by a URL made up from the GitHub repository.
 - Changelog coverage: as with the earlier Go commits of this campaign, these commits carry no changelog entry.
 
 ## Release, part two
