@@ -139,7 +139,13 @@ func BuildBumpPlan(in BumpPlanInputs) (BumpPlan, error) {
 				return BumpPlan{}, err
 			}
 		}
-		for _, m := range versioned {
+		// The representative's versions are written first and the other
+		// members' synced after, the order the Python planned them in.
+		bumped := append([]declarations.Member(nil), versioned...)
+		sort.SliceStable(bumped, func(i, j int) bool {
+			return bumped[i].Name == in.Representative && bumped[j].Name != in.Representative
+		})
+		for _, m := range bumped {
 			ts, err := targets.MemberTargets(root, m)
 			if err != nil {
 				return BumpPlan{}, err
