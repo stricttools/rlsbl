@@ -1,0 +1,2 @@
+# rlsbl's checks registry, read by strictcli's check framework.
+app = "rlsbl"
