@@ -24,7 +24,7 @@ import (
 func scaffoldedChecks() []check {
 	return []check{
 		errorCheck("publish-mode-workflow", checkPublishModeWorkflow),
-		errorCheck("scaffold-conflicts", checkScaffoldConflicts),
+		repositoryWide(errorCheck("scaffold-conflicts", checkScaffoldConflicts)),
 		errorCheck("scaffold-unreplaced-vars", checkScaffoldUnreplacedVars),
 		warnCheck("scaffold-gitignore-stale", checkScaffoldGitignoreStale),
 	}

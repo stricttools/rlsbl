@@ -607,13 +607,16 @@ func (x *execution) changelogPreflight() error {
 	return x.runPreflight(x.representative, sel, "Changelog preflight")
 }
 
-// preflight runs every member's preflight selection.
+// preflight runs every member's preflight selection, a check answering for
+// the whole repository once.
 func (x *execution) preflight() error {
-	for _, m := range sortedMembers(x.ws.MembersOf(x.releasable.Name)) {
-		sel, err := PreflightSelectionFor(x.releasable, m)
-		if err != nil {
-			return err
-		}
+	members := sortedMembers(x.ws.MembersOf(x.releasable.Name))
+	sels, err := PreflightSelectionsFor(x.releasable, members)
+	if err != nil {
+		return err
+	}
+	for i, m := range members {
+		sel := sels[i]
 		if sel.TestsReplacedBy != "" {
 			x.req.Log(fmt.Sprintf("The pre-release hook %s declares runs instead of the built-in tests of %s; every other preflight check runs", sel.TestsReplacedBy, m.Name))
 		}

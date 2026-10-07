@@ -435,6 +435,7 @@ Append-only companion to `todo/go-rewrite-plan.md`. Each entry records an implem
 - Not ported, with their rulings: the snapshot step, the mirror steps, the blog body, the pre-release channel, the asset upload, and the old deploy; the `CF_ACCOUNT_ID` alias of the environment file, which only the dropped Cloudflare pipeline read.
 - The step table (`release.Steps`) declares plan entries for the version-bumped step only; the committed and candidate-pushed steps are left for the release's execution to declare.
 - Changelog coverage: as with the earlier Go commits of this campaign, these commits carry no changelog entry. Coordinator step: the package's tests have not been compiled or run.
+- A preflight check that reads only the repository as a whole (`checks.SameInEveryMember`: `strictcode`, `lifecycle-record-valid`, `confidential-names`, `repository-visibility`, and `scaffold-conflicts`, each marked where package checks implements it) runs once per release, in the first member's preflight (`release.PreflightSelectionsFor`), where it ran once per member of the releasable, `strictcode analyze` included. The scope `repository` does not decide it: `test-suite` carries that scope and runs each member's own tests. Test: `TestARepositoryScopedPreflightCheckRunsOncePerRelease`.
 
 ## Changelog and transition commands
 

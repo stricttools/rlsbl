@@ -23,9 +23,9 @@ import (
 // for the whole repository.
 func lifecycleChecks() []check {
 	return []check{
-		errorCheck("lifecycle-record-valid", checkLifecycleRecordValid),
-		errorCheck("confidential-names", checkConfidentialNames),
-		errorCheck("repository-visibility", checkRepositoryVisibility),
+		repositoryWide(errorCheck("lifecycle-record-valid", checkLifecycleRecordValid)),
+		repositoryWide(errorCheck("confidential-names", checkConfidentialNames)),
+		repositoryWide(errorCheck("repository-visibility", checkRepositoryVisibility)),
 	}
 }
 

@@ -100,10 +100,35 @@ func preflightSelection(registry []byte, r declarations.Releasable, m declaratio
 	return sel, nil
 }
 
-// PreflightSelectionFor is preflightSelection over the checks registry rlsbl
-// ships.
-func PreflightSelectionFor(r declarations.Releasable, m declarations.Member) (PreflightSelection, error) {
-	return preflightSelection(checks.Registry, r, m)
+// preflightSelections are the preflight selections of the members of
+// releasable r, in the order given: a check that answers alike in every
+// member (checks.SameInEveryMember: strictcode analyzes the whole
+// repository) is kept in the first member's selection only.
+func preflightSelections(registry []byte, r declarations.Releasable, members []declarations.Member) ([]PreflightSelection, error) {
+	out := make([]PreflightSelection, 0, len(members))
+	for i, m := range members {
+		sel, err := preflightSelection(registry, r, m)
+		if err != nil {
+			return nil, err
+		}
+		if i > 0 {
+			kept := sel.Checks[:0]
+			for _, name := range sel.Checks {
+				if !checks.SameInEveryMember(name) {
+					kept = append(kept, name)
+				}
+			}
+			sel.Checks = kept
+		}
+		out = append(out, sel)
+	}
+	return out, nil
+}
+
+// PreflightSelectionsFor is preflightSelections over the checks registry
+// rlsbl ships.
+func PreflightSelectionsFor(r declarations.Releasable, members []declarations.Member) ([]PreflightSelection, error) {
+	return preflightSelections(checks.Registry, r, members)
 }
 
 // changelogPreflightSelection is the checks a release runs on the

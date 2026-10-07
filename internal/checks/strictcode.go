@@ -43,7 +43,7 @@ const StrictcodeInstall = "go install github.com/smm-h/strictcode/cmd/strictcode
 
 // The strictcode check family: one check, running the strictcode on PATH.
 func strictcodeChecks() []check {
-	return []check{errorCheck("strictcode", checkStrictcode)}
+	return []check{repositoryWide(errorCheck("strictcode", checkStrictcode))}
 }
 
 // strictcodeEnvelope is the part of strictcli's machine-mode document the

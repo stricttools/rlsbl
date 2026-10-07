@@ -102,6 +102,30 @@ type check struct {
 	// reportsLoadErrors marks a check that reports unreadable declarations
 	// or options itself instead of refusing to answer.
 	reportsLoadErrors bool
+	// sameInEveryMember marks a check that reads only the repository as a
+	// whole, so it answers alike from every member: a release runs it once,
+	// not once per member.
+	sameInEveryMember bool
+}
+
+// repositoryWide is c marked sameInEveryMember.
+func repositoryWide(c check) check {
+	c.sameInEveryMember = true
+	return c
+}
+
+// SameInEveryMember reports whether the check rlsbl implements under name
+// answers alike from every member of the repository; false for a name it
+// does not implement (a declared external check).
+func SameInEveryMember(name string) bool {
+	for _, family := range families {
+		for _, c := range family() {
+			if c.name == name {
+				return c.sameInEveryMember
+			}
+		}
+	}
+	return false
 }
 
 func errorCheck(name string, run func(*Context, *strictcli.ErrorReporter) strictcli.CheckOutcome) check {

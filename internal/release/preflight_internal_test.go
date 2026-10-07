@@ -208,3 +208,28 @@ func TestTheChangelogPreflightIsEveryChangelogCheckOfItsTag(t *testing.T) {
 		t.Error("a registry tagging no changelog check was accepted")
 	}
 }
+
+func TestARepositoryScopedPreflightCheckRunsOncePerRelease(t *testing.T) {
+	hygiene.Isolate(t)
+	members := []declarations.Member{
+		{Path: "widget", Name: "widget", Releasable: "kit"},
+		{Path: "gadget", Name: "gadget", Releasable: "kit"},
+	}
+	sels, err := preflightSelections(checks.Registry, declarations.Releasable{Name: "kit"}, members)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sels) != 2 {
+		t.Fatalf("%d selections for 2 members", len(sels))
+	}
+	for _, repositoryWide := range []string{"strictcode", "lifecycle-record-valid", "confidential-names", "scaffold-conflicts"} {
+		if !contains(sels[0].Checks, repositoryWide) || contains(sels[1].Checks, repositoryWide) {
+			t.Errorf("%s does not run once: first member %v, second %v", repositoryWide, sels[0].Checks, sels[1].Checks)
+		}
+	}
+	for _, perMember := range []string{"test-suite", "upload-private-paths"} {
+		if !contains(sels[0].Checks, perMember) || !contains(sels[1].Checks, perMember) {
+			t.Errorf("%s does not run for each member: %v, %v", perMember, sels[0].Checks, sels[1].Checks)
+		}
+	}
+}
