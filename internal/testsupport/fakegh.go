@@ -21,6 +21,25 @@ type GHAnswer struct {
 	Exit   int      `json:"exit"`
 }
 
+// GHAnyArg, as an element of GHAnswer.Args, matches any one argument: an
+// answer to a question whose argv carries a commit the test cannot know
+// before the code under test makes it.
+const GHAnyArg = "\x00any-argument"
+
+// argsMatch reports whether args is the answer's argv, GHAnyArg matching
+// any one argument.
+func argsMatch(pattern, args []string) bool {
+	if len(pattern) != len(args) {
+		return false
+	}
+	for i := range pattern {
+		if pattern[i] != GHAnyArg && pattern[i] != args[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // GHCall is one invocation the fake gh received.
 type GHCall struct {
 	Args  []string `json:"args"`
@@ -55,8 +74,9 @@ type GH struct {
 //		os.Exit(m.Run())
 //	}
 //
-// Answers are matched on the whole argv. When several answers share one
-// argv, each call takes the next, and the last one keeps answering. An argv
+// Answers are matched on the whole argv, an argument GHAnyArg matching any
+// one argument. When several answers match one argv, each call of that argv
+// takes the next, and the last one keeps answering. An argv
 // no answer covers exits 97 and names itself on stderr, and Calls records it
 // like every other invocation.
 func FakeGH(t testing.TB, answers ...GHAnswer) *GH {
@@ -136,7 +156,7 @@ func FakeGHMain() int {
 	}
 	var matching []GHAnswer
 	for _, a := range answers {
-		if slices.Equal(a.Args, args) {
+		if argsMatch(a.Args, args) {
 			matching = append(matching, a)
 		}
 	}
