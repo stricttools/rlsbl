@@ -1,24 +1,30 @@
-# strictspec schema for the RECONCILE PLAN file written by
-# `rlsbl release reconcile --plan` and consumed by
-# `rlsbl release reconcile --apply`.
+# strictspec schema for the reconcile plan,
+# .strictmetadata/.release-state/<releasable>/reconcile-plan.toml, written by
+# `rlsbl release reconcile --mode plan` and consumed by
+# `rlsbl release reconcile --mode apply`.
 #
-# The plan is the preview's output artifact and the apply step's only input.
-# It records what was observed, what each subject's verdict was, and a digest of
-# the world the verdicts were computed from -- the apply re-observes and refuses
-# when that digest no longer matches, so a plan can never be applied against a
-# remote that moved under it.
+# The plan is the preview's output and the apply's only input. It records
+# what was observed, each subject's verdict, and a digest of the world the
+# verdicts were computed from: the apply observes again and refuses when that
+# digest no longer matches, so a plan is never applied against a remote that
+# moved under it.
 
 name = "rlsbl-reconcile-plan"
 meta_version = 1
-format_version = 1
+format_version = 2
 document_syntax = "toml"
 role = "schema"
 root = "ReconcilePlan"
-targets = ["python"]
-description = "The observed plan `rlsbl release reconcile --apply` consumes: one verdict per release ref or GitHub Release, plus a digest of the world they were judged against."
+description = "The observed plan `rlsbl release reconcile --mode apply` consumes: one verdict per release ref or GitHub Release, plus a digest of the world they were judged against."
 
 [types.ReconcilePlan]
 type = "record"
+
+[types.ReconcilePlan.fields.format_version]
+type = "literal"
+value = 2
+required = true
+description = "The document's format version."
 
 [types.ReconcilePlan.fields.generated_at]
 type = "string"
@@ -54,11 +60,11 @@ required = true
 non_empty = true
 description = "The subject judged: a ref name, or `release:<tag>` for a GitHub Release."
 
-[types.PlanItem.fields.kind]
+[types.PlanItem.fields.subject_type]
 type = "enum"
 required = true
 values = ["ref", "release"]
-description = "Which kind of subject this item judges."
+description = "What the item judges: a ref, or a GitHub Release."
 
 [types.PlanItem.fields.state]
 type = "enum"

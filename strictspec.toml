@@ -10,9 +10,9 @@ format_version = 1
 path = ".strictspec/release-file.schema.toml"
 
   [[schemas.targets]]
-  lang    = "python"
-  output  = "rlsbl/strictspec_gen/release_file_validator.py"
-  package = "rlsbl.strictspec_gen"
+  lang    = "go"
+  output  = "internal/releaserecord/releasefilespec/rlsbl_release_file_gen.go"
+  package = "releasefilespec"
 
 [[schemas]]
 path = ".strictspec/config.schema.toml"
@@ -42,17 +42,17 @@ path = ".strictspec/changelog-entry-commit-mode.schema.toml"
 path = ".strictspec/transition-record-event.schema.toml"
 
   [[schemas.targets]]
-  lang    = "python"
-  output  = "rlsbl/strictspec_gen/transition_record_event_validator.py"
-  package = "rlsbl.strictspec_gen"
+  lang    = "go"
+  output  = "internal/releaserecord/transitionspec/rlsbl_transition_record_event_gen.go"
+  package = "transitionspec"
 
 [[schemas]]
 path = ".strictspec/reconcile-plan.schema.toml"
 
   [[schemas.targets]]
-  lang    = "python"
-  output  = "rlsbl/strictspec_gen/reconcile_plan_validator.py"
-  package = "rlsbl.strictspec_gen"
+  lang    = "go"
+  output  = "internal/historyrewrite/reconcileplanspec/rlsbl_reconcile_plan_gen.go"
+  package = "reconcileplanspec"
 
 [[schemas]]
 path = ".strictspec/releasables.schema.toml"

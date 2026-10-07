@@ -1,204 +1,142 @@
-# strictspec schema for one rlsbl TRANSITION RECORD line.
-# Source of truth: rlsbl/transition_record.py (the event dataclasses and read_events).
-# One document = one JSONL line = one transition record event.
+# strictspec schema for one line of the transition record,
+# .strictmetadata/transitions/transitions.jsonl: one repository-surgery fact
+# per line, selected by `event`. The record holds surgery only; renames,
+# identities, closed release histories, and tags outside the version model
+# are facts of the lifecycle-and-license record.
 #
-# WHAT A TRANSITION RECORD IS: a committed, append-only log of repository-surgery
-# FACTS -- what a conversion did, which tags were renamed, which commits a
-# history rewrite moved. It is written once by the operation that performed the
-# surgery -- or, for the two kinds no surgery writes (`non-version-tag` and
-# `release-history-closed`), declared by an operator through
-# `rlsbl transition record` -- and read afterwards by anything that needs to
-# explain how the repository got to its current shape. It records history; it
-# never drives it.
-#
-# SCOPE: strictspec owns the raw DOCUMENT SHAPE -- the per-line format_version
-# gate, the `kind` discriminator and its arm set, field types, enums, required
-# fields, and unknown-key rejection. rlsbl keeps everything strictspec cannot
-# see native: whether a recorded SHA still resolves in this repository, whether
-# a recorded tag still exists, and any cross-event correlation (`related_to`
-# pointing at an event id in the same or another file).
-#
-# RENAME VERSUS IDENTITY -- the line every reader of this record must hold.
-#
-# A RENAME is a tag-SPELLING fact. A releasable renamed from `widget` to
-# `gadget` changes what its future tags are called and nothing a consumer
-# resolves by: the artifacts already published keep the names they were
-# published under, and the versions released under the old spelling are still
-# those versions. It is bookkeeping. `rlsbl release reconcile`'s refusal to
-# recreate an older ref does NOT match on it, and a `tag-map` or
-# `boundary-alias` event is the record that explains it.
-#
-# An IDENTITY change is a change to the string CONSUMERS RESOLVE BY -- a Go
-# module path, a registry package name, a repository URL. Recreating an older
-# release's ref after one of those would publish a version that shipped under
-# the OLD identity under the NEW one, for the first time and permanently. That
-# is what `identity-transition` records, and reconcile's
-# `refuse-identity-mismatch` matches on it with ZERO exceptions: there is no
-# facet, no version and no operator flag that turns the refusal off.
-#
-# The two are recorded by different kinds on purpose, and a rename must never
-# be written as an `identity-transition` to "be safe": doing so would make
-# reconcile refuse to repair refs it is entitled to repair, permanently.
-#
-# `releasable-rename` is on the SPELLING side of that line, with `tag-map` and
-# `boundary-alias`. It records that a releasable group changed its name, which
-# changes what its future tags are called and nothing a consumer resolves by --
-# so `rlsbl release reconcile`'s `refuse-identity-mismatch` must NOT match on
-# it, exactly as it does not match on the other two.
+# The generated Go validator (internal/releaserecord/transitionspec) checks
+# each line; internal/releaserecord checks what one line cannot show: the
+# uniqueness of ids across the file.
 
 name = "rlsbl-transition-record-event"
 meta_version = 1
-format_version = 1
+format_version = 2
 document_syntax = "jsonl"
 role = "schema"
-root = "TransitionRecordEvent"
-targets = ["python"]
-description = "One JSONL transition record line: a single repository-surgery fact, discriminated by `kind`."
-
-# ---------------------------------------------------------------------------
-# Shared scalar refinements
-# ---------------------------------------------------------------------------
+root = "TransitionEvent"
+description = "One transition record line: a single repository-surgery fact, selected by `event`."
 
 [types.GitSha]
 type = "string"
-regex = "^[0-9a-f]{7,40}$"
-description = "A git commit hash, abbreviated (>= 7) or full (40). Transition record writers always record the FULL 40-character form; the shorter bound exists so a hand-written record is readable rather than rejected. Resolution against the object database is rlsbl-native, not a shape check."
+regex = "^[0-9a-f]{7,64}$"
+description = "A git commit id: full (40 hexadecimal digits, or 64 in a SHA-256 repository) or abbreviated to at least 7. Writers record the full form."
 
-# ---------------------------------------------------------------------------
-# Shared records
-# ---------------------------------------------------------------------------
-
-[types.TransitionRecordEndpoint]
+[types.Endpoint]
 type = "record"
-description = "One side of a conversion: which repository, and which slice of it."
+description = "One side of a conversion: which repository, and which part of it."
 
-[types.TransitionRecordEndpoint.fields.repo]
+[types.Endpoint.fields.repo]
 type = "string"
 required = true
 non_empty = true
-description = "Repository identity. A remote URL for a repository other than the one holding this record, or \".\" for this repository itself."
+description = "The repository: a remote URL for a repository other than the one holding this record, or \".\" for this repository."
 
-[types.TransitionRecordEndpoint.fields.path]
-type = "string"
-required = false
-description = "Repo-relative subtree path of this endpoint. Absent means the repository root (a standalone repo). Present means a monorepo sub-project directory."
-
-[types.TransitionRecordEndpoint.fields.project]
+[types.Endpoint.fields.path]
 type = "string"
 required = false
 non_empty = true
-description = "Workspace project name at this endpoint, when the endpoint is inside an rlsbl workspace."
+description = "The repository-relative directory of this side; absent means the repository root."
 
-[types.TransitionRecordEndpoint.fields.releasable]
+[types.Endpoint.fields.project]
 type = "string"
 required = false
 non_empty = true
-description = "Releasable group name at this endpoint, when the endpoint's versioning is owned by a releasable."
+description = "The workspace member name at this side, when it is inside a workspace."
 
-[types.TransitionRecordEndpoint.fields.tag_format]
+[types.Endpoint.fields.releasable]
 type = "string"
 required = false
 non_empty = true
-description = "The tag format in effect at this endpoint (e.g. \"v{version}\" standalone, \"{name}@v{version}\" in a workspace). Recorded because a conversion is exactly where it changes."
+description = "The releasable name at this side, when a releasable versions it."
+
+[types.Endpoint.fields.tag_format]
+type = "string"
+required = false
+non_empty = true
+description = "The tag format in effect at this side; a conversion is where it changes."
 
 [types.TagMapping]
 type = "record"
-description = "One old-tag -> new-tag correspondence."
+description = "One old-tag to new-tag correspondence."
 
 [types.TagMapping.fields.old_tag]
 type = "string"
 required = true
 non_empty = true
-description = "The tag name as it existed before the conversion."
+description = "The tag as it was before the conversion."
 
 [types.TagMapping.fields.new_tag]
 type = "string"
 required = true
 non_empty = true
-description = "The tag name after the conversion."
+description = "The tag after the conversion."
 
 [types.TagMapping.fields.old_commit]
 type = "GitSha"
 required = false
-description = "The commit the old tag pointed at, in the PRE-rewrite object graph. Absent when the pre-rewrite graph is not available to the writer (e.g. tags imported from a remote that was never fetched in full)."
+description = "The commit the old tag pointed at in the history before the rewrite; absent when the writer did not have that history."
 
 [types.TagMapping.fields.new_commit]
 type = "GitSha"
 required = true
-description = "The commit the new tag points at, in THIS repository's object graph."
+description = "The commit the new tag points at in this repository."
 
-[types.ReleaseCommitMapping]
+[types.CommitMapping]
 type = "record"
-description = "One old-SHA -> new-SHA correspondence produced by a history rewrite."
+description = "One old-commit to new-commit correspondence a history rewrite produced."
 
-[types.ReleaseCommitMapping.fields.old_sha]
+[types.CommitMapping.fields.old_sha]
 type = "GitSha"
 required = true
-description = "The commit hash before the rewrite. Typically unresolvable in this repository afterwards -- that is the point of recording it."
+description = "The commit before the rewrite, usually no longer in this repository."
 
-[types.ReleaseCommitMapping.fields.new_sha]
+[types.CommitMapping.fields.new_sha]
 type = "GitSha"
 required = true
-description = "The commit hash after the rewrite."
+description = "The commit after the rewrite."
 
 [types.BoundaryAlias]
 type = "record"
-description = "One alias tag created at a conversion point so a pre-conversion version stays addressable under the post-conversion naming."
+description = "One alias tag created at a boundary."
 
 [types.BoundaryAlias.fields.alias_tag]
 type = "string"
 required = true
 non_empty = true
-description = "The alias tag name created (in the post-conversion tag format)."
+description = "The alias tag created, in the tag format after the boundary."
 
 [types.BoundaryAlias.fields.aliased_tag]
 type = "string"
 required = true
 non_empty = true
-description = "The pre-existing tag the alias duplicates (in the pre-conversion tag format)."
+description = "The existing tag the alias duplicates, in the tag format before the boundary."
 
 [types.BoundaryAlias.fields.commit]
 type = "GitSha"
 required = true
 description = "The commit both tags point at."
 
-[types.SplitMapping]
-type = "record"
-description = "One monorepo-commit -> subtree-split-commit correspondence."
-
-[types.SplitMapping.fields.source_sha]
-type = "GitSha"
-required = true
-description = "The commit in the monorepo's own history."
-
-[types.SplitMapping.fields.split_sha]
-type = "GitSha"
-required = true
-description = "The corresponding commit in the deterministic subtree split pushed to the mirror."
-
-# ---------------------------------------------------------------------------
-# Event arms
-#
-# Every arm repeats the four common fields (format_version, id, recorded_at,
-# kind) plus the optional `related_to`. They are repeated rather than factored
-# into a wrapper because `kind` is the discriminator and must sit at the
-# document root for the union to select an arm without an extra nesting level.
-# ---------------------------------------------------------------------------
-
 [types.ConversionEvent]
 type = "record"
-description = "A repository conversion: a sub-project extracted out of a workspace, or an external repository absorbed into one."
+description = "A repository conversion: a releasable extracted out of a workspace into a repository of its own, or an external repository absorbed into a workspace."
 
 [types.ConversionEvent.fields.format_version]
-type = "integer"
+type = "literal"
+value = 2
 required = true
-description = "Per-line format_version gate. Every line rlsbl writes carries 1."
+description = "The line's format version."
+
+[types.ConversionEvent.fields.event]
+type = "literal"
+value = "conversion"
+required = true
+description = "Which event the line records."
 
 [types.ConversionEvent.fields.id]
 type = "string"
 required = true
 non_empty = true
-description = "Stable identifier for this event, unique within the file. Other events reference it via `related_to`."
+description = "The event's identifier, unique within the file. rlsbl writes 16 hexadecimal digits of a nanosecond timestamp followed by 32 of a random UUID4. Other events name it in related_to."
 
 [types.ConversionEvent.fields.recorded_at]
 type = "datetime"
@@ -206,52 +144,54 @@ required = true
 datetime_kind = "offset"
 description = "When the event was appended (RFC 3339, with offset)."
 
-[types.ConversionEvent.fields.kind]
-type = "literal"
-value = "conversion"
-required = true
-
 [types.ConversionEvent.fields.related_to]
 type = "string"
 required = false
 non_empty = true
-description = "The id of an earlier event this one elaborates. Absent on a standalone event."
+description = "The id of an earlier event this one elaborates."
 
 [types.ConversionEvent.fields.direction]
 type = "enum"
 required = true
 values = ["extract", "absorb"]
-description = "\"extract\" moved a sub-project out of a workspace into its own repository; \"absorb\" moved an external repository in as a sub-project."
+description = "\"extract\" moved a releasable out of a workspace into its own repository; \"absorb\" moved an external repository in as a member."
 
 [types.ConversionEvent.fields.source]
-type = "TransitionRecordEndpoint"
+type = "Endpoint"
 required = true
 description = "Where the code came from."
 
 [types.ConversionEvent.fields.destination]
-type = "TransitionRecordEndpoint"
+type = "Endpoint"
 required = true
 description = "Where the code went."
 
 [types.ConversionEvent.fields.commit]
 type = "GitSha"
 required = true
-description = "The commit in THIS repository at which the conversion took effect -- the merge/rewrite commit for an absorb, the last pre-removal commit for an extract."
+description = "The commit in this repository at which the conversion took effect: the merge or rewrite commit of an absorb, the last commit before the removal of an extract."
 
 [types.TagMapEvent]
 type = "record"
-description = "The tag renames a conversion performed. Split from the conversion event because a conversion may rename hundreds of tags and the mapping is read on its own."
+description = "The tag renames a conversion performed, apart from the conversion event because one conversion may rename hundreds of tags."
 
 [types.TagMapEvent.fields.format_version]
-type = "integer"
+type = "literal"
+value = 2
 required = true
-description = "Per-line format_version gate. Every line rlsbl writes carries 1."
+description = "The line's format version."
+
+[types.TagMapEvent.fields.event]
+type = "literal"
+value = "tag-map"
+required = true
+description = "Which event the line records."
 
 [types.TagMapEvent.fields.id]
 type = "string"
 required = true
 non_empty = true
-description = "Stable identifier for this event, unique within the file."
+description = "The event's identifier, unique within the file. rlsbl writes 16 hexadecimal digits of a nanosecond timestamp followed by 32 of a random UUID4. Other events name it in related_to."
 
 [types.TagMapEvent.fields.recorded_at]
 type = "datetime"
@@ -259,39 +199,47 @@ required = true
 datetime_kind = "offset"
 description = "When the event was appended (RFC 3339, with offset)."
 
-[types.TagMapEvent.fields.kind]
-type = "literal"
-value = "tag-map"
-required = true
-
 [types.TagMapEvent.fields.related_to]
 type = "string"
 required = false
 non_empty = true
 description = "The id of the conversion event whose tags these are."
 
+[types.TagMapEvent.fields.releasable]
+type = "string"
+required = false
+non_empty = true
+description = "The releasable a workspace scopes this event to; absent when the event concerns the whole repository."
+
 [types.TagMapEvent.fields.mappings]
 type = "array"
 required = true
 min_len = 1
-description = "The tag renames. A tag-map event with no mappings is not a fact worth recording, so the array is non-empty."
+description = "The tag renames."
 [types.TagMapEvent.fields.mappings.item]
 type = "TagMapping"
 
 [types.ReleaseCommitRemapEvent]
 type = "record"
-description = "The commit correspondence a history rewrite produced. \"Release commit\" is any SHA another rlsbl record points at -- a changelog entry's commits, a tag's target, an earlier transition record event's commit -- which the rewrite invalidated."
+description = "The commit correspondence a history rewrite produced for the commits rlsbl's records name: release commits, changelog commits, and the commits of earlier events."
 
 [types.ReleaseCommitRemapEvent.fields.format_version]
-type = "integer"
+type = "literal"
+value = 2
 required = true
-description = "Per-line format_version gate. Every line rlsbl writes carries 1."
+description = "The line's format version."
+
+[types.ReleaseCommitRemapEvent.fields.event]
+type = "literal"
+value = "release-commit-remap"
+required = true
+description = "Which event the line records."
 
 [types.ReleaseCommitRemapEvent.fields.id]
 type = "string"
 required = true
 non_empty = true
-description = "Stable identifier for this event, unique within the file."
+description = "The event's identifier, unique within the file. rlsbl writes 16 hexadecimal digits of a nanosecond timestamp followed by 32 of a random UUID4. Other events name it in related_to."
 
 [types.ReleaseCommitRemapEvent.fields.recorded_at]
 type = "datetime"
@@ -299,56 +247,59 @@ required = true
 datetime_kind = "offset"
 description = "When the event was appended (RFC 3339, with offset)."
 
-[types.ReleaseCommitRemapEvent.fields.kind]
-type = "literal"
-value = "release-commit-remap"
-required = true
-
 [types.ReleaseCommitRemapEvent.fields.related_to]
 type = "string"
 required = false
 non_empty = true
 description = "The id of the conversion event whose rewrite produced this mapping."
 
+[types.ReleaseCommitRemapEvent.fields.releasable]
+type = "string"
+required = false
+non_empty = true
+description = "The releasable a workspace scopes this event to; absent when the event concerns the whole repository."
+
 [types.ReleaseCommitRemapEvent.fields.rewrite]
 type = "string"
 required = true
 non_empty = true
-description = "What performed the rewrite, in the writer's own words (e.g. \"git-filter-repo --to-subdirectory-filter\"). Free text: it explains the mapping to a human, it is never dispatched on."
+description = "What performed the rewrite, in the writer's own words. It explains the mapping to a reader and is never dispatched on."
 
 [types.ReleaseCommitRemapEvent.fields.mappings]
 type = "array"
 required = true
 min_len = 1
-description = "The old-SHA -> new-SHA pairs. Non-empty: a rewrite that moved nothing is not recorded."
+description = "The old-to-new commit pairs. A rewrite that moved nothing is not recorded."
 [types.ReleaseCommitRemapEvent.fields.mappings.item]
-type = "ReleaseCommitMapping"
+type = "CommitMapping"
 
 [types.DepartedGlobsEvent]
 type = "record"
-description = "Tag globs that stopped belonging to this repository because the sub-project they named was extracted. A reader that still sees tags matching a departed glob knows they are residue, not live releases."
+description = "Tag globs that stopped belonging to this repository because the releasable they named was extracted. A tag still matching one is what the releasable left behind, not a live release."
 
 [types.DepartedGlobsEvent.fields.format_version]
-type = "integer"
+type = "literal"
+value = 2
 required = true
-description = "Per-line format_version gate. Every line rlsbl writes carries 1."
+description = "The line's format version."
+
+[types.DepartedGlobsEvent.fields.event]
+type = "literal"
+value = "departed-globs"
+required = true
+description = "Which event the line records."
 
 [types.DepartedGlobsEvent.fields.id]
 type = "string"
 required = true
 non_empty = true
-description = "Stable identifier for this event, unique within the file."
+description = "The event's identifier, unique within the file. rlsbl writes 16 hexadecimal digits of a nanosecond timestamp followed by 32 of a random UUID4. Other events name it in related_to."
 
 [types.DepartedGlobsEvent.fields.recorded_at]
 type = "datetime"
 required = true
 datetime_kind = "offset"
 description = "When the event was appended (RFC 3339, with offset)."
-
-[types.DepartedGlobsEvent.fields.kind]
-type = "literal"
-value = "departed-globs"
-required = true
 
 [types.DepartedGlobsEvent.fields.related_to]
 type = "string"
@@ -360,30 +311,37 @@ description = "The id of the conversion event that made these globs depart."
 type = "array"
 required = true
 min_len = 1
-description = "The tag globs (in the same syntax rlsbl's tag_glob matching uses) that left."
+description = "The tag globs that left, each a tag format with its version replaced by '*'."
 [types.DepartedGlobsEvent.fields.globs.item]
 type = "string"
 non_empty = true
 
 [types.DepartedGlobsEvent.fields.destination]
-type = "TransitionRecordEndpoint"
+type = "Endpoint"
 required = true
-description = "The repository the globs went to, so a reader can follow them."
+description = "Where the releasable went."
 
 [types.BoundaryAliasEvent]
 type = "record"
-description = "Alias tags created at a conversion point. Historical releases keep their original tag names; the aliases make the version immediately before the conversion addressable under the new naming too."
+description = "Alias tags created at a conversion or a rename, so the version released just before it is addressable under the new tag format too. Earlier releases keep their original tags."
 
 [types.BoundaryAliasEvent.fields.format_version]
-type = "integer"
+type = "literal"
+value = 2
 required = true
-description = "Per-line format_version gate. Every line rlsbl writes carries 1."
+description = "The line's format version."
+
+[types.BoundaryAliasEvent.fields.event]
+type = "literal"
+value = "boundary-alias"
+required = true
+description = "Which event the line records."
 
 [types.BoundaryAliasEvent.fields.id]
 type = "string"
 required = true
 non_empty = true
-description = "Stable identifier for this event, unique within the file."
+description = "The event's identifier, unique within the file. rlsbl writes 16 hexadecimal digits of a nanosecond timestamp followed by 32 of a random UUID4. Other events name it in related_to."
 
 [types.BoundaryAliasEvent.fields.recorded_at]
 type = "datetime"
@@ -391,312 +349,42 @@ required = true
 datetime_kind = "offset"
 description = "When the event was appended (RFC 3339, with offset)."
 
-[types.BoundaryAliasEvent.fields.kind]
-type = "literal"
-value = "boundary-alias"
-required = true
-
 [types.BoundaryAliasEvent.fields.related_to]
 type = "string"
 required = false
 non_empty = true
 description = "The id of the conversion event these aliases mark the boundary of."
 
+[types.BoundaryAliasEvent.fields.releasable]
+type = "string"
+required = false
+non_empty = true
+description = "The releasable a workspace scopes this event to; absent when the event concerns the whole repository."
+
 [types.BoundaryAliasEvent.fields.aliases]
 type = "array"
 required = true
 min_len = 1
-description = "The alias tags created. Non-empty: an event recording no alias records nothing."
+description = "The alias tags created."
 [types.BoundaryAliasEvent.fields.aliases.item]
 type = "BoundaryAlias"
 
-[types.IdentityTransitionEvent]
-type = "record"
-description = "A change to a published identity of the project -- the string consumers use to depend on it -- effective from a stated version. A Go module path change is the archetype."
-
-[types.IdentityTransitionEvent.fields.format_version]
-type = "integer"
-required = true
-description = "Per-line format_version gate. Every line rlsbl writes carries 1."
-
-[types.IdentityTransitionEvent.fields.id]
-type = "string"
-required = true
-non_empty = true
-description = "Stable identifier for this event, unique within the file."
-
-[types.IdentityTransitionEvent.fields.recorded_at]
-type = "datetime"
-required = true
-datetime_kind = "offset"
-description = "When the event was appended (RFC 3339, with offset)."
-
-[types.IdentityTransitionEvent.fields.kind]
-type = "literal"
-value = "identity-transition"
-required = true
-
-[types.IdentityTransitionEvent.fields.related_to]
-type = "string"
-required = false
-non_empty = true
-description = "The id of the conversion event that forced the transition, when one did."
-
-[types.IdentityTransitionEvent.fields.facet]
-type = "enum"
-required = true
-values = ["go-module-path", "package-name", "releasable-name", "project-name", "tag-format", "repository-url"]
-description = "WHICH identity changed. A closed set on purpose: every arm names something a consumer or a tool resolves by, and adding a facet is a deliberate schema change, not an accident of free text."
-
-[types.IdentityTransitionEvent.fields.old]
-type = "string"
-required = true
-non_empty = true
-description = "The identity before the transition."
-
-[types.IdentityTransitionEvent.fields.new]
-type = "string"
-required = true
-non_empty = true
-description = "The identity after the transition."
-
-[types.IdentityTransitionEvent.fields.effective_version]
-type = "string"
-required = true
-non_empty = true
-description = "The project version from which the new identity is in effect. Releases at and after this version use `new`; releases before it use `old`."
-
-[types.PromotionSplitMapEvent]
-type = "record"
-description = "The subtree-split correspondence persisted when a mirror is promoted. Recorded because the split is deterministic but expensive to recompute, and a later reader needs to map a monorepo commit to the mirror commit that carries it."
-
-[types.PromotionSplitMapEvent.fields.format_version]
-type = "integer"
-required = true
-description = "Per-line format_version gate. Every line rlsbl writes carries 1."
-
-[types.PromotionSplitMapEvent.fields.id]
-type = "string"
-required = true
-non_empty = true
-description = "Stable identifier for this event, unique within the file."
-
-[types.PromotionSplitMapEvent.fields.recorded_at]
-type = "datetime"
-required = true
-datetime_kind = "offset"
-description = "When the event was appended (RFC 3339, with offset)."
-
-[types.PromotionSplitMapEvent.fields.kind]
-type = "literal"
-value = "promotion-split-map"
-required = true
-
-[types.PromotionSplitMapEvent.fields.related_to]
-type = "string"
-required = false
-non_empty = true
-description = "The id of a related event, when the promotion accompanies a conversion."
-
-[types.PromotionSplitMapEvent.fields.subtree_path]
-type = "string"
-required = true
-non_empty = true
-description = "The repo-relative path that was split out."
-
-[types.PromotionSplitMapEvent.fields.mirror_remote]
-type = "string"
-required = true
-non_empty = true
-description = "The remote URL the split was pushed to."
-
-[types.PromotionSplitMapEvent.fields.promoted_version]
-type = "string"
-required = false
-non_empty = true
-description = "The project version at which the promotion happened, when the promotion was tied to a release."
-
-[types.PromotionSplitMapEvent.fields.mappings]
-type = "array"
-required = true
-min_len = 1
-description = "The source-commit -> split-commit pairs. Non-empty: an empty split map records nothing."
-[types.PromotionSplitMapEvent.fields.mappings.item]
-type = "SplitMapping"
-
-[types.ReleaseHistoryClosedEvent]
-type = "record"
-description = "A member's or releasable's release history is deliberately CLOSED: no further releases are expected under it. The state it leaves behind -- a version file, a changelog directory, release archives -- is therefore a deliberate record rather than residue to clean up, and the reason says who decided that and why."
-
-[types.ReleaseHistoryClosedEvent.fields.format_version]
-type = "integer"
-required = true
-description = "Per-line format_version gate. Every line rlsbl writes carries 1."
-
-[types.ReleaseHistoryClosedEvent.fields.id]
-type = "string"
-required = true
-non_empty = true
-description = "Stable identifier for this event, unique within the file."
-
-[types.ReleaseHistoryClosedEvent.fields.recorded_at]
-type = "datetime"
-required = true
-datetime_kind = "offset"
-description = "When the event was appended (RFC 3339, with offset)."
-
-[types.ReleaseHistoryClosedEvent.fields.kind]
-type = "literal"
-value = "release-history-closed"
-required = true
-
-[types.ReleaseHistoryClosedEvent.fields.related_to]
-type = "string"
-required = false
-non_empty = true
-description = "The id of the conversion event that closed the history, when one did."
-
-[types.ReleaseHistoryClosedEvent.fields.subject]
-type = "string"
-required = true
-non_empty = true
-description = "WHOSE release history is closed: the releasable name, or the member name when the member is the unit that stopped releasing. A name, never a path -- the same vocabulary workspace.toml uses."
-
-[types.ReleaseHistoryClosedEvent.fields.reason]
-type = "string"
-required = true
-non_empty = true
-description = "Why the history is closed, in the operator's own words (e.g. \"extracted into its own repository\", \"superseded by <name>\", \"retired\"). Free text: it explains the decision to a human and to a later check, and is never dispatched on."
-
-[types.NonVersionTagEvent]
-type = "record"
-description = "A tag that is deliberately OUTSIDE the version model: not a release, not an alias of one, and not something any repair path should try to explain as either. Recorded so a reader enumerating the tag namespace can account for it instead of reporting it as an unexplained ref."
-
-[types.NonVersionTagEvent.fields.format_version]
-type = "integer"
-required = true
-description = "Per-line format_version gate. Every line rlsbl writes carries 1."
-
-[types.NonVersionTagEvent.fields.id]
-type = "string"
-required = true
-non_empty = true
-description = "Stable identifier for this event, unique within the file."
-
-[types.NonVersionTagEvent.fields.recorded_at]
-type = "datetime"
-required = true
-datetime_kind = "offset"
-description = "When the event was appended (RFC 3339, with offset)."
-
-[types.NonVersionTagEvent.fields.kind]
-type = "literal"
-value = "non-version-tag"
-required = true
-
-[types.NonVersionTagEvent.fields.related_to]
-type = "string"
-required = false
-non_empty = true
-description = "The id of an event that explains where the tag came from, when one does."
-
-[types.NonVersionTagEvent.fields.tag]
-type = "string"
-required = true
-non_empty = true
-description = "The tag name, exactly as it exists in the namespace. One tag per event: each is a separate operator decision, and a list would let one reason stand for several that were never decided together."
-
-[types.NonVersionTagEvent.fields.reason]
-type = "string"
-required = true
-non_empty = true
-description = "Why this tag is outside the version model, in the operator's own words (e.g. \"a nightly build marker\", \"an upstream vendor tag imported with the history\"). Free text: it explains the decision to a human, it is never dispatched on."
-
-[types.ReleasableRenameEvent]
-type = "record"
-description = "A releasable group was renamed. A tag-SPELLING fact, on the same side of the rename-versus-identity line as `tag-map` and `boundary-alias`: it changes what the releasable's future tags are called and nothing a consumer resolves by, so reconcile's `refuse-identity-mismatch` does not match on it. Written by `rlsbl monorepo rename-releasable` and declarable by an operator who renamed one another way."
-
-[types.ReleasableRenameEvent.fields.format_version]
-type = "integer"
-required = true
-description = "Per-line format_version gate. Every line rlsbl writes carries 1."
-
-[types.ReleasableRenameEvent.fields.id]
-type = "string"
-required = true
-non_empty = true
-description = "Stable identifier for this event, unique within the file."
-
-[types.ReleasableRenameEvent.fields.recorded_at]
-type = "datetime"
-required = true
-datetime_kind = "offset"
-description = "When the event was appended (RFC 3339, with offset)."
-
-[types.ReleasableRenameEvent.fields.kind]
-type = "literal"
-value = "releasable-rename"
-required = true
-
-[types.ReleasableRenameEvent.fields.related_to]
-type = "string"
-required = false
-non_empty = true
-description = "The id of a related event -- typically the `boundary-alias` event recording the alias tag the rename created at the current version."
-
-[types.ReleasableRenameEvent.fields.old_name]
-type = "string"
-required = true
-non_empty = true
-description = "The releasable's name before the rename, in the vocabulary workspace.toml uses. Historical releases keep the tags spelled with it."
-
-[types.ReleasableRenameEvent.fields.new_name]
-type = "string"
-required = true
-non_empty = true
-description = "The releasable's name after the rename. Future tags are spelled with it."
-
-[types.ReleasableRenameEvent.fields.reason]
-type = "string"
-required = true
-non_empty = true
-description = "Why the releasable was renamed, in the writer's own words. Free text: it explains the rename to a human, it is never dispatched on."
-
-# ---------------------------------------------------------------------------
-# The document root: one line is exactly one event, selected by `kind`.
-# ---------------------------------------------------------------------------
-
-[types.TransitionRecordEvent]
+[types.TransitionEvent]
 type = "discriminated-union"
-discriminator = "kind"
-description = "One transition record line. The `kind` field selects the arm; an unrecognized kind is a hard error, never a skipped line."
+discriminator = "event"
+description = "One transition record line. `event` selects the record type; an unrecognized event is refused, never skipped."
 
-[types.TransitionRecordEvent.arms.conversion]
+[types.TransitionEvent.arms.conversion]
 type = "ConversionEvent"
 
-[types.TransitionRecordEvent.arms.tag-map]
+[types.TransitionEvent.arms.tag-map]
 type = "TagMapEvent"
 
-[types.TransitionRecordEvent.arms.release-commit-remap]
+[types.TransitionEvent.arms.release-commit-remap]
 type = "ReleaseCommitRemapEvent"
 
-[types.TransitionRecordEvent.arms.departed-globs]
+[types.TransitionEvent.arms.departed-globs]
 type = "DepartedGlobsEvent"
 
-[types.TransitionRecordEvent.arms.boundary-alias]
+[types.TransitionEvent.arms.boundary-alias]
 type = "BoundaryAliasEvent"
-
-[types.TransitionRecordEvent.arms.identity-transition]
-type = "IdentityTransitionEvent"
-
-[types.TransitionRecordEvent.arms.promotion-split-map]
-type = "PromotionSplitMapEvent"
-
-[types.TransitionRecordEvent.arms.release-history-closed]
-type = "ReleaseHistoryClosedEvent"
-
-[types.TransitionRecordEvent.arms.non-version-tag]
-type = "NonVersionTagEvent"
-
-[types.TransitionRecordEvent.arms.releasable-rename]
-type = "ReleasableRenameEvent"
