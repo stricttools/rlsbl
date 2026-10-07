@@ -84,9 +84,11 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 		},
 		{
 			name: "a derived name that cannot name a directory", fixture: standalone,
-			breakIt: func(f *fixture) { f.write("package.json", `{"name": "@owner/portal", "version": "0.1.0", "license": "MIT"}`+"\n") },
-			want:    "holding name = ",
-			fix:     func(f *fixture) { f.write(".rlsbl/releasable.toml", "name = \"portal\"\n") },
+			breakIt: func(f *fixture) {
+				f.write("package.json", `{"name": "@owner/portal", "version": "0.1.0", "license": "MIT"}`+"\n")
+			},
+			want: "holding name = ",
+			fix:  func(f *fixture) { f.write(".rlsbl/releasable.toml", "name = \"portal\"\n") },
 		},
 		{
 			name: "an implicit-mode workspace", fixture: workspace,
@@ -238,7 +240,9 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 				f.write(".rlsbl-monorepo/releases/unreleased.toml", "[packages.widget]\nbump = \"minor\"\ndescription = \"More\"\ninclude = [\"npm\"]\nexclude = []\n")
 			},
 			want: "Hand edit: rename each [packages.<name>]",
-			fix:  func(f *fixture) { f.edit(".rlsbl-monorepo/releases/unreleased.toml", "[packages.widget]", "[releasables.widget]") },
+			fix: func(f *fixture) {
+				f.edit(".rlsbl-monorepo/releases/unreleased.toml", "[packages.widget]", "[releasables.widget]")
+			},
 		},
 		{
 			name: "per-member release state", fixture: workspace,
