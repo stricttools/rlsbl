@@ -228,7 +228,8 @@ func TestAPendingIdentityOfAnotherValueRefusesUntilItIsRemoved(t *testing.T) {
 	repo := portalProject(t)
 	other := "format_version = 1\n\n[[identities]]\nsubject = \"portal\"\nfacet = \"package-name\"\nvalue = \"portal-next\"\nregistry = \"npm\"\ntag_patterns = [\"v*\"]\neffective_version = \"0.1.0\"\nreason = \"an earlier plan\"\n"
 	repo.Write(lifecycle.ManifestFile, "owner = \"strictspec\"\n")
-	repo.CommitFile(lifecycle.RecordFile, other, "an earlier pending identity")
+	repo.Write(lifecycle.RecordFile, other)
+	repo.Commit("an earlier pending identity", lifecycle.ManifestFile, lifecycle.RecordFile)
 	_, err := renameProject(t, repo, true, "portal", "gateway")
 	if err == nil || !strings.Contains(err.Error(), `a pending package-name identity of portal, "portal-next" effective 0.1.0`) || !strings.Contains(err.Error(), "Delete that [[identities]] entry") {
 		t.Fatalf("%v", err)
