@@ -99,6 +99,7 @@ var forbidden = map[string][][]string{
 		{"git", "fetch", "--all"},
 		{"git", "fetch", "origin", "--tags"},
 		{"git", "fetch", "origin", "--prune"},
+		{"git", "fetch", "origin", "--quiet"},
 		{"git", "update-ref", "refs/heads/main", "HEAD"},
 		{"git", "commit", "-m", "x"},
 		{"git", "tag", "-a", "v1.0.0", "-m", "x"},
@@ -197,7 +198,7 @@ func TestTheReadsStillMatch(t *testing.T) {
 // covers the pinned argv and nothing shorter.
 func TestTheFetchIsRetainedByARulingThatStopsAtThePin(t *testing.T) {
 	hygiene.Isolate(t)
-	pinned := []string{"git", "fetch", "origin", "--quiet"}
+	pinned := []string{"git", "fetch", "origin", "--quiet", "--no-tags"}
 	hits := Matching(pinned)
 	if len(hits) != 1 {
 		t.Fatalf("the pinned fetch matches %d entries", len(hits))

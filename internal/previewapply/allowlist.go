@@ -39,7 +39,7 @@
 //     would put a secret on a pipe, into a buffer, or into a log.
 //
 // One entry stands against the ref-update ban by an explicit ruling: the
-// pinned `git fetch origin --quiet`. FETCH_HEAD and origin's remote-tracking
+// pinned `git fetch origin --quiet --no-tags`. FETCH_HEAD and origin's remote-tracking
 // refs are cache-like git plumbing no user workflow reads as state (deleting
 // them costs a re-fetch), unlike refs/heads or the index. The pin keeps the
 // ruling narrow: the short mutating forms (git fetch --prune, --tags, --all)
@@ -101,7 +101,7 @@ var Allowlist = []Entry{
 	{[]string{"git", "log"}, LocalRead, "reads commit history"},
 	{[]string{"git", "show"}, LocalRead, "reads an object"},
 	{[]string{"git", "describe"}, LocalRead, "names a commit from tags"},
-	{[]string{"git", "fetch", "origin", "--quiet"}, NetworkRead, "the one fetch the release flow needs; retained by explicit ruling against the ref-update ban because FETCH_HEAD and origin's remote-tracking refs are cache-like git plumbing no user workflow reads as state, unlike refs/heads or the index; pinned to this argv so the short mutating forms (--prune, --tags, --all) cannot match"},
+	{[]string{"git", "fetch", "origin", "--quiet", "--no-tags"}, NetworkRead, "the one fetch the release flow needs; retained by explicit ruling against the ref-update ban because FETCH_HEAD and origin's remote-tracking refs are cache-like git plumbing no user workflow reads as state, unlike refs/heads or the index; --no-tags keeps it from creating local tags (a plain fetch follows the tags on the commits it brings), and the argv is pinned so the short mutating forms (--prune, --tags, --all, or the fetch without --no-tags) cannot match"},
 	{[]string{"git", "--no-optional-locks", "diff"}, LocalRead, "compares trees; the flag keeps it off index.lock"},
 	{[]string{"git", "diff-tree"}, LocalRead, "compares two trees, no index"},
 	{[]string{"git", "--no-optional-locks", "diff-index"}, LocalRead, "compares a tree against the index; the flag keeps it from refreshing"},

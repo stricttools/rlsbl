@@ -87,12 +87,18 @@ var validationDay = time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC)
 
 func validate(t *testing.T, repo *testsupport.Repo, fake *testsupport.FakeHTTP, adjust func(*release.Request)) (*release.Validated, error) {
 	t.Helper()
+	return validateIn(t, false, repo, fake, adjust)
+}
+
+// validateIn validates as validate does, under --dry-run when dryRun is set.
+func validateIn(t *testing.T, dryRun bool, repo *testsupport.Repo, fake *testsupport.FakeHTTP, adjust func(*release.Request)) (*release.Validated, error) {
+	t.Helper()
 	if fake == nil {
 		fake = testsupport.NewFakeHTTP(t)
 	}
 	var v *release.Validated
 	var verr error
-	testsupport.RunCommand(t, testsupport.CommandOptions{Effect: strictcli.EffectMutating, Allowlist: previewapply.Prefixes(), HTTPClient: fake.Client()}, func(ctx *strictcli.Context) error {
+	testsupport.RunCommand(t, testsupport.CommandOptions{Effect: strictcli.EffectMutating, DryRun: dryRun, Allowlist: previewapply.Prefixes(), HTTPClient: fake.Client()}, func(ctx *strictcli.Context) error {
 		e := ctx.Effects()
 		gh, err := github.New(e)
 		if err != nil {
@@ -299,15 +305,32 @@ func TestATagOnOriginIsRefusedUntilDeletedThere(t *testing.T) {
 	repo.Git("push", "-q", "origin", "v0.5.0")
 	repo.Git("tag", "-d", "v0.5.0")
 	_, err := validate(t, repo, nil, nil)
-	if err == nil || !strings.Contains(err.Error(), "git push origin :refs/tags/v0.5.0") || !strings.Contains(err.Error(), "git tag -d v0.5.0") {
-		t.Fatalf("a tag on origin was not refused naming its deletion there and here: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "git push origin :refs/tags/v0.5.0") || strings.Contains(err.Error(), "git tag -d") {
+		t.Fatalf("a tag on origin was not refused naming its deletion there, and only there: %v", err)
 	}
-	// The fetch of origin copied the tag here; the refusal names both
-	// deletions, and both together clear it.
+	// The fetch of origin copies no tag here, so the deletion on origin
+	// alone clears the refusal.
 	repo.Git("push", "-q", "origin", ":refs/tags/v0.5.0")
-	repo.Git("tag", "-d", "v0.5.0")
 	_, err = validate(t, repo, nil, nil)
 	mustNotFail(t, err)
+}
+
+// The validation's fetch of origin follows no tag, so a dry run against an
+// origin holding a tag this repository lacks (on a commit the fetch brings)
+// creates no tag here.
+func TestADryRunCreatesNoTagFromOrigin(t *testing.T) {
+	hygiene.Isolate(t)
+	gitHub(t, "public", true)
+	repo := readyRepo(t, "")
+	repo.Git("tag", "-a", "-m", "a marker", "marker")
+	repo.Git("push", "-q", "origin", "marker")
+	repo.Git("tag", "-d", "marker")
+	before := repo.Git("tag", "--list")
+	_, err := validateIn(t, true, repo, nil, nil)
+	mustNotFail(t, err)
+	if after := repo.Git("tag", "--list"); after != before {
+		t.Fatalf("a dry run created tags here: before %q, after %q", before, after)
+	}
 }
 
 func TestABranchBehindOriginIsRefusedUntilPulled(t *testing.T) {

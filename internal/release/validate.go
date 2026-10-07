@@ -604,9 +604,9 @@ func refuseTagOnOrigin(repo git.Repo, tag string) error {
 		return refuse("whether origin already has the tag %s could not be read (%v); a release does not start without knowing its tag is free, so make origin reachable and run the release again", tag, err)
 	}
 	if found {
-		// The fetch of origin has already copied a tag on a fetched commit
-		// here, so a stale tag is deleted in both places.
-		return refuse("origin already has the tag %s, at %s: the version may already be released, or a stale tag is left on origin. Find out which; delete a stale tag on origin (git push origin :refs/tags/%s) and the copy the fetch of origin left here (git tag -d %s) before releasing", tag, commit, tag, tag)
+		// The fetch of origin follows no tag, so a tag only origin has is
+		// deleted there alone; a copy here is refused on its own.
+		return refuse("origin already has the tag %s, at %s: the version may already be released, or a stale tag is left on origin. Find out which; delete a stale tag on origin (git push origin :refs/tags/%s) before releasing", tag, commit, tag)
 	}
 	return nil
 }

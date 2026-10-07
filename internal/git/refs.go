@@ -323,11 +323,13 @@ func (r Repo) Push(remote string, u RefUpdate, timeout time.Duration) error {
 	return r.mutate(timeout, "push", "--no-verify", "--force-with-lease="+u.Ref+":"+u.Expected, remote, u.New+":"+u.Ref)
 }
 
-// FetchOrigin fetches origin's branches into the remote-tracking refs. It is
-// the one fetch rlsbl issues, spelled the way the observe allowlist admits
-// it, so it runs for real under --dry-run.
+// FetchOrigin fetches origin's branches into the remote-tracking refs, and
+// no tag: a fetch following tags would create local tags, which no preview
+// may do and which a release must never take from origin unasked. It is the
+// one fetch rlsbl issues, spelled the way the observe allowlist admits it,
+// so it runs for real under --dry-run.
 func (r Repo) FetchOrigin() error {
-	args := []string{"fetch", "origin", "--quiet"}
+	args := []string{"fetch", "origin", "--quiet", "--no-tags"}
 	res, err := r.read(networkTimeout, nil, args...)
 	if err != nil {
 		return err
