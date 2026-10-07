@@ -1,7 +1,7 @@
 {
   "version": "0.131.0",
   "base_url": "https://smmh.dev/rlsbl",
-  "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
+  "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, and the Go module proxy",
   "search_engine": "pagefind",
   "author": {
     "name": "SMMH",
@@ -12,8 +12,12 @@
   },
   "source": [
     {
-      "path": "rlsbl/",
-      "language": "python"
+      "path": "cmd/rlsbl",
+      "language": "go"
+    },
+    {
+      "path": "internal",
+      "language": "go"
     }
   ],
   "docs": ".strictmetadata/docs/",
@@ -32,9 +36,10 @@
   ],
   "gen": {
     "exclude": [
-      "rlsbl.changelog",
-      "rlsbl.commands.monorepo",
-      "rlsbl.strictspec_gen*"
+      "testsupport",
+      "*spec",
+      "gen",
+      "privatepathscheck"
     ]
   },
   "root_files": [
@@ -52,13 +57,11 @@
     }
   ],
   "directives": {
-    "table-feature-matrix": ".strictmetadata/docs/directives/feature_matrix.py",
-    "table-pipelines": ".strictmetadata/docs/directives/pipeline_table.py",
     "table-targets": ".strictmetadata/docs/directives/target_table.py",
     "table-target-axes": ".strictmetadata/docs/directives/target_axes.py",
     "check-count": ".strictmetadata/docs/directives/check_count.py",
     "table-check-tags": ".strictmetadata/docs/directives/check_tags.py",
-    "target-count": ".strictmetadata/docs/directives/target_count.py"
+    "table-checks": ".strictmetadata/docs/directives/check_table.py"
   },
   "topology": {
     "slug": "rlsbl",

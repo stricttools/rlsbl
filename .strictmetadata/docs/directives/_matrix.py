@@ -1,21 +1,18 @@
 """Shared reader for the committed support matrix.
 
-Every table and count the docs derive from rlsbl's registries comes from
-``rlsbl/data/support-matrix.json``, which ``rlsbl/targets/introspect.py``
+Every table the docs derive from rlsbl's target registry comes from
+``internal/targets/support-matrix.json``, which ``internal/targets/gen``
 generates and the ``target-matrix-fresh`` check keeps in step with the code.
 
-The directives used to import rlsbl and call its introspection functions at
-documentation-build time. That put the whole package on the docs environment's
-dependency list, and a release once failed when that environment lost its rlsbl
-overlay. Reading a committed file has no such failure mode: the artifact is
-part of the repository, and a stale one is a check failure rather than a
-silently wrong page.
+Reading a committed file keeps the docs build free of any rlsbl build: the
+artifact is part of the repository, and a stale one is a check failure rather
+than a silently wrong page.
 
 This module is loaded by each directive through ``importlib`` by path, because
 selfdoc loads directive files individually rather than as a package. It also
 carries the Markdown table renderer, so every directive that emits a table --
-including the ones deriving from ``rlsbl/data/checks.toml`` rather than from the
-matrix -- renders through one function. The renderer is vendored here rather
+including the ones deriving from ``internal/checks/checks.toml`` rather than
+from the matrix -- renders through one function. The renderer is vendored here rather
 than imported: a directive script runs under whatever ``python3`` the site
 generator invokes, with no packages installed for it, so a directive that
 imported a library would break the whole docs build the moment that library was
@@ -38,7 +35,7 @@ def repo_root():
     raise RuntimeError(f"no selfdoc.json above {__file__}")
 
 
-MATRIX_PATH = repo_root() / "rlsbl" / "data" / "support-matrix.json"
+MATRIX_PATH = repo_root() / "internal" / "targets" / "support-matrix.json"
 
 
 def load():
@@ -122,5 +119,5 @@ def render_table(name, empty_message):
 
 
 def target_names():
-    """Every registered release target name, in the matrix's own order."""
-    return sorted(load()["targets"])
+    """Every registered release target name, sorted."""
+    return sorted(target["name"] for target in load()["targets"])

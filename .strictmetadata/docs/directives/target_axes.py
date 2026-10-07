@@ -1,10 +1,9 @@
 """Custom selfdoc directive: table-target-axes.
 
 Renders the support-axis inventory -- every question the release-target
-protocol answers about a target -- from the committed support matrix
-(``rlsbl/data/support-matrix.json``). The inventory is declared once, in
-``rlsbl.targets.introspect.TARGET_AXES``, and an axis missing from it is an
-import-time error, so this table cannot fall behind the protocol.
+model answers about a target -- from the committed support matrix
+(``internal/targets/support-matrix.json``), which ``internal/targets/gen``
+renders from the targets' facts.
 """
 
 import importlib.util

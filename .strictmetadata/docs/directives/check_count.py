@@ -1,6 +1,6 @@
 """Custom selfdoc directive: check-count.
 
-Reads ``rlsbl/data/checks.toml`` and returns the total number of checks
+Reads ``internal/checks/checks.toml`` and returns the total number of checks
 and the number of distinct tags as a prose sentence.
 
 Output example: ``rlsbl includes 49 checks across 6 tags.``
@@ -23,7 +23,7 @@ _spec.loader.exec_module(_matrix)
 
 def resolve(attrs, config, body):
     """Return a sentence with the check and tag counts from checks.toml."""
-    checks_path = _matrix.repo_root() / "rlsbl" / "data" / "checks.toml"
+    checks_path = _matrix.repo_root() / "internal" / "checks" / "checks.toml"
     with open(checks_path, "rb") as f:
         data = tomllib.load(f)
 
