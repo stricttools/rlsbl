@@ -229,7 +229,7 @@ const pypiInsertionCap = 30
 func pypiVariants(name string) (variants []string, capped bool) {
 	lower := strings.ToLower(name)
 	set := map[string]bool{
-		NormalizePypi(name): true,
+		NormalizePypi(name):                         true,
 		pypiSeparators.ReplaceAllString(lower, "_"): true,
 		pypiSeparators.ReplaceAllString(lower, "-"): true,
 	}

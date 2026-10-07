@@ -18,12 +18,12 @@ import (
 func TestClassificationTriesInfrastructureFirst(t *testing.T) {
 	hygiene.Isolate(t)
 	for log, want := range map[string]FailureClass{
-		"":                                              Infrastructure,
-		"   \n":                                         Infrastructure,
+		"":      Infrastructure,
+		"   \n": Infrastructure,
 		"The job was not acquired by a runner\nFAIL x": Infrastructure,
-		"--- FAIL: TestX\nconnection reset by peer":     Deterministic,
-		"dial tcp 1.2.3.4:443: i/o timeout":             Transient,
-		"something nobody has seen":                     Unrecognized,
+		"--- FAIL: TestX\nconnection reset by peer":    Deterministic,
+		"dial tcp 1.2.3.4:443: i/o timeout":            Transient,
+		"something nobody has seen":                    Unrecognized,
 	} {
 		if got := ClassifyFailure(log); got != want {
 			t.Errorf("%q: got %s, want %s", log, got, want)

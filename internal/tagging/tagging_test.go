@@ -241,13 +241,13 @@ func TestRelativeTime(t *testing.T) {
 	hygiene.Isolate(t)
 	now := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
 	for ago, want := range map[time.Duration]string{
-		30 * time.Second:      "just now",
-		5 * time.Minute:       "5m ago",
-		3 * time.Hour:         "3h ago",
-		2 * 24 * time.Hour:    "2d ago",
-		21 * 24 * time.Hour:   "3w ago",
-		120 * 24 * time.Hour:  "4mo ago",
-		800 * 24 * time.Hour:  "2y ago",
+		30 * time.Second:     "just now",
+		5 * time.Minute:      "5m ago",
+		3 * time.Hour:        "3h ago",
+		2 * 24 * time.Hour:   "2d ago",
+		21 * 24 * time.Hour:  "3w ago",
+		120 * 24 * time.Hour: "4mo ago",
+		800 * 24 * time.Hour: "2y ago",
 	} {
 		got, err := RelativeTime(now.Add(-ago).Format(time.RFC3339), now)
 		if err != nil || got != want {

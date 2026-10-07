@@ -280,12 +280,12 @@ func TestGoListingLatestPrefersReleases(t *testing.T) {
 func TestGoModDeprecationReadsOnlyTheModuleComment(t *testing.T) {
 	hygiene.Isolate(t)
 	for text, want := range map[string]string{
-		"// Deprecated: use v2\nmodule example.com/m\n":                       "use v2",
-		"module example.com/m // Deprecated: moved\n":                          "moved",
-		"// Deprecated:\nmodule example.com/m\n":                               "(no reason given)",
-		"// Deprecated: old\n\nmodule example.com/m\n":                         "",
+		"// Deprecated: use v2\nmodule example.com/m\n":                         "use v2",
+		"module example.com/m // Deprecated: moved\n":                           "moved",
+		"// Deprecated:\nmodule example.com/m\n":                                "(no reason given)",
+		"// Deprecated: old\n\nmodule example.com/m\n":                          "",
 		"module example.com/m\n\nretract (\n\t// Deprecated: no\n\tv1.0.0\n)\n": "",
-		"// A module.\n// Deprecated: gone\nmodule example.com/m\n":            "gone",
+		"// A module.\n// Deprecated: gone\nmodule example.com/m\n":             "gone",
 	} {
 		got, deprecated := GoModDeprecation(text)
 		if got != want || deprecated != (want != "") {

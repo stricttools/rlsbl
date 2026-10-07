@@ -54,11 +54,11 @@ func workflowOutputs(t *testing.T, text string) string {
 func TestWhatAWorkflowPublishes(t *testing.T) {
 	hygiene.Isolate(t)
 	for name, c := range map[string]struct{ text, want string }{
-		"a pypi publish step attests by default":   {attesting, string(lifecycle.BuildAttestation)},
+		"a pypi publish step attests by default":    {attesting, string(lifecycle.BuildAttestation)},
 		"a pypi publish step with attestations off": {attesting + "          attestations: false\n", ""},
-		"npm provenance":                            {provenance, string(lifecycle.BuildAttestation)},
-		"a Go module proxy request":                 {proxy, string(lifecycle.GoProxyNotification)},
-		"downloading through the proxy":             {"jobs:\n  b:\n    steps:\n      - run: go mod download\n", ""},
+		"npm provenance":                {provenance, string(lifecycle.BuildAttestation)},
+		"a Go module proxy request":     {proxy, string(lifecycle.GoProxyNotification)},
+		"downloading through the proxy": {"jobs:\n  b:\n    steps:\n      - run: go mod download\n", ""},
 	} {
 		if got := workflowOutputs(t, c.text); got != c.want {
 			t.Errorf("%s: %q, want %q", name, got, c.want)

@@ -20,10 +20,12 @@ const (
 	nullTag = "!!null"
 )
 
-func isMap(n *yaml.Node) bool    { return n != nil && n.Alias == nil && n.ShortTag() == mapTag }
-func isSeq(n *yaml.Node) bool    { return n != nil && n.Alias == nil && n.ShortTag() == seqTag }
-func isNull(n *yaml.Node) bool   { return n == nil || (n.Alias == nil && n.ShortTag() == nullTag) }
-func isScalar(n *yaml.Node) bool { return n != nil && n.Alias == nil && !isMap(n) && !isSeq(n) && len(n.Content) == 0 }
+func isMap(n *yaml.Node) bool  { return n != nil && n.Alias == nil && n.ShortTag() == mapTag }
+func isSeq(n *yaml.Node) bool  { return n != nil && n.Alias == nil && n.ShortTag() == seqTag }
+func isNull(n *yaml.Node) bool { return n == nil || (n.Alias == nil && n.ShortTag() == nullTag) }
+func isScalar(n *yaml.Node) bool {
+	return n != nil && n.Alias == nil && !isMap(n) && !isSeq(n) && len(n.Content) == 0
+}
 
 // parseDocument parses one YAML document and returns its root node; nil for
 // an empty document. Aliases are refused: a workflow rlsbl rewrites must say

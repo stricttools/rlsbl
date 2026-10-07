@@ -192,4 +192,3 @@ func TestAnUndeclaredBumpIsRefused(t *testing.T) {
 		t.Fatal("an empty bump was given a default")
 	}
 }
-

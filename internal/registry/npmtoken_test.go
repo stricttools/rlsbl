@@ -103,7 +103,7 @@ func TestNpmTokenCreatedAt(t *testing.T) {
 	token := "npm_abcdefghijklmnopqrstuvwxyz"
 	cases := []struct {
 		name, listing, want string
-		code             int
+		code                int
 	}{
 		{"the matching unrevoked token", `[{"token":"npm_ab...wxyz","created":"2026-03-01T10:00:00.000Z"},{"token":"npm_zz...zzzz","created":"2020-01-01T00:00:00Z"}]`, "2026-03-01T10:00:00Z", 0},
 		{"a wrapped listing", `{"objects":[{"token":"npm_ab...wxyz","created":"2026-03-01T10:00:00Z"}]}`, "2026-03-01T10:00:00Z", 0},

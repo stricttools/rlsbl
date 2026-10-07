@@ -17,15 +17,15 @@ func TestNpmNameProblems(t *testing.T) {
 		}
 	}
 	for name, want := range map[string]string{
-		"":             "must not be empty",
-		".portal":      "start with a period",
-		"_portal":      "start with an underscore",
-		" portal":      "leading or trailing spaces",
-		"node_modules": "blocked npm package name",
-		"fs":           "Node core module",
-		"Portal":       "uppercase",
-		"por tal":      "URL-friendly",
-		"portal!":      "special characters",
+		"":                       "must not be empty",
+		".portal":                "start with a period",
+		"_portal":                "start with an underscore",
+		" portal":                "leading or trailing spaces",
+		"node_modules":           "blocked npm package name",
+		"fs":                     "Node core module",
+		"Portal":                 "uppercase",
+		"por tal":                "URL-friendly",
+		"portal!":                "special characters",
 		strings.Repeat("a", 215): "longer than 214",
 	} {
 		if p := NpmNameProblems(name); !strings.Contains(strings.Join(p, "\n"), want) {
