@@ -78,6 +78,7 @@ func New(d Dependencies) (*strictcli.App, error) {
 	registerReleaseOps(r)
 	registerHistoryRewrites(r, d.Version)
 	registerChangelog(r)
+	registerTransition(r)
 	if err := registerChecks(app); err != nil {
 		return nil, err
 	}
