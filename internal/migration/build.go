@@ -296,7 +296,7 @@ func (b *builder) refuseRunsInProgress() {
 		case "scrub-result.json":
 			b.p.add("%s records a history rewrite in progress; finish it by running `rlsbl release scrub` again (the Python rlsbl 0.131.0), then migrate", f)
 		case "reconcile-plan.toml":
-			b.p.add("%s is a reconcile plan not yet applied; apply it with `rlsbl release reconcile --apply` or delete it through saferm (`rlsbl release reconcile --plan` writes it again), then migrate", f)
+			b.p.add("%s is a reconcile plan not yet applied; apply it with `rlsbl release reconcile --apply` of the Python rlsbl 0.131.0 or delete it through saferm (its `rlsbl release reconcile --plan` writes it again), then migrate", f)
 		case "lock":
 			b.p.add("%s is the release lock: a release is running or one died holding it. Finish the release, or delete the lock through saferm once no rlsbl process runs, then migrate", f)
 		}

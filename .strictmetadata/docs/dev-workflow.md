@@ -76,4 +76,4 @@ It exits 0 when every run passed and 1 otherwise. `rlsbl release run --watch`, `
 
 The test checks depend on `prepush-changelog-coverage`, so a push missing an entry fails before any test runs. There is no environment-variable bypass. `rlsbl check --hook pre-push` prints the full report of the same selection, and outside a push the push-specific checks skip.
 
-A hook installed by an earlier rlsbl (one calling the removed `rlsbl pre-push-check`, say) is replaced by the next `rlsbl scaffold`, which recognizes every hook rlsbl shipped.
+A hook installed by an earlier rlsbl (one calling the pre-push-check command earlier versions had, say) is replaced by the next `rlsbl scaffold`, which recognizes every hook rlsbl shipped.
