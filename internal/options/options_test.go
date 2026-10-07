@@ -291,7 +291,7 @@ func TestAScopeNamingNoMemberIsRefusedNamingTheMembersAndTheFixClearsIt(t *testi
 	load(t, reg, root, workspaceDeclarations())
 }
 
-func TestAScopeInAStandaloneRepositoryIsRefused(t *testing.T) {
+func TestAScopeInAStandaloneRepositoryIsRefusedAndTheFixClearsIt(t *testing.T) {
 	hygiene.Isolate(t)
 	reg := fixtureRegistry(t)
 	root := t.TempDir()
@@ -305,7 +305,10 @@ func TestAScopeInAStandaloneRepositoryIsRefused(t *testing.T) {
 	if err == nil {
 		t.Fatal("a scope in a repository without declarations was accepted")
 	}
-	requireContains(t, err.Error(), "declares no members")
+	requireContains(t, err.Error(), "declares no members", "Remove the entry's scope")
+	writeEntries(t, root, "dependencies", entry("rlsbl:dep-floors", "", "error", "error"))
+	load(t, reg, root, standaloneDeclarations())
+	load(t, reg, root, nil)
 }
 
 func TestAnOptionWithoutAScopeTypeTakesNoScope(t *testing.T) {
