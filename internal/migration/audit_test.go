@@ -105,7 +105,7 @@ func TestEveryConfigKeyConverts(t *testing.T) {
 
 func TestEveryWorkspaceKeyConverts(t *testing.T) {
 	hygiene.Isolate(t)
-	f := workspace(t)
+	f := workspaceFixture(t)
 	f.edit(".rlsbl-monorepo/workspace.toml", "path = \"widget\"\nname = \"widget\"\n", "path = \"widget\"\nname = \"widget\"\nlibrary = true\ntest_only = false\nimport_name = \"widget_lib\"\nregistry_name = \"widget-js\"\ndescription = \"Widgets\"\nlint_allow = [\"net/http\"]\n")
 	f.edit(".rlsbl-monorepo/workspace.toml", "[[releasables]]\nname = \"gadget\"\n", "[[releasables]]\nname = \"gadget\"\ntag_format = \"gadget-v{version}\"\nsubtree_remote = \"\"\n")
 	f.write("tools/.keep", "")

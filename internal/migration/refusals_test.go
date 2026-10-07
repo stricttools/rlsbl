@@ -28,7 +28,7 @@ const plainConfig = `{"publish_mode": "ci", "targets": ["npm"], ` + npmPipeline 
 // workspaceWithTools is the workspace fixture with a dev-only member,
 // tools, the hand edits below change.
 func workspaceWithTools(t *testing.T) *fixture {
-	f := workspace(t)
+	f := workspaceFixture(t)
 	f.write("tools/.keep", "")
 	f.edit(".rlsbl-monorepo/workspace.toml", "[layers]", "[[projects]]\npath = \"tools\"\nname = \"tools\"\ndev_only = true\nreleasable = false\n\n[layers]")
 	f.commit("a tools member")
@@ -91,7 +91,7 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 			fix:  func(f *fixture) { f.write(".rlsbl/releasable.toml", "name = \"portal\"\n") },
 		},
 		{
-			name: "an implicit-mode workspace", fixture: workspace,
+			name: "an implicit-mode workspace", fixture: workspaceFixture,
 			breakIt: func(f *fixture) {
 				f.edit(".rlsbl-monorepo/workspace.toml", "[[releasables]]\nname = \"widget\"\n\n[[releasables]]\nname = \"gadget\"\n", "")
 			},
@@ -101,7 +101,7 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 			},
 		},
 		{
-			name: "a releasable's subtree_remote", fixture: workspace,
+			name: "a releasable's subtree_remote", fixture: workspaceFixture,
 			breakIt: func(f *fixture) {
 				f.edit(".rlsbl-monorepo/workspace.toml", "name = \"gadget\"\n\n[[projects]]", "name = \"gadget\"\nsubtree_remote = \"git@github.com:owner/gadget.git\"\n\n[[projects]]")
 			},
@@ -111,7 +111,7 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 			},
 		},
 		{
-			name: "a member's watch", fixture: workspace,
+			name: "a member's watch", fixture: workspaceFixture,
 			breakIt: func(f *fixture) {
 				f.edit(".rlsbl-monorepo/workspace.toml", "releasable = \"widget\"\n", "releasable = \"widget\"\nwatch = [\"widget/**\"]\n")
 			},
@@ -119,7 +119,7 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 			fix:  func(f *fixture) { f.edit(".rlsbl-monorepo/workspace.toml", "watch = [\"widget/**\"]\n", "") },
 		},
 		{
-			name: "a member's subtree_remote", fixture: workspace,
+			name: "a member's subtree_remote", fixture: workspaceFixture,
 			breakIt: func(f *fixture) {
 				f.edit(".rlsbl-monorepo/workspace.toml", "releasable = \"widget\"\n", "releasable = \"widget\"\nsubtree_remote = \"git@github.com:owner/widget.git\"\n")
 			},
@@ -139,13 +139,13 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 			},
 		},
 		{
-			name: "a misnamed root member", fixture: workspace,
+			name: "a misnamed root member", fixture: workspaceFixture,
 			breakIt: func(f *fixture) { f.edit(".rlsbl-monorepo/workspace.toml", "name = \"root\"", "name = \"top\"") },
 			want:    `Hand edit: set name = "root"`,
 			fix:     func(f *fixture) { f.edit(".rlsbl-monorepo/workspace.toml", "name = \"top\"", "name = \"root\"") },
 		},
 		{
-			name: "a workspace without a root member", fixture: workspace,
+			name: "a workspace without a root member", fixture: workspaceFixture,
 			breakIt: func(f *fixture) {
 				f.edit(".rlsbl-monorepo/workspace.toml", "[[projects]]\npath = \".\"\nname = \"root\"\ndev_only = true\nreleasable = false\n\n", "")
 			},
@@ -181,7 +181,7 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 			fix:  func(f *fixture) { f.write(".rlsbl/transitions.jsonl", "") },
 		},
 		{
-			name: "an identity transition in the repository's own record", fixture: workspace,
+			name: "an identity transition in the repository's own record", fixture: workspaceFixture,
 			breakIt: func(f *fixture) {
 				f.write(".rlsbl-monorepo/transitions.jsonl", eventLine("identity-transition", `"facet":"package-name","old":"widget","new":"widget-client","effective_version":"0.4.0"`))
 			},
@@ -193,7 +193,7 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 			},
 		},
 		{
-			name: "a releasable-name identity transition", fixture: workspace,
+			name: "a releasable-name identity transition", fixture: workspaceFixture,
 			breakIt: func(f *fixture) {
 				f.write(".rlsbl-monorepo/releasables/gadget/transitions.jsonl", eventLine("identity-transition", `"facet":"releasable-name","old":"gizmo","new":"gadget","effective_version":"0.1.0"`))
 			},
@@ -235,7 +235,7 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 			fix:  func(f *fixture) { f.edit(".rlsbl/releases/unreleased.toml", "\"prerelease\"", "\"minor\"") },
 		},
 		{
-			name: "a batch release file of packages", fixture: workspace,
+			name: "a batch release file of packages", fixture: workspaceFixture,
 			breakIt: func(f *fixture) {
 				f.write(".rlsbl-monorepo/releases/unreleased.toml", "[packages.widget]\nbump = \"minor\"\ndescription = \"More\"\ninclude = [\"npm\"]\nexclude = []\n")
 			},
@@ -245,7 +245,7 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 			},
 		},
 		{
-			name: "per-member release state", fixture: workspace,
+			name: "per-member release state", fixture: workspaceFixture,
 			breakIt: func(f *fixture) {
 				f.write("widget/.rlsbl/changes/unreleased.jsonl", `{"format_version":1,"commits":[],"user_facing":false}`+"\n")
 			},
@@ -339,7 +339,7 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 			fix:  func(f *fixture) { f.remove(".rlsbl/hooks/pre-release.sh") },
 		},
 		{
-			name: "a releasable without a publish mode", fixture: workspace,
+			name: "a releasable without a publish mode", fixture: workspaceFixture,
 			breakIt: func(f *fixture) {
 				f.write(".rlsbl-monorepo/releasables/gadget/config.json", "{}\n")
 				f.write("gadget/.rlsbl/config.json", `{"targets": ["pypi"], "pipelines": {}}`+"\n")
@@ -380,7 +380,7 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 			fix:  func(f *fixture) { f.write("strictcode.toml", "") },
 		},
 		{
-			name: "disagreeing publish modes", fixture: workspace,
+			name: "disagreeing publish modes", fixture: workspaceFixture,
 			breakIt: func(f *fixture) {
 				f.write(".rlsbl-monorepo/releasables/widget/config.json", `{"publish_mode": "none"}`+"\n")
 			},
@@ -390,7 +390,7 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 			},
 		},
 		{
-			name: "batch_limits in a member's config", fixture: workspace,
+			name: "batch_limits in a member's config", fixture: workspaceFixture,
 			breakIt: func(f *fixture) {
 				f.write("widget/.rlsbl/config.json", `{"targets": ["npm"], "publish_mode": "ci", `+npmPipeline+`, "batch_limits": {"exclusions": []}}`+"\n")
 			},
@@ -400,13 +400,13 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 			},
 		},
 		{
-			name: "a stray old-layout directory", fixture: workspace,
+			name: "a stray old-layout directory", fixture: workspaceFixture,
 			breakIt: func(f *fixture) { f.write("docs/.rlsbl/config.json", "{}\n") },
 			want:    "docs/.rlsbl/ is an old-layout directory of no declared member",
 			fix:     func(f *fixture) { f.remove("docs/.rlsbl") },
 		},
 		{
-			name: "an undeclared releasable directory without a closed history", fixture: workspace,
+			name: "an undeclared releasable directory without a closed history", fixture: workspaceFixture,
 			breakIt: func(f *fixture) {
 				f.write(".rlsbl-monorepo/releasables/gizmo/version", "0.1.0\n")
 			},

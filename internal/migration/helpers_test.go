@@ -297,9 +297,9 @@ func standalone(t *testing.T) *fixture {
 	return f
 }
 
-// workspace is a workspace whose root member is a dev node, with two
+// workspaceFixture is a workspace whose root member is a dev node, with two
 // releasables: widget (npm) and gadget (pypi, depending on widget).
-func workspace(t *testing.T) *fixture {
+func workspaceFixture(t *testing.T) *fixture {
 	t.Helper()
 	f := newFixture(t, "portal", "public")
 	f.write(".rlsbl-monorepo/workspace.toml", `[[releasables]]

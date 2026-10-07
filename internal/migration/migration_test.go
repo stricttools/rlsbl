@@ -182,7 +182,7 @@ func TestEveryConvertedLayoutGetsALifecycleAndLicenseRecord(t *testing.T) {
 	hygiene.Isolate(t)
 	for name, build := range map[string]func(*testing.T) *fixture{
 		"standalone":         standalone,
-		"workspace":          workspace,
+		"workspace":          workspaceFixture,
 		"root-only":          rootOnlyWorkspace,
 		"retired":            withClosedHistory,
 		"standalone unnamed": standaloneWithoutManifestName,
@@ -268,7 +268,7 @@ func TestARemovedTargetIsRefusedUntilTheHandEditRemovesItAndItsPipeline(t *testi
 
 func TestAWorkspaceMigrates(t *testing.T) {
 	hygiene.Isolate(t)
-	f := workspace(t)
+	f := workspaceFixture(t)
 	plan := f.mustPlan()
 	text := planned(t, plan, declarations.ReleasablesFile)
 	contains(t, text, `repository_layout = "workspace"`)
@@ -335,7 +335,7 @@ func TestAWorkspaceWhoseOnlyMemberIsTheRootStaysAWorkspace(t *testing.T) {
 
 func TestMemberConfigsMergeOverTheirReleasablesConfig(t *testing.T) {
 	hygiene.Isolate(t)
-	f := workspace(t)
+	f := workspaceFixture(t)
 	f.write(".rlsbl-monorepo/releasables/widget/config.json", `{"publish_mode": "ci", "check_timeout": 300, "hooks": {"pre_release": ["make check"]}}`+"\n")
 	f.write("widget/.rlsbl/config.json", `{"targets": ["npm"], "pipelines": {"npm": {"type": "npm", "target": "npm", "local": false}}, "hooks": {"post_release": [{"cmd": "make announce", "dir": "docs"}]}, "internal_dep_floors": ["gadget"], "external_checks": [{"name": "docs-build", "`+externalCheckFormKey+`": "freeform", "command": "make docs", "tag": "preflight"}]}`+"\n")
 	f.write("widget/docs/README.md", "docs\n")
@@ -362,7 +362,7 @@ func TestMemberConfigsMergeOverTheirReleasablesConfig(t *testing.T) {
 // releasable, and records an identity transition not yet released.
 func withClosedHistory(t *testing.T) *fixture {
 	t.Helper()
-	f := workspace(t)
+	f := workspaceFixture(t)
 	f.write(".rlsbl-monorepo/releasables/conformance/version", "0.4.0\n")
 	f.write(".rlsbl-monorepo/releasables/conformance/config.json", `{"publish_mode": "ci"}`+"\n")
 	f.write(".rlsbl-monorepo/releasables/conformance/changes/0.4.0.jsonl", `{"format_version":1,"commits":["`+someCommit+`"],"user_facing":true,"description":"Cases","type":"feature"}`+"\n")
@@ -425,7 +425,7 @@ func TestTransitionsSplitBetweenTheRecordsAndAClosedHistoryRetires(t *testing.T)
 
 func TestCustomizedHookScriptsMoveAndAreDeclared(t *testing.T) {
 	hygiene.Isolate(t)
-	f := workspace(t)
+	f := workspaceFixture(t)
 	f.write(".rlsbl-monorepo/releasables/widget/hooks/pre-release.sh", "#!/usr/bin/env bash\nmake verify\n")
 	f.write("gadget/.rlsbl/hooks/post-release.sh", "#!/usr/bin/env bash\n./announce\n")
 	f.write("gadget/.rlsbl/hooks/pre-checks.sh", shippedPreChecks)
@@ -453,7 +453,7 @@ func TestCustomizedHookScriptsMoveAndAreDeclared(t *testing.T) {
 
 func TestDeadModulesBecomeStrictcodeSuppressions(t *testing.T) {
 	hygiene.Isolate(t)
-	f := workspace(t)
+	f := workspaceFixture(t)
 	f.write("gadget/.rlsbl/dead-modules.toml", "[[known_non_entry]]\npath = \"hatch_build.py\"\nreason = \"the build backend imports it\"\n")
 	f.commit("dead modules")
 	text := planned(t, f.mustPlan(), StrictcodeFile)
@@ -535,7 +535,7 @@ func TestThePrivateModuleStubMovesIntoStrictmetadata(t *testing.T) {
 
 func TestBatchReleaseFilesAndUndoAuditsConvert(t *testing.T) {
 	hygiene.Isolate(t)
-	f := workspace(t)
+	f := workspaceFixture(t)
 	f.write(".rlsbl-monorepo/releases/unreleased.toml", "[releasables.widget]\nbump = \"minor\"\ndescription = \"More widgets\"\ninclude = [\"npm\"]\nexclude = []\n")
 	f.write(".rlsbl-monorepo/releases/batch-20260924-173247.toml", "[packages.widget]\nbump = \"patch\"\ndescription = \"Fixes\"\ninclude = [\"npm\"]\nexclude = []\n")
 	f.write(".rlsbl-monorepo/releases/batch-20260924-173247.plan.json", "{}\n")
@@ -596,7 +596,7 @@ func TestAnInProgressReleaseIsRefused(t *testing.T) {
 
 func TestDisagreeingTimeoutsAreRefusedListingTheValues(t *testing.T) {
 	hygiene.Isolate(t)
-	f := workspace(t)
+	f := workspaceFixture(t)
 	f.write(".rlsbl-monorepo/releasables/widget/config.json", `{"publish_mode": "ci", "push_timeout": 60}`+"\n")
 	f.write(".rlsbl-monorepo/releasables/gadget/config.json", `{"publish_mode": "ci", "push_timeout": 90}`+"\n")
 	f.commit("disagreeing timeouts")
@@ -607,7 +607,7 @@ func TestDisagreeingTimeoutsAreRefusedListingTheValues(t *testing.T) {
 
 func TestDisagreeingPublishModesWithinAReleasableAreRefused(t *testing.T) {
 	hygiene.Isolate(t)
-	f := workspace(t)
+	f := workspaceFixture(t)
 	f.write(".rlsbl-monorepo/releasables/widget/config.json", `{"publish_mode": "none"}`+"\n")
 	f.commit("disagreeing publish modes")
 	f.refused("disagree on publish_mode")
