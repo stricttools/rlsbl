@@ -199,11 +199,6 @@
     ],
     [
       "git",
-      "remote",
-      "-v"
-    ],
-    [
-      "git",
       "branch",
       "--show-current"
     ],
@@ -316,13 +311,17 @@
     [
       "go",
       "list",
-      "-m"
+      "-m",
+      "-json",
+      "all"
     ],
     [
       "go",
       "list",
       "-e",
-      "-f"
+      "-f",
+      "{{.Name}}\t{{.ImportPath}}\t{{.Dir}}",
+      "./..."
     ],
     [
       "go",
