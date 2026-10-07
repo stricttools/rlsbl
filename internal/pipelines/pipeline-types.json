@@ -1,0 +1,35 @@
+{
+  "format_version": 1,
+  "generator": "internal/pipelines/gen",
+  "regenerate_with": "go run ./internal/pipelines/gen",
+  "headers": [
+    "Type",
+    "Publishes to",
+    "Artifacts",
+    "Authenticates in CI",
+    "Authenticates locally"
+  ],
+  "rows": [
+    [
+      "`go`",
+      "the Go module proxy (a module is published by its tag), and GitHub Release archives for a binary",
+      "`binary`, `library`",
+      "nothing",
+      "nothing"
+    ],
+    [
+      "`npm`",
+      "the npm registry",
+      "`package`, `go-binary`",
+      "a token: the `NPM_TOKEN` Actions secret",
+      "`NPM_TOKEN`"
+    ],
+    [
+      "`pypi`",
+      "the Python Package Index",
+      "`package`, `go-binary`",
+      "trusted publishing (OIDC), no secret",
+      "`PYPI_TOKEN`"
+    ]
+  ]
+}

@@ -28,11 +28,7 @@ artifact = "package"    # what it publishes (below)
 
 ## Pipeline types
 
-| Type | Publishes to | Artifacts | Authenticates in CI | Authenticates locally |
-| --- | --- | --- | --- | --- |
-| `go` | the Go module proxy, and GitHub Release archives for a binary | `binary`, `library` | nothing: a Go module is published by its tag | nothing |
-| `npm` | the npm registry | `package`, `go-binary` | the `NPM_TOKEN` Actions secret | `NPM_TOKEN` |
-| `pypi` | the Python Package Index | `package`, `go-binary` | trusted publishing (OIDC), no secret | `PYPI_TOKEN` |
+:-: table-pipelines
 
 The `ci-publish-secrets` check asks GitHub whether each secret a CI pipeline authenticates with exists on the repository, and `npm-token-synced` whether the `NPM_TOKEN` secret holds the token npm accepts on this machine; `rlsbl secrets sync-npm-token` copies it there.
 

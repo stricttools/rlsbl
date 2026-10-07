@@ -61,7 +61,8 @@
     "table-target-axes": ".strictmetadata/docs/directives/target_axes.py",
     "check-count": ".strictmetadata/docs/directives/check_count.py",
     "table-check-tags": ".strictmetadata/docs/directives/check_tags.py",
-    "table-checks": ".strictmetadata/docs/directives/check_table.py"
+    "table-checks": ".strictmetadata/docs/directives/check_table.py",
+    "table-pipelines": ".strictmetadata/docs/directives/pipeline_table.py"
   },
   "topology": {
     "slug": "rlsbl",

@@ -20,8 +20,8 @@ type Type struct {
 	Name string
 	// Destination names where it publishes, for people.
 	Destination string
-	// Auth is how a publish authenticates: "token", "trusted publishing",
-	// or "none".
+	// Auth is how a publish from CI authenticates, for people; the secrets
+	// it reads are CISecrets.
 	Auth string
 	// CISecrets are the repository secrets the CI publish job reads. The
 	// names are written into the publish workflow templates, so the workflow
@@ -38,22 +38,22 @@ type Type struct {
 var types = []Type{
 	{
 		Name:        declarations.TargetGo,
-		Destination: "Go module proxy",
-		Auth:        "none",
+		Destination: "the Go module proxy (a module is published by its tag), and GitHub Release archives for a binary",
+		Auth:        "nothing",
 		Artifacts:   []string{declarations.ArtifactBinary, declarations.ArtifactLibrary},
 	},
 	{
 		Name:         declarations.TargetNPM,
-		Destination:  "npm registry",
-		Auth:         "token",
+		Destination:  "the npm registry",
+		Auth:         "a token",
 		CISecrets:    []string{"NPM_TOKEN"},
 		LocalSecrets: []string{"NPM_TOKEN"},
 		Artifacts:    []string{declarations.ArtifactPackage, declarations.ArtifactGoBinary},
 	},
 	{
 		Name:         declarations.TargetPyPI,
-		Destination:  "Python Package Index",
-		Auth:         "trusted publishing",
+		Destination:  "the Python Package Index",
+		Auth:         "trusted publishing (OIDC), no secret",
 		LocalSecrets: []string{"PYPI_TOKEN"},
 		Artifacts:    []string{declarations.ArtifactPackage, declarations.ArtifactGoBinary},
 	},
@@ -115,11 +115,29 @@ func AsksGoProxy(p declarations.Pipeline) bool {
 	return p.Type == declarations.TargetGo && (p.Local || p.Artifact == declarations.ArtifactLibrary)
 }
 
-// TypeTable is the pipeline types as the docs render them.
+// TypeTable is the pipeline types as the docs render them, from the
+// committed rendering TypeTablePath holds.
 func TypeTable() (headers []string, rows [][]string) {
-	headers = []string{"Type", "Auth method", "CI secrets", "Local secrets", "Artifacts", "Publishes to"}
+	headers = []string{"Type", "Publishes to", "Artifacts", "Authenticates in CI", "Authenticates locally"}
 	for _, t := range types {
-		rows = append(rows, []string{t.Name, t.Auth, strings.Join(t.CISecrets, ", "), strings.Join(t.LocalSecrets, ", "), strings.Join(t.Artifacts, ", "), t.Destination})
+		ci := t.Auth
+		if len(t.CISecrets) > 0 {
+			ci += ": the " + codeList(t.CISecrets) + " Actions secret"
+		}
+		local := "nothing"
+		if len(t.LocalSecrets) > 0 {
+			local = codeList(t.LocalSecrets)
+		}
+		rows = append(rows, []string{"`" + t.Name + "`", t.Destination, codeList(t.Artifacts), ci, local})
 	}
 	return headers, rows
+}
+
+// codeList is names as code spans, comma-separated.
+func codeList(names []string) string {
+	quoted := make([]string, len(names))
+	for i, n := range names {
+		quoted[i] = "`" + n + "`"
+	}
+	return strings.Join(quoted, ", ")
 }
