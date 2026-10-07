@@ -88,8 +88,8 @@ func TestFlooringKeepsExtrasMarkersCommentsAndUnrelatedLines(t *testing.T) {
 	p := parse(t, `[project]
 name = "consumer"
 dependencies = [
-    "sibling[cli]>=0.1; python_version < '3.12'",  # keep me
-    "other==1",
+    "sibling[cli]>=0.1; python_version < '3.12'",
+    "other==1",  # keep me
 ]
 `)
 	n, err := p.FloorEntries(map[string]string{"sibling": "1.4.0"}, dependencies.AllFamilies)

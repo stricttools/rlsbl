@@ -61,6 +61,7 @@ func New(d Dependencies) (*strictcli.App, error) {
 	r := newRegistry(app)
 	registerNames(r)
 	registerDiscover(r)
+	registerRewrite(r)
 	return app, nil
 }
 
