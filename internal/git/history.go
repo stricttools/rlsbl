@@ -85,7 +85,7 @@ func (r Repo) TreeAt(sha, path string) (tree string, found bool, err error) {
 // is an error naming it: which member a commit is attributed to cannot be
 // guessed.
 func (r Repo) CommitFiles(sha string) ([]string, error) {
-	args := []string{"diff-tree", "--no-commit-id", "--name-only", "-r", "-z", "-m", "--first-parent", "--root", sha}
+	args := []string{"diff-tree", "--no-commit-id", "--name-only", "-r", "-z", "--diff-merges=first-parent", "--root", sha}
 	res, err := r.read(localTimeout, nil, args...)
 	if err != nil {
 		return nil, err

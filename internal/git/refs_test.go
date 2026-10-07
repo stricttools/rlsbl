@@ -253,7 +253,9 @@ func TestPushIsGuardedByItsLease(t *testing.T) {
 	if err := push(git.RefUpdate{Ref: "refs/heads/main", New: first}); err != nil {
 		t.Fatalf("creating main: %v", err)
 	}
-	if err := push(git.RefUpdate{Ref: "refs/heads/main", New: first}); err == nil {
+	// A push the remote already matches changes nothing, so git accepts it
+	// whatever the lease says; the lease guards a push that would move a ref.
+	if err := push(git.RefUpdate{Ref: "refs/heads/main", New: second}); err == nil {
 		t.Fatal("a push expecting no ref overwrote one")
 	}
 	if err := push(git.RefUpdate{Ref: "refs/heads/main", New: second, Expected: second}); err == nil {
