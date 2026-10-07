@@ -854,7 +854,7 @@
     },
     "watch": {
       "name": "watch",
-      "help": "Watch the GitHub Actions runs of a commit (HEAD when none is named), or of the runs --run-id names, until each concludes, through the authenticated gh command line. A run gh stops watching without a pass is a failure only when the run's own state says it completed; a run still going is watched again. A failed run is classified from its failing jobs' logs: a deterministic failure (tests, compilation, configuration, workflow syntax, a missing secret) is reported with the command running its failed jobs by hand, and any other failure is run again once (only its failed jobs for an infrastructure failure, where the run never executed). When the commit is a release commit of a releasable the release record holds, every release-triggered workflow of the tagged tree must show a run for its tag, or the command fails naming what it found. Runs started after the first listing are watched too. A commit on which no run appears within two minutes fails, naming the command to run again. Exits 0 when every run passed and 1 otherwise.",
+      "help": "Watch the GitHub Actions runs of a commit (HEAD when none is named), or of the runs --run-id names, until each concludes, through the authenticated gh command line. A run gh stops watching without a pass is a failure only when the run's own state says it completed; a run still going is watched again. A failed run is classified from its failing jobs' logs: a deterministic failure (tests, compilation, configuration, workflow syntax, a missing secret) is reported with the command running its failed jobs by hand, and any other failure is run again once (only its failed jobs for an infrastructure failure, where the run never executed). When the commit is a release commit of a releasable the release record holds, every release-triggered workflow of the tagged tree must show a run for its tag, or the command fails naming what it found. Runs started after the first listing are watched too. A commit on which no run appears within 120 seconds fails, naming the command to run again. Exits 0 when every run passed and 1 otherwise.",
       "effect": "mutating",
       "payload_schema": {
         "additionalProperties": false,
@@ -3533,7 +3533,7 @@
       "commands": {
         "add": {
           "name": "add",
-          "help": "Append an entry to the releasable's unreleased.jsonl and commit it. Each commit must resolve and change a file the releasable's changelog covers (its members' files and its own state directories). A user-facing entry (the default) needs --description and --type; --no-user-facing marks an internal change that CHANGELOG.md and the release notes leave out. A commit an entry of the same type and user-facing value already names is refused. An entry naming more than five commits needs --batch-reason saying why they are one change, which the entry carries and which exempts it from the per-entry limit; an entry within the limit refuses one. In a workspace the entry records the releasable's members the commits change. Committed unless --no-auto-commit.",
+          "help": "Append an entry to the releasable's unreleased.jsonl and commit it. Each commit must resolve and change a file the releasable's changelog covers (its members' files and its own state directories). A user-facing entry (the default) needs --description and --type; --no-user-facing marks an internal change that CHANGELOG.md and the release notes leave out. A commit an entry of the same type and user-facing value already names is refused. An entry naming more than 5 commits needs --batch-reason saying why they are one change, which the entry carries and which exempts it from the per-entry limit; an entry within the limit refuses one. In a workspace the entry records the releasable's members the commits change. Committed unless --no-auto-commit.",
           "effect": "mutating",
           "flags": [
             {
@@ -3599,7 +3599,7 @@
             },
             {
               "name": "batch-reason",
-              "help": "Why the entry's more than five commits are one change; the entry carries it, and it exempts the entry from the per-entry commit limit",
+              "help": "Why the entry's more than 5 commits are one change; the entry carries it, and it exempts the entry from the per-entry commit limit",
               "value_schema": {
                 "type": "string"
               },
