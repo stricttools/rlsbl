@@ -479,7 +479,7 @@ func (r *reconcileRun) heal(repo git.Repo, x explanations) (map[string]string, e
 	if err := releaserecord.AppendEvents(r.e, r.root, []releaserecord.Event{event}, r.now()); err != nil {
 		return nil, err
 	}
-	touched = append(touched, declarations.TransitionsFile)
+	touched = append(touched, declarations.TransitionsFile, transitionsManifest)
 	if _, err := repo.Commit(git.CommitRequest{
 		Message:       "reconcile: move the release record's release commits through the recorded rewrite",
 		Paths:         touched,

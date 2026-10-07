@@ -807,7 +807,9 @@ func (r *scrubRun) commit(s *scrubState) error {
 			return err
 		}
 	}
-	paths := mergePaths(mergePaths(mergePaths(s.RemappedFiles, s.ReleaseCommitFiles), s.DeletedCaches), []string{s.ArchivePath})
+	// The ownership manifests a first write into a directory creates ride
+	// along; one already committed and unchanged is left out of the commit.
+	paths := mergePaths(mergePaths(mergePaths(s.RemappedFiles, s.ReleaseCommitFiles), s.DeletedCaches), []string{s.ArchivePath, rewritesManifest, transitionsManifest})
 	if _, err := r.repo.Commit(git.CommitRequest{
 		Message:       fmt.Sprintf("scrub: %s\n\nScrub-remap: %s..%s", s.Reason, s.OldHead, s.NewHead),
 		Paths:         paths,

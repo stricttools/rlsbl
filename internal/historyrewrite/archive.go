@@ -66,6 +66,14 @@ type rawArchive struct {
 	Tags             []ArchivedTag     `toml:"tags"`
 }
 
+// The ownership manifests of the directories the history rewrites write
+// records into. A repository's first rewrite creates them, and its commit
+// carries them.
+var (
+	rewritesManifest    = declarations.HistoryRewritesDir + "/manifest.toml"
+	transitionsManifest = path.Dir(declarations.TransitionsFile) + "/manifest.toml"
+)
+
 // RewriteArchivePath is the repository-relative path of the archive of a
 // rewrite started at started.
 func RewriteArchivePath(started time.Time) string {
