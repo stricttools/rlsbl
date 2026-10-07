@@ -69,6 +69,10 @@ func New(d Dependencies) (*strictcli.App, error) {
 	registerUnreleased(r)
 	registerTargets(r)
 	registerCommit(r)
+	registerDev(r)
+	registerUpstream(r)
+	registerSecrets(r)
+	registerOptions(r)
 	return app, nil
 }
 
