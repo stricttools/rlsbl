@@ -25,3 +25,7 @@ When a project's `pre-release.sh` hook is customized, the release flow routes to
 ## Effort
 
 S-M. Independent of other planned release-flow work but should land before or with any new enforcement checks that use the preflight tag.
+
+## Resolution
+
+Option A (always run the built-in preflight checks) was built, in the Go rewrite of the release. `release.preflightSelection` in `internal/release/preflight.go` decides the release's preflight: every check `internal/checks/checks.toml` tags with the pre-release hook's tag, the member's external checks of that tag, and the scaffold-conflict and cross-repository path-source guards run whether or not a pre-release hook is declared, and a declared pre-release hook (on the releasable or on the member) replaces only the built-in tests (`test-suite`). Tests cover a release without a declared pre-release hook (`TestWithoutAPreReleaseHookEveryPreflightCheckRunsTheBuiltInTestsIncluded`) and with one (`TestADeclaredPreReleaseHookReplacesOnlyTheBuiltInTests`), in `internal/release/preflight_internal_test.go`.
