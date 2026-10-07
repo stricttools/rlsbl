@@ -78,7 +78,7 @@ Checks are grouped by tag: `--tag` runs one tag, `--name` one check, `--all` eve
 
 :-: table-check-tags
 
-What each check verifies is in [the check system](.strictmetadata/docs/checks.md). Every check is an option, `rlsbl:<check name>`, which a repository softens or switches off only through an options entry stating why.
+What each check verifies is in [the check system](.strictmetadata/docs/checks.md). Every check is an option, `rlsbl:<check name>`, and an options entry softens or switches it off for a repository, stating why.
 
 ```
 rlsbl check --all
