@@ -124,22 +124,26 @@ func TestAModuleWithoutAToolchainLineIsNamedAndTheNamedFixClearsIt(t *testing.T)
 func TestARetractionIsAppendedKeepingTheFileAndNotRepeated(t *testing.T) {
 	hygiene.Isolate(t)
 	before := "module example.com/portal\n\ngo 1.21 // the oldest Go\n\n"
-	out, changed, err := AddRetraction("go.mod", []byte(before), "v1.2.3")
+	out, changed, err := AddRetraction("go.mod", []byte(before), "v1.2.3", "")
 	if err != nil || !changed {
 		t.Fatalf("changed %v, err %v", changed, err)
 	}
 	if want := "module example.com/portal\n\ngo 1.21 // the oldest Go\n\nretract v1.2.3\n"; string(out) != want {
 		t.Fatalf("got:\n%s", out)
 	}
-	if _, changed, err := AddRetraction("go.mod", out, "v1.2.3"); err != nil || changed {
+	if _, changed, err := AddRetraction("go.mod", out, "v1.2.3", ""); err != nil || changed {
 		t.Fatalf("a second retraction: changed %v, err %v", changed, err)
 	}
 	ranged := "module example.com/portal\n\nretract [v1.0.0, v1.5.0]\n"
-	if _, changed, err := AddRetraction("go.mod", []byte(ranged), "v1.2.3"); err != nil || changed {
+	if _, changed, err := AddRetraction("go.mod", []byte(ranged), "v1.2.3", ""); err != nil || changed {
 		t.Fatalf("a version inside a retracted range: changed %v, err %v", changed, err)
 	}
-	if _, _, err := AddRetraction("go.mod", []byte(before), "1.2.3"); err == nil {
+	if _, _, err := AddRetraction("go.mod", []byte(before), "1.2.3", ""); err == nil {
 		t.Fatal("a version without its v was accepted")
+	}
+	out, _, err = AddRetraction("go.mod", []byte(before), "v1.2.3", "  Broken\n parser ")
+	if err != nil || !strings.HasSuffix(string(out), "retract v1.2.3 // Broken parser\n") {
+		t.Fatalf("the rationale comment: %v\n%s", err, out)
 	}
 }
 

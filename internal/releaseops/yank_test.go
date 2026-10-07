@@ -173,6 +173,21 @@ func TestYankRetractsAGoModuleInACommitOfItsOwn(t *testing.T) {
 	}
 }
 
+func TestYankOfAVersionARetractedRangeCoversWritesNoSecondRetraction(t *testing.T) {
+	hygiene.Isolate(t)
+	p := newPortal(t, "go.mod")
+	p.release("portal", "0.3.0")
+	p.release("portal", "0.4.0")
+	p.CommitFile("go.mod", "module github.com/acme/portal\n\ngo 1.26\n\nretract [v0.2.0, v0.3.5] // the parser rewrite\n", "retract the parser rewrite")
+	testsupport.FakeSafegit(t)
+	testsupport.FakeGH(t, authStatus, releaseExists("v0.3.0"), testsupport.GHAnswer{Args: rewriteArgs("v0.3.0", true)})
+	listing := get("https://proxy.golang.org/github.com/acme/portal/@v/list", 200, "v0.3.0\nv0.4.0\n")
+	requireExit(t, yank(t, p, testsupport.NewFakeHTTP(t, listing), false, releaseops.NoticeRequest{Version: "0.3.0", Reason: "Broken parser"}), 0)
+	if n := strings.Count(p.read("go.mod"), "retract"); n != 1 {
+		t.Fatalf("go.mod holds %d retractions:\n%s", n, p.read("go.mod"))
+	}
+}
+
 func TestYankRefusesAGoModWithUncommittedChangesUntilTheyAreCommitted(t *testing.T) {
 	hygiene.Isolate(t)
 	p := newPortal(t, "go.mod")

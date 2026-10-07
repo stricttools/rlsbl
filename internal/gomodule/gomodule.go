@@ -142,12 +142,24 @@ func ToolchainProblems(root string, moduleDirs []string) ([]string, error) {
 	return problems, nil
 }
 
+// Retracted reports whether a retract directive of f covers version
+// (vX.Y.Z): a single version or a range holding it.
+func Retracted(f *modfile.File, version string) bool {
+	for _, r := range f.Retract {
+		if semver.Compare(r.Low, version) <= 0 && semver.Compare(version, r.High) <= 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // AddRetraction appends a retract directive for version (vX.Y.Z) to the
-// go.mod text data, keeping every other byte. changed is false when a
+// go.mod text data, keeping every other byte, with rationale (when not
+// empty, its whitespace collapsed) as its comment. changed is false when a
 // retraction already covers the version. A module version can never be
 // removed from the proxy, only retracted, and the retraction takes effect
 // once a later version carrying it is published.
-func AddRetraction(path string, data []byte, version string) (out []byte, changed bool, err error) {
+func AddRetraction(path string, data []byte, version, rationale string) (out []byte, changed bool, err error) {
 	f, err := Parse(path, data)
 	if err != nil {
 		return nil, false, err
@@ -155,13 +167,15 @@ func AddRetraction(path string, data []byte, version string) (out []byte, change
 	if !semver.IsValid(version) || semver.Canonical(version) != version {
 		return nil, false, fmt.Errorf("%q is not a canonical module version (vMAJOR.MINOR.PATCH)", version)
 	}
-	for _, r := range f.Retract {
-		if semver.Compare(r.Low, version) <= 0 && semver.Compare(version, r.High) <= 0 {
-			return data, false, nil
-		}
+	if Retracted(f, version) {
+		return data, false, nil
+	}
+	line := "retract " + version
+	if r := strings.Join(strings.Fields(rationale), " "); r != "" {
+		line += " // " + r
 	}
 	text := strings.TrimRight(string(data), " \t\r\n")
-	out = []byte(text + "\n\nretract " + version + "\n")
+	out = []byte(text + "\n\n" + line + "\n")
 	if _, err := Parse(path, out); err != nil {
 		return nil, false, err
 	}

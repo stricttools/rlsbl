@@ -189,10 +189,8 @@ func retracted(s Selection, pkg Package, v semver.Version) (bool, string, error)
 	if !found {
 		return false, goMod, fmt.Errorf("%s does not exist, so the retraction of v%s has nowhere to go", goMod, v)
 	}
-	for _, r := range f.Retract {
-		if r.Low == "v"+v.String() && r.High == "v"+v.String() {
-			return true, goMod, nil
-		}
+	if gomodule.Retracted(f, "v"+v.String()) {
+		return true, goMod, nil
 	}
 	changed, err := s.Repo.ChangedPaths([]string{goMod}, git.UntrackedNormal)
 	if err != nil {
@@ -231,14 +229,15 @@ func retract(ctx *strictcli.Context, s Selection, st yankStep, v semver.Version,
 	if err != nil {
 		return fmt.Errorf("reading %s: %w", st.goMod, err)
 	}
-	line := "retract v" + v.String()
-	if r := strings.Join(strings.Fields(reason), " "); r != "" {
-		line += " // " + r
-	}
-	text := strings.TrimRight(string(data), "\n") + "\n\n" + line + "\n"
-	if _, err := gomodule.Parse(st.goMod, []byte(text)); err != nil {
+	out, changed, err := gomodule.AddRetraction(st.goMod, data, "v"+v.String(), reason)
+	if err != nil {
 		return err
 	}
+	if !changed {
+		// planYank asks retracted first, so a covered version never gets here.
+		return fmt.Errorf("%s already retracts v%s, and the yank planned a retraction of it", st.goMod, v)
+	}
+	text := string(out)
 	e := ctx.Effects()
 	tmp := path + ".rlsbl-writing"
 	if _, err := e.Write(tmp, text); err != nil {
