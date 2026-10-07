@@ -664,18 +664,36 @@ func visibilityOf(info github.RepositoryInfo) lifecycle.Visibility {
 // declarations and the committed workflows publish, and the deploy
 // command's precondition.
 func refusePublishing(v *Validated, repo git.Repo, info github.RepositoryInfo, now time.Time) error {
+	return publishingRules(v.Workspace, v.Releasable, v.Lifecycle, repo, "HEAD", info, now)
+}
+
+// RefuseRepublishing holds a command that makes a release publish again
+// (`rlsbl release retry`) to the refusals release validation applies:
+// lifecycle-allows-release for the releasable and its members, then the
+// publishing rules refusePublishing applies, over the declarations and the
+// workflows committed at rev, the tree whose workflows run.
+func RefuseRepublishing(ws *workspace.Workspace, r declarations.Releasable, record *lifecycle.Record, repo git.Repo, rev string, info github.RepositoryInfo, now time.Time) error {
+	if err := refuseHeldLifecycle(record, ws, r, now); err != nil {
+		return err
+	}
+	return publishingRules(ws, r, record, repo, rev, info, now)
+}
+
+// publishingRules are the rules refusePublishing describes, with the
+// workflows read at rev.
+func publishingRules(ws *workspace.Workspace, r declarations.Releasable, record *lifecycle.Record, repo git.Repo, rev string, info github.RepositoryInfo, now time.Time) error {
 	source, err := publishrules.KnownVisibility(visibilityOf(info))
 	if err != nil {
 		return err
 	}
-	if err := publishrules.CheckVisibility(v.Lifecycle, source, now); err != nil {
+	if err := publishrules.CheckVisibility(record, source, now); err != nil {
 		return &ValidationError{Message: err.Error()}
 	}
-	uses, err := publishrules.ReleasableUses(v.Workspace, v.Releasable.Name)
+	uses, err := publishrules.ReleasableUses(ws, r.Name)
 	if err != nil {
 		return err
 	}
-	workflows, err := publishrules.CommittedWorkflows(repo, "HEAD")
+	workflows, err := publishrules.CommittedWorkflows(repo, rev)
 	if err != nil {
 		return err
 	}
@@ -683,10 +701,10 @@ func refusePublishing(v *Validated, repo git.Repo, info github.RepositoryInfo, n
 	if err != nil {
 		return err
 	}
-	if err := publishrules.CheckUses(v.Lifecycle, append(uses, workflowUses...), source, now); err != nil {
+	if err := publishrules.CheckUses(record, append(uses, workflowUses...), source, now); err != nil {
 		return &ValidationError{Message: err.Error()}
 	}
-	if err := publishrules.DeployAllowed(v.Lifecycle, v.Releasable, now); err != nil {
+	if err := publishrules.DeployAllowed(record, r, now); err != nil {
 		return &ValidationError{Message: err.Error()}
 	}
 	return nil

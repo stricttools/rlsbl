@@ -10,11 +10,13 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/lifecycle"
 
 	"github.com/stricttools/rlsbl/internal/ci"
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/github"
 	"github.com/stricttools/rlsbl/internal/publishrules"
+	"github.com/stricttools/rlsbl/internal/release"
 	"github.com/stricttools/rlsbl/internal/runstate"
 )
 
@@ -105,6 +107,9 @@ func Retry(ctx *strictcli.Context, req RetryRequest) (err error) {
 	}
 	gh, slug, err := openGitHub(e, s)
 	if err != nil {
+		return err
+	}
+	if err := refuseRepublishing(gh, slug, s, commit); err != nil {
 		return err
 	}
 	if err := requireRelease(gh, slug, tag); err != nil {
@@ -213,6 +218,26 @@ func Retry(ctx *strictcli.Context, req RetryRequest) (err error) {
 		return fmt.Errorf("the runs of %s that did not pass: %s", tag, strings.Join(failed, ", "))
 	}
 	ctx.Out(fmt.Sprintf("Every dispatched run of %s passed", tag))
+	return nil
+}
+
+// refuseRepublishing refuses a retry release validation would refuse: the
+// dispatched workflows publish the release again, so the releasable's
+// lifecycle and the publishing rules over the workflows the tag holds are
+// judged as a release judges them, before anything is written or
+// dispatched.
+func refuseRepublishing(gh github.Client, slug github.Repository, s Selection, commit string) error {
+	record, err := lifecycle.Load(s.Root())
+	if err != nil {
+		return err
+	}
+	info, err := gh.Info(slug)
+	if err != nil {
+		return fmt.Errorf("GitHub could not be asked about %s (%v), and a retry must know whether the repository is public before it publishes again; check `gh auth status` and run the retry again", slug, err)
+	}
+	if err := release.RefuseRepublishing(s.Workspace, s.Releasable, record, s.Repo, commit, info, time.Now()); err != nil {
+		return fmt.Errorf("%w\n  Nothing was dispatched: a retry publishes the release again, and is refused what a release is refused", err)
+	}
 	return nil
 }
 

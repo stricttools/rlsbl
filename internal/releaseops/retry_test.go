@@ -1,12 +1,14 @@
 package releaseops_test
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/lifecycle"
 	"github.com/stricttools/testisolation/go/hygiene"
 
 	"github.com/stricttools/rlsbl/internal/releaseops"
@@ -73,7 +75,7 @@ func retry(t *testing.T, p *project, dryRun bool) strictcli.Result {
 func TestRetryWritesTheRetryFileAndDispatchesAtTheTag(t *testing.T) {
 	hygiene.Isolate(t)
 	p := portalWithWorkflows(t)
-	gh := testsupport.FakeGH(t, authStatus, releaseExists("v0.4.0"),
+	gh := testsupport.FakeGH(t, authStatus, repoInfo("public"), releaseExists("v0.4.0"),
 		testsupport.GHAnswer{Args: dispatchArgs("ci.yml", false)},
 		testsupport.GHAnswer{Args: dispatchArgs("publish.yml", true)})
 	r := retry(t, p, false)
@@ -93,7 +95,7 @@ func TestRetryWritesTheRetryFileAndDispatchesAtTheTag(t *testing.T) {
 func TestARetryFileNamingAnotherRefIsRefusedUntilItNamesTheTag(t *testing.T) {
 	hygiene.Isolate(t)
 	p := portalWithWorkflows(t)
-	gh := testsupport.FakeGH(t, authStatus, releaseExists("v0.4.0"), testsupport.GHAnswer{Args: dispatchArgs("publish.yml", true)})
+	gh := testsupport.FakeGH(t, authStatus, repoInfo("public"), releaseExists("v0.4.0"), testsupport.GHAnswer{Args: dispatchArgs("publish.yml", true)})
 	p.Write(runstate.RetryPath("portal"), "format_version = 1\nref = \"main\"\nworkflows = [\"publish.yml\"]\n")
 	r := retry(t, p, false)
 	requireExit(t, r, 1)
@@ -113,7 +115,7 @@ func TestARetryFileNamingAnotherRefIsRefusedUntilItNamesTheTag(t *testing.T) {
 func TestRetryRefusesWithoutAGitHubReleaseUntilOneExists(t *testing.T) {
 	hygiene.Isolate(t)
 	p := portalWithWorkflows(t)
-	gh := testsupport.FakeGH(t, authStatus, releaseMissing("v0.4.0"))
+	gh := testsupport.FakeGH(t, authStatus, repoInfo("public"), releaseMissing("v0.4.0"))
 	r := retry(t, p, false)
 	requireExit(t, r, 1)
 	requireContains(t, r.Stderr, "has no GitHub Release for v0.4.0", "rlsbl release reconcile")
@@ -122,7 +124,7 @@ func TestRetryRefusesWithoutAGitHubReleaseUntilOneExists(t *testing.T) {
 			t.Fatalf("a refused retry dispatched: %q", c.Args)
 		}
 	}
-	testsupport.FakeGH(t, authStatus, releaseExists("v0.4.0"),
+	testsupport.FakeGH(t, authStatus, repoInfo("public"), releaseExists("v0.4.0"),
 		testsupport.GHAnswer{Args: dispatchArgs("ci.yml", false)},
 		testsupport.GHAnswer{Args: dispatchArgs("publish.yml", true)})
 	requireExit(t, retry(t, p, false), 0)
@@ -131,7 +133,7 @@ func TestRetryRefusesWithoutAGitHubReleaseUntilOneExists(t *testing.T) {
 func TestAFailedDispatchLeavesOnlyTheRestToRetry(t *testing.T) {
 	hygiene.Isolate(t)
 	p := portalWithWorkflows(t)
-	first := testsupport.FakeGH(t, authStatus, releaseExists("v0.4.0"),
+	first := testsupport.FakeGH(t, authStatus, repoInfo("public"), releaseExists("v0.4.0"),
 		testsupport.GHAnswer{Args: dispatchArgs("ci.yml", false)},
 		testsupport.GHAnswer{Args: dispatchArgs("publish.yml", true), Stderr: "HTTP 500\n", Exit: 1})
 	r := retry(t, p, false)
@@ -141,7 +143,7 @@ func TestAFailedDispatchLeavesOnlyTheRestToRetry(t *testing.T) {
 		t.Fatal("ci.yml was not dispatched")
 	}
 	requireContains(t, p.read(runstate.RetryPath("portal")), `workflows = ["publish.yml"]`)
-	second := testsupport.FakeGH(t, authStatus, releaseExists("v0.4.0"), testsupport.GHAnswer{Args: dispatchArgs("publish.yml", true)})
+	second := testsupport.FakeGH(t, authStatus, repoInfo("public"), releaseExists("v0.4.0"), testsupport.GHAnswer{Args: dispatchArgs("publish.yml", true)})
 	requireExit(t, retry(t, p, false), 0)
 	var dispatched [][]string
 	for _, c := range second.Calls() {
@@ -157,7 +159,7 @@ func TestAFailedDispatchLeavesOnlyTheRestToRetry(t *testing.T) {
 func TestAnUnreadableRetryFileIsRefusedAndKept(t *testing.T) {
 	hygiene.Isolate(t)
 	p := portalWithWorkflows(t)
-	testsupport.FakeGH(t, authStatus, releaseExists("v0.4.0"))
+	testsupport.FakeGH(t, authStatus, repoInfo("public"), releaseExists("v0.4.0"))
 	p.Write(runstate.RetryPath("portal"), "format_version = 1\nref = \"v0.4.0\"\n")
 	r := retry(t, p, false)
 	requireExit(t, r, 1)
@@ -170,7 +172,7 @@ func TestAnUnreadableRetryFileIsRefusedAndKept(t *testing.T) {
 func TestARetryFileNamingAWorkflowTheTaggedTreeLacksIsRefused(t *testing.T) {
 	hygiene.Isolate(t)
 	p := portalWithWorkflows(t)
-	testsupport.FakeGH(t, authStatus, releaseExists("v0.4.0"))
+	testsupport.FakeGH(t, authStatus, repoInfo("public"), releaseExists("v0.4.0"))
 	p.Write(runstate.RetryPath("portal"), "format_version = 1\nref = \"v0.4.0\"\nworkflows = [\"deploy.yml\"]\n")
 	r := retry(t, p, false)
 	requireExit(t, r, 1)
@@ -180,7 +182,7 @@ func TestARetryFileNamingAWorkflowTheTaggedTreeLacksIsRefused(t *testing.T) {
 func TestADryRunRetryDispatchesNothing(t *testing.T) {
 	hygiene.Isolate(t)
 	p := portalWithWorkflows(t)
-	gh := testsupport.FakeGH(t, authStatus, releaseExists("v0.4.0"))
+	gh := testsupport.FakeGH(t, authStatus, repoInfo("public"), releaseExists("v0.4.0"))
 	r := retry(t, p, true)
 	requireExit(t, r, 0)
 	requireContains(t, r.Stdout, "Would dispatch ci.yml, publish.yml at v0.4.0")
@@ -203,4 +205,82 @@ func TestRetryNeedsARelease(t *testing.T) {
 	if strings.Contains(r.Stderr, "panic") {
 		t.Fatal(r.Stderr)
 	}
+}
+
+// repoInfo is gh's answer about acme/portal: the repository is visibility,
+// and the caller may push to it.
+func repoInfo(visibility string) testsupport.GHAnswer {
+	return testsupport.GHAnswer{Args: []string{"api", "--method", "GET", "repos/" + slug},
+		Stdout: fmt.Sprintf(`{"full_name":%q,"visibility":%q,"private":%t,"archived":false,"permissions":{"push":true}}`, slug, visibility, visibility != "public")}
+}
+
+// requireNoDispatch fails the test when gh was asked to dispatch anything.
+func requireNoDispatch(t *testing.T, gh *testsupport.GH) {
+	t.Helper()
+	for _, c := range gh.Calls() {
+		if c.Args[0] == "workflow" {
+			t.Fatalf("a refused retry dispatched: %q", c.Args)
+		}
+	}
+}
+
+const onHoldRecord = `format_version = 1
+
+[[lifecycle]]
+subject = "portal"
+status = "on-hold"
+from = 2026-01-01
+reason = "paused"
+`
+
+func TestRetryRefusesAReleasableOnHoldUntilItIsActive(t *testing.T) {
+	hygiene.Isolate(t)
+	p := portalWithWorkflows(t)
+	p.Write(lifecycle.RecordFile, onHoldRecord)
+	p.Commit("put portal on hold", lifecycle.RecordFile)
+	gh := testsupport.FakeGH(t, authStatus, repoInfo("public"), releaseExists("v0.4.0"))
+	r := retry(t, p, false)
+	requireExit(t, r, 1)
+	requireContains(t, r.Stderr, "on-hold", "Nothing was dispatched")
+	requireNoDispatch(t, gh)
+	if p.exists(runstate.RetryPath("portal")) {
+		t.Fatal("a refused retry wrote its retry file")
+	}
+	// The fix the refusal names: an active lifecycle period.
+	p.Write(lifecycle.RecordFile, strings.Replace(onHoldRecord, "reason = \"paused\"\n", "until = 2026-02-01\nreason = \"paused\"\n", 1)+"\n[[lifecycle]]\nsubject = \"portal\"\nstatus = \"active\"\nfrom = 2026-02-01\nreason = \"resumed\"\n")
+	p.Commit("portal is active again", lifecycle.RecordFile)
+	testsupport.FakeGH(t, authStatus, repoInfo("public"), releaseExists("v0.4.0"),
+		testsupport.GHAnswer{Args: dispatchArgs("ci.yml", false)},
+		testsupport.GHAnswer{Args: dispatchArgs("publish.yml", true)})
+	requireExit(t, retry(t, p, false), 0)
+}
+
+func TestRetryRefusesToRepublishAProprietaryReleasable(t *testing.T) {
+	hygiene.Isolate(t)
+	p := portalWithWorkflows(t)
+	p.Write(lifecycle.RecordFile, proprietaryRecord)
+	p.Commit("classify portal", lifecycle.RecordFile)
+	// In a public repository the record and the visibility disagree.
+	gh := testsupport.FakeGH(t, authStatus, repoInfo("public"), releaseExists("v0.4.0"))
+	r := retry(t, p, false)
+	requireExit(t, r, 1)
+	requireContains(t, r.Stderr, "proprietary", "Nothing was dispatched")
+	requireNoDispatch(t, gh)
+	// In a private one, the npm pipeline the declarations publish through is
+	// a public output proprietary software never makes.
+	p.Write(declarationsPath, standaloneDeclarations+`targets = [{ name = "npm" }]
+
+[[members.pipelines]]
+name = "npm"
+type = "npm"
+target = "npm"
+local = false
+artifact = "package"
+`)
+	p.Commit("publish portal to npm", declarationsPath)
+	gh = testsupport.FakeGH(t, authStatus, repoInfo("private"), releaseExists("v0.4.0"))
+	r = retry(t, p, false)
+	requireExit(t, r, 1)
+	requireContains(t, r.Stderr, "proprietary", "npm", "Nothing was dispatched")
+	requireNoDispatch(t, gh)
 }

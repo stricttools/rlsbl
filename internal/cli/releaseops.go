@@ -16,7 +16,10 @@ const releaseEditHelp = "Rewrite one released version's GitHub Release in place 
 	"releasable."
 
 const releaseRetryHelp = "Dispatch the workflows of the releasable's latest release again at its tag, for a release whose GitHub Release exists " +
-	"while its publish runs never started or failed for reasons outside it. What is dispatched is the retry file, " +
+	"while its publish runs never started or failed for reasons outside it. A retry publishes again, so before anything is written or " +
+	"dispatched it is refused what release validation refuses: a releasable or member on hold or retired, a repository whose visibility " +
+	"disagrees with the lifecycle-and-license record, and an output the publishing rules forbid in the declarations or the tagged tree's " +
+	"workflows. What is dispatched is the retry file, " +
 	".strictmetadata/.release-state/<releasable>/retry.toml: ref, which must be the release tag (any other ref is refused, since a run there " +
 	"cannot be tied to the release), and the workflow files. A missing retry file is written first, naming every workflow of the tagged tree " +
 	"with a workflow_dispatch trigger. A workflow declaring a tag input is passed the tag. Workflows are dispatched one at a time; a dispatch " +
