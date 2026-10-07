@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/dependencies"
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/gomodule"
+	"github.com/stricttools/rlsbl/internal/previewapply"
 	"github.com/stricttools/rlsbl/internal/targets"
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
@@ -489,7 +491,7 @@ type goListedModule struct {
 // version the workspace's build list selects. The build list comes from `go
 // list -m -json all`; each module's requirements from its go.mod.
 func goWorkSyncChanges(r HookRunner, dir, where string, environment map[string]string, timeout time.Duration) ([]string, error) {
-	argv := []string{"go", "list", "-m", "-json", "all"}
+	argv := slices.Clone(previewapply.GoBuildList)
 	out, code, stderr, err := runGo(r, dir, where, argv, environment, timeout)
 	if err != nil {
 		return nil, err

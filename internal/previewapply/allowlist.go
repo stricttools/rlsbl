@@ -50,9 +50,12 @@
 //
 // git status, diff, and diff-index appear only with --no-optional-locks,
 // here and at every call site: without it they refresh the index and take
-// index.lock. go list appears in the two forms rlsbl issues, because the
-// bare prefix also admits go list -mod=mod, which rewrites go.mod and
-// go.sum. gh auth status is pinned to --hostname github.com, because the
+// index.lock. go list appears only as the two whole argvs rlsbl issues
+// (GoBuildList and GoPackageListing, which the call sites use), because the
+// bare prefix, or any prefix ending before the package or module pattern,
+// also admits go list -mod=mod, which rewrites go.mod and go.sum; go reads
+// no flag after the first pattern, so nothing appended to them is a flag.
+// gh auth status is pinned to --hostname github.com, because the
 // bare prefix also admits --show-token and -t, which print the credential.
 // No entry is a single token: that would make every invocation of the
 // program an observe.
@@ -93,6 +96,17 @@ type Entry struct {
 	Reason   string
 }
 
+// The go list argvs rlsbl issues while observing, each pinned whole in the
+// allowlist and used as is by its call site.
+var (
+	// GoBuildList prints the build list of the module or workspace in the
+	// working directory as a stream of JSON objects.
+	GoBuildList = []string{"go", "list", "-m", "-json", "all"}
+	// GoPackageListing prints one line per package of the module in the
+	// working directory: its name, import path, and directory, tab-separated.
+	GoPackageListing = []string{"go", "list", "-e", "-f", "{{.Name}}\t{{.ImportPath}}\t{{.Dir}}", "./..."}
+)
+
 // Allowlist is the observe allowlist.
 var Allowlist = []Entry{
 	{[]string{"git", "rev-parse"}, LocalRead, "resolves refs and paths"},
@@ -120,7 +134,6 @@ var Allowlist = []Entry{
 	{[]string{"git", "config", "--get-all"}, LocalRead, "reads config values"},
 	{[]string{"git", "config", "--list"}, LocalRead, "lists config"},
 	{[]string{"git", "remote", "get-url"}, LocalRead, "reads a remote URL"},
-	{[]string{"git", "remote", "-v"}, LocalRead, "lists remotes"},
 	{[]string{"git", "branch", "--show-current"}, LocalRead, "reads the branch"},
 	{[]string{"git", "branch", "--contains"}, LocalRead, "lists containing branches"},
 	{[]string{"git", "branch", "-a"}, LocalRead, "lists branches"},
@@ -143,8 +156,8 @@ var Allowlist = []Entry{
 	{[]string{"gh", "workflow", "list"}, NetworkRead, "lists workflows"},
 	{[]string{"gh", "--version"}, SelfReport, "prints gh's version"},
 	{[]string{"npm", "view"}, NetworkRead, "registry metadata read; its only write is npm's own cache"},
-	{[]string{"go", "list", "-m"}, NetworkRead, "module metadata read (the Go module proxy notification); its only write is the module cache"},
-	{[]string{"go", "list", "-e", "-f"}, LocalRead, "package enumeration; -e keeps it off the network and the format string only shapes stdout"},
+	{GoBuildList, NetworkRead, "reads the build list of a Go module or workspace (the release's go work sync check); its only write is the module cache"},
+	{GoPackageListing, LocalRead, "package enumeration; -e keeps it off the network and the format string only shapes stdout"},
 	{[]string{"go", "mod", "tidy", "-diff"}, NetworkRead, "reports what `go mod tidy` would change without changing go.mod or go.sum (the release's untidy-module check); its only write is the module cache"},
 	{[]string{"go", "mod", "edit", "-json"}, LocalRead, "prints a module's go.mod as JSON; -json prints the result instead of writing go.mod"},
 	{[]string{"go", "work", "edit", "-json"}, LocalRead, "prints go.work as JSON; -json prints the result instead of writing go.work"},

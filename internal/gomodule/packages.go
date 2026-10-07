@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+
+	"github.com/stricttools/rlsbl/internal/previewapply"
 )
 
 // listTimeout bounds `go list`, which reads only the local tree.
@@ -51,7 +53,11 @@ func ListPackages(r Runner, dir string) ([]Package, error) {
 		}
 		return nil, err
 	}
-	res, err := r.Run([]interface{}{"go", "list", "-e", "-f", "{{.Name}}\t{{.ImportPath}}\t{{.Dir}}", "./..."},
+	argv := make([]interface{}, len(previewapply.GoPackageListing))
+	for i, a := range previewapply.GoPackageListing {
+		argv[i] = a
+	}
+	res, err := r.Run(argv,
 		strictcli.Cwd(dir), strictcli.Check(false), strictcli.Timeout(listTimeout))
 	if err != nil {
 		return nil, err

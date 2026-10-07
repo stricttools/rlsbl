@@ -109,6 +109,7 @@ var forbidden = map[string][][]string{
 		{"git", "rebase", "origin/main"},
 		{"git", "stash", "push"},
 		{"git", "remote", "add", "origin", "git@example:x/y"},
+		{"git", "remote", "-v", "add", "origin", "git@example:x/y"},
 		{"git", "subtree", "split", "--prefix", "pkg"},
 	},
 	"a worktree write": {
@@ -148,6 +149,9 @@ var forbidden = map[string][][]string{
 		{"npm", "install"},
 		{"go", "get", "example.com/m"},
 		{"go", "list", "-mod=mod", "all"},
+		{"go", "list", "-m", "-mod=mod", "all"},
+		{"go", "list", "-m", "-json", "-mod=mod", "all"},
+		{"go", "list", "-e", "-f", "{{.Name}}", "-mod=mod", "./..."},
 		{"uv", "publish"},
 		{"uv", "sync"},
 		{"ruff", "check", "--fix", "."},
@@ -185,8 +189,8 @@ func TestTheReadsStillMatch(t *testing.T) {
 		{"gh", "auth", "status", "--hostname", "github.com"},
 		{"gh", "run", "view", "1", "--log-failed"},
 		{"npm", "view", "widget", "version"},
-		{"go", "list", "-m", "all"},
-		{"go", "list", "-e", "-f", "{{.Name}}", "./..."},
+		{"go", "list", "-m", "-json", "all"},
+		{"go", "list", "-e", "-f", "{{.Name}}\t{{.ImportPath}}\t{{.Dir}}", "./..."},
 	} {
 		if !Allowed(argv) {
 			t.Errorf("%s is a read but matches no entry", joined(argv))
