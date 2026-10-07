@@ -167,6 +167,9 @@ func RunPreflight(app CheckRunner, ctx strictcli.CheckContext, sel PreflightSele
 		if err != nil {
 			return report, fmt.Errorf("running the preflight check %s: %w", name, err)
 		}
+		if len(results) == 0 && len(listed) == 0 {
+			return report, fmt.Errorf("the preflight check %s was selected, and no check registered for the member's directory holds that name, so nothing ran; an external check is registered from the external_checks of the member in %s", name, declarations.ReleasablesFile)
+		}
 		for _, r := range results {
 			if seen[r.Name] {
 				continue

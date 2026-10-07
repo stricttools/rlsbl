@@ -39,14 +39,14 @@ var checkName = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
 const externalOutputLines = 20
 
 // externalCheckProvider supplies, at materialization, the external checks
-// the member the current directory lies in declares. A directory whose
-// declarations cannot be read supplies none: declarations-valid reports
-// why, and every other check refuses to answer there. A name that is not a
-// check name, or that a shipped check holds, is a hard error naming the
-// declaration to fix.
-func externalCheckProvider(shipped map[string]declaration) func() []strictcli.CheckSpec {
+// the member the directory the run answers for lies in declares. A
+// directory whose declarations cannot be read supplies none:
+// declarations-valid reports why, and every other check refuses to answer
+// there. A name that is not a check name, or that a shipped check holds, is
+// a hard error naming the declaration to fix.
+func externalCheckProvider(shipped map[string]declaration, directory func() (string, error)) func() []strictcli.CheckSpec {
 	return func() []strictcli.CheckSpec {
-		dir, err := os.Getwd()
+		dir, err := directory()
 		if err != nil {
 			return nil
 		}

@@ -134,7 +134,7 @@ func TestEveryDeclaredCheckIsImplementedOnce(t *testing.T) {
 func TestRegisterRegistersEveryImplementedCheck(t *testing.T) {
 	hygiene.Isolate(t)
 	app := strictcli.NewApp("rlsbl", "0.0.0", "A test application", strictcli.WithChecksEmbed(Registry))
-	if err := Register(app); err != nil {
+	if _, err := Register(app); err != nil {
 		t.Fatal(err)
 	}
 }

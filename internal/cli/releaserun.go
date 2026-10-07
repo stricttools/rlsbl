@@ -77,7 +77,7 @@ func registerReleaseRun(r *commandSet, version string) {
 			strictcli.StringFlag("releasable", "The releasable to release, where the working directory selects none", strictcli.Optional()),
 		}, releaseTimeoutFlags()...),
 		run: func(ctx *strictcli.Context, kw map[string]any) (any, error) {
-			req, err := releaseRunRequest(ctx, kw, version, r.app)
+			req, err := releaseRunRequest(ctx, kw, version, r.checks)
 			if err != nil {
 				return nil, err
 			}
@@ -100,7 +100,7 @@ func registerReleaseRun(r *commandSet, version string) {
 			strictcli.BoolFlag("watch", "Watch CI on the release commit afterwards and verify the registries list the version (--no-watch says it was not verified)", strictcli.Required()),
 		}, releaseTimeoutFlags()...),
 		run: func(ctx *strictcli.Context, kw map[string]any) (any, error) {
-			req, err := releaseRunRequest(ctx, kw, version, r.app)
+			req, err := releaseRunRequest(ctx, kw, version, r.checks)
 			if err != nil {
 				return nil, err
 			}

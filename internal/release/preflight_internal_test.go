@@ -102,13 +102,19 @@ type fakeChecks struct {
 	outcomes  map[string]func() strictcli.CheckOutcome
 	dependsOn map[string][]string
 	impure    map[string]bool
-	asked     []string
-	pureOnly  []bool
+	// unknown are names no check registered holds: a run selecting one runs
+	// nothing, as strictcli's runner does.
+	unknown  map[string]bool
+	asked    []string
+	pureOnly []bool
 }
 
 func (f *fakeChecks) RunChecks(_ strictcli.CheckContext, opts strictcli.RunChecksOptions) ([]strictcli.CheckRunResult, []string, int, error) {
 	f.asked = append(f.asked, opts.NameGlob)
 	f.pureOnly = append(f.pureOnly, opts.PureOnly)
+	if f.unknown[opts.NameGlob] {
+		return []strictcli.CheckRunResult{}, nil, 0, nil
+	}
 	var results []strictcli.CheckRunResult
 	var listed []string
 	for _, name := range append(append([]string{}, f.dependsOn[opts.NameGlob]...), opts.NameGlob) {
@@ -167,6 +173,20 @@ func TestAPreflightUnderDryRunRunsPureChecksAndListsTheOthers(t *testing.T) {
 	}
 	if strings.Join(report.Impure, ",") != "test-suite" || len(report.Results) != 1 || fake.pureOnly[0] != true {
 		t.Errorf("the report: %+v (pure only %v)", report, fake.pureOnly)
+	}
+}
+
+func TestAPreflightCheckNoCheckRegisteredHoldsIsAnError(t *testing.T) {
+	hygiene.Isolate(t)
+	for _, dryRun := range []bool{false, true} {
+		fake := &fakeChecks{
+			outcomes: map[string]func() strictcli.CheckOutcome{"strictcode": passing},
+			unknown:  map[string]bool{"portal-lint": true},
+		}
+		_, err := RunPreflight(fake, root("/repo"), PreflightSelection{Checks: []string{"portal-lint", "strictcode"}}, dryRun)
+		if err == nil || !strings.Contains(err.Error(), "portal-lint") || !strings.Contains(err.Error(), "no check registered") {
+			t.Errorf("under dry run %v, a selected check that ran nothing was not refused: %v", dryRun, err)
+		}
 	}
 }
 

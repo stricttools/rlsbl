@@ -14,6 +14,7 @@ import (
 	"github.com/stricttools/strictcli/go/strictcli"
 	"github.com/stricttools/strictspec/go/lifecycle/index"
 
+	"github.com/stricttools/rlsbl/internal/checks"
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/lifecycleops"
@@ -103,6 +104,10 @@ func newGrant(name, reason, effectClass string) strictcli.Grant {
 type commandSet struct {
 	app    *strictcli.App
 	groups map[string]*strictcli.Group
+	// checks runs the registered checks for a command that builds its own
+	// check context; registerChecks sets it, and the handlers read it when
+	// they run.
+	checks *checks.Runner
 }
 
 func newRegistry(app *strictcli.App) *commandSet {

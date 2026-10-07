@@ -81,7 +81,7 @@ func New(d Dependencies) (*strictcli.App, error) {
 	registerMigrate(r, d.Version)
 	registerChangelog(r)
 	registerTransition(r)
-	if err := registerChecks(app); err != nil {
+	if err := registerChecks(r); err != nil {
 		return nil, err
 	}
 	return app, nil

@@ -147,28 +147,32 @@ func Implemented() []string {
 }
 
 // Register registers every check package checks implements on app, whose
-// checks registry is Registry, and the provider of the external checks
-// the members declare. Each implementation sees the run's *Context
-// narrowed by the check's scope, and a check answering for one releasable
-// refuses at a workspace root.
-func Register(app *strictcli.App) error {
+// checks registry is Registry, the provider of the external checks the
+// members declare, and the resolver giving each check the value the
+// repository's options assign it, and returns the runner a command that
+// runs checks with a context of its own runs them through. Each
+// implementation sees the run's *Context narrowed by the check's scope, and
+// a check answering for one releasable refuses at a workspace root.
+func Register(app *strictcli.App) (*Runner, error) {
 	decls, err := declared()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for _, family := range families {
 		for _, c := range family() {
 			d, ok := decls[c.name]
 			if !ok {
-				return fmt.Errorf("checks: %s is implemented but internal/checks/checks.toml does not declare it", c.name)
+				return nil, fmt.Errorf("checks: %s is implemented but internal/checks/checks.toml does not declare it", c.name)
 			}
 			if err := register(app, c, d); err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
-	app.RegisterCheckProvider(externalCheckProvider(decls))
-	return nil
+	runner := &Runner{app: app}
+	app.RegisterCheckProvider(externalCheckProvider(decls, runner.directory))
+	app.SetCheckValueResolver(runner.value)
+	return runner, nil
 }
 
 func register(app *strictcli.App, c check, d declaration) error {

@@ -45,7 +45,8 @@ type RunRequest struct {
 	// RlsblVersion is the running rlsbl's version, which the scaffold state
 	// records.
 	RlsblVersion string
-	// Checks runs the preflight checks: the strictcli app.
+	// Checks runs the preflight checks: the checks.Runner of the app, which
+	// runs them for the member directory each check context names.
 	Checks CheckRunner
 	// Home is the user's home directory and IndexPath the machine-local
 	// confidential-name index, both read by the checks; IndexPath is also

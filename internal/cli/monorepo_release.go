@@ -49,7 +49,7 @@ func registerMonorepoRelease(r *commandSet, version string) {
 			strictcli.BoolFlag("watch", "Watch CI on each release commit afterwards and verify the registries list each version (--no-watch says it was not verified)", strictcli.Required()),
 		}, releaseTimeoutFlags()...),
 		run: func(ctx *strictcli.Context, kw map[string]any) (any, error) {
-			req, err := releaseRunRequest(ctx, kw, version, r.app)
+			req, err := releaseRunRequest(ctx, kw, version, r.checks)
 			if err != nil {
 				return nil, err
 			}
