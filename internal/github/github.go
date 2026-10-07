@@ -87,29 +87,36 @@ func ParseRepository(slug string) (Repository, error) {
 }
 
 var (
-	httpsRemote = regexp.MustCompile(`^https?://[^/]+/(.+)$`)
-	scpRemote   = regexp.MustCompile(`^(?:[^@/:]+@)?[^@/:]+:(.+/.+)$`)
+	httpsRemote = regexp.MustCompile(`^https?://([^/]+)/(.+)$`)
+	scpRemote   = regexp.MustCompile(`^(?:[^@/:]+@)?([^@/:]+):(.+/.+)$`)
 )
 
+// githubHost is the one host whose repositories a remote URL may name.
+const githubHost = "github.com"
+
 // RepositoryFromRemoteURL reads the repository a git remote URL names:
-// https://host/owner/name[.git] (the last two path segments), or the SCP
-// form [user@]host:owner/name[.git] with exactly two segments. A URL in
-// any other form is refused, naming it.
+// https://github.com/owner/name[.git], or the SCP form
+// [user@]host:owner/name[.git] whose host is github.com or an SSH alias (a
+// host without a dot, which the SSH configuration resolves). Any other host
+// names another forge or a server rlsbl cannot ask GitHub about, and is
+// refused, as is a URL in any other form, naming it.
 func RepositoryFromRemoteURL(url string) (Repository, error) {
-	refuse := fmt.Errorf("the remote URL %q names no GitHub repository (expected https://github.com/owner/name or git@github.com:owner/name)", url)
+	refuse := fmt.Errorf("the remote URL %q names no GitHub repository (expected https://github.com/owner/name, git@github.com:owner/name, or an SSH alias without a dot such as gh:owner/name)", url)
 	if m := httpsRemote.FindStringSubmatch(url); m != nil {
-		parts := strings.Split(strings.TrimRight(strings.TrimSuffix(m[1], ".git"), "/"), "/")
-		if len(parts) < 2 {
+		if m[1] != githubHost {
 			return Repository{}, refuse
 		}
-		repo, err := ParseRepository(parts[len(parts)-2] + "/" + strings.TrimSuffix(parts[len(parts)-1], ".git"))
+		repo, err := ParseRepository(strings.TrimSuffix(strings.TrimRight(m[2], "/"), ".git"))
 		if err != nil {
 			return Repository{}, refuse
 		}
 		return repo, nil
 	}
 	if m := scpRemote.FindStringSubmatch(url); m != nil {
-		repo, err := ParseRepository(strings.TrimSuffix(m[1], ".git"))
+		if m[1] != githubHost && strings.Contains(m[1], ".") {
+			return Repository{}, refuse
+		}
+		repo, err := ParseRepository(strings.TrimSuffix(m[2], ".git"))
 		if err != nil {
 			return Repository{}, refuse
 		}

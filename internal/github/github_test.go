@@ -52,7 +52,6 @@ func TestRepositoryFromRemoteURL(t *testing.T) {
 		"https://github.com/acme/portal.git":  "acme/portal",
 		"https://github.com/acme/portal":      "acme/portal",
 		"https://github.com/acme/portal/":     "acme/portal",
-		"https://host/group/acme/portal.git":  "acme/portal",
 		"http://github.com/acme/widget-2.git": "acme/widget-2",
 	} {
 		got, err := RepositoryFromRemoteURL(url)
@@ -63,6 +62,27 @@ func TestRepositoryFromRemoteURL(t *testing.T) {
 	for _, url := range []string{"", "/srv/git/portal.git", "file:///srv/portal", "git@github.com:portal.git", "git@github.com:a/b/c.git", "https://github.com/portal"} {
 		if got, err := RepositoryFromRemoteURL(url); err == nil {
 			t.Errorf("%q was read as %v", url, got)
+		}
+	}
+	// A host that is a domain names a forge: only github.com is GitHub. An
+	// SSH alias (no dot) stands for a host the SSH configuration names.
+	for _, url := range []string{
+		"git@gitlab.com:acme/portal.git",
+		"gitlab.com:acme/portal",
+		"https://gitlab.com/acme/portal.git",
+		"https://host/group/acme/portal.git",
+		"https://github.example.com/acme/portal",
+		"git@github.com.evil.org:acme/portal.git",
+		"https://github.com/group/acme/portal.git",
+		"https://github.com:8443/acme/portal",
+	} {
+		got, err := RepositoryFromRemoteURL(url)
+		if err == nil {
+			t.Errorf("%q was read as %v", url, got)
+			continue
+		}
+		if !strings.Contains(err.Error(), url) {
+			t.Errorf("the refusal of %q does not name it: %v", url, err)
 		}
 	}
 }
