@@ -148,6 +148,10 @@ func checkGoCompanionTags(c *Context, r *strictcli.ErrorReporter) strictcli.Chec
 		}
 		checked++
 		for _, tag := range expected.Companions {
+			if owner, closed := closedOwner(c, tag, archive.ReleaseCommit.Commit); closed {
+				r.Note(fmt.Sprintf("%s: %s", rel.Name, closedOwnerNote(tag, owner)))
+				continue
+			}
 			if _, ok := local[tag]; !ok {
 				missing = append(missing, fmt.Sprintf("%s: %s, its latest release, owes the companion tag %s, which does not exist locally. %s", rel.Name, v, tag, reconcileFix))
 			}

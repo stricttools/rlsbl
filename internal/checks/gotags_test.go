@@ -93,3 +93,45 @@ func TestACompanionEqualToThePrimaryTagIsNotOwedTwice(t *testing.T) {
 	writeArchive(t, r, "widget", "1.0.0", r.Head(), map[string]string{"widget": strings.Repeat("e", 40)})
 	mustStatus(t, runCheck(t, inputs(t, r.Dir), "go-companion-tags"), "skip")
 }
+
+// widgetMovedRecord licenses widget and records that its companion tags
+// (widget/v*) belonged to an identity that closed on 2026-05-01.
+const widgetMovedRecord = `format_version = 1
+
+[[lifecycle]]
+subject = "widget"
+status = "active"
+from = 2026-01-01
+reason = "first release"
+
+[[licenses]]
+subject = "widget"
+license = "MIT"
+from = 2026-01-01
+reason = "chosen by the owner"
+
+[[identities]]
+subject = "widget"
+facet = "go-module-path"
+value = "github.com/acme/oldrepo/widget"
+registry = "go"
+tag_patterns = ["widget/v*"]
+from = 2026-01-01
+until = 2026-05-01
+reason = "the first home"
+`
+
+func TestACompanionTagAClosedIdentityOwnsIsNotOwed(t *testing.T) {
+	hygiene.Isolate(t)
+	t.Setenv("GIT_COMMITTER_DATE", "2026-03-01T12:00:00Z")
+	t.Setenv("GIT_AUTHOR_DATE", "2026-03-01T12:00:00Z")
+	r := workspaceRepo(t)
+	r.Write(".strictmetadata/releasables/releasables.toml", widgetAtSign)
+	r.Write(recordFile, widgetMovedRecord)
+	r.Git("add", "-A")
+	r.Git("commit", "-q", "-m", "Tag widget with its name")
+	writeArchive(t, r, "widget", "1.0.0", r.Head(), map[string]string{"widget": strings.Repeat("e", 40)})
+	got := runCheck(t, inputs(t, r.Dir), "go-companion-tags")
+	mustStatus(t, got, "pass")
+	mustMention(t, got, "widget/v1.0.0", "github.com/acme/oldrepo/widget")
+}

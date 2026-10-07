@@ -83,7 +83,9 @@ func boundaryAliases(c *Context, rel declarations.Releasable) map[string][]strin
 
 // refTally counts what unpublished-refs found besides its errors.
 type refTally struct {
-	neverReleased      []string
+	neverReleased []string
+	// closedOwned are the notes on refs a closed identity owns.
+	closedOwned        []string
 	unrecoverableRefs  int
 	unrecoverableNotes int
 	releasesListed     bool
@@ -144,6 +146,9 @@ func checkUnpublishedRefs(c *Context, r *strictcli.ErrorReporter) strictcli.Chec
 	for _, v := range versions {
 		problems = append(problems, versionRefProblems(c, rel, scheme, dir, v, members, aliases, local, remote, releases, &tally)...)
 	}
+	for _, n := range tally.closedOwned {
+		r.Note(n)
+	}
 	if len(problems) > 0 {
 		return reportErrors(r, problems, fmt.Sprintf("%d ref or Release problem(s) of archived releases of %q", len(problems), rel.Name), "")
 	}
@@ -164,6 +169,9 @@ func checkUnpublishedRefs(c *Context, r *strictcli.ErrorReporter) strictcli.Chec
 	}
 	if tally.unrecoverableNotes > 0 {
 		scope += fmt.Sprintf("; %d GitHub Release(s) absent for versions recorded unrecoverable", tally.unrecoverableNotes)
+	}
+	if len(tally.closedOwned) > 0 {
+		scope += fmt.Sprintf("; %d ref(s) owned by closed identities, accounted for and not demanded", len(tally.closedOwned))
 	}
 	return r.Passed(fmt.Sprintf("%s exists for %s", subjects, scope))
 }
@@ -208,6 +216,12 @@ func versionRefProblems(c *Context, rel declarations.Releasable, scheme workspac
 	}
 	var problems []string
 	for _, ref := range expected.Tags() {
+		if releaseCommit != "" {
+			if owner, closed := closedOwner(c, ref, releaseCommit); closed {
+				tally.closedOwned = append(tally.closedOwned, fmt.Sprintf("%s: %s", v, closedOwnerNote(ref, owner)))
+				continue
+			}
+		}
 		at, found := local[ref]
 		if !found {
 			if releaseCommit == "" {
@@ -229,6 +243,11 @@ func versionRefProblems(c *Context, rel declarations.Releasable, scheme workspac
 	}
 	if releases == nil || remote == nil {
 		return problems
+	}
+	if releaseCommit != "" {
+		if _, closed := closedOwner(c, expected.Primary, releaseCommit); closed {
+			return problems
+		}
 	}
 	if _, onRemote := remote[expected.Primary]; !onRemote {
 		return problems
@@ -467,4 +486,29 @@ func checkGoDeprecationPublished(c *Context, r *strictcli.ErrorReporter) strictc
 		return releaserecord.DeprecationAnswer{Status: releaserecord.NotDeprecated, Version: dep.Version}, nil
 	})
 	return reportFollowup(r, verdict, "every superseded module path is deprecated")
+}
+
+// closedOwner is the closed identity that owns tag, a tag of the release
+// made at releaseCommit (its committer date stands for the tag's creation):
+// under identity-owns-its-tags such a tag is accounted for, so no check
+// demands it, refuses it, or calls it unexplained. Found is false for a tag
+// no identity owns or one an open identity owns.
+func closedOwner(c *Context, tag, releaseCommit string) (lifecycle.Identity, bool) {
+	created, err := c.Repo().CommitterDate(releaseCommit)
+	if err != nil {
+		panic(unanswered(err.Error()))
+	}
+	owner, found, err := c.Record().TagOwner(tag, created)
+	if err != nil {
+		panic(unanswered(err.Error()))
+	}
+	if !found || owner.Open() {
+		return lifecycle.Identity{}, false
+	}
+	return owner, true
+}
+
+// closedOwnerNote says why a tag a closed identity owns is not demanded.
+func closedOwnerNote(tag string, owner lifecycle.Identity) string {
+	return fmt.Sprintf("%s belongs to the %s identity %q of %q, which closed on %s, so it is accounted for and not demanded", tag, owner.Facet, owner.Value, owner.Subject, owner.Until.Format("2006-01-02"))
 }

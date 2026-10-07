@@ -256,3 +256,36 @@ func TestASupersededModulePathMustServeADeprecation(t *testing.T) {
 		}
 	}
 }
+
+// commitDatedInMarch makes the next commits' committer date 2026-03-01,
+// within the first home's period in movedRecord.
+func commitDatedInMarch(t *testing.T) {
+	t.Helper()
+	t.Setenv("GIT_COMMITTER_DATE", "2026-03-01T12:00:00Z")
+	t.Setenv("GIT_AUTHOR_DATE", "2026-03-01T12:00:00Z")
+}
+
+func TestARefAClosedIdentityOwnsIsNotDemanded(t *testing.T) {
+	hygiene.Isolate(t)
+	commitDatedInMarch(t)
+	r := portalRepo(t, "none", map[string]string{recordFile: movedRecord})
+	released := r.Head()
+	writeArchive(t, r, "portal", "1.0.0", released, map[string]string{".": strings.Repeat("e", 40)})
+	// v1.0.0 was released under the first home, whose go-module-path
+	// identity owned the v* tags and closed on 2026-05-01; the tag stayed
+	// behind there.
+	got := runCheck(t, inputs(t, r.Dir), "unpublished-refs")
+	mustStatus(t, got, "pass")
+	mustMention(t, got, "v1.0.0", "github.com/acme/oldportal")
+	// A release while the open identity owns v* is demanded.
+	t.Setenv("GIT_COMMITTER_DATE", "2026-06-01T12:00:00Z")
+	t.Setenv("GIT_AUTHOR_DATE", "2026-06-01T12:00:00Z")
+	later := r.CommitFile("main.go", "package main\n\nfunc main() {}\n", "Add the entry point")
+	writeArchive(t, r, "portal", "1.1.0", later, map[string]string{".": strings.Repeat("f", 40)})
+	got = runCheck(t, inputs(t, r.Dir), "unpublished-refs")
+	mustStatus(t, got, "fail")
+	mustMention(t, got, "v1.1.0", "does not exist locally")
+	if strings.Contains(got.texts(), "v1.0.0") {
+		t.Errorf("the ref the closed identity owns was demanded:\n%s", got.texts())
+	}
+}
