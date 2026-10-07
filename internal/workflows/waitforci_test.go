@@ -8,7 +8,7 @@ import (
 	"github.com/stricttools/testisolation/go/hygiene"
 )
 
-func TestTheCheckPatternMatchesTheCIJobAndItsMatrixLegs(t *testing.T) {
+func TestTheCheckPatternMatchesTheCIJobAndItsMatrixEntries(t *testing.T) {
 	hygiene.Isolate(t)
 	pattern, err := CheckPatternForTargets([]string{"go", "npm"})
 	if err != nil {
