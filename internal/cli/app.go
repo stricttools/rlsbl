@@ -73,6 +73,8 @@ func New(d Dependencies) (*strictcli.App, error) {
 	registerUpstream(r)
 	registerSecrets(r)
 	registerOptions(r)
+	registerReleaseGroup(r)
+	registerReleaseOps(r)
 	if err := registerChecks(app); err != nil {
 		return nil, err
 	}
