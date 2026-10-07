@@ -50,24 +50,6 @@ var droppedChecks = []string{
 	"ruff-lint", "root-rlsbl-conflict", "config-schema", "changelog-format-version-gate",
 }
 
-// notImplementedYet are the declared checks whose implementation is not
-// written yet: the workspace, nested-member, Go tag and workspace, upload,
-// test-runner, overlay, matrix, generated-format, ldflags, toolchain,
-// dependency, and router checks, and the checks that read scaffold's
-// templates and state. Each leaves this list when it is implemented.
-var notImplementedYet = []string{
-	"dep-floors", "dep-locks", "dev-only-boundary", "dev-overlay-drift", "go-companion-tags",
-	"go-module-major-suffix", "go-toolchain-declared", "go-workspace-replace",
-	"go-workspace-require-current", "ldflags-symbol", "member-pytest-config", "mixed-tag-schemes",
-	"nested-member-runner-exclusion", "nested-member-upload-contents", "nested-member-uv-sources",
-	"path-tag-format-go-member", "publish-mode-workflow", "releasable-residue",
-	"router-filters-fresh", "scaffold-conflicts", "scaffold-gitignore-stale",
-	"scaffold-unreplaced-vars", "strictspec-generated-format", "target-matrix-fresh", "test-suite",
-	"test-suite-workspace", "testisolation-floor", "unversioned-boundary", "upload-private-paths",
-	"workspace-ci-router", "workspace-ci-synced", "workspace-stale-entries", "workspace-targets",
-	"workspace-unbuildable", "workspace-unregistered",
-}
-
 func declaredNames(t *testing.T) []string {
 	t.Helper()
 	decls, err := declared()
@@ -134,13 +116,17 @@ func TestEveryImplementedCheckIsDeclaredInItsForm(t *testing.T) {
 	}
 }
 
-func TestEveryDeclaredCheckIsImplementedOrListedAsNotYet(t *testing.T) {
+func TestEveryDeclaredCheckIsImplementedOnce(t *testing.T) {
 	hygiene.Isolate(t)
 	implemented := Implemented()
 	for _, name := range declaredNames(t) {
-		have, pending := slices.Contains(implemented, name), slices.Contains(notImplementedYet, name)
-		if have == pending {
-			t.Errorf("%s: implemented %v, listed as not implemented yet %v; one and only one must hold", name, have, pending)
+		if !slices.Contains(implemented, name) {
+			t.Errorf("%s is declared in checks.toml and not implemented", name)
+		}
+	}
+	for i := 1; i < len(implemented); i++ {
+		if implemented[i] == implemented[i-1] {
+			t.Errorf("%s is implemented twice", implemented[i])
 		}
 	}
 }

@@ -121,6 +121,17 @@ var families = []func() []check{
 	releaseChecks,
 	lifecycleChecks,
 	strictcodeChecks,
+	workspaceChecks,
+	routerChecks,
+	nestedChecks,
+	uploadChecks,
+	goTagChecks,
+	goWorkspaceChecks,
+	goBuildChecks,
+	dependencyChecks,
+	testRunnerChecks,
+	scaffoldedChecks,
+	matrixChecks,
 }
 
 // Implemented are the names of every check package checks implements.
