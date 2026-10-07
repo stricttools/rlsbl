@@ -102,7 +102,7 @@ Some checks carry multiple tags, so they appear in multiple tag counts: `test-su
 | Check | Severity | Description |
 | --- | --- | --- |
 | `lock` | warn | Detects stale lock state in `.rlsbl/` |
-| `version-consistency` | error | Project version matches across all target files (e.g., `pyproject.toml`, `package.json`, `.rlsbl/version`) |
+| `version-consistency` | error | Project version matches across all target files (e.g., `pyproject.toml`, `package.json`); `.rlsbl/version` is not compared, since it names the rlsbl that last scaffolded or released the project |
 | `name-consistency` | warn | Package name is consistent across manifest files |
 | `description-consistency` | warn | Package description is consistent across manifest files |
 | `license-file` | error | A LICENSE file exists in the project root |

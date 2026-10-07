@@ -20,7 +20,7 @@ description = "How rlsbl scaffold writes CI workflows, git hooks, scratch direct
 | `.rlsbl/hooks/post-release.sh` | Scaffold-managed post-release hook |
 | `.rlsbl/bases/` | Merge bases for three-way merge (internal); a releasable member's live in its releasable's state directory instead (see below) |
 | `.rlsbl/hashes.json` | File hashes for change detection (internal) |
-| `.rlsbl/version` | Records which rlsbl version generated the scaffolding; not written for a releasable member |
+| `.rlsbl/version` | Records the rlsbl version that last scaffolded or released the project (never the project's own version); not written for a releasable member |
 | `.gitignore` | Additions for build artifacts and rlsbl internals |
 | `CHANGELOG.md` | Generated changelog (created once, never overwritten) |
 | `experiments/.gitignore` | Makes `experiments/` a scratch directory git carries but never fills |
