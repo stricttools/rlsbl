@@ -130,7 +130,7 @@ func (wc watchContext) releasesAt(commit string) ([]string, error) {
 func runWatch(ctx *strictcli.Context, kw map[string]any) (any, error) {
 	commitArg, hasCommit := strictcli.GetOpt[string](kw, "sha")
 	var ids []int64
-	if raw, ok := kw["run-id"]; ok && raw != nil {
+	if raw, ok := kw["run_id"]; ok && raw != nil {
 		texts, err := stringList(raw)
 		if err != nil {
 			return nil, err

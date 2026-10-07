@@ -226,7 +226,7 @@ func runOptionsSet(ctx *strictcli.Context, kw map[string]any) (any, error) {
 		return nil, errors.New("--scope must not be empty; leave it out for an entry covering the whole repository")
 	}
 	req.Scope = scope
-	autoCommit, stated := strictcli.GetOpt[bool](kw, "auto-commit")
+	autoCommit, stated := strictcli.GetOpt[bool](kw, "auto_commit")
 	if !stated {
 		autoCommit = true
 	}

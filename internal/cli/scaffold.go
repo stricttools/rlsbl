@@ -65,12 +65,12 @@ func runScaffold(ctx *strictcli.Context, kw map[string]any, version string) erro
 		return fmt.Errorf("reading the working directory: %w", err)
 	}
 	target, _ := strictcli.GetOpt[string](kw, "target")
-	mode, _ := strictcli.GetOpt[string](kw, "publish-mode")
-	autoCommit, set := strictcli.GetOpt[bool](kw, "auto-commit")
+	mode, _ := strictcli.GetOpt[string](kw, "publish_mode")
+	autoCommit, set := strictcli.GetOpt[bool](kw, "auto_commit")
 	if !set {
 		autoCommit = true
 	}
-	skipShared, _ := strictcli.GetOpt[bool](kw, "skip-shared")
+	skipShared, _ := strictcli.GetOpt[bool](kw, "skip_shared")
 	gh, err := github.New(ctx.Effects())
 	if err != nil {
 		return err

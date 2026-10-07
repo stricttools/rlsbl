@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/stricttools/strictcli/go/strictcli"
 
@@ -88,7 +89,7 @@ func registerRewrite(r *commandSet) {
 func requireNonEmpty(kw map[string]any, names ...string) error {
 	for _, n := range names {
 		if strictcli.Get[string](kw, n) == "" {
-			return fmt.Errorf("--%s must not be empty", n)
+			return fmt.Errorf("--%s must not be empty", strings.ReplaceAll(n, "_", "-"))
 		}
 	}
 	return nil
@@ -106,14 +107,14 @@ func workingRepository() (dir, root string, err error) {
 }
 
 func runRewriteGoModulePath(ctx *strictcli.Context, kw map[string]any) (any, error) {
-	if err := requireNonEmpty(kw, "from-module", "to-module"); err != nil {
+	if err := requireNonEmpty(kw, "from_module", "to_module"); err != nil {
 		return nil, err
 	}
 	_, root, err := workingRepository()
 	if err != nil {
 		return nil, err
 	}
-	return nil, rewrite.RunGoModulePath(ctx, root, strictcli.Get[string](kw, "from-module"), strictcli.Get[string](kw, "to-module"))
+	return nil, rewrite.RunGoModulePath(ctx, root, strictcli.Get[string](kw, "from_module"), strictcli.Get[string](kw, "to_module"))
 }
 
 func runRewriteProjectName(ctx *strictcli.Context, kw map[string]any) (any, error) {

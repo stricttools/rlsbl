@@ -164,7 +164,7 @@ func runReleaseScrub(ctx *strictcli.Context, kw map[string]any) (any, error) {
 		}
 		req.Recipe = recipe
 	}
-	commits := strictcli.GetElected(kw, "commit-range")
+	commits := strictcli.GetElected(kw, "commit_range")
 	if commits.Is(scrubFromCommit) {
 		req.FromCommit = strictcli.Get[string](commits.Fields, "value")
 		if req.FromCommit == "" {
@@ -193,7 +193,7 @@ func runReleaseReconcile(ctx *strictcli.Context, kw map[string]any, version stri
 	if err != nil {
 		return err
 	}
-	seconds, timed := strictcli.GetOpt[int](kw, "push-timeout")
+	seconds, timed := strictcli.GetOpt[int](kw, "push_timeout")
 	timeout, err := historyrewrite.PushTimeout(ws.Declarations, seconds, timed)
 	if err != nil {
 		return err
@@ -224,6 +224,6 @@ func runReleaseBackfill(ctx *strictcli.Context, kw map[string]any) (any, error) 
 	}
 	return nil, historyrewrite.Backfill(ctx, root, historyrewrite.BackfillRequest{
 		Overrides:  overrides,
-		AutoCommit: optionalBool(kw, "auto-commit", true),
+		AutoCommit: optionalBool(kw, "auto_commit", true),
 	})
 }
