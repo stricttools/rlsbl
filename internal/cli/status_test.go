@@ -68,8 +68,9 @@ func TestStatusInAForkLeavesTheUpstreamsHistoryOut(t *testing.T) {
 	app := appWith(t, testsupport.NewFakeHTTP(t))
 
 	r := app.Test([]string{"status", "--json"})
-	if r.ExitCode != 1 || !strings.Contains(r.Stderr, "git fetch --no-tags https://github.com/acme/gadget +refs/heads/main:refs/upstream/github.com/acme/gadget/main") {
-		t.Fatalf("a fork without its upstream ref: exit %d: %s", r.ExitCode, r.Stderr)
+	// Under --json the refusal is the envelope's error diagnostic on stdout.
+	if r.ExitCode != 1 || !strings.Contains(r.Stdout, "git fetch --no-tags https://github.com/acme/gadget +refs/heads/main:refs/upstream/github.com/acme/gadget/main") {
+		t.Fatalf("a fork without its upstream ref: exit %d: %s%s", r.ExitCode, r.Stdout, r.Stderr)
 	}
 	repo.Git("update-ref", "refs/upstream/github.com/acme/gadget/main", inherited)
 	r = app.Test([]string{"status", "--json"})

@@ -173,8 +173,8 @@ func TestRegistrationRules(t *testing.T) {
 	})
 	mustPanic(t, "declared twice", func() {
 		r := scratchRegistry()
-		r.group([]string{"a"}, "A")
-		r.group([]string{"a"}, "A")
+		r.group([]string{"alpha"}, "A")
+		r.group([]string{"alpha"}, "A")
 	})
 }
 
