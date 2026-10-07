@@ -3246,14 +3246,6 @@
           "consequential": true,
           "flags": [
             {
-              "name": "target",
-              "help": "Refused: the version comes from the release archives, and the evidence is read from every target",
-              "value_schema": {
-                "type": "string"
-              },
-              "presence": "optional"
-            },
-            {
               "name": "version",
               "help": "An earlier release to undo, bare (0.3.0), without reverting its commits; the latest release when omitted",
               "value_schema": {
@@ -3642,7 +3634,7 @@
         },
         "amend": {
           "name": "amend",
-          "help": "Append an entry to a released version's read-only <version>.jsonl, which stays read-only, regenerate CHANGELOG.md, commit both, and rewrite that version's GitHub Release from the record (as `rlsbl release edit <version>` does). The entry's checks are changelog add's; --no-validate-hashes takes the commits as given, unresolved and unchecked against the scope, for an old commit a rewrite took away. A version without a release archive, or with one stating no fate, is refused before anything is written; a version recorded never released has no GitHub Release to rewrite. --id is refused: an amend adds a new entry, whose id is minted.",
+          "help": "Append an entry to a released version's read-only <version>.jsonl, which stays read-only, regenerate CHANGELOG.md, commit both, and rewrite that version's GitHub Release from the record (as `rlsbl release edit <version>` does). The entry's checks are changelog add's; --no-validate-hashes takes the commits as given, unresolved and unchecked against the scope, for an old commit a rewrite took away. A version without a release archive, or with one stating no fate, is refused before anything is written; a version recorded never released has no GitHub Release to rewrite.",
           "effect": "mutating",
           "flags": [
             {
@@ -3660,14 +3652,6 @@
                 "type": "string"
               },
               "presence": "required"
-            },
-            {
-              "name": "id",
-              "help": "Refused: the amend adds a new entry, whose id is minted; `rlsbl changelog edit --id` changes an existing one",
-              "value_schema": {
-                "type": "string"
-              },
-              "presence": "optional"
             },
             {
               "name": "description",
