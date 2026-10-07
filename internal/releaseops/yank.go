@@ -32,7 +32,7 @@ type yankStep struct {
 	goMod string
 }
 
-// Yank removes a published past version from the registries the way each
+// Yank removes a published version, the latest one included, from the registries the way each
 // allows, and marks its GitHub Release: npm deprecates the version, a Go
 // module gains a retract directive in its go.mod (committed; the next
 // release publishes it), and PyPI, which offers no yank to a tool, is
@@ -62,7 +62,7 @@ func Yank(ctx *strictcli.Context, req NoticeRequest) (err error) {
 		return err
 	}
 	defer unlock(l, &err)
-	n, err := prepareNotice(ctx, s, req, yankedLabel, "yank")
+	n, err := prepareNotice(ctx, s, req, yankedLabel)
 	if err != nil {
 		return err
 	}

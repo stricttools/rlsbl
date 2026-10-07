@@ -62,9 +62,10 @@ type noticeTarget struct {
 
 // prepareNotice reads and checks everything a notice on req's version
 // needs: the version and the replacement it names, the version's archive
-// recording a release, a GitHub Release under its tag, and that it is not
-// the releasable's latest release. Nothing is written.
-func prepareNotice(ctx *strictcli.Context, s Selection, req NoticeRequest, label, operation string) (noticeTarget, error) {
+// recording a release, and a GitHub Release under its tag. The latest
+// release is marked like any other: a published version is never undone,
+// so a notice is how it is withdrawn. Nothing is written.
+func prepareNotice(ctx *strictcli.Context, s Selection, req NoticeRequest, label string) (noticeTarget, error) {
 	v, err := ParseVersion(req.Version, "the version")
 	if err != nil {
 		return noticeTarget{}, err
@@ -94,9 +95,6 @@ func prepareNotice(ctx *strictcli.Context, s Selection, req NoticeRequest, label
 	}
 	tag := s.tagOf(a)
 	if err := requireRelease(gh, slug, tag); err != nil {
-		return noticeTarget{}, err
-	}
-	if err := s.refuseLatest(v, tag, operation); err != nil {
 		return noticeTarget{}, err
 	}
 	return noticeTarget{s: s, gh: gh, slug: slug, version: v, archive: a, tag: tag, notice: Notice(label, req.Reason, use)}, nil
@@ -130,11 +128,11 @@ func (n noticeTarget) publish(ctx *strictcli.Context, verb string) error {
 	return releasenotes.Rewrite(n.gh, n.slug, doc)
 }
 
-// Deprecate marks a past release deprecated: its notice is recorded in the
+// Deprecate marks a release deprecated, the latest one included: its notice is recorded in the
 // version's archive and committed, and the GitHub Release is rewritten from
-// the record with the notice on top and the pre-release flag set. The
-// latest release, a version the record holds no release of, and a version
-// without a GitHub Release are refused before anything is written.
+// the record with the notice on top and the pre-release flag set. A version
+// the record holds no release of and a version without a GitHub Release are
+// refused before anything is written.
 func Deprecate(ctx *strictcli.Context, req NoticeRequest) (err error) {
 	s, err := Select(ctx.Effects(), req.Dir)
 	if err != nil {
@@ -145,7 +143,7 @@ func Deprecate(ctx *strictcli.Context, req NoticeRequest) (err error) {
 		return err
 	}
 	defer unlock(l, &err)
-	n, err := prepareNotice(ctx, s, req, deprecatedLabel, "deprecate")
+	n, err := prepareNotice(ctx, s, req, deprecatedLabel)
 	if err != nil {
 		return err
 	}

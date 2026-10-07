@@ -93,20 +93,22 @@ func TestARunAfterAnInterruptedDeprecateRecordsTheNoticeOnce(t *testing.T) {
 	}
 }
 
-func TestDeprecateRefusesTheLatestRelease(t *testing.T) {
+func TestDeprecateAndYankMarkTheLatestRelease(t *testing.T) {
 	hygiene.Isolate(t)
 	p := portalWithTwoReleases(t)
-	gh := testsupport.FakeGH(t, authStatus, releaseExists("v0.4.0"))
-	head := p.Head()
-	r := deprecate(t, p, false, releaseops.NoticeRequest{Version: "0.4.0"})
-	requireExit(t, r, 1)
-	requireContains(t, r.Stderr, "latest release", "rlsbl release undo", "Nothing was changed")
-	if p.Head() != head {
-		t.Fatal("a refused deprecate committed")
+	testsupport.FakeSafegit(t)
+	gh := testsupport.FakeGH(t, authStatus, releaseExists("v0.4.0"), testsupport.GHAnswer{Args: rewriteArgs("v0.4.0", true)})
+	requireExit(t, deprecate(t, p, false, releaseops.NoticeRequest{Version: "0.4.0", Reason: "Abandoned", Use: "0.3.0"}), 0)
+	if _, ok := called(gh.Calls(), rewriteArgs("v0.4.0", true)); !ok {
+		t.Fatalf("the latest Release was not rewritten: %+v", gh.Calls())
 	}
-	if _, ok := called(gh.Calls(), rewriteArgs("v0.4.0", true)); ok {
-		t.Fatal("a refused deprecate rewrote the Release")
+	npm := fakeNpm(t)
+	fake := testsupport.NewFakeHTTP(t, npmDocument("0.3.0", "0.4.0"))
+	requireExit(t, yank(t, p, fake, false, releaseops.NoticeRequest{Version: "0.4.0", Reason: "Abandoned"}), 0)
+	if calls := npm(); len(calls) != 1 || calls[0] != "deprecate portal@0.4.0 Abandoned" {
+		t.Fatalf("npm calls %q", calls)
 	}
+	requireContains(t, p.read(".strictmetadata/releases/portal/v0.4.0.toml"), "**Deprecated:** Abandoned. Use v0.3.0 instead.", "**Yanked:** Abandoned.")
 }
 
 func TestDeprecateRefusesAVersionWithoutAReleaseUntilItExists(t *testing.T) {

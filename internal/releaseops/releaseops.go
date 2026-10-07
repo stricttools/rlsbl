@@ -171,20 +171,6 @@ func (s Selection) latestReleased() (semver.Version, bool, error) {
 	return releaserecord.LatestReleasedVersion(s.Root(), s.Record.Dir())
 }
 
-// refuseLatest refuses an operation meant for a version that is not the
-// releasable's latest release when v is the latest release: the latest is
-// reverted with `release undo` instead.
-func (s Selection) refuseLatest(v semver.Version, tag, operation string) error {
-	latest, found, err := s.latestReleased()
-	if err != nil {
-		return fmt.Errorf("the latest release of %s could not be read from its release archives in %s: %w", s.Releasable.Name, s.Record.Dir(), err)
-	}
-	if found && semver.Compare(latest, v) == 0 {
-		return fmt.Errorf("%s is the latest release of %s (the highest version its release archives record as released), and `rlsbl release %s` is for a version a later release replaced. Nothing was changed. `rlsbl release undo` reverts the latest release instead", tag, s.Releasable.Name, operation)
-	}
-	return nil
-}
-
 // openGitHub is the gh client and the GitHub repository the releasable's
 // Releases live in: the declarations' github_repository, or the one origin
 // names. gh must be installed and authenticated.

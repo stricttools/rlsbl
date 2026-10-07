@@ -49,13 +49,13 @@ const releaseAbandonHelp = "Record an abandoned release attempt's version as nev
 	"and a GitHub Release under the attempt's tag (a published release, which release undo reverts). A question that cannot be answered is " +
 	"refused, never read as absence."
 
-const releaseDeprecateHelp = "Mark a past release deprecated. The notice (\"> **Deprecated:** <reason>. Use v<use> instead.\") is recorded first " +
+const releaseDeprecateHelp = "Mark a release deprecated, the latest one included. The notice (\"> **Deprecated:** <reason>. Use v<use> instead.\") is recorded first " +
 	"in the version's release archive (release_notices) and committed, so every later rewrite of the Release keeps it; the GitHub Release is " +
-	"then rewritten from the record with the notice on top and the pre-release flag set. The latest release (which release undo reverts), a " +
-	"version the record holds no release of, and one without a GitHub Release are refused before anything is written. --use must name a " +
+	"then rewritten from the record with the notice on top and the pre-release flag set. A version the record holds no release of and one " +
+	"without a GitHub Release are refused before anything is written. --use must name a " +
 	"version the record holds as released."
 
-const releaseYankHelp = "Remove a published past version from its registries the way each allows, and mark its GitHub Release. Each package of " +
+const releaseYankHelp = "Remove a published version, the latest one included, from its registries the way each allows, and mark its GitHub Release. Each package of " +
 	"the releasable's members is looked up in its registry's listing (npm's package document, PyPI's project document, origin's Go module tag " +
 	"and the module proxy's version list; no request names one version), and a package whose publication cannot be read refuses the yank " +
 	"before anything is written. For each published package: npm deprecates the version (npm deprecate, run in the package's directory); a Go " +
@@ -63,8 +63,8 @@ const releaseYankHelp = "Remove a published past version from its registries the
 	"yanked by hand, and the command exits 1 naming the steps until PyPI's project document shows the release's files yanked. Nothing is " +
 	"ever unpublished. The yank notice is recorded in the version's release archive and committed, and the Release rewritten from the record " +
 	"with the notice on top, marked pre-release. A releasable whose current license is proprietary is refused before anything is read, since " +
-	"no registry write is made for it; release deprecate marks its Release without one. The latest release, a version the record holds no " +
-	"release of, and one without a GitHub Release are refused before anything is written."
+	"no registry write is made for it; release deprecate marks its Release without one. A version the record holds no release of and one " +
+	"without a GitHub Release are refused before anything is written."
 
 // noticeFlags are deprecate's and yank's flags.
 func noticeFlags(verb string) []strictcli.Flag {
