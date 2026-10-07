@@ -31,3 +31,4 @@
 {"format_version":1,"id":"18dc17b192b5615909ed5482b8f746a680f38e23f54426a5","commits":["16f3878711af0a54377e6afcef2f5a801c9e6348"],"user_facing":false}
 {"format_version":1,"id":"18dc17cb7dd66fdf98c48f44c3974141b2f678c7f7d14abe","commits":["3c1e00473860dfef26428d2257a5d5e112405505"],"user_facing":true,"description":"The release workflow page, the README, and the check reference no longer say the release writes the project's new version to `.rlsbl/version` or that `version-consistency` compares it: the file names the rlsbl that last scaffolded or released the project.","type":"fix"}
 {"format_version":1,"id":"18dc17cb948e2d6c07cce9ce0653433f92460fe97a3c06a9","commits":["dbfcede704c825e7173a56f1150395f217103756"],"user_facing":false}
+{"format_version":1,"id":"18dc18182f684d88436905edf673468cacf292e7463bcefc","commits":["56eccebe88569e9cb896fab8da34bcadb8c46178"],"user_facing":false}
