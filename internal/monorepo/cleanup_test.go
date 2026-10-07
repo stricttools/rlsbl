@@ -1,7 +1,10 @@
 package monorepo
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -10,6 +13,7 @@ import (
 
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
+	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/testsupport"
 )
 
@@ -125,5 +129,33 @@ func TestCleanupOfAWorkspaceWithoutResidueDoesNothing(t *testing.T) {
 	mustRun(t, strictcli.EffectMutating, false, cleaning(repo, true, false, &out))
 	if len(out.Removed) != 0 || len(out.Kept) != 0 || out.Committed {
 		t.Fatalf("out %+v", out)
+	}
+}
+
+func TestCleanupRemovesUnderTheReleaseLock(t *testing.T) {
+	hygiene.Isolate(t)
+	testsupport.FakeSafegit(t)
+	deletingSaferm(t)
+	repo := residueFixture(t)
+	// saferm, as it removes, records whether the lock is free.
+	deleting, err := exec.LookPath("saferm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	seen := filepath.Join(dir, "seen")
+	script := fmt.Sprintf("#!/bin/sh\nif flock -n %[1]s true; then echo free >> %[2]s; else echo held >> %[2]s; fi\nexec %[3]s \"$@\"\n", repo.Path(runstate.LockPath), seen, deleting)
+	if err := os.WriteFile(filepath.Join(dir, "saferm"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	var out Cleanup
+	mustRun(t, strictcli.EffectMutating, false, cleaning(repo, true, false, &out))
+	data, err := os.ReadFile(seen)
+	if err != nil {
+		t.Fatalf("saferm was not run: %v", err)
+	}
+	if strings.Contains(string(data), "free") {
+		t.Fatal("the cleanup removed residue without holding the release lock")
 	}
 }
