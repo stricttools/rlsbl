@@ -53,8 +53,11 @@ type command struct {
 	// grants are the command's labelled authorizations for dangerous
 	// effects, shown in its preview.
 	grants []strictcli.Grant
-	flags  []strictcli.Flag
-	args   []strictcli.Arg
+	// scratch declares the command's scratch directory, where a program it
+	// runs writes for itself (npm's cache when an npm upload is listed).
+	scratch bool
+	flags   []strictcli.Flag
+	args    []strictcli.Arg
 	// payload is the JSON Schema of the --json payload; nil declares none.
 	payload map[string]any
 	// render is the human rendering of the payload, required with payload.
@@ -146,6 +149,9 @@ func (r *commandSet) add(c command) {
 	}
 	if len(c.grants) > 0 {
 		opts = append(opts, strictcli.WithGrants(c.grants...))
+	}
+	if c.scratch {
+		opts = append(opts, strictcli.WithScratchDir())
 	}
 	if len(c.flags) > 0 {
 		opts = append(opts, strictcli.WithFlags(c.flags...))

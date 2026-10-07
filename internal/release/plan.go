@@ -405,6 +405,9 @@ type BumpExecution struct {
 	Preview bool
 	Record  *lifecycle.Record
 	Index   *index.Index
+	// Scratch is the command's scratch directory, where npm writes its cache
+	// when the packed contents list an npm upload.
+	Scratch targets.Scratch
 	Now     time.Time
 	Log     func(string)
 }
@@ -598,7 +601,7 @@ func siblingConstraints(w *workspace.Workspace) (map[string]string, error) {
 // outside the releasable's members and, in a public repository, a
 // confidential name in any packed text.
 func checkPacked(e *strictcli.Effects, x BumpExecution) error {
-	artifacts, err := publishrules.PackedArtifacts(e, x.Repo, x.Workspace, x.Releasable)
+	artifacts, err := publishrules.PackedArtifacts(e, x.Repo, x.Workspace, x.Releasable, x.Scratch)
 	if err != nil {
 		return err
 	}

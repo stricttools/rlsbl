@@ -278,7 +278,7 @@ func (x *execution) bumpExecution(preview bool) BumpExecution {
 	return BumpExecution{
 		Workspace: x.ws, Releasable: x.name(), Repo: x.repo, LiveRoot: x.session.LiveRoot,
 		Environment: x.env, Rerun: x.rerun(), Preview: preview, Record: x.record, Index: x.index,
-		Now: x.now, Log: x.req.Log,
+		Scratch: x.req.Scratch, Now: x.now, Log: x.req.Log,
 	}
 }
 

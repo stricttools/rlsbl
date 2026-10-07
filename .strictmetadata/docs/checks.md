@@ -162,7 +162,7 @@ Each entry of `checks.toml` carries:
 
 ### Purity
 
-A pure check starts only read-only programs on the observe allowlist (`internal/previewapply`), whose written standard is no user-visible change, or no program at all. Every program an impure check starts (a member's tests, `uv sync --dry-run`, `npm pack --dry-run`, an external check) runs observed, so a check changes nothing in the repository either way. Purity decides what a preview does: under `--dry-run` the pure checks run and the impure ones are listed as would-run. `needs_network` is separate: a pure check may read the network.
+A pure check starts only read-only programs on the observe allowlist (`internal/previewapply`), whose written standard is no user-visible change, or no program at all. Every program an impure check starts (a member's tests, `uv sync --dry-run`, `npm pack --dry-run`, an external check) runs observed, so a check changes nothing in the repository either way. What such a program writes for itself (npm's cache and logs) goes to the command's scratch directory, which strictcli makes under `~/.cache/strictcli/scratch/` and removes when the command ends: `rlsbl check`, `rlsbl failing-checks`, and the release commands declare one, so `rlsbl check` lists npm packages without writing anywhere else. Purity decides what a preview does: under `--dry-run` the pure checks run and the impure ones are listed as would-run. `needs_network` is separate: a pure check may read the network.
 
 ## Examples
 

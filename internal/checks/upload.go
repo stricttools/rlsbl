@@ -56,7 +56,7 @@ func uploadsOf(c *Context, members []declarations.Member) (uploads []upload, pro
 				continue
 			}
 			seen[key] = true
-			listing, found, err := targets.ListUpload(observedHandle{c.Effects()}, c.Repo(), t.target, t.dir)
+			listing, found, err := targets.ListUpload(observedHandle{c.Effects()}, c.Repo(), t.target, t.dir, c.in.Scratch)
 			if err != nil {
 				problems = append(problems, fmt.Sprintf("%s: the %s upload in %s cannot be listed: %v", m.Name, t.target.Name(), dirLabel(c, t.dir), err))
 				continue

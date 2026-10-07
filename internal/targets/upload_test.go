@@ -29,7 +29,7 @@ func TestTheGoModuleZipIsTheTrackedFilesLessNestedModules(t *testing.T) {
 			return err
 		}
 		target, _ := Get(Go)
-		listing, found, err = ListUpload(nil, r, target, repo.Dir)
+		listing, found, err = ListUpload(nil, r, target, repo.Dir, nil)
 		return err
 	})
 	if !found || !slices.Equal(listing.Files, []string{"CLAUDE.md", "go.mod", "main.go", "todo/plan.md"}) {
@@ -64,7 +64,7 @@ func TestASelfdocGeneratedClaudeFileIsMovedBySelfdoc(t *testing.T) {
 func TestAPythonUploadIsNotListedOffline(t *testing.T) {
 	hygiene.Isolate(t)
 	target, _ := Get(PyPI)
-	if _, found, err := ListUpload(nil, git.Repo{}, target, t.TempDir()); err != nil || found {
+	if _, found, err := ListUpload(nil, git.Repo{}, target, t.TempDir(), nil); err != nil || found {
 		t.Fatalf("found %v, %v", found, err)
 	}
 }

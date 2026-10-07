@@ -52,6 +52,9 @@ func registerMonorepoRelease(r *commandSet, version string) {
 		path:   []string{"monorepo", "release", "run"},
 		help:   monorepoReleaseRunHelp,
 		effect: mutating,
+		// The preflight and the packed contents list npm uploads, whose
+		// cache npm writes in the scratch directory.
+		scratch: true,
 		// A batch release tags, publishes, and deploys a version of every
 		// releasable it names: only a person decides that.
 		consequential: true,

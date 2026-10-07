@@ -23,6 +23,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/releaserecord"
 	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/semver"
+	"github.com/stricttools/rlsbl/internal/targets"
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
 
@@ -53,8 +54,11 @@ type RunRequest struct {
 	// what the published texts are scanned against.
 	Home      string
 	IndexPath string
-	Now       func() time.Time
-	Sleep     func(time.Duration)
+	// Scratch is the command's scratch directory, where npm writes its
+	// cache when the release lists an npm upload.
+	Scratch targets.Scratch
+	Now     func() time.Time
+	Sleep   func(time.Duration)
 	// Log reports progress; Warn reports what --quiet must not swallow.
 	Log  func(string)
 	Warn func(string)
@@ -643,7 +647,7 @@ func (x *execution) preflight() error {
 func (x *execution) runPreflight(m declarations.Member, sel PreflightSelection, label string) error {
 	ctx, err := checks.NewContext(x.e, checks.Inputs{
 		Dir: x.ws.MemberDir(m), Releasable: x.releasable.Name, Now: x.now, CheckTimeout: x.timeouts.Check,
-		Home: x.req.Home, IndexPath: x.req.IndexPath,
+		Home: x.req.Home, IndexPath: x.req.IndexPath, Scratch: x.req.Scratch,
 	})
 	if err != nil {
 		return err

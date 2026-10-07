@@ -36,7 +36,7 @@ func TestAPackedFileFromOutsideTheMemberPathsIsNamed(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		artifacts, err := publishrules.PackedArtifacts(e, r, w, "portal")
+		artifacts, err := publishrules.PackedArtifacts(e, r, w, "portal", nil)
 		if err != nil {
 			return err
 		}
@@ -85,7 +85,7 @@ func TestNothingIsPackedUnderPublishModeNone(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		artifacts, err := publishrules.PackedArtifacts(e, r, w, "portal")
+		artifacts, err := publishrules.PackedArtifacts(e, r, w, "portal", nil)
 		if err != nil || len(artifacts) != 0 {
 			t.Errorf("artifacts = %v, %v", artifacts, err)
 		}
@@ -124,7 +124,7 @@ func TestAGoBinaryBuiltFromAnotherMembersPackageIsRefused(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		artifacts, err := publishrules.PackedArtifacts(e, r, w, "portal")
+		artifacts, err := publishrules.PackedArtifacts(e, r, w, "portal", nil)
 		if err != nil {
 			return err
 		}
@@ -202,7 +202,7 @@ func TestAWheelEntryIdenticalToFilesOfSeveralMembersIsCreditedToTheReleasables(t
 		if err != nil {
 			return err
 		}
-		artifacts, err := publishrules.PackedArtifacts(e, r, w, "portal")
+		artifacts, err := publishrules.PackedArtifacts(e, r, w, "portal", nil)
 		if err != nil {
 			return err
 		}

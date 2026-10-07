@@ -69,6 +69,9 @@ func registerReleaseRun(r *commandSet, version string) {
 		path:   []string{"release", "run"},
 		help:   releaseRunHelp,
 		effect: mutating,
+		// The preflight and the packed contents list npm uploads, whose
+		// cache npm writes in the scratch directory.
+		scratch: true,
 		// A release tags, publishes, and deploys a version: only a person
 		// decides that.
 		consequential: true,
@@ -93,6 +96,9 @@ func registerReleaseRun(r *commandSet, version string) {
 		path:   []string{"release", "resume"},
 		help:   releaseResumeHelp,
 		effect: mutating,
+		// The preflight and the packed contents list npm uploads, whose
+		// cache npm writes in the scratch directory.
+		scratch: true,
 		// A resume tags, publishes, and deploys what the release it continues
 		// would have: only a person decides that.
 		consequential: true,
@@ -155,6 +161,7 @@ func releaseRunRequest(ctx *strictcli.Context, kw map[string]any, version string
 		RlsblVersion: version,
 		Checks:       checks,
 		IndexPath:    indexPath,
+		Scratch:      ctx.ScratchDir,
 		Now:          time.Now,
 		Sleep:        time.Sleep,
 		Log:          ctx.Info,

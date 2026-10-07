@@ -33,8 +33,8 @@ func registerChecks(r *commandSet) error {
 }
 
 // checkContext is the context of a `check` or `failing-checks` run: the
-// working directory, over the dispatch's effects handle, with the pushed
-// refs when the pre-push hook runs it. A home directory or index location
+// working directory, over the dispatch's effects handle and with its scratch
+// directory, with the pushed refs when the pre-push hook runs it. A home directory or index location
 // that cannot be found is left unstated, so only the checks that read them
 // refuse.
 func checkContext(ctx *strictcli.Context) (strictcli.CheckContext, error) {
@@ -42,7 +42,7 @@ func checkContext(ctx *strictcli.Context) (strictcli.CheckContext, error) {
 	if err != nil {
 		return nil, err
 	}
-	in := checks.Inputs{Dir: dir, Now: time.Now()}
+	in := checks.Inputs{Dir: dir, Now: time.Now(), Scratch: ctx.ScratchDir}
 	if home, err := os.UserHomeDir(); err == nil {
 		in.Home = home
 	}

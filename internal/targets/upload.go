@@ -1,8 +1,6 @@
 package targets
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -38,18 +36,24 @@ type UploadListing struct {
 // (golang.org/x/mod/zip).
 var zipExcludedDirs = map[string]bool{"vendor": true, ".git": true, ".hg": true, ".svn": true, ".bzr": true}
 
+// Scratch is the command's scratch directory (strictcli's
+// Context.ScratchDir): a directory outside the repository, made by the
+// framework on the first call and removed when the command ends, for what
+// a program the listing runs writes for itself.
+type Scratch func() (string, error)
+
 // ListUpload lists the files the upload of t's package in dir (absolute,
 // inside repo) would carry, without the network: the Go module zip from the
-// tracked files, the npm tarball from `npm pack --dry-run`. found is false
-// for pypi, whose upload has to be built, which needs the network; the pypi
-// CI workflow builds and checks it instead.
-func ListUpload(h Handle, repo git.Repo, t Target, dir string) (UploadListing, bool, error) {
+// tracked files, the npm tarball from `npm pack --dry-run`, whose cache is
+// in scratch. found is false for pypi, whose upload has to be built, which
+// needs the network; the pypi CI workflow builds and checks it instead.
+func ListUpload(h Handle, repo git.Repo, t Target, dir string, scratch Scratch) (UploadListing, bool, error) {
 	switch t.Name() {
 	case Go:
 		l, err := goModuleZip(repo, dir)
 		return l, err == nil, err
 	case NPM:
-		l, err := npmPack(h, dir)
+		l, err := npmPack(h, dir, scratch)
 		return l, err == nil, err
 	}
 	return UploadListing{}, false, nil
@@ -169,8 +173,9 @@ func selfdocGenerated(file string) bool {
 // npmPack lists the tarball `npm pack` would publish without packing it:
 // --dry-run packs nothing, --ignore-scripts runs no lifecycle script, and
 // --offline fetches nothing. npm still writes its cache and logs, so its
-// cache is a scratch directory made for the listing and removed after it.
-func npmPack(h Handle, dir string) (listing UploadListing, err error) {
+// cache is in the command's scratch directory, which the command removes
+// when it ends.
+func npmPack(h Handle, dir string, scratch Scratch) (listing UploadListing, err error) {
 	p, err := readManifest(dir)
 	if err != nil {
 		return UploadListing{}, err
@@ -179,19 +184,14 @@ func npmPack(h Handle, dir string) (listing UploadListing, err error) {
 	if err != nil {
 		return UploadListing{}, err
 	}
-	suffix := make([]byte, 6)
-	if _, err := rand.Read(suffix); err != nil {
+	if scratch == nil {
+		return UploadListing{}, fmt.Errorf("listing the npm upload of %s runs npm, which writes its cache, and the command gave no scratch directory for it", dir)
+	}
+	root, err := scratch()
+	if err != nil {
 		return UploadListing{}, err
 	}
-	cache := filepath.Join(os.TempDir(), "rlsbl-npm-pack-"+hex.EncodeToString(suffix))
-	if _, err := h.Mkdir(cache); err != nil {
-		return UploadListing{}, err
-	}
-	defer func() {
-		if _, rmErr := h.Remove(cache); rmErr != nil && err == nil {
-			err = rmErr
-		}
-	}()
+	cache := filepath.Join(root, "npm-cache")
 	res, err := h.Run([]interface{}{"npm", "pack", "--dry-run", "--json", "--ignore-scripts", "--offline", "--logs-max=0"},
 		strictcli.Cwd(dir), strictcli.Check(false), strictcli.Timeout(packTimeout),
 		strictcli.EffectEnv(map[string]string{"npm_config_cache": cache}))

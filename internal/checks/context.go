@@ -17,6 +17,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/github"
 	"github.com/stricttools/rlsbl/internal/options"
 	"github.com/stricttools/rlsbl/internal/registry"
+	"github.com/stricttools/rlsbl/internal/targets"
 	"github.com/stricttools/rlsbl/internal/upstream"
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
@@ -50,6 +51,10 @@ type Inputs struct {
 	// (empty when unset): uv's own relocation of a project's environment,
 	// where the dev overlays are installed.
 	UVProjectEnvironment string
+	// Scratch is the command's scratch directory, where the programs a check
+	// runs write for themselves (npm's cache when an npm upload is listed);
+	// nil when the command declares none, which refuses those checks.
+	Scratch targets.Scratch
 }
 
 // Context is what every check of one run sees: the repository, its

@@ -60,8 +60,8 @@ type Artifact struct {
 // zip, and the sources of a go binary pipeline's binaries (each package
 // directory's files and embedded files inside the repository, for every
 // platform of the platform table), which npm and pypi go-binary pipelines
-// carry too. repo is the repository w describes.
-func PackedArtifacts(h targets.Handle, repo git.Repo, w *workspace.Workspace, releasable string) ([]Artifact, error) {
+// carry too. repo is the repository w describes; scratch holds npm's cache.
+func PackedArtifacts(h targets.Handle, repo git.Repo, w *workspace.Workspace, releasable string, scratch targets.Scratch) ([]Artifact, error) {
 	r, ok := w.Declarations.Releasable(releasable)
 	if !ok {
 		return nil, fmt.Errorf("no releasable %q is declared in .strictmetadata/releasables/releasables.toml", releasable)
@@ -117,14 +117,14 @@ func PackedArtifacts(h targets.Handle, repo git.Repo, w *workspace.Workspace, re
 					return nil, err
 				}
 			case p.Type == declarations.TargetGo:
-				a, err := listUpload(h, repo, w.Root, dir, targets.Go)
+				a, err := listUpload(h, repo, w.Root, dir, targets.Go, scratch)
 				if err != nil {
 					return nil, err
 				}
 				a.Label = "the module zip of " + label
 				out = append(out, a)
 			case p.Type == declarations.TargetNPM:
-				a, err := listUpload(h, repo, w.Root, dir, targets.NPM)
+				a, err := listUpload(h, repo, w.Root, dir, targets.NPM, scratch)
 				if err != nil {
 					return nil, err
 				}
@@ -160,12 +160,12 @@ func PackedArtifacts(h targets.Handle, repo git.Repo, w *workspace.Workspace, re
 
 // listUpload is targets.ListUpload of the target in dir (repository-relative),
 // with each file named from the repository root.
-func listUpload(h targets.Handle, repo git.Repo, root, dir, target string) (Artifact, error) {
+func listUpload(h targets.Handle, repo git.Repo, root, dir, target string, scratch targets.Scratch) (Artifact, error) {
 	t, err := targets.Get(target)
 	if err != nil {
 		return Artifact{}, err
 	}
-	l, found, err := targets.ListUpload(h, repo, t, filepath.Join(root, filepath.FromSlash(dir)))
+	l, found, err := targets.ListUpload(h, repo, t, filepath.Join(root, filepath.FromSlash(dir)), scratch)
 	if err != nil {
 		return Artifact{}, err
 	}
