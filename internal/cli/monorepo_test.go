@@ -210,3 +210,16 @@ func TestTheMonorepoCommandsRefuseAStandaloneRepository(t *testing.T) {
 		}
 	}
 }
+
+func TestMonorepoAddPreviewsTheMember(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := monorepoFixture(t)
+	repo.CommitFile("tools/kit/package.json", "{\n  \"name\": \"kit\",\n  \"version\": \"0.1.0\"\n}\n", "the kit")
+	r := appWith(t, testsupport.NewFakeHTTP(t)).Test([]string{"monorepo", "add", "tools/kit", "--releasable", "false", "--dry-run"})
+	if r.ExitCode != 0 || !strings.Contains(r.Stdout, `Would declare the member "kit" at tools/kit`) || !strings.Contains(r.Stdout, "The scaffold is not previewed") {
+		t.Fatalf("exit %d:\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
+	}
+	if status := repo.Git("status", "--porcelain"); status != "" {
+		t.Fatalf("a dry run changed the tree:\n%s", status)
+	}
+}

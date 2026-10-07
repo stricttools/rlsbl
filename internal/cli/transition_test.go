@@ -98,3 +98,37 @@ func TestIdentityNeedsFromWithUntil(t *testing.T) {
 		t.Fatalf("--until without --from was accepted:\n%s", r.Stdout)
 	}
 }
+
+// Each period and declaration command previews the record it would write
+// and the commit it would make.
+func TestTheTransitionDeclarationsPreviewTheirRecord(t *testing.T) {
+	hygiene.Isolate(t)
+	for argv, want := range map[string]string{
+		"transition lifecycle --subject portal --status on-hold --reason paused":                                 "portal is on-hold from ",
+		"transition license --subject portal --license MIT --reason relicensed":                                  "portal is licensed MIT from ",
+		"transition identity --subject portal --facet package-name --registry npm --value portal --reason named": `Recorded portal's package-name identity "portal" from `,
+		"transition unversioned-tag --tag nightly --reason builds":                                               "Recorded nightly as a tag that releases no version.",
+	} {
+		t.Run(argv, func(t *testing.T) {
+			repo := releaseCommandsProject(t)
+			r := appWith(t, testsupport.NewFakeHTTP(t)).Test(append(strings.Fields(argv), "--dry-run"))
+			if r.ExitCode != 0 || !strings.Contains(r.Stdout, want) || !strings.Contains(r.Stdout, "Would commit .strictmetadata/lifecycle-and-license/lifecycle-and-license.toml") {
+				t.Fatalf("exit %d:\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
+			}
+			if status := repo.Git("status", "--porcelain"); status != "" {
+				t.Fatalf("a dry run changed the tree:\n%s", status)
+			}
+		})
+	}
+}
+
+// Classifying a releasable proprietary needs to know the repository's
+// visibility, so a checkout naming no GitHub repository is refused.
+func TestClassifyRefusesACheckoutNamingNoGitHubRepository(t *testing.T) {
+	hygiene.Isolate(t)
+	releaseCommandsProject(t)
+	r := appWith(t, testsupport.NewFakeHTTP(t)).Test([]string{"transition", "classify", "--subject", "portal", "--reason", "closed", "--dry-run"})
+	if r.ExitCode != 1 || !strings.Contains(r.Stderr, "no GitHub repository is declared (github_repository)") {
+		t.Fatalf("exit %d:\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
+	}
+}

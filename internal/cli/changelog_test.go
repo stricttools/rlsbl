@@ -135,3 +135,25 @@ func TestRemapReadsAMapFileRelativeToTheWorkingDirectory(t *testing.T) {
 		t.Fatalf("the released file was not remapped: %s", text)
 	}
 }
+
+func TestChangelogGenerateUnderDryRunRendersAndWritesNothing(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := releaseCommandsProject(t)
+	r := appWith(t, testsupport.NewFakeHTTP(t)).Test([]string{"changelog", "generate", "--dry-run"})
+	if r.ExitCode != 0 || !strings.Contains(r.Stdout, "## 0.4.0") || !strings.Contains(r.Stdout, "Would commit CHANGELOG.md") {
+		t.Fatalf("exit %d:\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
+	}
+	if status := repo.Git("status", "--porcelain"); status != "" {
+		t.Fatalf("a dry run changed the tree:\n%s", status)
+	}
+}
+
+func TestChangelogRemoveRefusesAnIDNoEntryHas(t *testing.T) {
+	hygiene.Isolate(t)
+	releaseCommandsProject(t)
+	id := strings.Repeat("0", 48) + "99"
+	r := appWith(t, testsupport.NewFakeHTTP(t)).Test([]string{"changelog", "remove", "--id", id})
+	if r.ExitCode != 1 || !strings.Contains(r.Stderr, `no changelog entry of "portal" has the id `+id) {
+		t.Fatalf("exit %d:\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
+	}
+}
