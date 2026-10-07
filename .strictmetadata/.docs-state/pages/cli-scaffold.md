@@ -18,7 +18,7 @@ Generate or update CI/CD workflows, git hooks, changelog, and license files. Saf
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str | optional |  | Declare an additional registry this project publishes to (for targets auto-detection cannot find, e.g. plain). Added to the project's target set; scaffold always covers every target, never just this one. |
+| `--target` |  | str | optional |  | Declare an additional registry this project publishes to. Added to the project's target set; scaffold always covers every target, never just this one. |
 | `--publish-mode` |  | str | optional |  | Publish mode. Required for private repos; when omitted, public repos are scaffolded as "ci". Values: `ci` (publish via the scaffolded CI pipelines), `none` (suppress publishing to public registries). |
 | `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Auto-commit scaffolded files after writing them to disk (the handler commits when neither --auto-commit nor --no-auto-commit is passed) |
 | `--skip-shared`, `--no-skip-shared` |  | bool | optional |  | Skip processing of shared workflow templates across targets |

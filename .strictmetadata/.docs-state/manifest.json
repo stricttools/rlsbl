@@ -22245,10 +22245,14 @@
       ]
     }
   ],
-  "last_gen": "2026-10-06T23:23:07.096283+00:00",
+  "last_gen": "2026-10-07T00:25:59.917707+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
+      {
+        "word": "mixin",
+        "aliases": []
+      },
       {
         "word": "prs",
         "aliases": []

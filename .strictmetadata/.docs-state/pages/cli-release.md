@@ -47,7 +47,7 @@ Resume a previously failed release from where it left off. Reads the in-progress
 
 ## release init
 
-Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch), an include list of all detected targets, and per-target configuration sections for Flutter targets.
+Scaffold a .rlsbl/releases/unreleased.toml file by auto-detecting project targets. The generated file contains a default bump type (patch) and an include list of all detected targets.
 
 **Effect:** mutating
 

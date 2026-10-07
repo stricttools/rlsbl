@@ -10,7 +10,7 @@ nav_order = 91
 
 # rlsbl CLI Reference
 
-Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding. Ships 63 commands organized into 14 top-level commands and 9 command groups (release, changelog, monorepo, dev, rewrite, transition, upstream, secrets, options). Covers 17 release targets: npm, pypi, go, swift, swift-apple, spec, hex, deno, dart, docker, flutter, maven, native-android, native-ios, zig, pgdesign, plain.
+Release orchestration and project scaffolding CLI. Automates version bumping, changelog validation, tagging, GitHub Releases, and CI/CD scaffolding. Ships 63 commands organized into 14 top-level commands and 9 command groups (release, changelog, monorepo, dev, rewrite, transition, upstream, secrets, options). Covers 4 release targets: npm, pypi, go, spec.
 
 Version: :-: var key="project.version"
 
@@ -35,7 +35,7 @@ Version: :-: var key="project.version"
 
 - [release](../cli-release/) -- Release orchestration commands covering the full release lifecycle. Provides 12 subcommands: run, resume, init, retry, edit, undo, abandon, deprecate, yank, scrub, backfill, reconcile.
 - [changelog](../cli-changelog/) -- Structured changelog management using JSONL entries, each typed feature, fix or breaking. Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.
-- [monorepo](../cli-monorepo/) -- Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 17 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, snapshot-check, mirror, graph, impact, extract, absorb, cleanup, rename-releasable. Plus 1 subgroup: release. Supports all 17 release targets in a single workspace.toml (the app help enumerates them).
+- [monorepo](../cli-monorepo/) -- Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 17 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, snapshot-check, mirror, graph, impact, extract, absorb, cleanup, rename-releasable. Plus 1 subgroup: release. Supports all 4 release targets in a single workspace.toml (the app help enumerates them).
 - [dev](../cli-dev/) -- Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install -e, npm -> npm link, go -> go install).
 - [rewrite](../cli-rewrite/) -- Sweeping rewrites of the current working tree, each previewed before it is performed. Every command in this group observes the tree, reports a per-file plan with occurrence counts, and refuses to apply when a count moved between the preview and the write.
 - [transition](../cli-transition/) -- Record the transition-record facts an operator states. Most events in a repository's transition record are written by the operation that performed them; the ones here are statements about a repository somebody read -- two that nothing can derive at all, and one whose command exists but which a rename performed by hand leaves unrecorded.
