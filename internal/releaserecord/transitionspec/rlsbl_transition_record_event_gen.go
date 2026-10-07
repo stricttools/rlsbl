@@ -46,15 +46,16 @@ func init() {
 
 // ValidateBytes is the raw-bytes entry point: lossless parse of input in the
 // given syntax ("json" | "toml" | "jsonl"), then validate. It returns the
-// typed root value (nil when any diagnostic fired) and the ordered diagnostics.
+// root value (the zero Value when any diagnostic fired) and the ordered
+// diagnostics.
 func ValidateBytes(input []byte, syntax string) (strictspec.Value, []strictspec.Diagnostic) {
 	res := program.Validate(input, syntax)
 	if !res.Valid {
-		return nil, res.Diagnostics
+		return strictspec.Value{}, res.Diagnostics
 	}
 	v, err := strictspec.LoadValue(input, syntax)
 	if err != nil {
-		return nil, res.Diagnostics
+		return strictspec.Value{}, res.Diagnostics
 	}
 	return v, nil
 }
@@ -64,7 +65,7 @@ func ValidateBytes(input []byte, syntax string) (strictspec.Value, []strictspec.
 func ValidateValue(v strictspec.Value) (strictspec.Value, []strictspec.Diagnostic) {
 	res := program.ValidateValue(v)
 	if !res.Valid {
-		return nil, res.Diagnostics
+		return strictspec.Value{}, res.Diagnostics
 	}
 	return v, nil
 }
@@ -74,11 +75,11 @@ func ValidateValue(v strictspec.Value) (strictspec.Value, []strictspec.Diagnosti
 func ValidateBytesWithEvidence(input []byte, syntax string, evidence map[string][]map[string]any) (strictspec.Value, []strictspec.Diagnostic) {
 	res := program.ValidateWithEvidence(input, syntax, evidence)
 	if !res.Valid {
-		return nil, res.Diagnostics
+		return strictspec.Value{}, res.Diagnostics
 	}
 	v, err := strictspec.LoadValue(input, syntax)
 	if err != nil {
-		return nil, res.Diagnostics
+		return strictspec.Value{}, res.Diagnostics
 	}
 	return v, nil
 }
