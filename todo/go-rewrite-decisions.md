@@ -86,3 +86,20 @@ Recorded by the session that deleted the removed targets; each is an implementat
 - The checks moving to strictcode are ported into strictcode in Go and strictcode is released, and the Go rlsbl's release checks call it, before the Python rlsbl is deleted.
 - The rewrite is finished only when the Python is deleted and the Go rlsbl is released: the record migration is committed in every rlsbl repository (rlsbl-owned files only), strictcli, strictcode, selfdoc, safegit, saferm, and rlsbl are released as needed in dependency order, and the rlsbl guides under ~/Projects/CONTEXT are rewritten for the Go commands.
 - The last Python version is 0.131.0.
+
+## Orchestrator rulings on the rewrite plan
+
+Made by the session leading the campaign, not by the owner.
+
+- `library-lint`, `dead-workspace-packages`, and `ruff-lint` move to strictcode; `ruff-lint` merges into strictcode's lint rule. The Go rlsbl parses no source.
+- The `rlsbl:strictcode` option's value is `error`: every release runs strictcode with all its rules.
+- The cgofree tree-sitter modules are released before strictcode, as subdirectory modules inside the cgofree repository named after their existing directories and tagged `<dir>/vX.Y.Z` there; no new repositories and no new registry names. cgofree joins the release order before strictcode. No 1.x tag.
+- A repository with no lifecycle-and-license record is treated as public, and confidential names are refused there. The migration writes a record for every rlsbl repository, and a command writes a minimal record for repositories rlsbl does not manage.
+- `transition declassify` squashes each proprietary period's commits into one commit whose message names no confidential term, keeping the public history before and after it.
+- rlsbl's npm per-platform packages are `rlsbl-linux-x64`, `rlsbl-linux-arm64`, `rlsbl-darwin-x64`, and `rlsbl-darwin-arm64`; there are no win32 packages.
+- Preflight checks always run; a declared pre-release hook replaces only the built-in tests (option A of `todo/preflight-checks-skipped-by-custom-hooks.md`, which moves to `todo/.done/` with the resolution when built).
+- The record has no `disclosure` field: a repository is confidential when one of its releasables currently has a proprietary license period, and safegit derives that from the license periods offline. Private repositories without a proprietary releasable are not designed for.
+- The migration refuses a config naming a removed target and names the hand edit.
+- strictspec, which holds the lifecycle-and-license library, joins the release order; saferm is the first project released with npm per-platform packages, before rlsbl.
+- `release undo --version` evidence and the registry probe in `rewrite uv-path-sources` use package-level listings of already-published versions, with tests; no request ever names one of our unpublished versions.
+- A releasable whose lifecycle is on-hold refuses releases.
