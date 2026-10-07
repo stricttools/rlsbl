@@ -95,6 +95,37 @@ func TestADryRunWritesNothing(t *testing.T) {
 	}
 }
 
+// The file table of a dry run says what the run would do to each file:
+// a file it would create, update, or merge is never reported as created,
+// updated, or merged, and a file it leaves alone is reported unchanged.
+func TestADryRunsFileTableSaysWhatItWouldDo(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := newProject(t, standalone("none", ""), goModule)
+	s := mustScaffold(t, repo.Dir, func(in *Inputs) { in.DryRun = true })
+	if got := s.rowStatus(".github/workflows/ci.yml"); got != "would be created" {
+		t.Errorf("ci.yml: %q\n%s", got, s.text())
+	}
+	mustScaffold(t, repo.Dir, nil)
+	repo.Write(".github/workflows/ci.yml", readFile(t, repo, ".github/workflows/ci.yml")+"# the project's own line\n")
+	repo.Write(".gitignore", "")
+	again := mustScaffold(t, repo.Dir, func(in *Inputs) { in.DryRun = true })
+	if got := again.rowStatus("VERSION"); got != statusUnchanged {
+		t.Errorf("VERSION: %q\n%s", got, again.text())
+	}
+	if got := again.rowStatus(".gitignore"); got != "would be updated (lines added)" {
+		t.Errorf(".gitignore: %q\n%s", got, again.text())
+	}
+	for _, line := range again.said {
+		_, status, isRow := strings.Cut(line, " ..")
+		status = strings.TrimSpace(strings.TrimLeft(status, "."))
+		for _, done := range []string{"created", "updated", "merged", "removed"} {
+			if isRow && strings.HasPrefix(status, done) {
+				t.Errorf("a dry run reports a row as done: %q", line)
+			}
+		}
+	}
+}
+
 // A workspace's root member is not scaffolded: its workflows are the ones
 // monorepo sync generates.
 func TestAWorkspacesRootMemberIsNotScaffolded(t *testing.T) {

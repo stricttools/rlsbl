@@ -352,7 +352,11 @@ func (r *run) report(publishSkip string) {
 		}
 		r.in.Say("Files:")
 		for _, row := range rows {
-			r.in.Say(fmt.Sprintf("  %s %s %s", row.Path, strings.Repeat(".", width+4-len(row.Path)), row.Status))
+			status := row.Status
+			if r.in.DryRun {
+				status = wouldStatus(status)
+			}
+			r.in.Say(fmt.Sprintf("  %s %s %s", row.Path, strings.Repeat(".", width+4-len(row.Path)), status))
 		}
 	}
 	if publishSkip != "" {
@@ -365,6 +369,25 @@ func (r *run) report(publishSkip string) {
 			r.in.Say(fmt.Sprintf("  %d. %s", i+1, s))
 		}
 	}
+}
+
+// wouldStatus is a file row's status as a dry run reports it: what the run
+// would do to the file, since it did nothing.
+func wouldStatus(status string) string {
+	for _, done := range []string{statusCreated, statusUpdated, statusMerged, statusRemoved} {
+		if rest, ok := strings.CutPrefix(status, done); ok {
+			return "would be " + done + rest
+		}
+	}
+	switch status {
+	case statusSeeded:
+		return "unchanged, base would be seeded"
+	case statusHealed:
+		return "unchanged, base would be rebuilt"
+	case statusConflicts:
+		return "WOULD CONFLICT: the run writes git's markers to resolve"
+	}
+	return status
 }
 
 // commitWritten commits what the run changed, through safegit, with the

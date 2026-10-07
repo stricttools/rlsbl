@@ -38,6 +38,7 @@ const (
 	statusUserOwned  = "user-owned"
 	statusLinesAdded = "updated (lines added)"
 	statusConflicts  = "CONFLICTS: resolve manually"
+	statusRemoved    = "removed"
 )
 
 // filePlan is what scaffold does to one file.

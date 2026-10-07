@@ -330,7 +330,11 @@ func scaffoldMember(e *strictcli.Effects, repo git.Repo, ws *workspace.Workspace
 	var conflicted []string
 	for _, p := range plans {
 		if p.healed != "" {
-			in.Say(fmt.Sprintf("%s: merge base rebuilt from the last scaffold commit %s", p.path, p.healed))
+			if in.DryRun {
+				in.Say(fmt.Sprintf("%s: merge base would be rebuilt from the last scaffold commit %s", p.path, p.healed))
+			} else {
+				in.Say(fmt.Sprintf("%s: merge base rebuilt from the last scaffold commit %s", p.path, p.healed))
+			}
 		}
 		if err := applyPlan(e, root, p); err != nil {
 			return err
@@ -371,7 +375,7 @@ func scaffoldMember(e *strictcli.Effects, repo git.Repo, ws *workspace.Workspace
 			}
 			r.commit = append(r.commit, BasePath(o.path))
 		}
-		r.row(o.path, "removed ("+o.reason+")")
+		r.row(o.path, statusRemoved+" ("+o.reason+")")
 	}
 	if err := installHooks(e, hooks, in.DryRun, in.Say); err != nil {
 		return err
