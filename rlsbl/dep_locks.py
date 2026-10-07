@@ -78,7 +78,12 @@ from .dep_floors import (
 from .uv_workspace import locate_uv_lock
 
 PYPI_RELOCK = "uv lock"
-NPM_RELOCK = "npm install --package-lock-only"
+#: The npm lockfile refresh, as argv. ``--ignore-scripts`` keeps the package's
+#: own lifecycle scripts out of it: a wrapper whose postinstall downloads the
+#: release asset of the version being bumped would otherwise fail, and a lock
+#: refresh has no business running project code.
+NPM_RELOCK_ARGV = ("npm", "install", "--package-lock-only", "--ignore-scripts")
+NPM_RELOCK = " ".join(NPM_RELOCK_ARGV)
 GO_RELOCK = "go mod tidy"
 
 

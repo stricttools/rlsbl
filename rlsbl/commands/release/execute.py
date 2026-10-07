@@ -11,6 +11,7 @@ import sys
 import time
 
 from ...ci_checks import RUN_ALL_REMEDY
+from ...dep_locks import NPM_RELOCK_ARGV
 from ...errors import ReleaseFileError, RlsblError
 from ...release_checkout import BranchMovedError
 from ...git_util import Ancestry, ancestry, tree_rev_spec
@@ -1828,7 +1829,7 @@ GO_WORK_SYNC = ["go", "work", "sync"]
 # This distinguishes e.g. go.sum (per-module) from go.work.sum (workspace root only).
 _LOCKFILE_SPECS = [
     ("uv.lock", "uv", ["uv", "lock"], None),
-    ("package-lock.json", "npm", ["npm", "install", "--package-lock-only"], None),
+    ("package-lock.json", "npm", list(NPM_RELOCK_ARGV), None),
     ("go.sum", "go", GO_TIDY, None),
     ("go.work.sum", "go", GO_WORK_SYNC, "go.work"),
 ]

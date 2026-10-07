@@ -204,3 +204,51 @@ class TestWorkspaceRootUnconditionalInclusion:
         # go.sum has no guard, so it IS included if present
         expected = os.path.normpath(str(ws_root / "go.sum"))
         assert expected in files
+
+
+class TestNpmRelockRunsNoScripts:
+    """The release's package-lock.json re-sync never runs the package's own
+    lifecycle scripts. A wrapper package whose postinstall downloads the
+    release asset of the version being bumped (which does not exist yet)
+    otherwise fails the release before its candidate is pushed."""
+
+    def test_owed_npm_sync_skips_install_scripts(self, tmp_path):
+        import json
+        import shutil as _shutil
+        import subprocess
+
+        import pytest
+
+        if _shutil.which("npm") is None:
+            pytest.skip("npm is not installed")
+        marker = tmp_path / "postinstall-ran"
+        (tmp_path / "package.json").write_text(json.dumps({
+            "name": "relock-probe",
+            "version": "0.2.0",
+            "scripts": {
+                "preinstall": f"node -e \"require('fs').writeFileSync('{marker}', 'pre')\"",
+                "postinstall": f"node -e \"require('fs').writeFileSync('{marker}', 'post')\"",
+            },
+        }))
+        (tmp_path / "package-lock.json").write_text(json.dumps({
+            "name": "relock-probe", "version": "0.1.0", "lockfileVersion": 3,
+            "requires": True,
+            "packages": {"": {"name": "relock-probe", "version": "0.1.0"}},
+        }))
+        owed = [s for s in _owed(tmp_path) if s["lockfile"] == "package-lock.json"]
+        assert len(owed) == 1
+        result = subprocess.run(
+            owed[0]["cmd"], cwd=owed[0]["cwd"], capture_output=True, text=True,
+            timeout=120,
+        )
+        assert result.returncode == 0, result.stderr
+        assert not marker.exists(), "the lockfile re-sync ran an install script"
+        lock = json.loads((tmp_path / "package-lock.json").read_text())
+        assert lock["version"] == "0.2.0"
+
+    def test_dep_locks_relock_instruction_matches_the_release_sync(self):
+        from rlsbl.dep_locks import NPM_RELOCK
+
+        npm_spec = [s for s in _LOCKFILE_SPECS if s[0] == "package-lock.json"]
+        assert NPM_RELOCK == " ".join(npm_spec[0][2])
+        assert "--ignore-scripts" in npm_spec[0][2]
