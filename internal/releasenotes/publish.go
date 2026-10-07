@@ -7,15 +7,39 @@ import (
 
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/github"
+	"github.com/stricttools/rlsbl/internal/publishrules"
 )
+
+// Check refuses a document whose Release body carries a confidential name
+// in a public repository (the scanner decides). Every writer of a Release
+// body below runs it on the body it writes before writing; a command that
+// writes elsewhere first (an archive notice) runs it before that, too. A
+// missing scanner is an error, so no body is ever written unscanned.
+func Check(scanner *publishrules.Scanner, doc Document) error {
+	body, err := doc.Body()
+	if err != nil {
+		return err
+	}
+	return checkBody(scanner, doc.Tag, body)
+}
+
+func checkBody(scanner *publishrules.Scanner, tag, body string) error {
+	if scanner == nil {
+		return fmt.Errorf("the GitHub Release body of %s is written only after the confidential-name scan, and no scanner was given", tag)
+	}
+	return scanner.ScanTexts([]publishrules.Text{{Name: "the GitHub Release body of " + tag, Content: body}})
+}
 
 // Create creates the Release doc describes, refusing through gh's
 // --verify-tag when the tag is not on GitHub. movesLatest states whether it
 // may take the repository's "Latest" badge: true for a release, and for a
 // repair only where RepairTakesLatest says so.
-func Create(gh github.Client, repo github.Repository, doc Document, movesLatest bool, extra ...strictcli.EffectOption) error {
+func Create(gh github.Client, repo github.Repository, scanner *publishrules.Scanner, doc Document, movesLatest bool, extra ...strictcli.EffectOption) error {
 	body, err := doc.Body()
 	if err != nil {
+		return err
+	}
+	if err := checkBody(scanner, doc.Tag, body); err != nil {
 		return err
 	}
 	return gh.CreateRelease(repo, github.NewRelease{
@@ -33,7 +57,7 @@ func Create(gh github.Client, repo github.Repository, doc Document, movesLatest 
 // marker the Release's body carries (KeepingMarkerOf), which is read first;
 // a Release that does not exist is an error. Nothing is deleted, so a
 // failure leaves the old Release as it was.
-func Rewrite(gh github.Client, repo github.Repository, doc Document, extra ...strictcli.EffectOption) error {
+func Rewrite(gh github.Client, repo github.Repository, scanner *publishrules.Scanner, doc Document, extra ...strictcli.EffectOption) error {
 	if doc.ReleaseCommit == "" {
 		existing, err := gh.ReleaseBody(repo, doc.Tag)
 		if err != nil {
@@ -45,6 +69,9 @@ func Rewrite(gh github.Client, repo github.Repository, doc Document, extra ...st
 	if err != nil {
 		return err
 	}
+	if err := checkBody(scanner, doc.Tag, body); err != nil {
+		return err
+	}
 	return gh.RewriteRelease(repo, doc.Tag, github.ReleaseDocument{Notes: body, Title: doc.Title(), Prerelease: doc.Prerelease()}, extra...)
 }
 
@@ -53,7 +80,7 @@ func Rewrite(gh github.Client, repo github.Repository, doc Document, extra ...st
 // it is, and reports whether it wrote. A release resuming onto a Release
 // that already exists asks this, so the publish workflow always reads the
 // commit CI verified.
-func EnsureMarker(gh github.Client, repo github.Repository, doc Document, extra ...strictcli.EffectOption) (bool, error) {
+func EnsureMarker(gh github.Client, repo github.Repository, scanner *publishrules.Scanner, doc Document, extra ...strictcli.EffectOption) (bool, error) {
 	marker, err := doc.Marker()
 	if err != nil {
 		return false, err
@@ -66,6 +93,9 @@ func EnsureMarker(gh github.Client, repo github.Repository, doc Document, extra 
 	if !changed {
 		return false, nil
 	}
+	if err := checkBody(scanner, doc.Tag, body); err != nil {
+		return false, err
+	}
 	if err := gh.EditReleaseNotes(repo, doc.Tag, body, extra...); err != nil {
 		return false, err
 	}
@@ -75,15 +105,15 @@ func EnsureMarker(gh github.Client, repo github.Repository, doc Document, extra 
 // Publish creates the Release of doc's tag when GitHub has none and
 // otherwise rewrites the existing one in place, reporting whether it
 // created. movesLatest is Create's.
-func Publish(gh github.Client, repo github.Repository, doc Document, movesLatest bool, extra ...strictcli.EffectOption) (created bool, err error) {
+func Publish(gh github.Client, repo github.Repository, scanner *publishrules.Scanner, doc Document, movesLatest bool, extra ...strictcli.EffectOption) (created bool, err error) {
 	exists, err := gh.ReleaseExists(repo, doc.Tag)
 	if err != nil {
 		return false, err
 	}
 	if exists {
-		return false, Rewrite(gh, repo, doc, extra...)
+		return false, Rewrite(gh, repo, scanner, doc, extra...)
 	}
-	return true, Create(gh, repo, doc, movesLatest, extra...)
+	return true, Create(gh, repo, scanner, doc, movesLatest, extra...)
 }
 
 // RepairTakesLatest decides whether a repair creating doc's Release takes

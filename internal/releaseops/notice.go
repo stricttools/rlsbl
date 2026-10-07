@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
 
 	"github.com/stricttools/rlsbl/internal/github"
+	"github.com/stricttools/rlsbl/internal/publishrules"
 	"github.com/stricttools/rlsbl/internal/releasenotes"
 	"github.com/stricttools/rlsbl/internal/releaserecord"
 	"github.com/stricttools/rlsbl/internal/semver"
@@ -28,6 +30,9 @@ type NoticeRequest struct {
 	Reason string
 	// Use is the version to use instead, and empty when not given.
 	Use string
+	// IndexPath is the machine-local confidential-name index the
+	// rewritten Release body is scanned against.
+	IndexPath string
 }
 
 // Notice is the line a deprecate or yank puts on top of a Release body:
@@ -58,6 +63,7 @@ type noticeTarget struct {
 	archive releaserecord.Archive
 	tag     string
 	notice  string
+	scanner *publishrules.Scanner
 }
 
 // prepareNotice reads and checks everything a notice on req's version
@@ -89,6 +95,10 @@ func prepareNotice(ctx *strictcli.Context, s Selection, req NoticeRequest, label
 	if err != nil {
 		return noticeTarget{}, err
 	}
+	scanner, err := publishrules.LoadScanner(s.Root(), req.IndexPath, time.Now())
+	if err != nil {
+		return noticeTarget{}, err
+	}
 	gh, slug, err := openGitHub(ctx.Effects(), s)
 	if err != nil {
 		return noticeTarget{}, err
@@ -97,7 +107,30 @@ func prepareNotice(ctx *strictcli.Context, s Selection, req NoticeRequest, label
 	if err := requireRelease(gh, slug, tag); err != nil {
 		return noticeTarget{}, err
 	}
-	return noticeTarget{s: s, gh: gh, slug: slug, version: v, archive: a, tag: tag, notice: Notice(label, req.Reason, use)}, nil
+	n := noticeTarget{s: s, gh: gh, slug: slug, version: v, archive: a, tag: tag, notice: Notice(label, req.Reason, use), scanner: scanner}
+	// The notice is scanned with the body it joins before it is recorded:
+	// a refused name never reaches the archive either.
+	doc, err := n.document()
+	if err != nil {
+		return noticeTarget{}, err
+	}
+	if err := releasenotes.Check(scanner, doc); err != nil {
+		return noticeTarget{}, err
+	}
+	return n, nil
+}
+
+// document is the Release document of the version with the notice on top,
+// as the record holds it once the notice is recorded.
+func (n noticeTarget) document() (releasenotes.Document, error) {
+	doc, err := releasenotes.Read(n.s.Root(), n.s.Releasable.Name, n.s.Scheme, n.version)
+	if err != nil {
+		return releasenotes.Document{}, err
+	}
+	if !slices.Contains(doc.Notices, n.notice) {
+		doc.Notices = append([]string{n.notice}, doc.Notices...)
+	}
+	return doc, nil
 }
 
 // publish records the notice in the version's archive and commits it, then
@@ -115,17 +148,14 @@ func (n noticeTarget) publish(ctx *strictcli.Context, verb string) error {
 			return fmt.Errorf("the %s notice of %s was written into %s, and committing it failed: %w. Commit that file, then run `rlsbl release edit %s` to put the notice on the Release", verb, n.tag, n.archive.Path, err, n.version)
 		}
 	}
-	doc, err := releasenotes.Read(n.s.Root(), n.s.Releasable.Name, n.s.Scheme, n.version)
+	// Under --dry-run the archive write was recorded, not made, so the
+	// document read back lacks the notice; document puts it where the
+	// record will hold it.
+	doc, err := n.document()
 	if err != nil {
 		return err
 	}
-	// Under --dry-run the archive write was recorded, not made, so the
-	// document read back lacks the notice; it is put where the record will
-	// hold it.
-	if !slices.Contains(doc.Notices, n.notice) {
-		doc.Notices = append([]string{n.notice}, doc.Notices...)
-	}
-	return releasenotes.Rewrite(n.gh, n.slug, doc)
+	return releasenotes.Rewrite(n.gh, n.slug, n.scanner, doc)
 }
 
 // Deprecate marks a release deprecated, the latest one included: its notice is recorded in the

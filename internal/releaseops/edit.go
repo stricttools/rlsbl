@@ -2,9 +2,11 @@ package releaseops
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
 
+	"github.com/stricttools/rlsbl/internal/publishrules"
 	"github.com/stricttools/rlsbl/internal/releasenotes"
 	"github.com/stricttools/rlsbl/internal/semver"
 )
@@ -16,6 +18,9 @@ type EditRequest struct {
 	// Version is the version whose Release is rewritten, and empty for the
 	// releasable's latest release.
 	Version string
+	// IndexPath is the machine-local confidential-name index the rewritten
+	// Release body is scanned against.
+	IndexPath string
 }
 
 // Edit rewrites one released version's GitHub Release in place from the
@@ -45,6 +50,10 @@ func Edit(ctx *strictcli.Context, req EditRequest) error {
 	if _, err := s.releasedArchive(v); err != nil {
 		return err
 	}
+	scanner, err := publishrules.LoadScanner(s.Root(), req.IndexPath, time.Now())
+	if err != nil {
+		return err
+	}
 	doc, err := releasenotes.Read(s.Root(), s.Releasable.Name, s.Scheme, v)
 	if err != nil {
 		return err
@@ -56,7 +65,7 @@ func Edit(ctx *strictcli.Context, req EditRequest) error {
 	if err := requireRelease(gh, slug, doc.Tag); err != nil {
 		return err
 	}
-	if err := releasenotes.Rewrite(gh, slug, doc); err != nil {
+	if err := releasenotes.Rewrite(gh, slug, scanner, doc); err != nil {
 		return err
 	}
 	if ctx.DryRun() {

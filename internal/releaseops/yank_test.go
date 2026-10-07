@@ -15,7 +15,7 @@ import (
 
 func yank(t *testing.T, p *project, fake *testsupport.FakeHTTP, dryRun bool, req releaseops.NoticeRequest) strictcli.Result {
 	t.Helper()
-	req.Dir = p.Dir
+	req.Dir, req.IndexPath = p.Dir, p.indexPath
 	return run(t, fake, dryRun, func(ctx *strictcli.Context) error { return releaseops.Yank(ctx, req) })
 }
 

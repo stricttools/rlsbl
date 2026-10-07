@@ -11,6 +11,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/github"
+	"github.com/stricttools/rlsbl/internal/publishrules"
 	"github.com/stricttools/rlsbl/internal/releasenotes"
 	"github.com/stricttools/rlsbl/internal/releaserecord"
 	"github.com/stricttools/rlsbl/internal/semver"
@@ -25,6 +26,9 @@ type ReleaseRepair struct {
 	Record     *lifecycle.Record
 	GitHub     github.Client
 	Repository github.Repository
+	// Scanner scans every Release body the repair writes for confidential
+	// names (publishrules.LoadScanner).
+	Scanner *publishrules.Scanner
 	// Rewrites is the rewrite's commit map, through which the marker of a
 	// version whose record names no release commit is moved.
 	Rewrites map[string]string
@@ -232,7 +236,7 @@ func (r ReleaseRepair) rewriteOne(res *releaseResolver, tag string) (bool, error
 		}
 	}
 	if exists {
-		if err := releasenotes.Rewrite(r.GitHub, r.Repository, doc); err != nil {
+		if err := releasenotes.Rewrite(r.GitHub, r.Repository, r.Scanner, doc); err != nil {
 			return false, err
 		}
 		r.Say(fmt.Sprintf("%s: rewrote its GitHub Release in place", tag))
@@ -244,7 +248,7 @@ func (r ReleaseRepair) rewriteOne(res *releaseResolver, tag string) (bool, error
 	if err != nil {
 		return false, err
 	}
-	if err := releasenotes.Create(r.GitHub, r.Repository, doc, moves); err != nil {
+	if err := releasenotes.Create(r.GitHub, r.Repository, r.Scanner, doc, moves); err != nil {
 		return false, err
 	}
 	r.Say(fmt.Sprintf("%s: created its missing GitHub Release", tag))

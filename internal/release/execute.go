@@ -695,11 +695,7 @@ func (x *execution) githubRelease() error {
 	if err != nil {
 		return err
 	}
-	body, err := doc.Body()
-	if err != nil {
-		return err
-	}
-	if err := x.scanner.ScanTexts([]publishrules.Text{{Name: "the GitHub Release body of " + doc.Tag, Content: body}}); err != nil {
+	if err := releasenotes.Check(x.scanner, doc); err != nil {
 		return err
 	}
 	exists, err := x.gh.ReleaseExists(x.ghRepo, doc.Tag)
@@ -707,7 +703,7 @@ func (x *execution) githubRelease() error {
 		return err
 	}
 	if !exists {
-		if cerr := releasenotes.Create(x.gh, x.ghRepo, doc, true); cerr != nil {
+		if cerr := releasenotes.Create(x.gh, x.ghRepo, x.scanner, doc, true); cerr != nil {
 			// GitHub can answer an error for a Release it created.
 			created, err := x.gh.ReleaseExists(x.ghRepo, doc.Tag)
 			if err != nil || !created {
@@ -719,7 +715,7 @@ func (x *execution) githubRelease() error {
 		}
 	}
 	if exists {
-		wrote, err := releasenotes.EnsureMarker(x.gh, x.ghRepo, doc)
+		wrote, err := releasenotes.EnsureMarker(x.gh, x.ghRepo, x.scanner, doc)
 		if err != nil {
 			return fmt.Errorf("the GitHub Release of %s exists, and its rlsbl-ci-sha marker, which tells the publish workflow which commit CI verified, could not be written: %w", doc.Tag, err)
 		}

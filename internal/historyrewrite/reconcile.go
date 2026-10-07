@@ -18,6 +18,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/github"
 	"github.com/stricttools/rlsbl/internal/historyrewrite/reconcileplanspec"
 	"github.com/stricttools/rlsbl/internal/previewapply"
+	"github.com/stricttools/rlsbl/internal/publishrules"
 	"github.com/stricttools/rlsbl/internal/releasenotes"
 	"github.com/stricttools/rlsbl/internal/releaserecord"
 	"github.com/stricttools/rlsbl/internal/runstate"
@@ -69,6 +70,9 @@ type ReconcileRequest struct {
 	PushTimeout time.Duration
 	// Version is the running rlsbl's version, recorded in the plan.
 	Version string
+	// IndexPath is the machine-local confidential-name index every Release
+	// body the apply writes is scanned against.
+	IndexPath string
 }
 
 // SelectReleasable is the releasable the working directory dir selects, or
@@ -248,6 +252,7 @@ type reconcileRun struct {
 	req        ReconcileRequest
 	refs       *releasableRefs
 	repository github.Repository
+	scanner    *publishrules.Scanner
 	now        func() time.Time
 }
 
@@ -298,7 +303,11 @@ func Reconcile(ctx *strictcli.Context, root string, req ReconcileRequest, now fu
 	if err != nil {
 		return err
 	}
-	r := &reconcileRun{ctx: ctx, e: e, root: root, ws: ws, record: record, req: req, refs: refs, repository: repository, now: now}
+	scanner, err := publishrules.LoadScanner(root, req.IndexPath, now())
+	if err != nil {
+		return err
+	}
+	r := &reconcileRun{ctx: ctx, e: e, root: root, ws: ws, record: record, req: req, refs: refs, repository: repository, scanner: scanner, now: now}
 	x, err := collectExplanations(repo, root, record, req.Releasable.Name)
 	if err != nil {
 		return err
@@ -856,7 +865,7 @@ func (r *reconcileRun) apply(e *strictcli.Effects, item previewapply.Item) error
 		if doc.ReleaseCommit == "" {
 			return nil
 		}
-		wrote, err := releasenotes.EnsureMarker(gh, r.repository, doc)
+		wrote, err := releasenotes.EnsureMarker(gh, r.repository, r.scanner, doc)
 		if err != nil {
 			return fmt.Errorf("the tag %s was moved, but the rlsbl-ci-sha marker of its GitHub Release could not be rewritten (%w); the publish workflow reads that marker to learn which commit CI verified. Fix the cause and run the reconcile again", action.tag, err)
 		}
@@ -875,7 +884,7 @@ func (r *reconcileRun) apply(e *strictcli.Effects, item previewapply.Item) error
 	if err != nil {
 		return err
 	}
-	if err := releasenotes.Create(gh, r.repository, doc, moves); err != nil {
+	if err := releasenotes.Create(gh, r.repository, r.scanner, doc, moves); err != nil {
 		return err
 	}
 	r.say(fmt.Sprintf("Created the GitHub Release %s.", doc.Tag))

@@ -38,6 +38,24 @@ func NewScanner(record *lifecycle.Record, on time.Time, idx *index.Index) (*Scan
 	return &Scanner{index: idx, active: !record.Confidential(on)}, nil
 }
 
+// LoadScanner is NewScanner for the repository at root on the date of on,
+// its lifecycle-and-license record and the index at indexPath read from
+// disk. An empty indexPath is refused.
+func LoadScanner(root, indexPath string, on time.Time) (*Scanner, error) {
+	if indexPath == "" {
+		return nil, fmt.Errorf("scanning for confidential names needs the confidential-name index's path (index.DefaultPath())")
+	}
+	record, err := lifecycle.Load(root)
+	if err != nil {
+		return nil, err
+	}
+	idx, err := index.Load(indexPath)
+	if err != nil {
+		return nil, err
+	}
+	return NewScanner(record, on, idx)
+}
+
 // Active reports whether the scanner scans: the repository is public.
 func (s *Scanner) Active() bool { return s.active }
 

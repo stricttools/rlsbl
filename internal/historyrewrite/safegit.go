@@ -155,6 +155,9 @@ type ScrubRequest struct {
 	FromCommit    string
 	EntireHistory bool
 	Reason        string
+	// IndexPath is the machine-local confidential-name index the rewritten
+	// Release bodies are scanned against.
+	IndexPath string
 }
 
 // validate refuses a request no scrub can run, before anything is read.

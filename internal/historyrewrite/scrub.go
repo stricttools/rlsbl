@@ -20,6 +20,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/github"
+	"github.com/stricttools/rlsbl/internal/publishrules"
 	"github.com/stricttools/rlsbl/internal/release"
 	"github.com/stricttools/rlsbl/internal/releaserecord"
 	"github.com/stricttools/rlsbl/internal/runstate"
@@ -843,7 +844,7 @@ func (r *scrubRun) updateReleases(s *scrubState) error {
 	if len(s.Tags) == 0 {
 		return nil
 	}
-	repair, err := newReleaseRepair(r.e, r.repo, r.ws, s.Rewrites, r.say)
+	repair, err := newReleaseRepair(r.e, r.repo, r.ws, s.Rewrites, r.req.IndexPath, r.now(), r.say)
 	if err != nil {
 		return err
 	}
@@ -854,7 +855,7 @@ func (r *scrubRun) updateReleases(s *scrubState) error {
 
 // newReleaseRepair binds the Release repair to the repository's GitHub
 // repository: the declared github_repository, else the one origin names.
-func newReleaseRepair(e *strictcli.Effects, repo git.Repo, ws *workspace.Workspace, rewrites map[string]string, say func(string)) (ReleaseRepair, error) {
+func newReleaseRepair(e *strictcli.Effects, repo git.Repo, ws *workspace.Workspace, rewrites map[string]string, indexPath string, now time.Time, say func(string)) (ReleaseRepair, error) {
 	gh, err := github.New(e)
 	if err != nil {
 		return ReleaseRepair{}, err
@@ -873,7 +874,11 @@ func newReleaseRepair(e *strictcli.Effects, repo git.Repo, ws *workspace.Workspa
 	if err != nil {
 		return ReleaseRepair{}, err
 	}
-	return ReleaseRepair{Repo: repo, Workspace: ws, Record: record, GitHub: gh, Repository: repository, Rewrites: rewrites, Say: say}, nil
+	scanner, err := publishrules.LoadScanner(ws.Root, indexPath, now)
+	if err != nil {
+		return ReleaseRepair{}, err
+	}
+	return ReleaseRepair{Repo: repo, Workspace: ws, Record: record, GitHub: gh, Repository: repository, Scanner: scanner, Rewrites: rewrites, Say: say}, nil
 }
 
 // repairWithoutRewrite validates the changelog when safegit found nothing to

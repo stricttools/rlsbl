@@ -107,6 +107,9 @@ type project struct {
 	bare string
 	// workspace is whether the declarations declare one.
 	workspace bool
+	// indexPath is the confidential-name index the fixture's commands
+	// read, outside the repository.
+	indexPath string
 }
 
 // newPortal is the standalone project portal at 0.1.0, carrying the
@@ -133,7 +136,7 @@ func newPortal(t *testing.T, manifests ...string) *project {
 		paths = append(paths, m)
 	}
 	repo.Commit("the project", paths...)
-	p := &project{Repo: repo, t: t}
+	p := &project{Repo: repo, t: t, indexPath: filepath.Join(t.TempDir(), "confidential-names.toml")}
 	p.bare = repo.AddBareRemote("origin")
 	repo.Git("push", "-q", "origin", "main")
 	return p
@@ -152,7 +155,7 @@ func newWorkspace(t *testing.T) *project {
 		paths = append(paths, name+"/package.json", ".strictmetadata/releases/"+name+"/version")
 	}
 	repo.Commit("the workspace", paths...)
-	p := &project{Repo: repo, t: t, workspace: true}
+	p := &project{Repo: repo, t: t, workspace: true, indexPath: filepath.Join(t.TempDir(), "confidential-names.toml")}
 	p.bare = repo.AddBareRemote("origin")
 	repo.Git("push", "-q", "origin", "main")
 	return p

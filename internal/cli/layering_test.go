@@ -35,10 +35,11 @@ var layers = [][]string{
 // sameLayerImports names each import allowed between two packages of one
 // layer, importer first, with the reason for it.
 var sameLayerImports = map[[2]string]string{
-	{"dependencies", "gomodule"}: "the lockfile evaluation reads go.mod's requirements and replacements through the one strict go.mod reader",
-	{"scaffold", "workflows"}:    "a standalone publish workflow takes the wait-for-ci job and the go binary packaging jobs the workspace's publish router renders",
-	{"scaffold", "publishrules"}: "scaffold renders only the publishing features the private-repository-publishing rule allows the repository",
-	{"scaffold", "tagging"}:      "scaffold puts the rlsbl keyword into the manifests and the topic on the repository",
+	{"dependencies", "gomodule"}:     "the lockfile evaluation reads go.mod's requirements and replacements through the one strict go.mod reader",
+	{"scaffold", "workflows"}:        "a standalone publish workflow takes the wait-for-ci job and the go binary packaging jobs the workspace's publish router renders",
+	{"scaffold", "publishrules"}:     "scaffold renders only the publishing features the private-repository-publishing rule allows the repository",
+	{"scaffold", "tagging"}:          "scaffold puts the rlsbl keyword into the manifests and the topic on the repository",
+	{"releasenotes", "publishrules"}: "every Release body is scanned for confidential names by the one writer of Release bodies before it is written",
 }
 
 // testOnly is the package only _test.go files may import.

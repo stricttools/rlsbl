@@ -2,16 +2,21 @@ package releasenotes_test
 
 import (
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/lifecycle"
+	"github.com/stricttools/strictspec/go/lifecycle/index"
 	"github.com/stricttools/testisolation/go/hygiene"
 
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/github"
 	"github.com/stricttools/rlsbl/internal/previewapply"
+	"github.com/stricttools/rlsbl/internal/publishrules"
 	"github.com/stricttools/rlsbl/internal/releasenotes"
 	"github.com/stricttools/rlsbl/internal/testsupport"
 )
@@ -74,7 +79,7 @@ func TestCreateWritesTheComposedDocument(t *testing.T) {
 	hygiene.Isolate(t)
 	gh := testsupport.FakeGH(t, testsupport.GHAnswer{Args: create})
 	if err := withGH(t, func(c github.Client) error {
-		return releasenotes.Create(c, portal, doc(t), true)
+		return releasenotes.Create(c, portal, scanner(t, ""), doc(t), true)
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +95,7 @@ func TestARepairCreationKeepsTheLatestBadgeWhereItIs(t *testing.T) {
 	repair := append(append([]string(nil), create...), "--latest=false")
 	gh := testsupport.FakeGH(t, testsupport.GHAnswer{Args: repair})
 	if err := withGH(t, func(c github.Client) error {
-		return releasenotes.Create(c, portal, doc(t), false)
+		return releasenotes.Create(c, portal, scanner(t, ""), doc(t), false)
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -101,10 +106,10 @@ func TestRewriteEditsInPlaceAndStatesTheFlag(t *testing.T) {
 	hygiene.Isolate(t)
 	gh := testsupport.FakeGH(t, testsupport.GHAnswer{Args: rewrite}, testsupport.GHAnswer{Args: rewritePre})
 	if err := withGH(t, func(c github.Client) error {
-		if err := releasenotes.Rewrite(c, portal, doc(t)); err != nil {
+		if err := releasenotes.Rewrite(c, portal, scanner(t, ""), doc(t)); err != nil {
 			return err
 		}
-		return releasenotes.Rewrite(c, portal, doc(t, deprecated))
+		return releasenotes.Rewrite(c, portal, scanner(t, ""), doc(t, deprecated))
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +133,7 @@ func TestRewriteOfAnUnrecoverableVersionKeepsTheMarkerGitHubHolds(t *testing.T) 
 	)
 	d := doc(t)
 	d.ReleaseCommit = ""
-	if err := withGH(t, func(c github.Client) error { return releasenotes.Rewrite(c, portal, d) }); err != nil {
+	if err := withGH(t, func(c github.Client) error { return releasenotes.Rewrite(c, portal, scanner(t, ""), d) }); err != nil {
 		t.Fatal(err)
 	}
 	calls := gh.Calls()
@@ -148,10 +153,10 @@ func TestEnsureMarkerWritesOnlyWhenTheMarkerIsMissingOrStale(t *testing.T) {
 	var first, second bool
 	if err := withGH(t, func(c github.Client) error {
 		var err error
-		if first, err = releasenotes.EnsureMarker(c, portal, doc(t)); err != nil {
+		if first, err = releasenotes.EnsureMarker(c, portal, scanner(t, ""), doc(t)); err != nil {
 			return err
 		}
-		second, err = releasenotes.EnsureMarker(c, portal, doc(t))
+		second, err = releasenotes.EnsureMarker(c, portal, scanner(t, ""), doc(t))
 		return err
 	}); err != nil {
 		t.Fatal(err)
@@ -177,7 +182,7 @@ func TestPublishCreatesOnlyWhatDoesNotExist(t *testing.T) {
 	var created []bool
 	if err := withGH(t, func(c github.Client) error {
 		for range 2 {
-			was, err := releasenotes.Publish(c, portal, doc(t), true)
+			was, err := releasenotes.Publish(c, portal, scanner(t, ""), doc(t), true)
 			if err != nil {
 				return err
 			}
@@ -197,7 +202,7 @@ func TestPublishRefusesWhenGitHubCannotSay(t *testing.T) {
 	hygiene.Isolate(t)
 	gh := testsupport.FakeGH(t, testsupport.GHAnswer{Args: viewExists, Stderr: "HTTP 502\n", Exit: 1})
 	err := withGH(t, func(c github.Client) error {
-		_, err := releasenotes.Publish(c, portal, doc(t), true)
+		_, err := releasenotes.Publish(c, portal, scanner(t, ""), doc(t), true)
 		return err
 	})
 	if err == nil {
@@ -297,5 +302,72 @@ func TestAMissingTagIsAnsweredOnceTheTagExists(t *testing.T) {
 	clone.Git("fetch", "origin", "--tags")
 	if newer, err := ask(); err != nil || !newer {
 		t.Fatalf("after fetching the tags: %v, %v", newer, err)
+	}
+}
+
+// diskWriter performs the index's writes, for a fixture.
+type diskWriter struct{}
+
+func (diskWriter) WriteFile(path string, data []byte) error { return os.WriteFile(path, data, 0o644) }
+func (diskWriter) MkdirAll(path string) error               { return os.MkdirAll(path, 0o755) }
+
+// scanner is the confidential-name scanner of a public repository whose
+// index holds the name confidential, none when it is empty.
+func scanner(t *testing.T, confidential string) *publishrules.Scanner {
+	t.Helper()
+	idx, err := index.Load(filepath.Join(t.TempDir(), index.FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if confidential != "" {
+		if err := idx.Upsert(diskWriter{}, "https://github.com/acme/gadget.git", []string{confidential}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s, err := publishrules.NewScanner(&lifecycle.Record{}, time.Now(), idx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+func TestEveryReleaseBodyWriterRefusesAConfidentialName(t *testing.T) {
+	hygiene.Isolate(t)
+	leaky := releasenotes.Document{Tag: "v0.4.0", Version: version(t, "0.4.0"), Notes: "- Talks to Moonbeam now", ReleaseCommit: commitA}
+	gh := testsupport.FakeGH(t,
+		testsupport.GHAnswer{Args: viewBody, Stdout: "- Talks to Moonbeam now\n"},
+		testsupport.GHAnswer{Args: viewExists, Stdout: "v0.4.0\n"})
+	writers := map[string]func(c github.Client, s *publishrules.Scanner, d releasenotes.Document) error{
+		"Create": func(c github.Client, s *publishrules.Scanner, d releasenotes.Document) error {
+			return releasenotes.Create(c, portal, s, d, true)
+		},
+		"Rewrite": func(c github.Client, s *publishrules.Scanner, d releasenotes.Document) error {
+			return releasenotes.Rewrite(c, portal, s, d)
+		},
+		"EnsureMarker": func(c github.Client, s *publishrules.Scanner, d releasenotes.Document) error {
+			_, err := releasenotes.EnsureMarker(c, portal, s, d)
+			return err
+		},
+		"Publish": func(c github.Client, s *publishrules.Scanner, d releasenotes.Document) error {
+			_, err := releasenotes.Publish(c, portal, s, d, true)
+			return err
+		},
+	}
+	for name, write := range writers {
+		err := withGH(t, func(c github.Client) error { return write(c, scanner(t, "moonbeam"), leaky) })
+		if err == nil || !strings.Contains(err.Error(), "confidential") || !strings.Contains(err.Error(), "the GitHub Release body of v0.4.0") {
+			t.Errorf("%s wrote a body naming a confidential name: %v", name, err)
+		}
+		if err := withGH(t, func(c github.Client) error { return write(c, nil, doc(t)) }); err == nil {
+			t.Errorf("%s wrote without a scanner", name)
+		}
+	}
+	if err := withGH(t, func(c github.Client) error { return releasenotes.Check(scanner(t, "moonbeam"), leaky) }); err == nil {
+		t.Error("Check passed a body naming a confidential name")
+	}
+	for _, c := range gh.Calls() {
+		if c.Args[1] == "create" || c.Args[1] == "edit" {
+			t.Fatalf("a refused body was written: %q", c.Args)
+		}
 	}
 }

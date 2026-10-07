@@ -2,6 +2,7 @@ package historyrewrite_test
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -23,6 +24,9 @@ var mangleSecret = historyrewrite.ScrubRequest{Mode: historyrewrite.ModePattern,
 
 func scrub(t *testing.T, dir string, req historyrewrite.ScrubRequest, dryRun bool) strictcli.Result {
 	t.Helper()
+	if req.IndexPath == "" {
+		req.IndexPath = filepath.Join(t.TempDir(), "confidential-names.toml")
+	}
 	return run(t, dryRun, func(ctx *strictcli.Context) error {
 		return historyrewrite.Scrub(ctx, dir, req, scrubNow)
 	})

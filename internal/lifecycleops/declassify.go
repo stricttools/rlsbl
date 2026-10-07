@@ -21,6 +21,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/github"
 	"github.com/stricttools/rlsbl/internal/historyrewrite"
+	"github.com/stricttools/rlsbl/internal/publishrules"
 	"github.com/stricttools/rlsbl/internal/release"
 	"github.com/stricttools/rlsbl/internal/releaserecord"
 	"github.com/stricttools/rlsbl/internal/runstate"
@@ -628,7 +629,11 @@ func (inv Invocation) finishDeclassify(m managed, s *declassifyState) error {
 			if err != nil {
 				return err
 			}
-			written, err := historyrewrite.RewriteReleases(historyrewrite.ReleaseRepair{Repo: m.repo, Workspace: m.ws, Record: rec, GitHub: client, Repository: slug, Rewrites: s.Rewrites, Say: inv.Say}, s.Tags)
+			scanner, err := publishrules.LoadScanner(m.root, inv.IndexPath, inv.Now())
+			if err != nil {
+				return err
+			}
+			written, err := historyrewrite.RewriteReleases(historyrewrite.ReleaseRepair{Repo: m.repo, Workspace: m.ws, Record: rec, GitHub: client, Repository: slug, Scanner: scanner, Rewrites: s.Rewrites, Say: inv.Say}, s.Tags)
 			s.ReleasesWritten = written
 			return err
 		}},
