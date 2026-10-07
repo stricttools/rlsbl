@@ -2995,6 +2995,53 @@ def _merge_template_vars(registries_list, primary, target_paths, ctx):
     return merged
 
 
+def _refuse_new_version_disagreement(registries_list, target_paths, ctx):
+    """Refuse a scaffold that would create VERSION disagreeing with a target.
+
+    The go, zig, and plain targets scaffold VERSION, rendering it from their
+    own ``version`` template variable (0.0.0 when no VERSION exists yet), while
+    other targets such as npm and pypi declare their version in their own
+    manifest. When VERSION does not exist yet, every scaffolded target that
+    declares a version must agree with the value VERSION would be created
+    with; otherwise one project would carry two versions. An existing VERSION
+    is not compared here.
+
+    Raises ConfigError, before anything is written, naming each target and
+    its version.
+    """
+    if os.path.exists("VERSION"):
+        return
+    writers = {
+        r for r in registries_list
+        if any(m["target"] == "VERSION" for m in TARGETS[r].template_mappings(ctx))
+    }
+    if not writers:
+        return
+
+    versions = {}
+    for r in registries_list:
+        target_vars = TARGETS[r].template_vars(target_paths.get(r, "."), ctx)
+        if "version" in target_vars:
+            versions[r] = target_vars["version"]
+    if len(set(versions.values())) <= 1:
+        return
+
+    # Manifest-declared versions first, then the VERSION writers, so the
+    # listing does not depend on which registry is primary.
+    ordered = sorted(versions, key=lambda r: (r in writers, r))
+    lines = []
+    for r in ordered:
+        suffix = " (the value VERSION would be created with)" if r in writers else ""
+        lines.append(f"  {r}: {versions[r]}{suffix}")
+    raise ConfigError(
+        "Scaffolding would create VERSION, but the scaffolded targets disagree "
+        "on the project's version:\n"
+        + "\n".join(lines)
+        + "\nA project carries one version. Create VERSION holding the "
+        "project's version, then re-run `rlsbl scaffold`. Nothing was written."
+    )
+
+
 def _plan_merged_publish(publish_target, merged_content):
     """Compute a plan for the merged publish workflow (analysis only)."""
     if not os.path.exists(publish_target):
@@ -3161,6 +3208,7 @@ def run_cmd_multi(registries_list, args, flags, ctx):
     from ..scratch_dirs import refuse_tracked_scratch_files
     refuse_tracked_scratch_files()
     refuse_unreachable_hooks_dir()
+    _refuse_new_version_disagreement(registries_list, target_paths, ctx)
 
     # Acquire advisory lock to prevent concurrent rlsbl operations
     acquire_lock(project_root=project_root)
