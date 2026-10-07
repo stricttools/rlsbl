@@ -117,6 +117,7 @@ func registerMonorepo(r *commandSet, version string) {
 	registerMonorepoReports(r)
 	registerMonorepoMaintenance(r)
 	registerMonorepoConversions(r, version)
+	registerMonorepoRelease(r, version)
 }
 
 // The choices of monorepo init's --root-member.
