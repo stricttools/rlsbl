@@ -135,10 +135,15 @@ func TestANeverReleasedArchiveIsLeftAsItIs(t *testing.T) {
 	f.repo.Git("commit", "-q", "-m", "declare the fate")
 	newSafegit(t, "0.31.0")
 	gh(t)
-	r := backfill(t, f.repo.Dir, "", false)
+	r := backfill(t, f.repo.Dir, "", true)
 	requireExit(t, r, 0)
-	if !strings.Contains(r.Stdout, "never_released = true") || !strings.Contains(r.Stdout, "Nothing to do") {
+	if !strings.Contains(r.Stdout, "never_released = true") || !strings.Contains(r.Stdout, "0 archive(s) would be written") {
 		t.Fatalf("the settled fate was not reported:\n%s", r.Stdout)
+	}
+	r = backfill(t, f.repo.Dir, "", false)
+	requireExit(t, r, 0)
+	if !strings.Contains(r.Stdout, "Nothing to do") {
+		t.Fatalf("an apply had something to do:\n%s", r.Stdout)
 	}
 	if readFile(t, f.repo, archivePath) != content {
 		t.Fatal("the never-released archive was rewritten")
@@ -150,13 +155,14 @@ func TestATaglessVersionIsRecordedFromItsVersionBumpCommit(t *testing.T) {
 	f := newUnarchived(t, false, "v0.1.0")
 	newSafegit(t, "0.31.0")
 	gh(t)
-	r := backfill(t, f.repo.Dir, "", false)
+	r := backfill(t, f.repo.Dir, "", true)
 	requireExit(t, r, 0)
+	if !strings.Contains(r.Stdout, "version-bump commit") || !strings.Contains(r.Stdout, "never_released = true") {
+		t.Fatalf("the plan does not name the bump commit and how to declare a version never released:\n%s", r.Stdout)
+	}
+	requireExit(t, backfill(t, f.repo.Dir, "", false), 0)
 	if a := readArchive(t, f.repo, "0.1.0"); a.ReleaseCommit.Commit != f.R {
 		t.Fatalf("the archive records %+v, want the version-bump commit %s", a.ReleaseCommit, f.R)
-	}
-	if !strings.Contains(r.Stdout, "never_released = true") {
-		t.Fatalf("the plan does not say how to declare a version never released:\n%s", r.Stdout)
 	}
 }
 

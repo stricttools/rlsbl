@@ -341,8 +341,8 @@ func (r *scrubRun) isScrubCommitOn(s *scrubState, head string) bool {
 
 // refuseStoppedReleases refuses the scrub while a release is stopped
 // mid-flight: its state records commits of the history about to be
-// rewritten, and its release checkout, which the scrub removes, is where it
-// resumes.
+// rewritten, and it resumes in the release checkout, which the scrub
+// removes.
 func (r *scrubRun) refuseStoppedReleases() error {
 	names, err := runstate.InProgressReleasables(r.root)
 	if err != nil || len(names) == 0 {
@@ -808,7 +808,8 @@ func (r *scrubRun) commit(s *scrubState) error {
 		}
 	}
 	// The ownership manifests a first write into a directory creates are
-	// committed with them; one already committed and unchanged is left out of the commit.
+	// committed with the records; one already committed and unchanged is
+	// left out of the commit.
 	paths := mergePaths(mergePaths(mergePaths(s.RemappedFiles, s.ReleaseCommitFiles), s.DeletedCaches), []string{s.ArchivePath, rewritesManifest, transitionsManifest})
 	if _, err := r.repo.Commit(git.CommitRequest{
 		Message:       fmt.Sprintf("scrub: %s\n\nScrub-remap: %s..%s", s.Reason, s.OldHead, s.NewHead),
