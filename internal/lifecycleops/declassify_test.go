@@ -16,6 +16,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/github"
 	"github.com/stricttools/rlsbl/internal/lifecycleops"
+	"github.com/stricttools/rlsbl/internal/releaserecord"
 	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/testsupport"
 )
@@ -197,6 +198,11 @@ func TestDeclassifySquashesEachProprietaryPeriodAndGoesPublic(t *testing.T) {
 	// The run is archived and committed, and nothing is left in progress.
 	if got := readFile(t, repo, ".strictmetadata/history-rewrites/20260601T120000Z.toml"); !strings.Contains(got, `operation = "declassify"`) || !strings.Contains(got, `mode = "squash"`) {
 		t.Fatalf("the rewrite archive:\n%s", got)
+	}
+	// It records both squash commits as the history now holds them, which
+	// the changelog batch checks leave out.
+	if squashes, err := releaserecord.DeclassifySquashCommits(repo.Dir); err != nil || len(squashes) != 2 || !squashes[s1] || !squashes[s22] {
+		t.Fatalf("the archive records the squash commits %v (%v), want %s and %s", squashes, err, s1, s22)
 	}
 	if s := repo.Git("status", "--porcelain", "--", ".strictmetadata/changelog", ".strictmetadata/releases", ".strictmetadata/lifecycle-and-license", ".strictmetadata/history-rewrites"); s != "" {
 		t.Fatalf("records left uncommitted:\n%s", s)

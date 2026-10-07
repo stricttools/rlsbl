@@ -12,7 +12,6 @@ import (
 	"github.com/stricttools/strictcli/go/strictcli"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
-	"github.com/stricttools/rlsbl/internal/historyrewrite"
 	"github.com/stricttools/rlsbl/internal/releaserecord"
 	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/semver"
@@ -287,7 +286,7 @@ func (b *builder) convertScrubArchive(src string) {
 	if !ok {
 		return
 	}
-	a := historyrewrite.RewriteArchive{Operation: "scrub", Rewrites: map[string]string{}}
+	a := releaserecord.RewriteArchive{Operation: releaserecord.OperationScrub, Rewrites: map[string]string{}}
 	mode, _ := o.str("mode")
 	a.Mode = scrubModes[mode]
 	if a.Mode == "" {
@@ -311,7 +310,7 @@ func (b *builder) convertScrubArchive(src string) {
 			if !ok {
 				continue
 			}
-			var t historyrewrite.ArchivedTag
+			var t releaserecord.ArchivedTag
 			t.Refname, _ = to.str("refname")
 			t.OldSHA, _ = to.str("old_sha")
 			t.NewSHA, _ = to.str("new_sha")
@@ -328,9 +327,9 @@ func (b *builder) convertScrubArchive(src string) {
 		b.p.add("%s: the new head %s, whose committer date names the history-rewrite archive, cannot be read (%v)", src, a.NewHead, err)
 		return
 	}
-	dst := historyrewrite.RewriteArchivePath(started)
+	dst := releaserecord.RewriteArchivePath(started)
 	b.addWrite(write{path: dst, sources: []string{src}, change: "the history-rewrite archive of a scrub", writer: func(e *strictcli.Effects, root string) error {
-		_, err := historyrewrite.WriteRewriteArchive(e, root, started, a)
+		_, err := releaserecord.WriteRewriteArchive(e, root, started, a)
 		return err
 	}})
 }

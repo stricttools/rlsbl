@@ -721,12 +721,12 @@ func (inv Invocation) repairRecords(m managed, s *declassifyState) error {
 		return fmt.Errorf("the declassified record would not be valid, so nothing was committed: %w", err)
 	}
 	if s.ArchivePath == "" {
-		tags := make([]historyrewrite.ArchivedTag, len(s.Tags))
+		tags := make([]releaserecord.ArchivedTag, len(s.Tags))
 		for i, t := range s.Tags {
-			tags[i] = historyrewrite.ArchivedTag{Refname: t.Refname, OldSHA: t.OldSHA, NewSHA: t.NewSHA, Annotated: t.Annotated}
+			tags[i] = releaserecord.ArchivedTag{Refname: t.Refname, OldSHA: t.OldSHA, NewSHA: t.NewSHA, Annotated: t.Annotated}
 		}
-		rel, err := historyrewrite.WriteRewriteArchive(inv.E, m.root, started, historyrewrite.RewriteArchive{
-			Operation:        "declassify",
+		rel, err := releaserecord.WriteRewriteArchive(inv.E, m.root, started, releaserecord.RewriteArchive{
+			Operation:        releaserecord.OperationDeclassify,
 			Mode:             "squash",
 			Reason:           s.Reason,
 			OldHead:          s.OldHead,
@@ -734,6 +734,7 @@ func (inv Invocation) repairRecords(m managed, s *declassifyState) error {
 			CommitsRewritten: s.CommitsRewritten,
 			Rewrites:         s.Rewrites,
 			Tags:             tags,
+			SquashCommits:    s.SquashCommits,
 		})
 		if err != nil {
 			return err

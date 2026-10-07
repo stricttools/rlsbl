@@ -136,7 +136,7 @@ func (x explanations) resolve(sha string) (string, []string) {
 // two records name one old commit they name the same new one.
 func collectExplanations(repo git.Repo, root string, record *lifecycle.Record, releasable string) (explanations, error) {
 	x := explanations{commitMap: map[string]string{}, origins: map[string]string{}}
-	archives, names, err := ReadRewriteArchives(root)
+	archives, names, err := releaserecord.ReadRewriteArchives(root)
 	if err != nil {
 		return x, err
 	}

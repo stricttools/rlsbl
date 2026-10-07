@@ -283,24 +283,6 @@ func TestAnOverridesFileHoldsReviewedDescriptionsAndNothingElse(t *testing.T) {
 	}
 }
 
-func TestTheRewriteArchiveKeepsOnlyItsFieldsAndReadsBack(t *testing.T) {
-	hygiene.Isolate(t)
-	a := RewriteArchive{Operation: "scrub", Mode: "pattern", Reason: "a token", OldHead: shaA, NewHead: shaB, CommitsRewritten: 1, Rewrites: map[string]string{shaA: shaB}, Tags: []ArchivedTag{{Refname: "refs/tags/v1", OldSHA: shaA, NewSHA: shaB}}}
-	back, err := parseArchive("x.toml", renderArchive(a))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if back.Rewrites[shaA] != shaB || back.Tags[0].NewSHA != shaB || back.Reason != "a token" {
-		t.Fatalf("read back %+v", back)
-	}
-	if _, err := parseArchive("x.toml", append(renderArchive(a), []byte("pattern = \"tok\"\n")...)); err == nil {
-		t.Fatal("an archive carrying an unknown field was accepted")
-	}
-	if got := RewriteArchivePath(time.Date(2026, 3, 4, 5, 6, 7, 0, time.FixedZone("x", 3600))); got != ".strictmetadata/history-rewrites/20260304T040607Z.toml" {
-		t.Fatalf("archive path %s", got)
-	}
-}
-
 func TestAGeneratedFileNamesItsFirstDifferentLine(t *testing.T) {
 	hygiene.Isolate(t)
 	got := firstDifference("CHANGELOG.md", "# Changelog\n\n## 0.1.0\n", "# Changelog\n\n## 0.2.0\n")

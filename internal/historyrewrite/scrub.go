@@ -763,8 +763,8 @@ func (r *scrubRun) commit(s *scrubState) error {
 		return err
 	}
 	if s.ArchivePath == "" {
-		rel, err := WriteRewriteArchive(r.e, r.root, started, RewriteArchive{
-			Operation:        "scrub",
+		rel, err := releaserecord.WriteRewriteArchive(r.e, r.root, started, releaserecord.RewriteArchive{
+			Operation:        releaserecord.OperationScrub,
 			Mode:             s.Mode,
 			Reason:           s.Reason,
 			OldHead:          s.OldHead,
@@ -795,10 +795,10 @@ func (r *scrubRun) commit(s *scrubState) error {
 	return nil
 }
 
-func archivedTags(tags []TagRewrite) []ArchivedTag {
-	out := make([]ArchivedTag, len(tags))
+func archivedTags(tags []TagRewrite) []releaserecord.ArchivedTag {
+	out := make([]releaserecord.ArchivedTag, len(tags))
 	for i, t := range tags {
-		out[i] = ArchivedTag{Refname: t.Refname, OldSHA: t.OldSHA, NewSHA: t.NewSHA, Annotated: t.Annotated}
+		out[i] = releaserecord.ArchivedTag{Refname: t.Refname, OldSHA: t.OldSHA, NewSHA: t.NewSHA, Annotated: t.Annotated}
 	}
 	return out
 }
