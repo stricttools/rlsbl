@@ -1,0 +1,331 @@
+{
+  "format_version": 2,
+  "generator": "internal/targets/gen",
+  "regenerate_with": "go run ./internal/targets/gen",
+  "axes": [
+    {
+      "name": "ecosystem",
+      "doc": "The registry or platform, named for people."
+    },
+    {
+      "name": "detection_files",
+      "doc": "The manifests whose presence in a directory declares the target."
+    },
+    {
+      "name": "content_based_detection",
+      "doc": "Whether detection also reads the manifest's content."
+    },
+    {
+      "name": "version_files",
+      "doc": "The files a version write changes."
+    },
+    {
+      "name": "companion_tag",
+      "doc": "The extra tag a member of this target owes a release besides the releasable's own tag, or empty."
+    },
+    {
+      "name": "registry_display_name",
+      "doc": "How the registry is spelled in output."
+    },
+    {
+      "name": "build_timeout_seconds",
+      "doc": "Seconds the release's build of the target may take; 0 when the release builds nothing for it."
+    },
+    {
+      "name": "project_init_hint",
+      "doc": "What creates a project of this target."
+    },
+    {
+      "name": "publisher_binds_to_repository",
+      "doc": "Whether publishing is authorized for a repository rather than by a token, so moving the code needs a new authorization."
+    },
+    {
+      "name": "publisher_setup_url",
+      "doc": "Where a repository-bound publisher is registered; empty when none is."
+    },
+    {
+      "name": "release_materialization_policy",
+      "doc": "Whether a reconcile may recreate a released version's missing refs unconditionally, or must refuse when the version was released under another identity."
+    },
+    {
+      "name": "package_rename",
+      "doc": "How rlsbl rewrite project-name renames the package: manifest-field or go-module-path."
+    },
+    {
+      "name": "package_name_field",
+      "doc": "Where the package name is declared."
+    },
+    {
+      "name": "builtin_test_command",
+      "doc": "What the built-in test runner runs."
+    },
+    {
+      "name": "test_settings",
+      "doc": "The keys of a member's test table the target reads."
+    },
+    {
+      "name": "dev_install_global",
+      "doc": "What rlsbl dev install runs to install onto the machine; empty when nothing."
+    },
+    {
+      "name": "dev_install_venv",
+      "doc": "What rlsbl dev install runs to install into the project's environment; empty when nothing."
+    },
+    {
+      "name": "shares_workspace_environment",
+      "doc": "Whether a workspace's members of this target resolve into one environment."
+    },
+    {
+      "name": "publish_workflow_attests",
+      "doc": "Whether the CI publish step attaches attestations to a public transparency log unless told not to."
+    },
+    {
+      "name": "supports_dep_floors",
+      "doc": "Whether the manifest states dependency floors a lockfile can resolve ahead of."
+    },
+    {
+      "name": "lists_upload_offline",
+      "doc": "Whether the files an upload carries are listed without the network, so private paths are refused before a release starts."
+    },
+    {
+      "name": "scratch_test_exclusion",
+      "doc": "How the target's own test runner is kept out of the scratch directories."
+    }
+  ],
+  "targets": [
+    {
+      "name": "go",
+      "ecosystem": "Go modules",
+      "detection_files": [
+        "go.mod"
+      ],
+      "content_based_detection": false,
+      "version_files": [
+        "VERSION"
+      ],
+      "companion_tag": "{path}/v{version}, or v{version} at the repository root",
+      "registry_display_name": "pkg.go.dev",
+      "build_timeout_seconds": 0,
+      "project_init_hint": "Run \"go mod init <module-path>\" first",
+      "publisher_binds_to_repository": false,
+      "publisher_setup_url": "",
+      "release_materialization_policy": "refuse-identity-transition",
+      "package_rename": "go-module-path",
+      "package_name_field": "go.mod module directive (its last path element)",
+      "builtin_test_command": "go test ./... -race -short -count=1",
+      "test_settings": [
+        "go_command"
+      ],
+      "dev_install_global": "go install <install_paths>",
+      "dev_install_venv": "",
+      "shares_workspace_environment": false,
+      "publish_workflow_attests": false,
+      "supports_dep_floors": true,
+      "lists_upload_offline": true,
+      "scratch_test_exclusion": "go-nested-module"
+    },
+    {
+      "name": "npm",
+      "ecosystem": "Node.js / npm",
+      "detection_files": [
+        "package.json"
+      ],
+      "content_based_detection": false,
+      "version_files": [
+        "package.json"
+      ],
+      "companion_tag": "",
+      "registry_display_name": "npm",
+      "build_timeout_seconds": 0,
+      "project_init_hint": "Run \"npm init\" first",
+      "publisher_binds_to_repository": false,
+      "publisher_setup_url": "",
+      "release_materialization_policy": "materialize",
+      "package_rename": "manifest-field",
+      "package_name_field": "package.json \"name\"",
+      "builtin_test_command": "npm test",
+      "test_settings": [],
+      "dev_install_global": "npm link",
+      "dev_install_venv": "npm install",
+      "shares_workspace_environment": false,
+      "publish_workflow_attests": false,
+      "supports_dep_floors": true,
+      "lists_upload_offline": true,
+      "scratch_test_exclusion": "runner-chosen-by-project"
+    },
+    {
+      "name": "pypi",
+      "ecosystem": "Python / PyPI",
+      "detection_files": [
+        "pyproject.toml"
+      ],
+      "content_based_detection": true,
+      "version_files": [
+        "pyproject.toml",
+        "<package root>/__init__.py"
+      ],
+      "companion_tag": "",
+      "registry_display_name": "PyPI",
+      "build_timeout_seconds": 120,
+      "project_init_hint": "Run \"uv init\" first",
+      "publisher_binds_to_repository": true,
+      "publisher_setup_url": "https://pypi.org/manage/account/publishing/",
+      "release_materialization_policy": "materialize",
+      "package_rename": "manifest-field",
+      "package_name_field": "pyproject.toml [project].name",
+      "builtin_test_command": "uv run python -P -m pytest",
+      "test_settings": [
+        "pypi_markers"
+      ],
+      "dev_install_global": "uv tool install -e .",
+      "dev_install_venv": "uv sync --all-packages",
+      "shares_workspace_environment": true,
+      "publish_workflow_attests": true,
+      "supports_dep_floors": true,
+      "lists_upload_offline": false,
+      "scratch_test_exclusion": "pytest-norecursedirs"
+    }
+  ],
+  "tables": {
+    "axes": {
+      "headers": [
+        "Axis",
+        "What it says about a target"
+      ],
+      "rows": [
+        [
+          "ecosystem",
+          "The registry or platform, named for people."
+        ],
+        [
+          "detection_files",
+          "The manifests whose presence in a directory declares the target."
+        ],
+        [
+          "content_based_detection",
+          "Whether detection also reads the manifest's content."
+        ],
+        [
+          "version_files",
+          "The files a version write changes."
+        ],
+        [
+          "companion_tag",
+          "The extra tag a member of this target owes a release besides the releasable's own tag, or empty."
+        ],
+        [
+          "registry_display_name",
+          "How the registry is spelled in output."
+        ],
+        [
+          "build_timeout_seconds",
+          "Seconds the release's build of the target may take; 0 when the release builds nothing for it."
+        ],
+        [
+          "project_init_hint",
+          "What creates a project of this target."
+        ],
+        [
+          "publisher_binds_to_repository",
+          "Whether publishing is authorized for a repository rather than by a token, so moving the code needs a new authorization."
+        ],
+        [
+          "publisher_setup_url",
+          "Where a repository-bound publisher is registered; empty when none is."
+        ],
+        [
+          "release_materialization_policy",
+          "Whether a reconcile may recreate a released version's missing refs unconditionally, or must refuse when the version was released under another identity."
+        ],
+        [
+          "package_rename",
+          "How rlsbl rewrite project-name renames the package: manifest-field or go-module-path."
+        ],
+        [
+          "package_name_field",
+          "Where the package name is declared."
+        ],
+        [
+          "builtin_test_command",
+          "What the built-in test runner runs."
+        ],
+        [
+          "test_settings",
+          "The keys of a member's test table the target reads."
+        ],
+        [
+          "dev_install_global",
+          "What rlsbl dev install runs to install onto the machine; empty when nothing."
+        ],
+        [
+          "dev_install_venv",
+          "What rlsbl dev install runs to install into the project's environment; empty when nothing."
+        ],
+        [
+          "shares_workspace_environment",
+          "Whether a workspace's members of this target resolve into one environment."
+        ],
+        [
+          "publish_workflow_attests",
+          "Whether the CI publish step attaches attestations to a public transparency log unless told not to."
+        ],
+        [
+          "supports_dep_floors",
+          "Whether the manifest states dependency floors a lockfile can resolve ahead of."
+        ],
+        [
+          "lists_upload_offline",
+          "Whether the files an upload carries are listed without the network, so private paths are refused before a release starts."
+        ],
+        [
+          "scratch_test_exclusion",
+          "How the target's own test runner is kept out of the scratch directories."
+        ]
+      ]
+    },
+    "targets": {
+      "headers": [
+        "Name",
+        "Ecosystem",
+        "Detection files",
+        "Version files",
+        "Companion tag",
+        "Built-in tests",
+        "Dev install (global)",
+        "Dev install (venv)"
+      ],
+      "rows": [
+        [
+          "go",
+          "Go modules",
+          "go.mod",
+          "VERSION",
+          "{path}/v{version}, or v{version} at the repository root",
+          "go test ./... -race -short -count=1",
+          "go install <install_paths>",
+          "---"
+        ],
+        [
+          "npm",
+          "Node.js / npm",
+          "package.json",
+          "package.json",
+          "---",
+          "npm test",
+          "npm link",
+          "npm install"
+        ],
+        [
+          "pypi",
+          "Python / PyPI",
+          "pyproject.toml",
+          "pyproject.toml, <package root>/__init__.py",
+          "---",
+          "uv run python -P -m pytest",
+          "uv tool install -e .",
+          "uv sync --all-packages"
+        ]
+      ]
+    }
+  }
+}

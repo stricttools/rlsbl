@@ -1,0 +1,144 @@
+// Command privatepathscheck refuses every private path in the Python
+// artifacts built into the directory it is given. The pypi CI workflow runs
+// it from the package directory, after `uv build --out-dir <dir>`:
+//
+//	go run privatepathscheck.go <dir>
+//
+// It prints one ::error:: line per private path an sdist or wheel would
+// ship, and exits 1 when there is any.
+package main
+
+import (
+	"archive/tar"
+	"archive/zip"
+	"bufio"
+	"compress/gzip"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+func main() { os.Exit(run(os.Args[1:])) }
+
+func run(args []string) int {
+	if len(args) != 1 {
+		fmt.Fprintln(os.Stderr, "usage: go run privatepathscheck.go <directory the upload was built into>")
+		return 2
+	}
+	backend, err := buildBackend("pyproject.toml")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
+	entries, err := os.ReadDir(args[0])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
+	var refused []string
+	for _, e := range entries {
+		part := ""
+		switch {
+		case strings.HasSuffix(e.Name(), ".tar.gz"):
+			part = "sdist"
+		case strings.HasSuffix(e.Name(), ".whl"):
+			part = "wheel"
+		default:
+			continue
+		}
+		paths, err := archivePaths(filepath.Join(args[0], e.Name()))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 2
+		}
+		for _, p := range PrivatePathsIn(paths) {
+			refused = append(refused, fmt.Sprintf("%s would ship %s, a private path (%s): %s", e.Name(), p.Rel, p.Rule, PythonFix(backend, part, p.Rel, p.Rule, p.Directory)))
+		}
+	}
+	for _, line := range refused {
+		fmt.Println("::error::" + line)
+	}
+	if len(refused) > 0 {
+		fmt.Printf("%d private path(s) in the upload; a registry keeps every upload permanently, so this release is refused until each is excluded\n", len(refused))
+		return 1
+	}
+	fmt.Println("the upload carries no private paths")
+	return 0
+}
+
+// archivePaths are the package-relative files an artifact carries: a wheel
+// from its install root without its .dist-info metadata, an sdist below its
+// one top-level directory.
+func archivePaths(file string) ([]string, error) {
+	var out []string
+	if strings.HasSuffix(file, ".whl") {
+		r, err := zip.OpenReader(file)
+		if err != nil {
+			return nil, err
+		}
+		defer r.Close()
+		for _, f := range r.File {
+			if !strings.HasSuffix(f.Name, "/") && !strings.Contains(f.Name, ".dist-info/") {
+				out = append(out, f.Name)
+			}
+		}
+		return out, nil
+	}
+	handle, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer handle.Close()
+	gz, err := gzip.NewReader(handle)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", file, err)
+	}
+	tr := tar.NewReader(gz)
+	for {
+		h, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			return out, nil
+		}
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", file, err)
+		}
+		if _, rel, ok := strings.Cut(h.Name, "/"); ok && h.Typeflag == tar.TypeReg && rel != "" {
+			out = append(out, rel)
+		}
+	}
+}
+
+// buildBackend is [build-system] build-backend of the pyproject.toml at
+// path, or "" when it declares none. The standard library has no TOML
+// reader, so this reads the key's plain one-line spelling, the one uv and
+// rlsbl write; it names the backend only to word each refusal's fix.
+func buildBackend(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	section := ""
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if strings.HasPrefix(line, "[") {
+			section = strings.TrimSpace(strings.Trim(line, "[]"))
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok || section != "build-system" || strings.TrimSpace(key) != "build-backend" {
+			continue
+		}
+		value = strings.TrimSpace(value)
+		if len(value) >= 2 && (value[0] == '"' || value[0] == '\'') {
+			if end := strings.IndexByte(value[1:], value[0]); end >= 0 {
+				return value[1 : end+1], nil
+			}
+		}
+	}
+	return "", sc.Err()
+}
