@@ -104,6 +104,16 @@ func publishGo(r Runner, in LocalPublish) (Published, error) {
 	if !found {
 		return Published{}, fmt.Errorf("%s holds no go.mod, so the pipeline %q has no module to publish", in.Dir, in.Pipeline.Name)
 	}
+	if in.Pipeline.InstallPaths == nil {
+		return Published{}, fmt.Errorf("the local go pipeline %q declares no install_paths; declare the main packages it installs in .strictmetadata/releasables/releasables.toml", in.Pipeline.Name)
+	}
+	// The install paths are validated before the notification: the
+	// validation observes the module, and under --dry-run an observe after
+	// a recorded effect has no answer.
+	paths, err := gomodule.ValidateInstallPaths(r, in.Dir, in.Pipeline.InstallPaths)
+	if err != nil {
+		return Published{}, err
+	}
 	ref := module + "@v" + in.Version.String()
 	// The argv is not the observe allowlist's `go list -m`, which a preview
 	// runs rather than records: under --dry-run the tag was never pushed, and asking
@@ -112,13 +122,6 @@ func publishGo(r Runner, in LocalPublish) (Published, error) {
 	if err := run(r, []string{"go", "list", "-json", "-m", ref}, strictcli.Cwd(in.Dir), strictcli.EffectEnv(map[string]string{"GOPROXY": "proxy.golang.org"}),
 		strictcli.Stream(true), strictcli.Timeout(publishTimeout)); err != nil {
 		return Published{}, fmt.Errorf("notifying the Go module proxy of %s: %w", ref, err)
-	}
-	if in.Pipeline.InstallPaths == nil {
-		return Published{}, fmt.Errorf("the local go pipeline %q declares no install_paths; declare the main packages it installs in .strictmetadata/releasables/releasables.toml", in.Pipeline.Name)
-	}
-	paths, err := gomodule.ValidateInstallPaths(r, in.Dir, in.Pipeline.InstallPaths)
-	if err != nil {
-		return Published{}, err
 	}
 	for _, p := range paths {
 		if err := run(r, []string{"go", "install", p}, strictcli.Cwd(in.Dir), strictcli.Stream(true), strictcli.Timeout(installTimeout)); err != nil {
