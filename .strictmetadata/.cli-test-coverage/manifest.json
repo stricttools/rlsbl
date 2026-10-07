@@ -55,6 +55,7 @@
   "rewrite.project-name",
   "rewrite.uv-path-sources",
   "scaffold",
+  "secrets.sync-npm-token",
   "status",
   "targets",
   "transition.record",
