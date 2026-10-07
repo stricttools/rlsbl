@@ -28,7 +28,8 @@ func older(a, b [2]int) bool { return a[0] < b[0] || (a[0] == b[0] && a[1] < b[1
 
 // The committed Go table matches `go list std` under the local toolchain
 // when the toolchain is on the table's release line; a newer line asks for
-// regeneration, and an older one cannot judge a newer table.
+// regeneration, and an older one cannot judge a newer table, which fails
+// rather than leaving the table unchecked.
 func TestTheGoStdlibTableIsFresh(t *testing.T) {
 	hygiene.Isolate(t, hygiene.Preserve(hygiene.GoCache))
 	if _, err := exec.LookPath("go"); err != nil {
@@ -47,7 +48,7 @@ func TestTheGoStdlibTableIsFresh(t *testing.T) {
 		t.Fatal(err)
 	}
 	if older(releaseLine(t, local), releaseLine(t, committed.GoVersion)) {
-		t.Skipf("the local Go toolchain %s is older than the table's %s, and an older release line cannot judge a newer table", local, committed.GoVersion)
+		t.Fatalf("the local Go toolchain %s is older than the table's %s, and an older release line cannot judge a newer table, so its freshness is unchecked; run the suite with a toolchain on the table's release line", local, committed.GoVersion)
 	}
 	fresh, err := listStd()
 	if err != nil {

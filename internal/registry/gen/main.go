@@ -1,6 +1,7 @@
 // Command gen regenerates the standard-library tables package registry
-// embeds: go-stdlib-packages.json, from `go list std` over every platform
-// `go tool dist list` names (cgo enabled, so runtime/cgo is included),
+// embeds: go-stdlib-packages.json, the union of what `go list std` lists
+// over every platform `go tool dist list` names (cgo enabled, so
+// runtime/cgo is included), evaluated in process with go/build,
 // without import paths that have an internal or vendor element, since
 // nothing outside the standard library can import those; and
 // python-stdlib-modules.json, from sys.stdlib_module_names of the python3
@@ -15,8 +16,11 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
+	"go/build"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -88,9 +92,23 @@ func importable(path string) bool {
 }
 
 // listStd is every importable standard-library import path, across all
-// platforms, sorted.
+// platforms, sorted: the union of what `go list std` lists under each
+// GOOS/GOARCH `go tool dist list` names, with cgo enabled. It is evaluated
+// in process with go/build, the build-constraint logic `go list` applies,
+// over the toolchain's GOROOT, rather than by one `go list std` per
+// platform, which took seconds on every suite run.
 func listStd() ([]string, error) {
 	platforms, err := run(nil, "go", "tool", "dist", "list")
+	if err != nil {
+		return nil, err
+	}
+	gorootOut, err := run(nil, "go", "env", "GOROOT")
+	if err != nil {
+		return nil, err
+	}
+	goroot := strings.TrimSpace(gorootOut)
+	src := filepath.Join(goroot, "src")
+	dirs, err := stdDirectories(src)
 	if err != nil {
 		return nil, err
 	}
@@ -100,22 +118,64 @@ func listStd() ([]string, error) {
 		if !ok {
 			return nil, fmt.Errorf("`go tool dist list` printed %q, which is not GOOS/GOARCH", platform)
 		}
-		out, err := run([]string{"GOOS=" + goos, "GOARCH=" + goarch, "CGO_ENABLED=1"}, "go", "list", "std")
-		if err != nil {
-			return nil, err
-		}
-		for _, p := range strings.Fields(out) {
-			if importable(p) {
-				set[p] = true
+		ctx := build.Default
+		ctx.GOROOT, ctx.GOOS, ctx.GOARCH, ctx.CgoEnabled = goroot, goos, goarch, true
+		for _, d := range dirs {
+			if set[d.importPath] {
+				continue
 			}
+			if _, err := ctx.ImportDir(d.dir, 0); err != nil {
+				var noGo *build.NoGoError
+				if errors.As(err, &noGo) {
+					continue
+				}
+				// A package whose files go/build reads with another problem
+				// (files of two package names, for one) is still a package
+				// `go list std` lists.
+			}
+			set[d.importPath] = true
 		}
 	}
 	out := make([]string, 0, len(set))
 	for p := range set {
-		out = append(out, p)
+		if importable(p) {
+			out = append(out, p)
+		}
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+// stdDirectory is one directory under GOROOT/src that may hold a package.
+type stdDirectory struct {
+	dir        string
+	importPath string
+}
+
+// stdDirectories are the directories `go list std` considers: every
+// directory under src but cmd/, testdata/, and names starting with . or _,
+// without builtin, which documents the predeclared identifiers and is no
+// package.
+func stdDirectories(src string) ([]stdDirectory, error) {
+	var out []stdDirectory
+	err := filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || !d.IsDir() || p == src {
+			return err
+		}
+		rel, err := filepath.Rel(src, p)
+		if err != nil {
+			return err
+		}
+		name := d.Name()
+		if rel == "cmd" || name == "testdata" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
+			return filepath.SkipDir
+		}
+		if rel != "builtin" {
+			out = append(out, stdDirectory{dir: p, importPath: filepath.ToSlash(rel)})
+		}
+		return nil
+	})
+	return out, err
 }
 
 // freshGoTable renders the Go table from the local toolchain.
