@@ -106,6 +106,36 @@ func PreflightSelectionFor(r declarations.Releasable, m declarations.Member) (Pr
 	return preflightSelection(checks.Registry, r, m)
 }
 
+// changelogPreflightSelection is the checks a release runs on the
+// changelog before its pre-release pipeline: every check checks.toml tags
+// ChangelogPreflightTag.
+func changelogPreflightSelection(registry []byte) (PreflightSelection, error) {
+	doc, err := tomledit.Unmarshal[registryHooks](registry)
+	if err != nil {
+		return PreflightSelection{}, fmt.Errorf("internal/checks/checks.toml: %w", err)
+	}
+	sel := PreflightSelection{}
+	for name, d := range doc.Checks {
+		tags, _ := d["tags"].([]any)
+		for _, t := range tags {
+			if t == ChangelogPreflightTag {
+				sel.Checks = append(sel.Checks, name)
+			}
+		}
+	}
+	if len(sel.Checks) == 0 {
+		return PreflightSelection{}, fmt.Errorf("internal/checks/checks.toml tags no check %q, so a release would not check its changelog", ChangelogPreflightTag)
+	}
+	sort.Strings(sel.Checks)
+	return sel, nil
+}
+
+// ChangelogPreflightSelectionFor is changelogPreflightSelection over the
+// checks registry rlsbl ships.
+func ChangelogPreflightSelectionFor() (PreflightSelection, error) {
+	return changelogPreflightSelection(checks.Registry)
+}
+
 // CheckRunner runs checks: the strictcli app the release command belongs to.
 type CheckRunner interface {
 	RunChecks(ctx strictcli.CheckContext, opts strictcli.RunChecksOptions) ([]strictcli.CheckRunResult, []string, int, error)

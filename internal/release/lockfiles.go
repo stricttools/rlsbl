@@ -149,9 +149,19 @@ func OwedLockfileSyncs(repo git.Repo, w *workspace.Workspace, releasable string)
 	if !w.IsWorkspace() {
 		return syncs, nil
 	}
+	members, err := versionedMembers(w, releasable)
+	if err != nil {
+		return nil, err
+	}
 	bumped := map[string]bool{}
-	for _, d := range dirs {
-		bumped[filepath.Join(w.Root, filepath.FromSlash(d))] = true
+	for _, m := range members {
+		ts, err := targets.MemberTargets(root, m)
+		if err != nil {
+			return nil, err
+		}
+		for _, t := range ts {
+			bumped[filepath.Join(w.Root, filepath.FromSlash(m.TargetDir(t)))] = true
+		}
 	}
 	owedAlready := map[string]bool{}
 	for _, s := range syncs {

@@ -169,3 +169,22 @@ func TestAPreflightUnderDryRunRunsPureChecksAndListsTheOthers(t *testing.T) {
 		t.Errorf("the report: %+v (pure only %v)", report, fake.pureOnly)
 	}
 }
+
+func TestTheChangelogPreflightIsEveryChangelogCheckOfItsTag(t *testing.T) {
+	hygiene.Isolate(t)
+	sel, err := changelogPreflightSelection(checks.Registry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"changelog-coverage", "changelog-hashes", "changelog-schema"} {
+		if !contains(sel.Checks, want) {
+			t.Errorf("the changelog preflight leaves out %s: %v", want, sel.Checks)
+		}
+	}
+	if contains(sel.Checks, builtInTestsCheck) {
+		t.Error("the changelog preflight runs the built-in tests")
+	}
+	if _, err := changelogPreflightSelection([]byte("app = \"rlsbl\"\n")); err == nil {
+		t.Error("a registry tagging no changelog check was accepted")
+	}
+}
