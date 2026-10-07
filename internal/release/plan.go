@@ -239,7 +239,14 @@ func BuildBumpPlan(in BumpPlanInputs) (BumpPlan, error) {
 			return BumpPlan{}, err
 		}
 	}
-	files.add(changelog.Home(w.Declarations, in.Releasable))
+	home := changelog.Home(w.Declarations, in.Releasable)
+	files.add(home)
+	// Writing the changelog under the changelog root creates the root's
+	// ownership manifest when it is missing, and the release commit
+	// carries it.
+	if strings.HasPrefix(home, declarations.ChangelogRoot+"/") {
+		files.add(declarations.ChangelogRoot + "/manifest.toml")
+	}
 	if w.IsWorkspace() {
 		files.add(changelog.RollUpPath)
 	}
