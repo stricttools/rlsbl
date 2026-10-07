@@ -244,6 +244,9 @@ func (b *builder) convertHookScripts() {
 			dst := declarations.ReleaseHooksDir(owner.name) + "/" + script
 			b.addWrite(write{path: dst, sources: []string{f}, change: "a customized hook script, now run by a hooks." + point + " declaration", data: data, mode: 0o755})
 			command := "bash " + relativeFrom(owner.member, dst)
+			if !owner.isMember {
+				command = b.releasableHookCommand(owner.name, dst)
+			}
 			hook := declarations.Hook{Command: command}
 			if owner.isMember {
 				for i := range b.d.Members {
@@ -260,6 +263,28 @@ func (b *builder) convertHookScripts() {
 			}
 		}
 	}
+}
+
+// releasableHookCommand runs the script at the repository-relative path
+// dst from the directory a releasable's hooks run from: the representative
+// member's, which is any member the release is started from. When every
+// member of the releasable sits at one depth, the path is relative to that
+// depth; otherwise no one relative path reaches the script from every
+// member, and the command finds the repository root through git.
+func (b *builder) releasableHookCommand(releasable, dst string) string {
+	prefix, first := "", true
+	for _, m := range b.d.Members {
+		if m.Releasable != releasable {
+			continue
+		}
+		p := relativeFrom(m.Path, "")
+		if first {
+			prefix, first = p, false
+		} else if p != prefix {
+			return `bash "$(git rev-parse --show-toplevel)/` + dst + `"`
+		}
+	}
+	return "bash " + prefix + dst
 }
 
 func appendHook(h *declarations.Hooks, point string, hook declarations.Hook) {

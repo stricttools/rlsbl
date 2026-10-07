@@ -442,7 +442,7 @@ func TestCustomizedHookScriptsMoveAndAreDeclared(t *testing.T) {
 		t.Fatal(err)
 	}
 	r, _ := d.Releasable("widget")
-	if len(r.Hooks.PreRelease) != 1 || r.Hooks.PreRelease[0].Command != "bash .strictmetadata/release-hooks/widget/pre-release.sh" {
+	if len(r.Hooks.PreRelease) != 1 || r.Hooks.PreRelease[0].Command != "bash ../.strictmetadata/release-hooks/widget/pre-release.sh" {
 		t.Fatalf("the releasable's hooks: %+v", r.Hooks)
 	}
 	gadget, _ := d.Member("gadget")
