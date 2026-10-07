@@ -10,8 +10,8 @@
     "source_docstring": "4fff13535641ef3e9f7c8663fb4854a94edccb3e370b2f4d2721a69393f06594"
   },
   "en/checks.md": {
-    "content": "d65329b914da6dbacb349d1a6bd22ecaf3d569137579a817cc48341629416403",
-    "description": "77d68a3c3921ba59c4cca3f2566e4677969945d6ba53201f2ee9b55a4c582769"
+    "content": "2042d018807697fd2bfe999899be3c5eb61ceaf84c844c9b9eaec106561c8a00",
+    "description": "5d768a538aab5ab500307bc9c175f2da52d7ccf75b5f7bf5ac74ed98ce53327d"
   },
   "en/ci-customization.md": {
     "content": "6ca3fe39c2f1a77fdfc2220fb8b8ff2d983c5a0fcc023414b10b669c063f9857",
@@ -229,9 +229,8 @@
     "description": "f59af1c68e8a31401399068284034601ba8949cea1995835de2c1e213f597654"
   },
   "en/release-workflow.md": {
-    "content": "5cdf33feec8118de22ef94aacfea7eb5051aa396dd192702dfcc3ab97e6d3813",
-    "description": "24ac540af9722419fc1e669e5207802ba2ef859e3bd869248b5bc1c5ec5fea96",
-    "source_docstring": "0998f186e8a9850589e938859db694b132aaeacda3864775a912477466446a4b"
+    "content": "65810f6e9ab791b3e4faa8fef54258fd21d8e93e15f6d5c520ecb3d249dbb3e8",
+    "description": "64e86f4f84fef65a44e6b2bece123f279c0ce35670b5df81beb2cfe8304f74b8"
   },
   "en/rlsbl-__main__.md": {
     "content": "9492c626f355ccbe1313ba9976c5a812a6e1e4a636617657a287f2d3a59f4d99",
@@ -1268,8 +1267,8 @@
     "source_docstring": "4ceef094cf2befa2e82b4fe8d505033c32ab34024256fd835af303ed479dacb7"
   },
   "en/scaffold.md": {
-    "content": "c365527e6a80e563ef4445ae5a5efc06dfad8e704fc77de30bb9980a45a76ac5",
-    "description": "0f0ab78c6a60c39bcd4d6a9f0d5ea3546e9bb5a4e9b353e8b08325216347f5b9"
+    "content": "1063b0b28b7efd6fa02df6ba5fbba59c231fedbf9e3554e5d426ccb502da4843",
+    "description": "63ef008b29bf4bb47947d4ea19c9916195d5dc73849d4a92f27028cd24abdb7a"
   },
   "en/targets.md": {
     "content": "f79309fd233fb7d4f3d8e154fdd8675b05a3953d74120e50595a48490d088180",
