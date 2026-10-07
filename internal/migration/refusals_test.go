@@ -490,6 +490,43 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 			},
 		},
 		{
+			name: "configs disagreeing on a timeout", fixture: workspaceFixture,
+			breakIt: func(f *fixture) {
+				f.write(".rlsbl-monorepo/releasables/widget/config.json", `{"publish_mode": "ci", "push_timeout": 60}`+"\n")
+				f.write(".rlsbl-monorepo/releasables/gadget/config.json", `{"publish_mode": "ci", "push_timeout": 90}`+"\n")
+			},
+			want: "make the configs agree by hand first",
+			fix: func(f *fixture) {
+				f.write(".rlsbl-monorepo/releasables/gadget/config.json", `{"publish_mode": "ci", "push_timeout": 60}`+"\n")
+			},
+		},
+		{
+			name: "a release in progress", fixture: standalone,
+			breakIt: func(f *fixture) { f.write(".rlsbl/releases/in-progress.json", "{}\n") },
+			want:    "abandon it with `rlsbl release abandon`",
+			// What the finished or abandoned release leaves: no state.
+			fix: func(f *fixture) { f.remove(".rlsbl/releases/in-progress.json") },
+		},
+		{
+			name: "a history rewrite in progress", fixture: standalone,
+			breakIt: func(f *fixture) { f.write(".rlsbl/releases/scrub-result.json", "{}\n") },
+			want:    "finish it by running `rlsbl release scrub` again",
+			// What the finished scrub leaves: no result file.
+			fix: func(f *fixture) { f.remove(".rlsbl/releases/scrub-result.json") },
+		},
+		{
+			name: "a reconcile plan not yet applied", fixture: standalone,
+			breakIt: func(f *fixture) { f.write(".rlsbl/releases/reconcile-plan.toml", "\n") },
+			want:    "delete it through saferm",
+			fix:     func(f *fixture) { f.remove(".rlsbl/releases/reconcile-plan.toml") },
+		},
+		{
+			name: "the release lock", fixture: standalone,
+			breakIt: func(f *fixture) { f.write(".rlsbl/releases/lock", "") },
+			want:    "delete the lock through saferm",
+			fix:     func(f *fixture) { f.remove(".rlsbl/releases/lock") },
+		},
+		{
 			name: "two strictspec_gate sections", fixture: workspaceFixture,
 			breakIt: func(f *fixture) {
 				f.write("widget/.rlsbl/config.json", `{"targets": ["npm"], "publish_mode": "ci", `+npmPipeline+`, "strictspec_gate": {"certificate": "cert.json"}}`+"\n")
