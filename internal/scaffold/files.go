@@ -250,7 +250,8 @@ func goVersion(dir string) (string, error) {
 }
 
 // binaryName is the binary a go module builds and its release archives are
-// named after: the module path's last element.
+// named after: the name go gives it (gomodule.BinaryName), which skips a
+// major version suffix.
 func binaryName(dir string) (string, error) {
 	path, found, err := gomodule.ModulePath(dir)
 	if err != nil {
@@ -259,7 +260,7 @@ func binaryName(dir string) (string, error) {
 	if !found {
 		return "", fmt.Errorf("%s holds no go.mod: run `go mod init <module path>` there first", dir)
 	}
-	return gomodule.LastElement(path), nil
+	return gomodule.BinaryName(path), nil
 }
 
 // declaresVersion reports whether a .go file of dir declares a Version

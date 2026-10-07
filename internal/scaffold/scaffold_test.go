@@ -517,3 +517,18 @@ func TestScaffoldsOwnScratchFilesAreNotRefused(t *testing.T) {
 		t.Fatalf("stderr:\n%s", r.Stderr)
 	}
 }
+
+func TestTheBinaryOfAMajorSuffixedModuleIsNamedAfterItsProject(t *testing.T) {
+	hygiene.Isolate(t)
+	dir := t.TempDir()
+	if err := os.WriteFile(dir+"/go.mod", []byte("module github.com/acme/portal/v2\n\ngo 1.26\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	name, err := binaryName(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name != "portal" {
+		t.Errorf("the binary and its archives are named %q", name)
+	}
+}

@@ -159,3 +159,20 @@ func TestGoWorkUsesAreRead(t *testing.T) {
 		t.Fatalf("uses = %q, %v, %v", uses, found, err)
 	}
 }
+
+func TestTheBinaryOfAMajorSuffixedModuleIsNamedAsGoNamesIt(t *testing.T) {
+	hygiene.Isolate(t)
+	for path, want := range map[string]string{
+		"github.com/acme/portal":     "portal",
+		"github.com/acme/portal/v2":  "portal",
+		"github.com/acme/portal/v10": "portal",
+		"github.com/acme/portal/v1":  "v1",
+		"github.com/acme/portal/v0":  "v0",
+		"github.com/acme/portal/v2x": "v2x",
+		"v2":                         "v2",
+	} {
+		if got := BinaryName(path); got != want {
+			t.Errorf("BinaryName(%q) = %q, want %q", path, got, want)
+		}
+	}
+}

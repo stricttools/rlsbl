@@ -74,6 +74,32 @@ func LastElement(modulePath string) string {
 	return modulePath[strings.LastIndex(modulePath, "/")+1:]
 }
 
+// BinaryName is the name `go build` and `go install` give the binary of the
+// main package at modulePath: its last element, or the element before it
+// when the last is a major version suffix (v2 and up), so
+// example.com/portal/v2 builds portal, not v2.
+func BinaryName(modulePath string) string {
+	last := LastElement(modulePath)
+	if last == modulePath || !majorVersionElement(last) {
+		return last
+	}
+	return LastElement(modulePath[:len(modulePath)-len(last)-1])
+}
+
+// majorVersionElement reports whether a path element is a major version
+// suffix: v followed by digits, at least 2, without a leading zero.
+func majorVersionElement(s string) bool {
+	if len(s) < 2 || s[0] != 'v' || s[1] == '0' || (s[1] == '1' && len(s) == 2) {
+		return false
+	}
+	for _, r := range s[1:] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 // Require is one require directive.
 type Require struct {
 	Path    string
