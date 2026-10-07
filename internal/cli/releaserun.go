@@ -34,7 +34,9 @@ const releaseResumeHelp = "Continue the release in progress of the releasable th
 	"committed since the release stopped (the fix after a red CI verdict, other sessions' work) is adopted, provided the changelog describes " +
 	"every adopted commit, and refused otherwise before anything is written, naming the `rlsbl changelog add` that records each. A resume " +
 	"adopting commits after the CI verdict pushes the tip as the candidate and waits for CI again, so the tag is put on what CI verified; one " +
-	"adopting nothing past the verdict tags the commit the state records, which must still be on the branch. A failed deploy or post-release " +
+	"adopting nothing past the verdict tags the commit the state records, which must still be on the branch. Once the changelog is " +
+	"finalized, nothing is adopted any more: a resume finding commits it did not make refuses, naming them, until they are off the release " +
+	"branch. A failed deploy or post-release " +
 	"hook runs again. --dry-run reports what would be adopted and which steps would run, and writes nothing."
 
 const releaseInitHelp = "Write the release file of the releasable the working directory selects, " +

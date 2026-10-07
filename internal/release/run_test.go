@@ -352,17 +352,26 @@ func TestAResumeAfterARedVerdictAdoptsTheRecordedFixAndTagsWhatCIVerified(t *tes
 	}
 }
 
-func TestAFailingDeployLeavesAResumableStateAndResumeRunsItAgain(t *testing.T) {
-	hygiene.Isolate(t)
+// failingDeploy is a deploy command that fails until the file ready
+// exists, appending its arguments to the file calls on every run; keys
+// declare it on the releasable.
+func failingDeploy(t *testing.T) (keys, calls, ready string) {
+	t.Helper()
 	dir := t.TempDir()
-	calls := filepath.Join(dir, "calls")
-	ready := filepath.Join(dir, "ready")
+	calls = filepath.Join(dir, "calls")
+	ready = filepath.Join(dir, "ready")
 	deploy := filepath.Join(dir, "deploy")
 	if err := os.WriteFile(deploy, []byte(fmt.Sprintf("#!/bin/sh\necho \"$*\" >> %s\n[ -f %s ] || { echo 'the host is down' >&2; exit 1; }\n", calls, ready)), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	return fmt.Sprintf("deploy_command = [%q, \"--version\", \"{version}\"]\n", deploy), calls, ready
+}
+
+func TestAFailingDeployLeavesAResumableStateAndResumeRunsItAgain(t *testing.T) {
+	hygiene.Isolate(t)
+	keys, calls, ready := failingDeploy(t)
 	testsupport.FakeGH(t, answers(validationAnswers("private"), releaseCreation("v0.5.0"))...)
-	repo := runRepo(t, fmt.Sprintf("deploy_command = [%q, \"--version\", \"{version}\"]\n", deploy), "proprietary", nil)
+	repo := runRepo(t, keys, "proprietary", nil)
 	out, err := releaseCommand(t, repo, false, false)
 	if err == nil || !strings.Contains(err.Error(), "the deploy command") || !strings.Contains(err.Error(), "rlsbl release resume") {
 		t.Fatalf("a failing deploy did not stop the release resumably: %v\n%s", err, out)
@@ -445,4 +454,32 @@ func TestAReleasePushNeverOverwritesACommitOriginGainedDuringTheRelease(t *testi
 		t.Fatalf("the resume pushed past a commit origin gained:\n%s", out)
 	}
 	requireContains(t, err.Error(), "only fast-forwards")
+}
+
+func TestAResumeAfterTheChangelogIsFinalizedAdoptsNothing(t *testing.T) {
+	hygiene.Isolate(t)
+	keys, _, ready := failingDeploy(t)
+	testsupport.FakeGH(t, answers(validationAnswers("private"), releaseCreation("v0.5.0"))...)
+	repo := runRepo(t, keys, "proprietary", nil)
+	if out, err := releaseCommand(t, repo, false, false); err == nil {
+		t.Fatalf("the failing deploy did not stop the release:\n%s", out)
+	}
+	released := repo.Head()
+	late := repo.CommitFile("late.txt", "late\n", "a commit after the release stopped")
+	addEntry(t, repo, "portal", late)
+	if err := os.WriteFile(ready, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	testsupport.FakeGH(t, validationAnswers("private")...)
+	out, err := releaseCommand(t, repo, true, false)
+	if err == nil {
+		t.Fatalf("a resume past the finalized changelog adopted commits:\n%s", out)
+	}
+	requireContains(t, err.Error(), "changelog-finalized", late[:12], "move them off the release branch")
+	// The fix the refusal names: the commits moved off the release branch.
+	repo.Git("reset", "-q", "--hard", released)
+	out, err = releaseCommand(t, repo, true, false)
+	if err != nil {
+		t.Fatalf("the resume failed once the commits were moved off: %v\n%s", err, out)
+	}
 }

@@ -382,6 +382,13 @@ func resumeIn(e *strictcli.Effects, s *Session, req RunRequest, releasable strin
 	if err != nil {
 		return err
 	}
+	if len(adopted) > 0 && state.Completed(StepChangelogFinalized) {
+		return &ValidationError{Message: strings.Join(append(append([]string{
+			fmt.Sprintf("the release of %s %s recorded %s, and commits it did not make appeared on %s since it stopped:", releasable, state.Version, StepChangelogFinalized, branch)},
+			subjectLines(live, adopted)...),
+			"",
+			fmt.Sprintf("The released changelog and the release archive of %s are committed for the candidate %s, so a resume adopts nothing any more: these commits belong to the next release. To resume, move them off the release branch first, then run `%s`.", state.Version, short(state.ReleaseCommit), runstate.ResumeInvocation)), "\n")}
+	}
 	if err := RequireAdoptedCovered(repo, ws, releasable, adopted, version); err != nil {
 		return err
 	}
