@@ -2,8 +2,10 @@ package git_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -369,4 +371,31 @@ func TestObjectIDs(t *testing.T) {
 	if !git.IsNullObjectID(strings.Repeat("0", 40)) || git.IsNullObjectID(full) {
 		t.Error("the null object id is misjudged")
 	}
+}
+
+func TestRefNamesListsOneNamespace(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := testsupport.NewRepo(t)
+	sha := repo.CommitFile("a.txt", "a\n", "first")
+	repo.Git("update-ref", "refs/tags-of/github.com/acme/portal/v0.2.0", sha)
+	repo.Git("update-ref", "refs/tags-of/github.com/acme/portal/v0.1.0", sha)
+	repo.Git("update-ref", "refs/tags-of/github.com/acme/widget/v0.1.0", sha)
+	repo.Git("tag", "v0.3.0")
+	reading(t, repo.Dir, func(r git.Repo) error {
+		got, err := r.RefNames("refs/tags-of/github.com/acme/portal/")
+		if err != nil {
+			return err
+		}
+		want := []string{"refs/tags-of/github.com/acme/portal/v0.1.0", "refs/tags-of/github.com/acme/portal/v0.2.0"}
+		if !slices.Equal(got, want) {
+			return fmt.Errorf("refs %v, want %v", got, want)
+		}
+		if none, err := r.RefNames("refs/upstream/"); err != nil || len(none) != 0 {
+			return fmt.Errorf("an empty namespace: %v, %v", none, err)
+		}
+		if _, err := r.RefNames("refs/tags-of"); err == nil {
+			return errors.New("a namespace without its final slash was accepted")
+		}
+		return nil
+	})
 }

@@ -135,6 +135,19 @@ func (r Repo) TagCommits() (map[string]string, error) {
 	return tags, nil
 }
 
+// RefNames are the full names of the local refs under prefix (a ref
+// namespace such as "refs/tags-of/github.com/acme/portal/"), sorted.
+func (r Repo) RefNames(prefix string) ([]string, error) {
+	if !strings.HasPrefix(prefix, "refs/") || !strings.HasSuffix(prefix, "/") {
+		return nil, fmt.Errorf("%q is not a ref namespace: it starts with refs/ and ends with /", prefix)
+	}
+	out, err := r.output("for-each-ref", "--format=%(refname)", "--sort=refname", prefix)
+	if err != nil {
+		return nil, err
+	}
+	return lines(out), nil
+}
+
 // RemoteURL is the URL of the named remote.
 func (r Repo) RemoteURL(remote string) (string, error) {
 	out, err := r.output("remote", "get-url", remote)

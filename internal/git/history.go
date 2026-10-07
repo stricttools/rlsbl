@@ -152,6 +152,30 @@ func (r Repo) CommitMessage(sha string) (string, error) {
 	return strings.TrimRight(out, "\n"), err
 }
 
+// CommitSummary is what a listing of commits shows of one commit.
+type CommitSummary struct {
+	SHA     string
+	Subject string
+	// Author is the author's name.
+	Author string
+	// Date is the author date, ISO 8601 with its offset.
+	Date string
+}
+
+// Summarize reads the subject, author name, and author date of commit sha
+// in one git call.
+func (r Repo) Summarize(sha string) (CommitSummary, error) {
+	out, err := r.commitField(sha, "%H%x00%s%x00%an%x00%aI")
+	if err != nil {
+		return CommitSummary{}, err
+	}
+	fields := strings.Split(strings.TrimRight(out, "\n"), "\x00")
+	if len(fields) != 4 {
+		return CommitSummary{}, fmt.Errorf("git log of %s in %s printed an unreadable summary %q", sha, r.dir, out)
+	}
+	return CommitSummary{SHA: fields[0], Subject: fields[1], Author: fields[2], Date: fields[3]}, nil
+}
+
 // CommitterDate is when commit sha was committed.
 func (r Repo) CommitterDate(sha string) (time.Time, error) {
 	out, err := r.commitField(sha, "%cI")

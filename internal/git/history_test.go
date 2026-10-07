@@ -310,3 +310,25 @@ func TestFilesAtListsACommittedDirectory(t *testing.T) {
 		return nil
 	})
 }
+
+func TestSummarizeReadsSubjectAuthorAndDate(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := testsupport.NewRepo(t)
+	sha := repo.CommitFile("a.txt", "a\n", "the subject\n\nthe body")
+	reading(t, repo.Dir, func(r git.Repo) error {
+		got, err := r.Summarize(sha)
+		if err != nil {
+			return err
+		}
+		if got.SHA != sha || got.Subject != "the subject" || got.Author != repo.Git("log", "-1", "--format=%an") {
+			return fmt.Errorf("summary %+v", got)
+		}
+		if _, err := time.Parse(time.RFC3339, got.Date); err != nil {
+			return fmt.Errorf("the date %q is not ISO 8601: %v", got.Date, err)
+		}
+		if _, err := r.Summarize(strings.Repeat("d", 40)); err == nil {
+			return errors.New("a commit the repository does not have was summarized")
+		}
+		return nil
+	})
+}
