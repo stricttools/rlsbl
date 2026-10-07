@@ -1,0 +1,86 @@
+# strictspec schema for the sandboxed test runner's settings,
+# .strictmetadata/test-runner/test-runner.toml.
+#
+# The generated Go validator (internal/declarations/testrunnerspec) is what
+# declarations.ParseTestRunner runs first. The rules a schema cannot state
+# (paths that stay inside the repository, values the runner script embeds in
+# a single-quoted shell literal, the variable the runner always exports) are
+# checked by internal/declarations after this schema passes. Whether the file
+# may exist at all follows the rlsbl:test-sandbox option, which
+# internal/options decides.
+
+name = "rlsbl-test-runner"
+meta_version = 1
+format_version = 1
+document_syntax = "toml"
+role = "schema"
+root = "TestRunner"
+description = "The sandboxed test runner rlsbl scaffolds: where its script goes, what it runs, and what it carries into the sandbox."
+
+[types.TestRunner]
+type = "record"
+
+[types.TestRunner.fields.format_version]
+type = "literal"
+value = 1
+required = true
+description = "The document's format version."
+
+[types.TestRunner.fields.runner_path]
+type = "string"
+required = true
+non_empty = true
+description = "Where the runner script is written, relative to the repository root."
+
+[types.TestRunner.fields.command]
+type = "string"
+required = true
+non_empty = true
+description = "The command the runner runs inside the sandbox."
+
+[types.TestRunner.fields.default_args]
+type = "string"
+required = false
+non_empty = true
+description = "Arguments the runner passes to the command when it is given none."
+
+[types.TestRunner.fields.caches]
+type = "array"
+required = false
+description = "Toolchain caches the runner binds into the sandbox."
+[types.TestRunner.fields.caches.item]
+type = "enum"
+values = ["uv", "go", "python_user_base"]
+
+[types.TestRunner.fields.prewarm]
+type = "array"
+required = false
+description = "Commands run outside the sandbox, with network access, before it is entered."
+[types.TestRunner.fields.prewarm.item]
+type = "string"
+non_empty = true
+
+[types.TestRunner.fields.extra_env]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+description = "Environment variables the runner exports inside the sandbox."
+[types.TestRunner.fields.extra_env.value]
+type = "string"
+regex = "^[A-Za-z0-9_.:/=+-]+$"
+
+[types.TestRunner.fields.ci_workflows]
+type = "array"
+required = false
+description = "CI workflow files that must run the runner."
+[types.TestRunner.fields.ci_workflows.item]
+type = "string"
+non_empty = true
+
+[types.TestRunner.fields.carry_ignored]
+type = "array"
+required = false
+description = "Git-ignored paths copied into the sandbox when present."
+[types.TestRunner.fields.carry_ignored.item]
+type = "string"
+non_empty = true

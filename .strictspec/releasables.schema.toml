@@ -1,0 +1,468 @@
+# strictspec schema for a repository's release declarations,
+# .strictmetadata/releasables/releasables.toml.
+#
+# The generated Go validator (internal/declarations/releasablesspec) is what
+# declarations.Parse runs first, so a document that reaches the typed decode
+# and the declaration rules has already been through here.
+#
+# SCOPE: this schema owns the document's shape -- every key at every level,
+# each value's type, the closed value sets, and the uniqueness of names inside
+# one list. The rules that relate one part of the document to another (the
+# root member, a member naming a declared releasable, a pipeline naming a
+# target its member declares, the layout's member count) are checked by
+# internal/declarations after this schema passes.
+
+name = "rlsbl-releasables"
+meta_version = 1
+format_version = 1
+document_syntax = "toml"
+role = "schema"
+root = "Releasables"
+description = "A repository's release declarations: its layout, release branches, timeouts, releasables, and members with their targets, pipelines, hooks, and checks."
+
+[types.Releasables]
+type = "record"
+
+[types.Releasables.fields.format_version]
+type = "literal"
+value = 1
+required = true
+description = "The document's format version."
+
+[types.Releasables.fields.repository_layout]
+type = "enum"
+required = true
+values = ["standalone", "workspace"]
+description = "Whether the repository is one standalone project or a workspace of members; never derived from the member count."
+
+[types.Releasables.fields.release_branches]
+type = "array"
+required = true
+min_len = 1
+description = "The branches a release may run from."
+[types.Releasables.fields.release_branches.item]
+type = "string"
+non_empty = true
+
+[types.Releasables.fields.github_repository]
+type = "string"
+required = false
+regex = "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+description = "The GitHub repository as owner/name; absent means the origin remote names it."
+
+[types.Releasables.fields.environment_file]
+type = "string"
+required = false
+non_empty = true
+description = "A KEY=VALUE file loaded into the release's environment."
+
+[types.Releasables.fields.timeouts]
+type = "Timeouts"
+required = false
+description = "The release's timeouts, in seconds."
+
+[types.Releasables.fields.releasables]
+type = "array"
+required = true
+description = "The units of versioning: each has one version, one changelog, and one tag scheme."
+[types.Releasables.fields.releasables.item]
+type = "Releasable"
+
+[types.Releasables.fields.members]
+type = "array"
+required = true
+min_len = 1
+description = "The directories of the repository rlsbl knows, each owning the files under its path that no deeper member claims."
+[types.Releasables.fields.members.item]
+type = "Member"
+
+[[types.Releasables.constraints]]
+form = "unique-by"
+collection = "releasables"
+field = "name"
+normalization = "none"
+
+[[types.Releasables.constraints]]
+form = "unique-by"
+collection = "members"
+field = "path"
+normalization = "none"
+
+[[types.Releasables.constraints]]
+form = "unique-by"
+collection = "members"
+field = "name"
+normalization = "none"
+
+[types.Timeouts]
+type = "record"
+
+[types.Timeouts.fields.push_seconds]
+type = "integer"
+required = false
+min = 1
+description = "How long a push may take; absent means the shipped push timeout."
+
+[types.Timeouts.fields.ci_seconds]
+type = "integer"
+required = false
+min = 1
+description = "How long CI may take; absent means the shipped CI timeout."
+
+[types.Timeouts.fields.check_seconds]
+type = "integer"
+required = false
+min = 1
+description = "How long a check may take; absent means the shipped check timeout."
+
+[types.Timeouts.fields.hook_seconds]
+type = "integer"
+required = false
+min = 1
+description = "How long a hook may take; absent means hooks run with no timeout."
+
+[types.Releasable]
+type = "record"
+
+[types.Releasable.fields.name]
+type = "string"
+required = true
+non_empty = true
+description = "The releasable's name, recorded and never derived."
+
+[types.Releasable.fields.tag_format]
+type = "string"
+required = true
+non_empty = true
+description = "The releasable's tag format: one {version} placeholder, and optionally {name}."
+
+[types.Releasable.fields.publish_mode]
+type = "enum"
+required = true
+values = ["ci", "none"]
+description = "ci publishes from CI; none publishes nothing."
+
+[types.Releasable.fields.publish_ci_check_pattern]
+type = "string"
+required = false
+non_empty = true
+description = "The pattern of the check-run names the root's own CI reports, which publishing waits for; declared only by the releasable owning the root member of a workspace that publishes from CI."
+
+[types.Releasable.fields.deploy_command]
+type = "array"
+required = false
+min_len = 1
+description = "The command a release runs to deploy the releasable after tagging, {version} replaced by the released version."
+[types.Releasable.fields.deploy_command.item]
+type = "string"
+non_empty = true
+
+[types.Releasable.fields.hooks]
+type = "Hooks"
+required = false
+description = "Commands the release runs at its hook points for the releasable as a whole."
+
+[types.Hooks]
+type = "record"
+
+[types.Hooks.fields.pre_checks]
+type = "array"
+required = false
+description = "Run before the checks."
+[types.Hooks.fields.pre_checks.item]
+type = "HookEntry"
+
+[types.Hooks.fields.pre_release]
+type = "array"
+required = false
+description = "Run before the release commit; declaring one replaces the built-in tests."
+[types.Hooks.fields.pre_release.item]
+type = "HookEntry"
+
+[types.Hooks.fields.post_release]
+type = "array"
+required = false
+description = "Run after the release."
+[types.Hooks.fields.post_release.item]
+type = "HookEntry"
+
+[types.HookEntry]
+type = "node-kind-union"
+description = "A shell command line, or a table naming the command, the directory it runs in, and extra environment."
+[types.HookEntry.arms.string]
+type = "string"
+non_empty = true
+[types.HookEntry.arms.record]
+type = "HookCommand"
+
+[types.HookCommand]
+type = "record"
+
+[types.HookCommand.fields.cmd]
+type = "string"
+required = true
+non_empty = true
+description = "The shell command line."
+
+[types.HookCommand.fields.dir]
+type = "string"
+required = false
+non_empty = true
+description = "The directory it runs in, relative to the declaring member."
+
+[types.HookCommand.fields.env]
+type = "map"
+required = false
+key_pattern = "^[A-Za-z_][A-Za-z0-9_]*$"
+description = "Environment variables added for the command."
+[types.HookCommand.fields.env.value]
+type = "string"
+
+[types.Member]
+type = "record"
+
+[types.Member.fields.path]
+type = "string"
+required = true
+non_empty = true
+description = "The member's directory, repository-relative; the root member's is \".\"."
+
+[types.Member.fields.name]
+type = "string"
+required = true
+non_empty = true
+description = "The member's name; the root member's is \"root\"."
+
+[types.Member.fields.releasable]
+type = "MemberReleasable"
+required = true
+description = "The releasable the member is versioned under, or false."
+
+[types.Member.fields.dev_only]
+type = "boolean"
+required = false
+description = "The member is development tooling."
+
+[types.Member.fields.library]
+type = "boolean"
+required = false
+description = "The member is a library."
+
+[types.Member.fields.test_only]
+type = "boolean"
+required = false
+description = "The member is test infrastructure."
+
+[types.Member.fields.depends_on]
+type = "array"
+required = false
+description = "Members this member depends on beyond what its manifests say."
+[types.Member.fields.depends_on.item]
+type = "string"
+non_empty = true
+
+[types.Member.fields.import_name]
+type = "string"
+required = false
+non_empty = true
+description = "The name the member's code is imported by."
+
+[types.Member.fields.registry_name]
+type = "string"
+required = false
+non_empty = true
+description = "The name the member is published under."
+
+[types.Member.fields.description]
+type = "string"
+required = false
+non_empty = true
+description = "What the member is."
+
+[types.Member.fields.lint_allow]
+type = "array"
+required = false
+description = "Imports strictcode allows this member."
+[types.Member.fields.lint_allow.item]
+type = "string"
+non_empty = true
+
+[types.Member.fields.internal_dep_floors]
+type = "array"
+required = false
+description = "Dependencies whose version floors rlsbl:dep-floors keeps current."
+[types.Member.fields.internal_dep_floors.item]
+type = "string"
+non_empty = true
+
+[types.Member.fields.targets]
+type = "array"
+required = false
+min_len = 1
+description = "The member's release targets; absent means they are detected from its manifests."
+[types.Member.fields.targets.item]
+type = "Target"
+
+[types.Member.fields.hooks]
+type = "Hooks"
+required = false
+description = "Commands the release runs at its hook points for this member."
+
+[types.Member.fields.external_checks]
+type = "array"
+required = false
+description = "Checks the member declares, each a shell command."
+[types.Member.fields.external_checks.item]
+type = "ExternalCheck"
+
+[types.Member.fields.test]
+type = "TestSettings"
+required = false
+description = "How the built-in tests run for this member."
+
+[types.Member.fields.pipelines]
+type = "array"
+required = false
+description = "The member's publish pipelines."
+[types.Member.fields.pipelines.item]
+type = "Pipeline"
+
+[[types.Member.constraints]]
+form = "unique-by"
+collection = "pipelines"
+field = "name"
+normalization = "none"
+
+[[types.Member.constraints]]
+form = "unique-by"
+collection = "targets"
+field = "name"
+normalization = "none"
+
+[types.MemberReleasable]
+type = "node-kind-union"
+description = "A releasable's name, or false for a member versioned under none."
+[types.MemberReleasable.arms.string]
+type = "string"
+non_empty = true
+[types.MemberReleasable.arms.boolean]
+type = "literal"
+value = false
+
+[types.Target]
+type = "record"
+
+[types.Target.fields.name]
+type = "enum"
+required = true
+values = ["go", "npm", "pypi"]
+description = "The target."
+
+[types.Target.fields.path]
+type = "string"
+required = false
+non_empty = true
+description = "The target's directory relative to the member; absent means the member's own."
+
+[types.ExternalCheck]
+type = "record"
+
+[types.ExternalCheck.fields.name]
+type = "string"
+required = true
+regex = "^[a-z][a-z0-9-]*$"
+description = "The check's name."
+
+[types.ExternalCheck.fields.tag]
+type = "string"
+required = true
+non_empty = true
+description = "The tag the check runs under."
+
+[types.ExternalCheck.fields.command]
+type = "string"
+required = true
+non_empty = true
+description = "The shell command line the check runs."
+
+[types.ExternalCheck.fields.depends_on]
+type = "array"
+required = false
+description = "Checks that must pass first."
+[types.ExternalCheck.fields.depends_on.item]
+type = "string"
+non_empty = true
+
+[types.ExternalCheck.fields.cwd]
+type = "string"
+required = false
+non_empty = true
+description = "The directory the command runs in, relative to the member."
+
+[types.TestSettings]
+type = "record"
+
+[types.TestSettings.fields.pypi_markers]
+type = "string"
+required = false
+non_empty = true
+description = "The pytest marker expression the pypi target's tests run with."
+
+[types.TestSettings.fields.go_command]
+type = "string"
+required = false
+non_empty = true
+description = "The command the go target's tests run instead of go test."
+
+[types.Pipeline]
+type = "record"
+
+[types.Pipeline.fields.name]
+type = "string"
+required = true
+regex = "^[A-Za-z0-9_-]+$"
+description = "The pipeline's name."
+
+[types.Pipeline.fields.type]
+type = "enum"
+required = true
+values = ["go", "npm", "pypi"]
+description = "The pipeline type."
+
+[types.Pipeline.fields.target]
+type = "enum"
+required = true
+values = ["go", "npm", "pypi"]
+description = "The target the pipeline publishes, one the member declares."
+
+[types.Pipeline.fields.local]
+type = "boolean"
+required = true
+description = "Whether the pipeline publishes from this machine instead of CI."
+
+[types.Pipeline.fields.artifact]
+type = "enum"
+required = true
+values = ["binary", "library", "package", "go-binary"]
+description = "What the pipeline publishes: go binary or library; npm and pypi package or go-binary."
+
+[types.Pipeline.fields.install_paths]
+type = "array"
+required = false
+min_len = 1
+description = "A go pipeline's main packages; required when local is true."
+[types.Pipeline.fields.install_paths.item]
+type = "string"
+non_empty = true
+
+[types.Pipeline.fields.homebrew_tap]
+type = "string"
+required = false
+non_empty = true
+description = "The Homebrew tap a go binary pipeline publishes to."
+
+[types.Pipeline.fields.binary_pipeline]
+type = "string"
+required = false
+non_empty = true
+description = "The go binary pipeline an npm or pypi go-binary pipeline wraps."

@@ -1,6 +1,8 @@
 # strictspec manifest for rlsbl. Generation is file-driven: declare each schema
-# and its targets, then run `strictspec gen`. Generated validators land under
-# rlsbl/strictspec_gen/ (committed, read-only 0444). `strictspec check` verifies
+# and its targets, then run `strictspec gen`. Each target's output path names
+# where its generated validator lands (committed, read-only 0444); a Go
+# validator gets a package of its own, because the generator emits the same
+# package-level identifiers for every schema. `strictspec check` verifies
 # schema authoring validity and generated-code freshness.
 format_version = 1
 
@@ -51,3 +53,19 @@ path = ".strictspec/reconcile-plan.schema.toml"
   lang    = "python"
   output  = "rlsbl/strictspec_gen/reconcile_plan_validator.py"
   package = "rlsbl.strictspec_gen"
+
+[[schemas]]
+path = ".strictspec/releasables.schema.toml"
+
+  [[schemas.targets]]
+  lang    = "go"
+  output  = "internal/declarations/releasablesspec/rlsbl_releasables_gen.go"
+  package = "releasablesspec"
+
+[[schemas]]
+path = ".strictspec/test-runner.schema.toml"
+
+  [[schemas.targets]]
+  lang    = "go"
+  output  = "internal/declarations/testrunnerspec/rlsbl_test_runner_gen.go"
+  package = "testrunnerspec"
