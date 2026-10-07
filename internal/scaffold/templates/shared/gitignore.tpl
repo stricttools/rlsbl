@@ -1,0 +1,15 @@
+node_modules/
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+coverage/
+build/
+dist/
+target/
+*.egg-info/
+.credentials.json
+.*-cache.json
+.env
+.env.local
+*.local-only
