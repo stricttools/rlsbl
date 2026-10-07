@@ -6,9 +6,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stricttools/strictcli/go/strictcli"
 	"github.com/stricttools/testisolation/go/hygiene"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
+	"github.com/stricttools/rlsbl/internal/git"
+	"github.com/stricttools/rlsbl/internal/previewapply"
+	"github.com/stricttools/rlsbl/internal/semver"
+	"github.com/stricttools/rlsbl/internal/testsupport"
+	"github.com/stricttools/rlsbl/internal/workflows"
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
 
@@ -94,4 +100,39 @@ func TestAWorkspaceRootNeedsReleasableUntilItIsNamed(t *testing.T) {
 	if err != nil || r.Name != "gadget" || m.Name != "gadget" {
 		t.Errorf("%v %v %v", r.Name, m.Name, err)
 	}
+}
+
+func TestACIRouterThatCannotBeReadRefusesTheCandidateWindow(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := testsupport.NewRepo(t)
+	repo.Write(declarations.ReleasablesFile, selectionDeclarations)
+	repo.Write("widget/a.txt", "a\n")
+	repo.Write("gadget/a.txt", "a\n")
+	base := repo.Commit("the workspace", declarations.ReleasablesFile, "widget/a.txt", "gadget/a.txt")
+	candidate := repo.CommitFile("gadget/b.txt", "b\n", "a gadget change")
+	routerDir := repo.Path(workflows.Dir)
+	repo.Write(workflows.Dir+"/"+workflows.RouterFile, "name: router\n")
+	if err := os.Chmod(routerDir, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(routerDir, 0o755) })
+	ws, err := workspace.Load(repo.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := semver.Parse("0.2.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	testsupport.RunEffects(t, testsupport.CommandOptions{Effect: strictcli.EffectReadOnly, Allowlist: previewapply.Prefixes()}, func(e *strictcli.Effects) error {
+		r, err := git.Open(e, repo.Dir)
+		if err != nil {
+			return err
+		}
+		_, err = judgeCandidateWindow(r, ws, "widget", candidate, base, true, true, nil, v, "widget@v0.2.0", "main", RerunResume)
+		if err == nil || !strings.Contains(err.Error(), "the CI router "+workflows.Dir+"/"+workflows.RouterFile+" cannot be read") {
+			t.Errorf("a router that cannot be read was taken for no router: %v", err)
+		}
+		return nil
+	})
 }

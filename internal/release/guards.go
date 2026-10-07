@@ -2,7 +2,6 @@ package release
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -246,7 +245,11 @@ func judgeCandidateWindow(repo git.Repo, w *workspace.Workspace, releasable, can
 		}
 	}
 	router := filepath.Join(w.Root, filepath.FromSlash(workflows.Dir), workflows.RouterFile)
-	if _, err := os.Stat(router); err == nil && needsPush && publishedBefore {
+	hasRouter, err := fileExists(router)
+	if err != nil {
+		return 0, fmt.Errorf("the CI router %s/%s cannot be read, so whether the candidate's push triggers the CI of %s cannot be judged: %w", workflows.Dir, workflows.RouterFile, releasable, err)
+	}
+	if hasRouter && needsPush && publishedBefore {
 		return windowOwesDispatch, nil
 	}
 	var followable, excluded []string
