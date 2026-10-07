@@ -179,3 +179,36 @@ func TestAGoBinaryListsItsEmbeddedFiles(t *testing.T) {
 		return nil
 	})
 }
+
+// An entry whose content several files hold (an empty __init__.py) is the
+// releasable's own when one of them lies in its members, wherever the
+// others sort: the wheel maps its package directory to another name, so no
+// path matches the entry.
+func TestAWheelEntryIdenticalToFilesOfSeveralMembersIsCreditedToTheReleasables(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := testsupport.NewRepo(t)
+	repo.Write("portal/pyproject.toml", "[project]\nname = \"portal\"\nversion = \"0.1.0\"\n")
+	repo.Write("portal/src/__init__.py", "")
+	repo.Write("conftest.py", "")
+	repo.Write("widget/tests/__init__.py", "")
+	repo.Commit("files", "portal/pyproject.toml", "portal/src/__init__.py", "conftest.py", "widget/tests/__init__.py")
+	w := newWorkspace(t, repo.Dir, portalDeclarations("ci", pypiPipeline))
+	writeWheel(t, repo.Path("portal/dist/portal-0.1.0-py3-none-any.whl"), map[string]string{
+		"renamed/__init__.py":             "",
+		"portal-0.1.0.dist-info/METADATA": "Name: portal\n",
+	})
+	run(t, strictcli.EffectMutating, func(e *strictcli.Effects) error {
+		r, err := git.Open(e, repo.Dir)
+		if err != nil {
+			return err
+		}
+		artifacts, err := publishrules.PackedArtifacts(e, r, w, "portal")
+		if err != nil {
+			return err
+		}
+		if err := publishrules.CheckPackedContents(w.Declarations, "portal", artifacts); err != nil {
+			t.Errorf("an entry the releasable's own file holds was refused: %v", err)
+		}
+		return nil
+	})
+}

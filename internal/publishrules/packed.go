@@ -35,6 +35,12 @@ type PackedFile struct {
 	// when it comes from outside the repository's files (a wheel entry no
 	// file of the repository matches).
 	Source string
+	// Matches are, for an entry attributed by its content (a wheel's), every
+	// repository file holding that content, sorted; Source is one of them.
+	// An entry whose content files of several members hold (an empty
+	// __init__.py, a license text) is the releasable's own when one of them
+	// lies in its members.
+	Matches []string
 	// content is the entry's bytes when they were read from the artifact
 	// itself (a wheel); otherwise the bytes are Source's.
 	content []byte
@@ -253,6 +259,7 @@ func listWheel(wheel string, byContent map[[sha256.Size]byte][]string) (Artifact
 		pf := PackedFile{Entry: f.Name, content: data}
 		if paths := byContent[sha256.Sum256(data)]; len(paths) > 0 {
 			pf.Source = preferredSource(f.Name, paths)
+			pf.Matches = paths
 		}
 		a.Files = append(a.Files, pf)
 	}
@@ -371,6 +378,17 @@ func ListGoBinary(h gomodule.Runner, root, dir string, installPaths []string) (A
 	return a, nil
 }
 
+// ownMatch reports whether an entry attributed by its content matches a
+// file the releasable's members own.
+func ownMatch(d *declarations.Releasables, releasable string, f PackedFile) bool {
+	for _, p := range f.Matches {
+		if owner, ok := d.MemberForPath(p); ok && owner.Releasable == releasable {
+			return true
+		}
+	}
+	return false
+}
+
 // CheckPackedContents refuses every packed file that does not come from the
 // releasable's member paths: a file another member owns (a nested member
 // included), a file of the repository no member owns, and a wheel entry no
@@ -382,6 +400,9 @@ func CheckPackedContents(d *declarations.Releasables, releasable string, artifac
 		for _, f := range a.Files {
 			if f.Source == "" {
 				problems = append(problems, fmt.Sprintf("%s carries %s, which matches no file of the repository", a.Label, f.Entry))
+				continue
+			}
+			if ownMatch(d, releasable, f) {
 				continue
 			}
 			owner, ok := d.MemberForPath(f.Source)
