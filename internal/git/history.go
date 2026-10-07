@@ -216,6 +216,24 @@ func (r Repo) FileAt(rev, path string) (content string, found bool, err error) {
 	return content, err == nil, err
 }
 
+// FilesAt lists the files under the repository-relative directory dir in
+// the tree of revision rev, recursively, relative to the repository root.
+// A directory rev does not hold lists no files; a revision git cannot read
+// is an error.
+func (r Repo) FilesAt(rev, dir string) ([]string, error) {
+	if _, found, err := r.resolve(rev + "^{tree}"); err != nil {
+		return nil, err
+	} else if !found {
+		return nil, fmt.Errorf("%s names no tree in %s", rev, r.dir)
+	}
+	args := []string{"ls-tree", "-r", "-z", "--name-only", "--full-tree", rev, "--", dir}
+	out, err := r.output(args...)
+	if err != nil {
+		return nil, err
+	}
+	return nulFields(out), nil
+}
+
 // Blob is the content of the blob object, byte for byte. It is read through
 // git cat-file --batch, whose framing states the content's size, so a final
 // newline is neither lost nor invented.

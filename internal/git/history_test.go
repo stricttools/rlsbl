@@ -285,3 +285,28 @@ func TestTrackedFiles(t *testing.T) {
 		return nil
 	})
 }
+
+// FilesAt reads the committed tree, not the working tree, and a directory
+// the revision lacks lists nothing.
+func TestFilesAtListsACommittedDirectory(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := testsupport.NewRepo(t)
+	repo.Write(".github/workflows/ci.yml", "a\n")
+	repo.Write(".github/workflows/nested/publish.yml", "b\n")
+	repo.Write("other.txt", "c\n")
+	head := repo.Commit("files", ".github/workflows/ci.yml", ".github/workflows/nested/publish.yml", "other.txt")
+	repo.Write(".github/workflows/uncommitted.yml", "d\n")
+	reading(t, repo.Dir, func(r git.Repo) error {
+		got, err := r.FilesAt(head, ".github/workflows")
+		if err != nil || strings.Join(got, "|") != ".github/workflows/ci.yml|.github/workflows/nested/publish.yml" {
+			return fmt.Errorf("FilesAt = %q, %v", got, err)
+		}
+		if got, err := r.FilesAt(head, "missing"); err != nil || len(got) != 0 {
+			return fmt.Errorf("a missing directory listed %q, %v", got, err)
+		}
+		if _, err := r.FilesAt("refs/heads/none", "."); err == nil {
+			return errors.New("a revision that names nothing listed files")
+		}
+		return nil
+	})
+}
