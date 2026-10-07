@@ -53,9 +53,9 @@
     "seed_hash": "0e3ad846d267ef5e12ba3dd25734839d075afafc9765a9734e33ff3d2a3e83e0"
   },
   "en/cli-dev.md": {
-    "content": "20d44f0823fd875e71c6479c82dae0e7b961ff2d14805ae9ebe31e260746a4cd",
+    "content": "78eb105440eecbb370a0f13ba270e07b912def29dc5defbccfabe558704d09cf",
     "description": "c435981587345b80d9d8fe1c56134777f6a7d17215c0139bb8788b8bfa4c5ccb",
-    "schema_hash": "8e192954361435970407595053d78794921f11c9884b0517682c5b4f4045e023",
+    "schema_hash": "7b9786f735a2e7b34b5196b6aa350ddcaf84d7e6cf9be8605878ac173ed58235",
     "seed_hash": "c435981587345b80d9d8fe1c56134777f6a7d17215c0139bb8788b8bfa4c5ccb"
   },
   "en/cli-discover.md": {
@@ -71,7 +71,7 @@
     "seed_hash": "714ac7a57eb755ee99fb4bb89966aeba7cd9faaae19b83c604ca9e151162efe8"
   },
   "en/cli-index.md": {
-    "content": "7711dc8b2702d75f06ece3c7cda4d0cb664d42e25bda3a658c0dd49a3e67a8f1",
+    "content": "e87d20bee96df2e3cfbe60b9a34a61e847c53161ca9308637cce4eb9ea3fafa2",
     "description": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2",
     "seed_hash": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2"
   },
@@ -81,9 +81,9 @@
     "schema_hash": "6bf61b345615538d2a83180e7b498ab5eea7397122e629c8925c2d84f3d867ce"
   },
   "en/cli-monorepo.md": {
-    "content": "bd48cad066067dd067500e2bc3144088944c37729d1766257c12812cbec213a8",
+    "content": "c49f4d010fde49e6cdd1147860282c20aee9d906e98e30687b038c8fc525e0ca",
     "description": "651df98c12c7c974b36d4da3b1746d0cead7cc6e5b0df5c15b392584aad74cff",
-    "schema_hash": "282ac5d60544458c89197249124e796a73297109a1fd49bbc9044fad30f082e7",
+    "schema_hash": "b8f2b8f367d9f3175e9279604db59eb1d83fa8e4a004cf93ecef5e2adf1eaa71",
     "seed_hash": "651df98c12c7c974b36d4da3b1746d0cead7cc6e5b0df5c15b392584aad74cff"
   },
   "en/cli-options.md": {
@@ -115,21 +115,21 @@
     "schema_hash": "8ec11c80f2ba2db1ea6f1ccdb6d2f8aebce1c0386f499a42919083e4215beb23"
   },
   "en/cli-release.md": {
-    "content": "8833567be36bd6fa9b2cf67f632cd3f9f54df846590f58b3485aa5c8983887ea",
+    "content": "99374b863d782cb6d1018588268ef60549f3f287baee3496a165b69eb7dc89bc",
     "description": "834f34d30bf5b3f057ba3ec1746a807f12f823ec51ce9fffb90286426a77b60e",
-    "schema_hash": "6959c49918ea74912dc7e67215fb0a77c7f349d346e85b78e74987cc7c639cb1",
+    "schema_hash": "a28d150cb99558717776cfe942bb26c778895d0235022628fb57bb1f47816dcd",
     "seed_hash": "834f34d30bf5b3f057ba3ec1746a807f12f823ec51ce9fffb90286426a77b60e"
   },
   "en/cli-rewrite.md": {
-    "content": "30de18c8d1f1ac929215bb329ee1a4801f24f8e49e6ba6c2dac006c3f3a6890d",
+    "content": "89f34708214be905491e54f8c72147ab42ee41ab76de16e5857725de43309029",
     "description": "10cbade59f0391bbb170f13eb2eede251075ef56638157d66bb556a2b56bb189",
-    "schema_hash": "d084eca9f3b535990fa0f68efc5eb7d3b830e8171f17c3cc2b2a1592424cddfb",
+    "schema_hash": "d7f4fe8c4aac43652feb030ea328d84bc864a3e579eff6cd27c503775f21b562",
     "seed_hash": "10cbade59f0391bbb170f13eb2eede251075ef56638157d66bb556a2b56bb189"
   },
   "en/cli-scaffold.md": {
-    "content": "3db39f121a192d1f6d468878cf953dbc630c7b030406bf7e80571f6124930a2d",
+    "content": "1ab42d91bfa3625185b32b20853e23c92b5684f8ac7e8c6ed5de118749654d10",
     "description": "b68fc4731c6d793b1d0e6c38bca6cdf058b7aaa3d1118ea11595e3f830b0227c",
-    "schema_hash": "56394e2962bb18bd37e8e3dd993e205af2660d96dede50f84a57bbf627298c9e",
+    "schema_hash": "fcb6c1aeb4cf48e1fd6888be935e14e2aea053878c333b33c64fcec2f17cd6c5",
     "seed_hash": "b68fc4731c6d793b1d0e6c38bca6cdf058b7aaa3d1118ea11595e3f830b0227c"
   },
   "en/cli-secrets.md": {
@@ -176,7 +176,8 @@
   },
   "en/configuration.md": {
     "content": "9ee91618f84f7cfc28c2e6c3799f80e976d240b5212de1963f8cc56fb69aa01f",
-    "description": "83be2ba4c73c082058dabdc2244ebe3f92dfe2c1a72061998391e536ed729b5c"
+    "description": "83be2ba4c73c082058dabdc2244ebe3f92dfe2c1a72061998391e536ed729b5c",
+    "source_docstring": "f63ecdc06d0960176c03f8e153c8f9ac925ae3dc16a8edba4ae41c09c5c57e8c"
   },
   "en/conversions.md": {
     "content": "9c42aabd39b9f7908a590488e3ec8f6303bb29309ddac836303f9ff2094b0e84",
@@ -184,7 +185,8 @@
   },
   "en/dep-validation.md": {
     "content": "c6ee6aaac6e143ea26c7e4dc4ac4d7b005874302c92f13e8d7ef74a678e75ffe",
-    "description": "22e89da6bfc0a1d2375a37784f79d85b530f7290b8b3ab78d2c601a2d06dfc54"
+    "description": "22e89da6bfc0a1d2375a37784f79d85b530f7290b8b3ab78d2c601a2d06dfc54",
+    "source_docstring": "7299737f7e2be3e78219949dff48293aec7bd6a12f434527d127ac65306f881f"
   },
   "en/deploy.md": {
     "content": "25e7b522c84d4aedb13f891fc4196ba7e9e26d09fbb9a7beefd0bea70088fb80",
@@ -215,7 +217,8 @@
   },
   "en/monorepo.md": {
     "content": "9c03444540a2f40188679458579e33919189e4be5f4d6d7eaa927eb0e5aa417c",
-    "description": "4888918f745c413440053bfb4490f8e190dbab09dc433d4f51ff31dc57a0acce"
+    "description": "4888918f745c413440053bfb4490f8e190dbab09dc433d4f51ff31dc57a0acce",
+    "source_docstring": "02b6fd46cd97711b77f82491b52bedc0ef190654867b753b5daebf51751f82e3"
   },
   "en/native-targets.md": {
     "content": "a684009fc67404179a007b1cc5a927c28013f25e7074d1c69d3f514812b6fbd8",
@@ -227,7 +230,8 @@
   },
   "en/release-workflow.md": {
     "content": "5cdf33feec8118de22ef94aacfea7eb5051aa396dd192702dfcc3ab97e6d3813",
-    "description": "24ac540af9722419fc1e669e5207802ba2ef859e3bd869248b5bc1c5ec5fea96"
+    "description": "24ac540af9722419fc1e669e5207802ba2ef859e3bd869248b5bc1c5ec5fea96",
+    "source_docstring": "0998f186e8a9850589e938859db694b132aaeacda3864775a912477466446a4b"
   },
   "en/rlsbl-__main__.md": {
     "content": "9492c626f355ccbe1313ba9976c5a812a6e1e4a636617657a287f2d3a59f4d99",
@@ -346,11 +350,13 @@
   },
   "en/rlsbl-checks-upload_private_paths.md": {
     "content": "d48e7343acc85666519526d904dcd98f244843f76d057dcdcc69c7fc309bb7b6",
-    "description": "4bd2d9e09153f2d2c60e70db66e49acb6a2ac0ccf866793c40860e685ac9ef1d"
+    "description": "4bd2d9e09153f2d2c60e70db66e49acb6a2ac0ccf866793c40860e685ac9ef1d",
+    "source_docstring": "8b034c9bb759f5ba22da4b75828f5d3543d8fe07687d00f527edbb03573fdae8"
   },
   "en/rlsbl-checks-workspace.md": {
     "content": "efc2427d93b54ad89e5e727a15ac054037d28fc65f09ed3238b9c107eed39dcd",
-    "description": "0cc3d45cb64d0bbf342da6e8590803b217319c6198126bfa6cfaa48b6da78f69"
+    "description": "0cc3d45cb64d0bbf342da6e8590803b217319c6198126bfa6cfaa48b6da78f69",
+    "source_docstring": "0f923da0a5f491776229adc6ee8ab3473211e20a3c9fe5c0e6a83da4c87f5c25"
   },
   "en/rlsbl-checks.md": {
     "content": "e7958b4068ce08b3458a08ed8da2ac090eb19ace8b726e7ef07107bc3b747661",
@@ -369,7 +375,8 @@
   },
   "en/rlsbl-ci_secrets.md": {
     "content": "4db70cb473d6c532d9d4b2fa86836e9d6483e8d5eef7368171dbf1c860b9f63e",
-    "description": "a8e66ad0689876152bea7f7e734404654885d94a10d294efae0982f72afb99bd"
+    "description": "a8e66ad0689876152bea7f7e734404654885d94a10d294efae0982f72afb99bd",
+    "source_docstring": "731aee4ed2411412420bf38c541767c514f601566257278f4a63041eed9f32a9"
   },
   "en/rlsbl-ci_yaml.md": {
     "content": "44f4377f0c275cc76f1fac4bdc74112f2a12fd0af010fd77585c1e4f7bfcad1d",
@@ -608,7 +615,8 @@
   },
   "en/rlsbl-commands-rewrite-go_module_path.md": {
     "content": "930d66dd4ad1ad8e1348427ec6429f2e9f7c6c25c944ea268144d175edc82550",
-    "description": "e53615302c15f4c799a8c23f140ba308d2aea17fc0216e0dea6de960c97b8f21"
+    "description": "e53615302c15f4c799a8c23f140ba308d2aea17fc0216e0dea6de960c97b8f21",
+    "source_docstring": "2eb6ce181aa48c2b74d2b8cf0f2b92c292b2e39d75b6480477e37255a55423cb"
   },
   "en/rlsbl-commands-rewrite-project_name.md": {
     "content": "1a4e24e85e69c70cd3ec1e57b0525d922a1e80aecbba59aaeac0af1d47d96a6b",
@@ -771,7 +779,8 @@
   },
   "en/rlsbl-import_scanners.md": {
     "content": "654b187aa6baf9b827041018fca6eb160802115d0ae54f9a05213a2aa50d1f50",
-    "description": "23f74c7c1826e53f6dd200722c730b722178c382861417c052591c3840d79a50"
+    "description": "23f74c7c1826e53f6dd200722c730b722178c382861417c052591c3840d79a50",
+    "source_docstring": "b8479b52f6f9cfbe18fc5a824515607b9162312d678bdde75759898d8e48bec8"
   },
   "en/rlsbl-layers.md": {
     "content": "3b81fc9b7fcaf88ba077e5c6ff2f3d192b9a57a8fa12b26d1e5b2cbb071278e5",
@@ -815,7 +824,8 @@
   },
   "en/rlsbl-lint-languages.md": {
     "content": "245975e7463f7ea293b28c1eed4098c2ddfbccdb2705fa5f556cb56a9a829c9d",
-    "description": "514f989d7be9c999e83584bc4e6c6e251e046e6a5f62bd23daa5b1eb78437192"
+    "description": "514f989d7be9c999e83584bc4e6c6e251e046e6a5f62bd23daa5b1eb78437192",
+    "source_docstring": "0c2b6676b4bae16660516244a016bb87f2562c1668a134bb881364fa73c701f6"
   },
   "en/rlsbl-lint-npm_ast.md": {
     "content": "8fc92b02745226b17c2ba39746424c3d6d91258867db5b82e4c57cbb35c01d79",
@@ -879,11 +889,13 @@
   },
   "en/rlsbl-module_paths.md": {
     "content": "654b9b93e9b3f9e990692bba652fdb7d1a3ffd529b38a8449ff3c5a604417643",
-    "description": "b4a024f019c230c71521ed7f75f37d8a3292732b9b843d427bad67bfd8a30d69"
+    "description": "b4a024f019c230c71521ed7f75f37d8a3292732b9b843d427bad67bfd8a30d69",
+    "source_docstring": "029104f8944b26a00dec061bd473ca2c12b7af5b9979c809c344b8058eafb4f6"
   },
   "en/rlsbl-nested_exclusions.md": {
     "content": "4dad2c98537c7fca878a64f8a347ed2db67f1066fa96acebbbd6a4dee8496e60",
-    "description": "fe6265b1dca16d9efa56ece1a92c4897475fb322c7f0f768a00ddcf98c78d7a6"
+    "description": "fe6265b1dca16d9efa56ece1a92c4897475fb322c7f0f768a00ddcf98c78d7a6",
+    "source_docstring": "91cecfed240f4bdf9809f5f51fa94f25f11257d18eff59af91789acb180b7f15"
   },
   "en/rlsbl-node_matrix.md": {
     "content": "bcc1d8432136e92e650d385d126043458a637973b9f79c18d6dadafe9a525339",
@@ -932,7 +944,8 @@
   },
   "en/rlsbl-pipelines-base.md": {
     "content": "eebe18746f145b494b9070ad7013191bb52d87dfb430d1dae0d23ad1497e6243",
-    "description": "10425efec287741de54a89f4fd72a01dc64a5719ac1c06a1eb0c08336ae9e7f1"
+    "description": "10425efec287741de54a89f4fd72a01dc64a5719ac1c06a1eb0c08336ae9e7f1",
+    "source_docstring": "3b7cc141ad5de455e35d8e95c889f3d3faed9b6d0580a06b8bc00845377f3679"
   },
   "en/rlsbl-pipelines-build.md": {
     "content": "1268dde5b6dd74d06aee48ee36ee1fe66f8ae8cdd0e2b46bbb6a2f3392c3997a",
@@ -1061,7 +1074,8 @@
   },
   "en/rlsbl-resolved_target.md": {
     "content": "f6c4e13b1bc9c1eabbae169563236e24054a94bdb2375955c9a6cd6d5265e48b",
-    "description": "eb319c4970d455dde83cebdd4740d23621b745c5bdcb885b1f60a3dda190772a"
+    "description": "eb319c4970d455dde83cebdd4740d23621b745c5bdcb885b1f60a3dda190772a",
+    "source_docstring": "9d4211c27259f29d0e50f57427642a91bc6a327be58d532a7a618e332427b6ea"
   },
   "en/rlsbl-router_filters.md": {
     "content": "79f38b8138384cee03f3c211741521570d7207e3bfd7be99fc88d321afa905e6",
@@ -1190,7 +1204,8 @@
   },
   "en/rlsbl-targets.md": {
     "content": "070188e3a68e43ea96037a9bbd52698832f28b5978b0c25ccbd6143030ebf2e0",
-    "description": "d43a44bb6804472818f721ce178cf47bc60ab1c7c02ae5dfa6d955d30588c0a4"
+    "description": "d43a44bb6804472818f721ce178cf47bc60ab1c7c02ae5dfa6d955d30588c0a4",
+    "source_docstring": "06ac009ccaf9f1a890091255a07a9865079d83d9d17ce78ecb3acf5bf955e131"
   },
   "en/rlsbl-testing.md": {
     "content": "812dedfeff53f40cdd8bb3523248a9bb2eb3a0df06e64b3516db81ecdfd51742",
@@ -1214,7 +1229,8 @@
   },
   "en/rlsbl-upload_exclusions.md": {
     "content": "ea04d85bb3e88d05405e51300050fba2c0280a6c1c359c54581cf9ddad8a074b",
-    "description": "f065066b431d3ab011c8230c0c0841f236c79baf2478c73899e2d0466fa7d32f"
+    "description": "f065066b431d3ab011c8230c0c0841f236c79baf2478c73899e2d0466fa7d32f",
+    "source_docstring": "a50455c0ab27baa6a05a8f2ea45c944c9f70fbb20303e041d4c58773cc6e1bf9"
   },
   "en/rlsbl-upstream.md": {
     "content": "1543fb1739c294a7ace5a706579fb8f009e6716c61ea8a20d5d5c2d33be198e1",
@@ -1248,7 +1264,8 @@
   },
   "en/rlsbl.md": {
     "content": "9a4bf9dac5ebff2213b85e0b39ac43567da92f718bcdcaf398f09576a47b145e",
-    "description": "e319fcb3d166626075b5d8da80095a52ba726e2f3f5028f7b6cfff449b65a4f5"
+    "description": "e319fcb3d166626075b5d8da80095a52ba726e2f3f5028f7b6cfff449b65a4f5",
+    "source_docstring": "4ceef094cf2befa2e82b4fe8d505033c32ab34024256fd835af303ed479dacb7"
   },
   "en/scaffold.md": {
     "content": "c365527e6a80e563ef4445ae5a5efc06dfad8e704fc77de30bb9980a45a76ac5",
