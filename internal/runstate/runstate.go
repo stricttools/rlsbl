@@ -52,10 +52,10 @@ func ReconcilePlanPath(releasable string) string {
 	return declarations.RunStateDir(releasable) + "/reconcile-plan.toml"
 }
 
-// ScrubResultPath is a releasable's scrub result.
-func ScrubResultPath(releasable string) string {
-	return declarations.RunStateDir(releasable) + "/scrub-result.json"
-}
+// ScrubResultPath is the scrub result of a history rewrite in progress. It
+// belongs to the repository, not to a releasable: a rewrite renames every
+// commit whichever directory it was started from.
+const ScrubResultPath = declarations.ReleaseStateDir + "/scrub-result.json"
 
 // stateFileMode is the mode of every run-state file: tool-owned working
 // state nobody else reads, the same whichever writer ran last.
