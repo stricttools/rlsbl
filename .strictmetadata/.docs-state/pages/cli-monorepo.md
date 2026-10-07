@@ -2,7 +2,6 @@
 title = "rlsbl monorepo"
 description = "Manage monorepo workspaces with multiple independently-versioned projects."
 generated = true
-seeded = true
 nav_group = "CLI Reference"
 nav_order = 10
 +++
@@ -10,77 +9,11 @@ nav_order = 10
 
 # rlsbl monorepo
 
-Manage monorepo workspaces with multiple independently-versioned projects. Initialize workspaces, add or remove projects, sync CI workflows, check name availability, and analyze dependency graphs. Provides 17 monorepo subcommands: init, add, remove, list, sync, status, check-names, outdated, snapshot, snapshot-check, mirror, graph, impact, extract, absorb, cleanup, rename-releasable. Plus 1 subgroup: release. Supports all 4 release targets in a single workspace.toml (the app help enumerates them).
-
-## monorepo init
-
-Create a new monorepo workspace by generating the .rlsbl-monorepo directory and a workspace.toml at the current directory, carrying the mandatory root member whose kind you declare and a [[releasables]] section. This must be run at the repository root before adding individual projects with the add subcommand. Each workspace tracks multiple independently-versioned projects that share a single git repository.
-
-**Effect:** mutating
-
-**Dry run:** not supported — it bootstraps the workspace every other command reads, and there is no workspace to preview against until it exists
-
-### Flags
-
-| Name | Short | Type | Presence | Env | Description |
-| --- | --- | --- | --- | --- | --- |
-| `root-member` |  | choice | required |  | Selection (not typed as a flag). Elect exactly one of `--root-dev-node`, `--root-releasable`. What kind of member owns the repository root. Every workspace has exactly one root member, and it owns every tracked file no other member claims; whether those files need changelog coverage is a per-repository decision with no default. |
-| &nbsp;&nbsp;&nbsp;&nbsp;`--root-dev-node` |  |  | required |  | Elects `root-member` = `root-dev-node`. The root member is a dev node: files at the repository root that no other member claims need no changelog coverage. |
-| &nbsp;&nbsp;&nbsp;&nbsp;`--root-releasable` |  | str | required |  | Elects `root-member` = `root-releasable`. The root member belongs to a named releasable: files at the repository root that no other member claims get changelog coverage under it. Its value: name of the releasable the root member belongs to; it is created in [[releasables]] |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`--tag-format` |  | str | required |  | Only with `--root-releasable`. tag format for that releasable, e.g. "v{version}" for bare version tags or "{name}@v{version}" for the workspace scheme; a root releasable never inherits a default |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`--publish-mode` |  | str | required |  | Only with `--root-releasable`. the root member's publish mode, "ci" or "none", with no default; it is written to the releasable's .rlsbl-monorepo/releasables/<name>/config.json, where a root member's config lives |
-| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`--publish-gate-check-regex` |  | str | optional |  | Only with `--root-releasable`. regex matching the check-run names of the root's hand-authored CI, which publishing waits for on the release commit; required with --publish-mode ci when a release target is detected at the root |
-| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Automatically commit the generated workspace.toml, and the root releasable's config.json when one is written, to git (the handler commits when neither form is passed) |
-
-## monorepo add
-
-Register a project directory in the monorepo workspace.toml configuration. The path argument specifies the project's location relative to the repo root. Optional settings cover display name, target registry, inter-project dependencies, releasable membership, registry identity, and flags marking the project as a shared library or a dev-only leaf. A --releasable naming a group [[releasables]] does not declare yet creates it, as absorb creates one for an arriving member: a singleton entry whose tag_format is written out explicitly, derived from the member's primary target scheme unless --tag-format states it. The mirror destination is not among them: it is a releasable-level key, declared in workspace.toml beside the releasable it binds. What CI reacts to is not among them: the router's paths filters are derived from the workspace, never declared per project. After writing the entry the command scaffolds the member (unless it already has a .rlsbl/config.json) and runs monorepo sync, then commits what the three wrote as one commit, leaving uncommitted, and naming, a file that had uncommitted changes before the add; if the scaffold, the sync, or the commit fails, the command exits 1 with the working tree as it was before and nothing committed.
-
-**Effect:** mutating
-
-### Flags
-
-| Name | Short | Type | Presence | Env | Description |
-| --- | --- | --- | --- | --- | --- |
-| `--name` |  | str | optional |  | Display name for the project in workspace.toml (defaults to directory name) |
-| `--target` |  | str | optional |  | Registry this project publishes to (e.g. npm, pypi, go) |
-| `--depends-on` |  | str | optional |  | Comma-separated names of workspace projects this project depends on |
-| `--library` |  | str | optional |  | Mark as a shared library consumed by other workspace projects (true/false) |
-| `--dev-only` |  | str | optional |  | Mark as a dev-only leaf node excluded from the dependency boundary guardrail (true/false) |
-| `--releasable` |  | str | optional |  | Releasable group this project belongs to (name of a [[releasables]] entry, which is created when it does not exist yet, or 'false' to opt out of versioning) |
-| `--tag-format` |  | str | optional |  | The tag format of the releasable this command creates, e.g. "{name}@v{version}" or "pkgs/thing/v{version}". Derived from the member's primary target when omitted; required when its targets span both tag schemes. Illegal when --releasable names a releasable that already exists, which brings its own format, and with --releasable false, which creates none. |
-| `--registry-name` |  | str | optional |  | Package registry identity for this project (used verbatim for name checks; overrides prefix/suffix) |
-| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Auto-commit workspace.toml and trigger scaffold/sync commits (the handler commits when neither form is passed) |
-
-### Arguments
-
-| Name | Type | Presence | Description |
-| --- | --- | --- | --- |
-| `path` | str | required | Relative path from the repo root to the project directory to register |
-
-## monorepo remove
-
-Unregister a project from the monorepo workspace.toml by its path. This removes the project entry from the workspace configuration file but does not delete any files, directories, or git history on disk. The project's code remains intact and can be re-added later with the add subcommand if needed. The path must be a member's path as workspace.toml writes it; any other path is refused, naming every member's path.
-
-**Effect:** mutating
-
-**Dry run:** not supported — the whole edit is deleting the one workspace.toml entry you just named, and a preview of it would restate the path back to you
-
-### Arguments
-
-| Name | Type | Presence | Description |
-| --- | --- | --- | --- |
-| `path` | str | required | Relative path from the repo root of the project to unregister from workspace.toml |
-
-## monorepo list
-
-Display every member registered in the monorepo workspace.toml file, one row each: the member's name, its path relative to the repo root, the releasable it is versioned under (or false when it is opted out of versioning, or -- when it declares none), and the member flags it carries (library, dev-only, test-only). A release target is not among them -- targets are detected from each member's own manifests, never declared in workspace.toml -- and neither is a mirror destination, which belongs to the releasable rather than the member.
-
-**Effect:** read_only
+Commands on a workspace: a repository whose .strictmetadata/releasables/releasables.toml declares repository_layout = "workspace", holding several members versioned under one or more releasables
 
 ## monorepo sync
 
-Inline every project's CI jobs into a single generated ci-router.yml (and publish jobs into publish.yml) in the shared .github/workflows directory at the repository root. Jobs are inlined rather than routed via reusable-workflow calls because GitHub rejects workflows that reference 20 or more reusable workflows. Stale per-project workflow copies at the root are removed via saferm.
+Regenerate the workspace's two routers in .github/workflows at the repository root. ci-router.yml inlines every member's own CI jobs (the member's .github/workflows/ci.yml and ci-*.yml) under keys and names prefixed with the member and file, and runs each member's jobs when its path filter matched the push or when the router is dispatched with run_all=true; each member's filter is derived from the workspace (its directory, its dependencies' directories, the root manifests and lockfiles, the router, and its releasable's changelog file), never declared. publish.yml inlines the publish jobs of every member whose releasable publishes from CI (the member's .github/workflows/publish.yml), each run only for its releasable's tags, behind one wait-for-ci job that holds every publish until the releasing project's CI passed on the release commit. A root member publishing from CI has its jobs rendered from scaffold's templates, as scaffold would render its publish.yml, since that file is the router itself. Jobs are inlined because GitHub refuses a workflow calling 20 or more reusable workflows. Both routers are written read-only and start with a generated-file header. A member whose Python package directory is named other than the member gets that name declared as its import_name. Removed through saferm: a generated router left with nothing to route, the publish workflows of members publishing nothing, and the per-member workflow copies earlier versions of this command wrote at the root. Everything is derived before anything is written, so a refusal changes nothing. --auto-commit commits what was written and removed, with the Autogenerated trailer.
 
 **Effect:** mutating
 
@@ -88,62 +21,92 @@ Inline every project's CI jobs into a single generated ci-router.yml (and publis
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Auto-commit merged workflow files in .github/workflows/ (the handler commits when neither form is passed) |
+| `--auto-commit`, `--no-auto-commit` |  | bool | required |  | Commit what sync wrote and removed, with the Autogenerated trailer (--no-auto-commit leaves it uncommitted) |
+
+## monorepo init
+
+Write .strictmetadata/releasables/releasables.toml for a repository that declares nothing yet, as a workspace whose only member is the root member (path ".", named root), which owns every file no other member claims. --root-member states what the root member is: root-dev-node declares it dev-only and versioned under no releasable, so its files need no changelog entry; root-releasable versions it under the releasable --releasable names, created with the --tag-format and --publish-mode stated (neither has a default), and a root releasable publishing from CI states --publish-ci-check-pattern, the pattern of the check-run names the root's own CI reports, which publishing waits for. --release-branch names each branch a release may run from. A repository whose declarations exist is refused. The declarations are committed unless --no-auto-commit is passed; when the commit fails, the files the init created are removed again through saferm, so running it again starts afresh.
+
+**Effect:** mutating
+
+**Dry run:** not supported — it writes the declarations every other command reads, and there are no declarations to preview against until they exist
+
+### Flags
+
+| Name | Short | Type | Presence | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--root-member <choice>` |  | choice | required |  | Selection. Takes exactly one of `root-dev-node`, `root-releasable`. What the root member is |
+| &nbsp;&nbsp;&nbsp;&nbsp;`root-dev-node` |  |  |  |  | Value of `--root-member`. the root member is dev-only and versioned under no releasable: its files need no changelog entry and are never released |
+| &nbsp;&nbsp;&nbsp;&nbsp;`root-releasable` |  |  |  |  | Value of `--root-member`. the root member is versioned under a releasable created with it: its files need changelog entries and ship with its releases |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`--releasable` |  | str | required |  | Only with `--root-member root-releasable`. The name of the releasable the root member is versioned under |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`--tag-format` |  | str | required |  | Only with `--root-member root-releasable`. The releasable's tag format, holding {version} and optionally {name}: "v{version}" for bare version tags, "{name}@v{version}" for the workspace scheme |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`--publish-mode` |  | str | required |  | Only with `--root-member root-releasable`. The releasable's publish mode Values: `ci` (publish from CI), `none` (publish nothing to any registry). |
+| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;`--publish-ci-check-pattern` |  | str | optional |  | Only with `--root-member root-releasable`. The pattern of the check-run names the root's own CI reports, which publishing waits for on the release commit; required with --publish-mode ci |
+| `--release-branch` |  | list[str] (unique) | required |  | A branch a release may run from; repeatable |
+| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Commit the declarations (committed when neither --auto-commit nor --no-auto-commit is passed) |
+
+## monorepo add
+
+Declare the directory at <path> (relative to the repository root) as a member of the workspace, then scaffold it as `rlsbl scaffold` does, which regenerates the workspace's CI router and publish router, and commit what the three wrote as one commit. The member is named --name, or its directory's name. It needs a release target: one detected from its manifests, or the one --target names, which the scaffold declares when it is not detected. --releasable names the releasable it is versioned under, or is false for none; naming a releasable the workspace does not declare creates it, and then --tag-format and --publish-mode are required, because a tag scheme and a publish mode are stated, never derived (both are refused when no releasable is created). --depends-on names a member it depends on (repeatable), --library and --dev-only mark it, and --registry-name is its name on the registries. Every refusal is made before anything is written. When the scaffold, the routers, or the commit fails, every path the add changed is put back as it was and nothing is committed. A path that had uncommitted changes before the add and is written by it is left uncommitted and named. --no-auto-commit leaves everything uncommitted. Under --dry-run the declarations are previewed and the scaffold is named, not previewed, since it renders from the declarations the preview did not write.
+
+**Effect:** mutating
+
+### Flags
+
+| Name | Short | Type | Presence | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--name` |  | str | optional |  | The member's name (its directory's name when not passed) |
+| `--target` |  | str | optional |  | A target the member must have, declared by the scaffold when it is not detected Values: `go` (a Go module), `npm` (an npm package), `pypi` (a Python package). |
+| `--depends-on` |  | list[str] (unique) | optional |  | A member this member depends on; repeatable |
+| `--library`, `--no-library` |  | bool | optional |  | Declare the member a library (not declared when not passed) |
+| `--dev-only`, `--no-dev-only` |  | bool | optional |  | Declare the member dev-only: nothing user-facing may depend on it (not declared when not passed) |
+| `--releasable` |  | str | required |  | The releasable the member is versioned under, or false for none; an undeclared name creates the releasable |
+| `--tag-format` |  | str | optional |  | The tag format of the releasable the add creates, holding {version} and optionally {name} |
+| `--publish-mode` |  | str | optional |  | The publish mode of the releasable the add creates Values: `ci` (publish from CI), `none` (publish nothing to any registry). |
+| `--registry-name` |  | str | optional |  | The member's name on the registries, when it differs from its name |
+| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Commit what the add wrote as one commit (committed when neither --auto-commit nor --no-auto-commit is passed) |
+
+### Arguments
+
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `path` | str | required | The member's directory, relative to the repository root |
+
+## monorepo remove
+
+Delete the declaration of the member at <path>, the path as releasables.toml writes it, character for character (any other spelling is refused, naming every member's path), and write the declarations. The member's files are left on disk and nothing is committed. Refused: the root member, the only member of a releasable (which would then release nothing), a member another member's depends_on names, and a member the lifecycle-and-license record holds an open or pending entry for.
+
+**Effect:** mutating
+
+**Dry run:** not supported — the whole edit is deleting the one declaration you named, and a preview of it would restate the path back to you
+
+### Arguments
+
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `path` | str | required | The member's path as releasables.toml writes it |
+
+## monorepo list
+
+List every member the workspace declares, in declaration order: its name, its path, the releasable it is versioned under (empty for none), and the flags it declares (library, dev-only, test-only).
+
+**Effect:** read_only
 
 ## monorepo status
 
-Show the current version, last release tag, and changelog coverage for every project in the monorepo workspace. Coverage is the real JSONL figure -- the commits since the project's last tag, scoped to the project and minus the exempt ones, rendered covered/tracked with an (N exempted) suffix, or 'no changelog' when the project has no changes directory. A publish-suppressed member's version comes from its releasable's version file, annotated (version file): nothing publishes such a member, so nothing bumps its manifest and the version-consistency check reads the same file rather than the manifest. Provides a quick overview of which projects have pending changes and are ready for their next release.
+Report on every releasable and member of the workspace. Each releasable's row holds its version file's version (empty before its first release), its latest release (annotated when this checkout does not contain it), its changelog coverage (the commits since the nearest release this checkout contains that touch its members or its records, covered/needing an entry, with the exempt ones counted apart, as `rlsbl status` counts them; a fork leaves out its upstream's history), and its members. Each member's row holds its targets, its version (its first target's, or its releasable's version file when that releasable publishes nothing, since nothing bumps its manifests), its releasable, its flags, and how many members it depends on and how many depend on it. A manifest the dependency graph cannot read is refused.
 
 **Effect:** read_only
-
-## monorepo check-names
-
-Check every publishable project name in the monorepo workspace against one target, with the same verdicts as check-name. npm and PyPI query the registry for each name and report whether it is available or already taken; go judges the Go package name each project implies offline, as available, taken by a standard-library package, invalid, or discouraged. Supports optional prefix and suffix arguments to test naming conventions, with a configurable delay between registry queries to avoid rate limiting.
-
-**Effect:** read_only
-
-### Flags
-
-| Name | Short | Type | Presence | Env | Description |
-| --- | --- | --- | --- | --- | --- |
-| `--target` |  | str | required |  | Registry or rule set to check every workspace project name against Values: `npm` (the npm registry), `pypi` (the Python Package Index), `go` (the Go package name the candidate implies, judged offline (no network): invalid when it is not a Go identifier, is a keyword, or is the blank identifier (the Go spec refuses these as a package clause); taken when it is the name of a Go standard-library package (the last element of its import path, from a committed `go list std` table), since every file importing both needs an alias; discouraged when it has uppercase letters or underscores (Effective Go) or is one of Go's built-in identifiers such as `len` or `string` (reason `predeclared`); available otherwise). |
-| `--prefix` |  | str | optional |  | String to prepend to each project name before checking availability |
-| `--suffix` |  | str | optional |  | String to append to each project name before checking availability |
-| `--delay` |  | str | default: `200` |  | Milliseconds to wait between consecutive registry API queries (the offline go check never waits) |
 
 ## monorepo outdated
 
-Scan all projects in the monorepo workspace for intra-workspace dependencies that reference older versions than what is currently available in the workspace. Lists each outdated dependency with the referenced version and the latest available version, helping identify which downstream projects need a version bump after upstream releases.
+List every dependency between members (from their pyproject.toml and package.json, and their depends_on), each with the version the depended-on member's first target has now. A versioned dependency's status is ok when its constraint admits that version, outdated when it excludes it, and versioned when the constraint is one this evaluation does not read (several clauses, an exclusion); a path, npm workspace, or explicit dependency pins no version and its status is its form.
 
 **Effect:** read_only
-
-## monorepo snapshot
-
-Regenerate the committed JSON artifact at .rlsbl-monorepo/snapshot.json summarizing all packages, versions, dependencies, and graph structure, and commit it. Verifying without regenerating is a separate command, `rlsbl monorepo snapshot-check`. Under --dry-run the artifact is computed but neither written nor committed, and the preview names both steps.
-
-**Effect:** mutating
-
-## monorepo snapshot-check
-
-Verify that .rlsbl-monorepo/snapshot.json matches the workspace it describes, without regenerating it. Exits 1 when the artifact is stale or missing. This is the read-only half of the former `monorepo snapshot --check` flag; `rlsbl monorepo snapshot` is the half that writes.
-
-**Effect:** read_only
-
-## monorepo mirror
-
-Reconcile a monorepo project's subtree mirror toward its desired state. The mirror is a tool-owned, derived artifact: it observes the remote, then converges it to exactly one scaffold commit atop the current deterministic subtree split, force-pushing (with lease) as the routine write. A tripwire refuses to touch a mirror carrying foreign (hand-authored) commits. Use --dry-run to print a plan (converged, scaffold-stale, behind, scaffold-missing, contract-violated, ancestry-undetermined, or virgin) without writing.
-
-**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
-
-### Arguments
-
-| Name | Type | Presence | Description |
-| --- | --- | --- | --- |
-| `project` | str | required | Name of the workspace project to split and push as a standalone mirror repo |
 
 ## monorepo graph
 
-Export the monorepo dependency graph as DOT (Graphviz) or an indented text tree; the framework-owned --json yields the same graph as a structured document. Supports filtering by a root package (transitive deps) or reverse package (transitive rdeps), with optional depth limiting. Use --output to write the rendering to a file instead of stdout.
+Render the members' dependency graph as Graphviz DOT (--format dot: dev-only members gray, members nothing depends on green, development edges dashed, peer edges dotted, explicit edges bold) or as an indented tree (--format tree: each member with its dependencies below it, labelled [dev], [lib], and [leaf]). --root narrows it to a member and the members it depends on, --reverse to a member and the members depending on it, both at most --depth steps away when it is passed. --output writes the rendering to a file instead of printing it. The framework's --json prints the graph as a document: the members in topological order (each after the members it depends on) with their versions, targets, releasables, flags, dependencies, and dependents, and the edges in the same order. A cycle, a manifest that cannot be read, and a version that cannot be read are refused.
 
 **Effect:** mutating
 
@@ -151,15 +114,15 @@ Export the monorepo dependency graph as DOT (Graphviz) or an indented text tree;
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--format` |  | str | optional |  | Rendering for the dependency graph (the handler renders text when omitted) Values: `text` (an indented text tree), `dot` (a Graphviz DOT document). |
-| `--output` |  | str | optional |  | File path to write the graph output to instead of printing to stdout |
-| `--root` |  | str | optional |  | Filter to show only transitive dependencies reachable from this package |
-| `--reverse` |  | str | optional |  | Filter to show only transitive reverse dependencies of this package |
-| `--depth` |  | int | optional |  | Maximum number of dependency hops to traverse from the root or reverse node |
+| `--format` |  | str | required |  | The rendering Values: `dot` (Graphviz DOT), `tree` (an indented text tree). |
+| `--output` |  | str | optional |  | A file to write the rendering to instead of printing it |
+| `--root` |  | str | optional |  | Narrow the graph to this member and the members it depends on |
+| `--reverse` |  | str | optional |  | Narrow the graph to this member and the members depending on it |
+| `--depth` |  | int | optional |  | With --root or --reverse, the most steps away a member may be (any distance when not passed) |
 
 ## monorepo impact
 
-Analyze the impact of changes to a package, file, or git diff range on the monorepo dependency graph. Shows direct and transitive dependents, test scope, and release candidates as a human report, or as a structured document under the framework-owned --json. Supports package names, file paths, and --since for git-based change detection.
+Report what a change reaches through the members' dependency graph: the members it touches, the members depending on them directly, and every member depending on them at most --depth steps away (any distance when it is not passed), the ones to test and to consider releasing. The change is named by arguments, each a member's name or a path relative to the repository root that exists here (the member owning it; a path that is one of rlsbl's own records is refused), or by --since <revision>, the files the commits since it changed. An argument that is neither a member nor a path, and one that names a member and lies in another, are refused.
 
 **Effect:** read_only
 
@@ -167,54 +130,33 @@ Analyze the impact of changes to a package, file, or git diff range on the monor
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--depth` |  | int | optional |  | Maximum number of dependency hops to traverse when computing transitive impact |
-| `--since` |  | str | optional |  | Git ref to diff against HEAD (e.g. HEAD~3, v1.0.0) |
-
-## monorepo extract
-
-Extract a releasable out of the monorepo into its own repository. The releasable is the portable unit: its members' history is filtered into a new repo (hoisted to the root when it has a single member), its whole release state -- version, changelog, release archives with their release commits, config and hooks -- is transplanted, the release commits and changelog hashes are remapped onto the rewritten commits, and its tags are translated to the destination's scheme with one boundary alias at the current version. The source loses the members, the releasable and its state in one commit, with the CI router re-synced and the snapshot regenerated. A mirrored releasable is extracted by promotion instead of by filtering: the destination is cloned from the mirror and adopts the standalone history consumers already resolve, with the monorepo-to-mirror commit correspondence derived by subtree split and recorded in the destination's transition record. A promotion refuses a mirror whose contract is violated or whose split ancestry cannot be established, and one whose tree is behind the source. Refuses a releasable owning the root member, and a remaining member that depends on a departing one (naming the rewrite command that severs the edge). Use --dry-run to see the whole plan first.
-
-**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
-
-### Flags
-
-| Name | Short | Type | Presence | Env | Description |
-| --- | --- | --- | --- | --- | --- |
-| `--delete-with-rm`, `--no-delete-with-rm` |  | bool | optional |  | Delete the departed members' directories with a plain recursive rm instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete. |
+| `--since` |  | str | optional |  | A revision: the change is every file the commits since it changed |
+| `--depth` |  | int | optional |  | The most steps away a transitive dependent may be (any distance when not passed) |
 
 ### Arguments
 
 | Name | Type | Presence | Description |
 | --- | --- | --- | --- |
-| `releasable_name` | str | required | Name of the releasable group in workspace.toml to extract, with every member it owns |
-| `target_path` | str | required | Filesystem path where the new repository will be created (must not exist) |
+| `subjects` | list[str] (variadic) | optional | Members or paths relative to the repository root that changed |
 
-## monorepo absorb
+## monorepo check-names
 
-Absorb an external repository into this workspace as a releasable. The source's history is rewritten under the destination path and merged in (full history, rewritten paths), its version tags are imported under the destination's tag scheme with one boundary alias at the current version, and its whole release state -- changelog, release archives with their release commits, config and version -- moves into a releasable's state directory with every hash and release commit remapped onto the rewritten commits. Without --releasable a singleton releasable named after the member is created, with its tag_format written explicitly. Nothing is fetched as a tag, so a tag this repository already owns is never moved or deleted; a colliding tag name or version is refused before anything is written. A crashed run is completed by re-running it. Use --dry-run to see the whole plan first.
+Check the name of every member that is not dev-only against one --target, with the verdicts of check-name. A member's registry_name is checked as declared; any other member's name is checked with --prefix before it and --suffix after it. npm and PyPI are asked through their package-level pages, waiting --delay milliseconds between names; go is judged offline. Exits 0 when every name is available, 2 when any check ended in an error, and 1 otherwise, as check-name does.
 
-**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+**Effect:** read_only
 
 ### Flags
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--name` |  | str | optional |  | Workspace member name for the absorbed package (the basename of the destination path when omitted) |
-| `--registry-name` |  | str | optional |  | Package registry identity recorded in workspace.toml (used verbatim for name checks) |
-| `--releasable` |  | str | optional |  | An existing releasable group to join. When omitted, a singleton releasable named after the member is created for it. |
-| `--tag-format` |  | str | optional |  | The tag format of the releasable this command creates, e.g. "{name}@v{version}" or "pkgs/thing/v{version}". Derived from the member's primary target when omitted; required when its targets span both tag schemes. Illegal with --releasable, which brings its own format. |
-| `--delete-with-rm`, `--no-delete-with-rm` |  | bool | optional |  | Delete the per-package release state that moves to the releasable with a plain recursive rm instead of saferm (which is what an unset flag means). Without it, a missing saferm is a hard error rather than a silent downgrade to an unrecoverable delete. |
-
-### Arguments
-
-| Name | Type | Presence | Description |
-| --- | --- | --- | --- |
-| `source_repo` | str | required | Filesystem path to the external git repository to absorb |
-| `dest_path` | str | required | Destination directory (and workspace member path) the source repo's history is rewritten under |
+| `--target` |  | str | required |  | The registry or rule set to check the names against Values: `npm` (the npm registry), `pypi` (the Python Package Index), `go` (the Go package name the candidate implies, judged offline (no network): invalid when it is not a Go identifier, is a keyword, or is the blank identifier (the Go spec refuses these as a package clause); taken when it is the name of a Go standard-library package (the last element of its import path, from a committed `go list std` table), since every file importing both needs an alias; discouraged when it has uppercase letters or underscores (Effective Go) or is one of Go's built-in identifiers such as `len` or `string` (reason `predeclared`); available otherwise). |
+| `--prefix` |  | str | optional |  | Text put before each member's name (not before a registry_name) |
+| `--suffix` |  | str | optional |  | Text put after each member's name (not after a registry_name) |
+| `--delay` |  | int | default: `200` |  | Milliseconds to wait between consecutive registry requests (the offline go check never waits) |
 
 ## monorepo cleanup
 
-Remove per-package release-state residue from releasable member packages: .rlsbl/changes/, .rlsbl/releases/, .rlsbl/bases/, .rlsbl/lint/, .rlsbl/version, per-package CHANGELOG.md, and .rlsbl/config.json when identical to the releasable-level config. Per-package hooks/ directories are preserved (live feature), and members whose path is the workspace root are exempt. Deletions go through saferm (audit trail, recoverable) and are committed automatically unless --no-auto-commit is passed. Detect residue first with `rlsbl check --name releasable-residue`.
+Remove the old layout's release-state residue through saferm, which keeps an audit trail and can undo a deletion: every .rlsbl/ directory (at the root, at a member's path, or anywhere a tracked file lies in one), .rlsbl-monorepo/, a versioned member's own CHANGELOG.md in a workspace (its releasable's changelog is generated under .strictmetadata/changelog/), and the changelog validation cache of a name no releasable is declared as. The changelog and release directories of an undeclared name are never removed: they are the record of what that subject released, and are listed as kept. The removal of what git tracked is committed with the Autogenerated trailer unless --no-auto-commit is passed. The residue is what the releasable-residue check reports. Under --dry-run the removals are listed and nothing is removed. It works in a standalone repository too, whose old-layout .rlsbl/ is residue as well.
 
 **Effect:** mutating
 
@@ -222,11 +164,11 @@ Remove per-package release-state residue from releasable member packages: .rlsbl
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Commit the deletions after removing them (the handler commits when neither --auto-commit nor --no-auto-commit is passed) |
+| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Commit the removals (committed when neither --auto-commit nor --no-auto-commit is passed) |
 
 ## monorepo rename-releasable
 
-Rename a releasable group. Rewrites the [[releasables]] name and every member's releasable field in workspace.toml (preserving comments), moves the state directory, drops the stale changelog validation cache, re-runs monorepo sync, and commits it all as one commit. That commit carries no Autogenerated trailer, so changelog coverage decides whether it needs an entry: when tag_format contains {name} the commit changes the publish workflow and coverage asks for one, and the closing message prints the runnable rlsbl changelog add --type breaking line, changing into one of the releasable's members first; a name-only rename touches only files rlsbl owns, needs no entry, and the closing message says nothing about the changelog. When tag_format contains {name}, a boundary alias tag for the current version is created at the old tag's commit and pushed; historical releases stay under the old prefix, and each one's archive records that tag in shipped_as so reconcile and release edit/deprecate/yank resolve it there. Idempotent: re-running heals a crash between the commit and the tag push, and records shipped_as on the past releases of a releasable renamed before the rename recorded it.
+Rename a releasable. Its [[releasables]] name and every member's releasable field are rewritten in place in releasables.toml; its changelog, release, and run-state directories move to the new name; a file at its reserved changelog validation cache path (which no rlsbl command writes) is removed through saferm when one is there; in the lifecycle-and-license record every open lifecycle period, license period, and identity of the old name is closed on today's date and opened again under the new name, the releasable-name identity taking the new name and each identity the tag namespace the new name renders; and the workspace's routers are regenerated. All of it is one commit, without the Autogenerated trailer, so changelog coverage decides whether it needs an entry, and when it does the closing message prints the `rlsbl changelog add` line for it. When the tag format holds {name}, the tags change spelling: each past release's archive records the tag it shipped under (shipped_as) where that tag stands at its release commit, committed with the Autogenerated trailer; and the current version's tag under the new name is created at the commit of its tag under the old name, recorded as a boundary alias in the transition record, and pushed to origin, the one remote write. Refused before anything is written: a new name that is declared, a member's name, or holds another subject's state; uncommitted changes; a release or batch release in progress; a batch release file naming the old releasable; a record without the releasable's open releasable-name identity, or with a pending identity of it. A run whose declarations already name the new releasable and not the old completes an interrupted rename, doing only what is left. Use --dry-run to print the plan.
 
 **Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
@@ -234,16 +176,12 @@ Rename a releasable group. Rewrites the [[releasables]] name and every member's 
 
 | Name | Type | Presence | Description |
 | --- | --- | --- | --- |
-| `old_name` | str | required | Current name of the releasable group in workspace.toml |
-| `new_name` | str | required | New name for the releasable group in workspace.toml and state directories |
+| `old_name` | str | required | The releasable's name now |
+| `new_name` | str | required | The name it takes |
 
-## monorepo release
+## monorepo extract
 
-Release commands for monorepo workspaces. Provides 3 subcommands: run (batch release), init (scaffold release file), order (topological release order).
-
-## monorepo release run
-
-Execute a batch release of multiple monorepo packages in topological order. Reads package configurations from .rlsbl-monorepo/releases/unreleased.toml. Each package is released sequentially using the single-package release flow, with leaves (no dependencies) released first. The whole batch runs in the release checkout, a detached checkout of the release branch's committed tip, as rlsbl release run does: an uncommitted change to a path the batch writes (the workspace's release state, a member's version files, the workspace changelog) refuses it, naming the path, and every other uncommitted change is listed and left alone. Supports --dry-run, which reports those changes instead of refusing, and --approve-consequential.
+Move the releasable <releasable_name> out of this workspace into a new repository created at <target_path>, which must not exist. Its members' history is rewritten by git-filter-repo on a fresh clone, a lone member hoisted to the repository root, and each member's tree must be the tree that left. Its changelog and release records move to the new repository's .strictmetadata/, every commit id and release commit mapped through git-filter-repo's commit map (a changelog entry none of whose commits carried over is dropped, a release commit the rewrite did not carry is left as recorded, and each is named); a recorded tree the rewrite changed stops the extract. Its tags take the new repository's scheme (v{version} for a lone member, its own tag format otherwise), the current version keeping its old name beside the new one, and another releasable's tags are deleted there. The new repository gets its declarations, a lifecycle-and-license record holding every entry of the departing subjects, and a transition record explaining the conversion, each committed. This repository then loses the members, the releasable, and its records in one commit: the departure of its tag namespace is recorded, the departing subjects' open periods and identities are closed in its lifecycle-and-license record, the departing package names join the internal_dep_floors of every member of a releasable that stays (rlsbl:dep-floors switched on where it is off), and the routers are regenerated; a failure before that commit puts every path back as it was. Deletions go through saferm unless --delete-with-rm is passed. Refused before anything is written: a releasable holding the root member; a member nested in a departing one that stays; a departing member with nothing tracked or holding a submodule; a target that exists; a missing git-filter-repo or saferm; uncommitted changes; a release in flight; options entries scoped to a departing member; a member that stays depending on one that leaves (each dependency named with the edit that severs it); a renamed tag colliding with another tag; and declarations or records the result would leave invalid. Nothing is pushed and no remote is created. Use --dry-run to print the plan.
 
 **Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
@@ -251,28 +189,77 @@ Execute a batch release of multiple monorepo packages in topological order. Read
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--push-timeout` |  | int | optional |  | Timeout in seconds for each git push. Overrides the push_timeout config key; when omitted, push_timeout applies, else the shipped default. |
-| `--ci-timeout` |  | int | optional |  | Timeout in seconds for the release CI gate (the wait for CI to conclude on the pushed release candidate). Overrides the ci_timeout config key; when omitted, ci_timeout applies, else the shipped default. |
-| `--check-timeout` |  | int | optional |  | Timeout in seconds for each preflight check subprocess (tests, lint, external checks). Overrides the check_timeout config key; when omitted, check_timeout applies, else the shipped default. |
-| `--hook-timeout` |  | int | optional |  | Timeout in seconds for each release hook. Overrides the hook_timeout config key; when omitted, hook_timeout applies, else no timeout. |
-| `--watch`, `--no-watch` |  | bool | required |  | After batch release, automatically watch CI runs to completion (--no-watch to skip) |
+| `--delete-with-rm`, `--no-delete-with-rm` |  | bool | optional |  | Delete with a plain removal instead of saferm (saferm when not passed) |
 
-## monorepo release init
+### Arguments
 
-Scaffold a batch release file for the workspace's releasables by auto-detecting each releasable's release targets and generating one configuration section per releasable. Creates .rlsbl-monorepo/releases/unreleased.toml with a [releasables.<name>] section for each releasable declared in workspace.toml, carrying an empty bump type and description for you to fill in and the detected include list. A releasable with no unreleased commits since its last tag is rendered as a commented-out section; one with no members or no detected targets is skipped with a warning.
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `releasable_name` | str | required | The releasable to extract |
+| `target_path` | str | required | Where the new repository is created; it must not exist |
 
-**Effect:** mutating
+## monorepo absorb
 
-**Dry run:** not supported — the command scaffolds a batch release file whose point is that you edit it before releasing; printing it instead of writing it leaves nothing to edit
+Bring the repository at <source_repo> into this workspace as a member at <dest_path>. Its history is rewritten under that path by git-filter-repo on a clone inside this repository's git directory, fetched without tags, and merged; the merge carries trailers naming the member, the source's root commit, and the releasable, by which a run completing an interrupted absorb finds it. Its version tags are created under the releasable's scheme at the rewritten commits, and its tag of the current version beside them under its own name; no tag here is ever moved or deleted. Its records move into the new layout: its changelog and release archives into the releasable's directories, every commit id and release commit mapped through the commit map and every recorded tree checked at the new commit; its lifecycle-and-license entries into this repository's record under the member's name, with the source recorded as the member's closed repository-url identity; and its transition record's events into this repository's, scoped to the releasable. The arriving changelog and release directories and its CHANGELOG.md are then deleted (through saferm unless --delete-with-rm is passed); the rest of its .strictmetadata/ is residue `rlsbl monorepo cleanup` removes. The member is declared and scaffolded (which regenerates the routers), and the absorb is recorded in the transition record, each committed. --releasable joins a declared releasable; without it a releasable named after the member is created with the stated --tag-format, and with --publish-mode when the source declares none (the source's own otherwise). The source may be a standalone project in the new layout or declare nothing; one in the old layout or a workspace is refused. Refused before anything is written: a dirty source or workspace, a destination path taken, a name taken, a tag or version this workspace holds already, a version the source cannot state, and records the result would leave invalid. The source repository is never changed, and nothing is pushed. Use --dry-run to print the plan.
+
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
 ### Flags
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--releasables` |  | str | optional |  | Comma-separated releasable names to include (every releasable when omitted) |
+| `--name` |  | str | optional |  | The member's name (its directory's name when not passed) |
+| `--registry-name` |  | str | optional |  | The member's name on the registries, when it differs from its name |
+| `--releasable` |  | str | optional |  | A declared releasable the member joins (a releasable named after the member is created when not passed) |
+| `--tag-format` |  | str | optional |  | The tag format of the releasable the absorb creates, holding {version} and optionally {name} |
+| `--publish-mode` |  | str | optional |  | The publish mode of the releasable the absorb creates, when the source declares none Values: `ci` (publish from CI), `none` (publish nothing to any registry). |
+| `--delete-with-rm`, `--no-delete-with-rm` |  | bool | optional |  | Delete with a plain removal instead of saferm (saferm when not passed) |
+
+### Arguments
+
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `source_repo` | str | required | The repository to absorb |
+| `dest_path` | str | required | The member's directory, relative to the workspace root; it must not exist |
+
+## monorepo release
+
+Release several releasables of a workspace as one batch: write the batch release file, release what it names, and report the order a batch releases them in.
+
+## monorepo release run
+
+Release the releasables the batch release file .strictmetadata/batch-releases/unreleased.toml names, one [releasables.<name>] table each with the fields of a release file, in the order `rlsbl monorepo release order` reports: each after the releasables its members depend on. The whole batch runs in the release checkout, as `rlsbl release run --watch` does: an uncommitted change to a path the batch writes refuses it, naming the path, and every other uncommitted change is listed and left alone. The first run validates every releasable before anything is written and plans the batch (the version and tag each one ships) in .strictmetadata/.release-state/batch-plan.toml. Each releasable is then released up to its release commit; the branch tip, holding every release commit, is pushed untagged as one candidate, and CI's verdict on it is awaited once, every releasable's own CI jobs required to have run. Only when CI passes is each releasable finished on that commit: its changelog finalized, its release archived, tagged, pushed, its GitHub Release created, its local pipelines published, its deploy_command run, and its post-release hooks run. A run after a stop follows the plan: a releasable released already is skipped, one committed short of the CI verdict joins the new candidate (a red verdict is fixed forward on the branch and continued at the same versions), and one past the verdict is refused, naming `rlsbl release resume --watch`. The run releasing the last releasable archives the batch release file as .strictmetadata/batch-releases/batch-<UTC time>.toml, commits and pushes it, and removes the plan. A root member versioned under no releasable that declares selfdoc.json gets selfdoc gen and selfdoc check first. --watch and --no-watch apply to each releasable as in `rlsbl release run --watch`. --dry-run validates every releasable and reports the versions, tags, and order, writing nothing.
+
+**Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
+
+### Flags
+
+| Name | Short | Type | Presence | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `--watch`, `--no-watch` |  | bool | required |  | Watch CI on each release commit afterwards and verify the registries list each version (--no-watch says it was not verified) |
+| `--push-timeout` |  | int | optional |  | Seconds each push may take ([timeouts] push_seconds of releasables.toml when not passed, else 300) |
+| `--ci-timeout` |  | int | optional |  | Seconds the wait for CI's verdict on the candidate may take ([timeouts] ci_seconds of releasables.toml when not passed, else 3600) |
+| `--check-timeout` |  | int | optional |  | Seconds each program a check, the schema dump, selfdoc, or the deploy starts may take ([timeouts] check_seconds of releasables.toml when not passed, else 900) |
+| `--hook-timeout` |  | int | optional |  | Seconds each hook may take ([timeouts] hook_seconds of releasables.toml when not passed, else no bound) |
+
+## monorepo release init
+
+Write the batch release file .strictmetadata/batch-releases/unreleased.toml with one [releasables.<name>] table per releasable (the ones --releasables names, once per releasable, or, with --all, every declared one; one of the two is required, so no set of releasables is inferred), each with bump and description blank (a batch release refuses it until both are filled in), context blank, every target of the releasable's members in include, and exclude empty, and commit it. A releasable with no commit needing a changelog entry since its latest release is written commented out, and one with no target, or on hold or retired (it or a member), is refused, naming --releasables to leave it out. A batch release file nobody filled in yet is left as it is; one somebody filled in is refused, never overwritten.
+
+**Effect:** mutating
+
+**Dry run:** not supported — it writes one scaffolded file and commits it, and the file it would write is what this help describes
+
+### Flags
+
+| Name | Short | Type | Presence | Env | Description |
+| --- | --- | --- | --- | --- | --- |
+| `releasable-selection` |  | choice | required |  | Selection (not typed as a flag). Elect exactly one of `--releasables`, `--all`. Which releasables get a table |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--releasables` |  | list[str] | required |  | Elects `releasable-selection` = `releasables`. Write a table for each releasable named Its value: A releasable to write a table for; repeatable, once per releasable |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--all` |  |  | required |  | Elects `releasable-selection` = `all`. Write a table for every declared releasable |
 
 ## monorepo release order
 
-Compute and display the topological release order for all projects in the monorepo workspace based on their declared depends-on relationships. Projects with no dependencies are listed first, followed by projects that depend on them, ensuring each project is released only after its dependencies. Detects and reports circular dependency errors.
+Report every member of the workspace, each after the members it depends on (its manifests' dependencies on other members and its depends_on), and every releasable in the order a batch release releases them: by the latest position any of its members takes, ties by name. A manifest that cannot be read and a dependency cycle are refused.
 
 **Effect:** read_only

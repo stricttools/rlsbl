@@ -2,7 +2,6 @@
 title = "rlsbl claim-name"
 description = "Claim a name on a package registry by publishing a minimal placeholder package."
 generated = true
-seeded = true
 nav_group = "CLI Reference"
 nav_order = 4
 +++
@@ -10,7 +9,7 @@ nav_order = 4
 
 # rlsbl claim-name
 
-Claim a name on a package registry by publishing a minimal placeholder package. Runs check-name first and publishes only a name the check reports as available: a name reported taken is refused with exit 1, and a check that ended in an error or returned any other status is refused with exit 2. npm authenticates with NPM_TOKEN when it is set, otherwise with npm's own ~/.npmrc login; PyPI with UV_PUBLISH_TOKEN or PYPI_TOKEN when set, otherwise with the token in ~/.pypirc. With neither, the claim is refused naming both places. No token is ever printed.
+Claim a name on a package registry by publishing a minimal placeholder package (version 0.0.0). Runs the check-name check first and publishes only a name it reports as available: a name reported taken is refused with exit 1, and a check that ended in an error or returned any other status is refused with exit 2. npm authenticates with NPM_TOKEN when it is set, otherwise with npm's own ~/.npmrc login; PyPI with UV_PUBLISH_TOKEN or PYPI_TOKEN when set, otherwise with the token in ~/.pypirc. With neither, the claim is refused naming both places. No token is ever printed or passed as an argument. Registry names are held forever: neither npm nor PyPI gives a claimed name back.
 
 **Effect:** mutating · **consequential** (prompts before running; `--approve-consequential` skips)
 
@@ -18,10 +17,16 @@ Claim a name on a package registry by publishing a minimal placeholder package. 
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--target` |  | str | required |  | Target package registry to publish the placeholder to Values: `npm` (publish the placeholder to the npm registry), `pypi` (publish the placeholder to the Python Package Index). |
+| `--target` |  | str | required |  | The registry to publish the placeholder to Values: `npm` (publish the placeholder to the npm registry), `pypi` (publish the placeholder to the Python Package Index). |
+
+## Arguments
+
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `name` | str | required | The package name to claim |
 
 ## Grants
 
 | Kind | Name | Reason |
 | --- | --- | --- |
-| proc_mutate | `publish` | claiming a name publishes a real package to a public registry, and neither npm nor PyPI lets you take it back |
+| proc_mutate | `publish` | claiming a name publishes a package to a public registry, and neither npm nor PyPI lets you take it back |

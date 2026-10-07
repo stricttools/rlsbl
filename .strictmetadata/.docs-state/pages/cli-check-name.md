@@ -9,7 +9,7 @@ nav_order = 3
 
 # rlsbl check-name
 
-Check whether one or more package names are usable. npm and PyPI are queried over the network for availability and for names that collide after normalization; go is an offline check of the Go package name a candidate implies. Each name gets a status of available, taken, invalid (go only), discouraged (go only), or error. Accepts multiple names as positional arguments and waits a configurable delay between networked checks. Exits 0 when every name is available, 2 when any check ended in an error, and 1 otherwise: taken, invalid, and discouraged all exit 1, so a discouraged Go name exits 1 even though Go accepts it.
+Check whether one or more package names are usable. npm and PyPI are asked over the network, through the package-level pages that list a package's versions, whether the name and every name that collides with it after normalization are registered; go is an offline check of the Go package name a candidate implies. Each name gets a status of available, taken, invalid (go only), discouraged (go only), or error; a similar name the registry cannot answer about makes the status error, never available. Accepts several names and repeated --target, and waits --delay milliseconds between networked requests. Exits 0 when every name is available, 2 when any check ended in an error, and 1 otherwise: taken, invalid, and discouraged all exit 1, so a discouraged Go name exits 1 even though Go accepts it.
 
 **Effect:** read_only
 
@@ -18,4 +18,10 @@ Check whether one or more package names are usable. npm and PyPI are queried ove
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
 | `--target` |  | list[str] (unique) | required |  | Registry or rule set to check each name against; repeatable Values: `npm` (the npm registry), `pypi` (the Python Package Index), `go` (the Go package name the candidate implies, judged offline (no network): invalid when it is not a Go identifier, is a keyword, or is the blank identifier (the Go spec refuses these as a package clause); taken when it is the name of a Go standard-library package (the last element of its import path, from a committed `go list std` table), since every file importing both needs an alias; discouraged when it has uppercase letters or underscores (Effective Go) or is one of Go's built-in identifiers such as `len` or `string` (reason `predeclared`); available otherwise). |
-| `--delay` |  | str | default: `200` |  | Milliseconds to wait between consecutive registry API queries (the offline go check never waits) |
+| `--delay` |  | int | default: `200` |  | Milliseconds to wait between consecutive registry requests (the offline go check never waits) |
+
+## Arguments
+
+| Name | Type | Presence | Description |
+| --- | --- | --- | --- |
+| `names` | list[str] (variadic) | required | Package names to check |

@@ -2,7 +2,6 @@
 title = "rlsbl changelog"
 description = "Structured changelog management using JSONL entries, each typed feature, fix or breaking."
 generated = true
-seeded = true
 nav_group = "CLI Reference"
 nav_order = 1
 +++
@@ -10,11 +9,11 @@ nav_order = 1
 
 # rlsbl changelog
 
-Structured changelog management using JSONL entries, each typed feature, fix or breaking. Add and generate CHANGELOG.md from per-commit changelog entries stored in unreleased.jsonl for precise, auditable release notes.
+The structured changelog: one JSONL file of entries per release of each releasable, under .strictmetadata/changelog/<releasable>/ (unreleased.jsonl, and a read-only <version>.jsonl per release), each entry typed feature, fix, or breaking and naming the commits it describes, with CHANGELOG.md generated from them. Every command acts on the releasable of the member whose directory holds the working directory, except remap, which rewrites every changelog of the repository.
 
 ## changelog add
 
-Append a structured changelog entry to the project's unreleased.jsonl file. Each entry includes a human-readable description, an entry type (feature, fix, or breaking), and optional commit hashes linking it to specific changes. The file is auto-committed by default. Use --no-user-facing to mark internal changes that should not appear in the published changelog.
+Append an entry to the releasable's unreleased.jsonl and commit it. Each commit must resolve and change a file the releasable's changelog covers (its members' files and its own state directories). A user-facing entry (the default) needs --description and --type; --no-user-facing marks an internal change that CHANGELOG.md and the release notes leave out. A commit an entry of the same type and user-facing value already names is refused. An entry naming more than 5 commits needs --batch-reason saying why they are one change, which the entry carries and which exempts it from the per-entry limit; an entry within the limit refuses one. A commit appears in at most 5 entries. In a workspace the entry records the releasable's members the commits change. Committed unless --no-auto-commit.
 
 **Effect:** mutating
 
@@ -22,16 +21,16 @@ Append a structured changelog entry to the project's unreleased.jsonl file. Each
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--commits` |  | str | required |  | Comma-separated list of commit hashes to associate with this changelog entry |
-| `--description` |  | str | optional |  | Human-readable description of the change, shown in the generated CHANGELOG.md (required unless --no-user-facing) |
-| `--type` |  | str | optional |  | Classification of the change (required unless --no-user-facing) Values: `feature` (a new capability users can reach), `fix` (a user-visible defect that no longer happens), `breaking` (a change that requires action from users). |
-| `--user-facing`, `--no-user-facing` |  | bool | optional |  | Mark this entry as user-facing, included in generated CHANGELOG.md output (the handler treats an absent flag as user-facing) |
-| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Auto-commit unreleased.jsonl after appending the entry (the handler commits when neither form is passed) |
-| `--allow-batch`, `--no-allow-batch` |  | bool | optional |  | Auto-create an exclusion if this entry exceeds the commit batch limit |
+| `--commits` |  | str | required |  | Comma-separated commit ids the entry describes |
+| `--description` |  | str | optional |  | The change in one line of markdown, as CHANGELOG.md shows it (required for a user-facing entry) |
+| `--type` |  | str | optional |  | What the change is (required for a user-facing entry) Values: `feature` (a new capability users can reach), `fix` (a user-visible defect that no longer happens), `breaking` (a change that requires action from users). |
+| `--user-facing`, `--no-user-facing` |  | bool | optional |  | Whether CHANGELOG.md and the release notes show the entry (user-facing when neither --user-facing nor --no-user-facing is passed) |
+| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Commit the unreleased file (committed when neither --auto-commit nor --no-auto-commit is passed) |
+| `--batch-reason` |  | str | optional |  | Why the entry's more than 5 commits are one change; the entry carries it, and it exempts the entry from the per-entry commit limit |
 
 ## changelog generate
 
-Compile all validated JSONL changelog entries into a formatted CHANGELOG.md file. Groups entries by type (features, fixes, breaking changes) under the appropriate version heading, preserving existing changelog content for previous releases. Use --dry-run to preview the generated Markdown output without writing to disk, which is useful for reviewing before committing.
+Write the releasable's CHANGELOG.md from its changelog files and release archives (the root CHANGELOG.md standalone; .strictmetadata/changelog/<releasable>/CHANGELOG.md and the root roll-up in a workspace), and commit what changed with the Autogenerated trailer unless --no-auto-commit. --dry-run prints the releasable's document and writes nothing.
 
 **Effect:** mutating
 
@@ -39,11 +38,11 @@ Compile all validated JSONL changelog entries into a formatted CHANGELOG.md file
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Auto-commit generated CHANGELOG.md and per-version .md files (the handler commits when neither form is passed) |
+| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Commit what changed (committed when neither --auto-commit nor --no-auto-commit is passed) |
 
 ## changelog amend
 
-Append a changelog entry to a released version's JSONL file. Temporarily unlocks the read-only file, appends the entry, re-locks it, regenerates CHANGELOG.md, and syncs GitHub Release notes. Use --no-validate-hashes to skip hash validation for old or amended commits.
+Append an entry to a released version's read-only <version>.jsonl, which stays read-only, regenerate CHANGELOG.md, commit both, and rewrite that version's GitHub Release from the record (as `rlsbl release edit <version>` does). The entry's checks are changelog add's; --no-validate-hashes takes the commits as given, unresolved and unchecked against the scope, for an old commit a rewrite took away. A version without a release archive, or with one stating no fate, is refused before anything is written; a version recorded never released has no GitHub Release to rewrite. --id is refused: an amend adds a new entry, whose id is minted.
 
 **Effect:** mutating
 
@@ -51,23 +50,23 @@ Append a changelog entry to a released version's JSONL file. Temporarily unlocks
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--version` |  | str | required |  | Semver of the already-released version whose JSONL to amend (e.g. 0.39.0) |
-| `--commits` |  | str | required |  | Comma-separated commit hashes to associate with the amended changelog entry |
-| `--id` |  | str | optional |  | Entry ID (ULID) to select the target entry for amendment |
-| `--description` |  | str | optional |  | Human-readable description for the amended entry in CHANGELOG.md |
-| `--type` |  | str | optional |  | Classification for the amended entry (required unless --no-user-facing) Values: `feature` (a new capability users can reach), `fix` (a user-visible defect that no longer happens), `breaking` (a change that requires action from users). |
-| `--user-facing`, `--no-user-facing` |  | bool | optional |  | Mark the amended entry as user-facing, included in CHANGELOG.md output (the handler treats an absent flag as user-facing) |
-| `--validate-hashes`, `--no-validate-hashes` |  | bool | optional |  | Validate commit hashes via git rev-parse before appending (the handler validates when neither form is passed) |
+| `--version` |  | str | required |  | The released version whose file is amended, bare (0.39.0) |
+| `--commits` |  | str | required |  | Comma-separated commit ids the entry describes |
+| `--id` |  | str | optional |  | Refused: the amend adds a new entry, whose id is minted; `rlsbl changelog edit --id` changes an existing one |
+| `--description` |  | str | optional |  | The change in one line of markdown (required for a user-facing entry) |
+| `--type` |  | str | optional |  | What the change is (required for a user-facing entry) Values: `feature` (a new capability users can reach), `fix` (a user-visible defect that no longer happens), `breaking` (a change that requires action from users). |
+| `--user-facing`, `--no-user-facing` |  | bool | optional |  | Whether CHANGELOG.md and the release notes show the entry (user-facing when neither form is passed) |
+| `--validate-hashes`, `--no-validate-hashes` |  | bool | optional |  | Resolve every commit and check it against the releasable's scope (validated when neither form is passed) |
 
 ## changelog edit
 
-Modify an existing changelog entry in unreleased or released JSONL files. Finds the entry by commit hash or entry ID, applies field changes (type, description, user-facing status), and rewrites the file atomically. For released files, temporarily unlocks the read-only file, regenerates CHANGELOG.md, and syncs GitHub Release notes.
+Change one existing entry, in unreleased.jsonl or a released version's file, as a sparse update: --description, --type, and --user-facing write those fields, --unset-description and --unset-type clear them, and every field not named is left as it is. The entry is named by --id or by --commits (an entry naming any of them); several entries matching --commits are narrowed to those of the type the edit writes, and otherwise refused with every match named. Making an entry user-facing needs a description and a type, held already or written by the same edit; making it internal keeps its description and type for a later flip back unless the edit clears them. An edit of a released version's file keeps it read-only, regenerates CHANGELOG.md, and rewrites that version's GitHub Release from the record. Committed unless --no-auto-commit.
 
 **Effect:** mutating
 
 **Updates:** `changelog-entry` (write mode: sparse)
 
-- Identified by: `--commits`, `--id`
+- Identified by: `--entry`
 - Writes: `--description`, `--type`, `--user-facing` -- at least one of them is required.
 - A property that is not supplied is left unchanged.
 - Clearable: `--unset-description`, `--unset-type`.
@@ -76,24 +75,17 @@ Modify an existing changelog entry in unreleased or released JSONL files. Finds 
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--commits` |  | str | optional |  | Comma-separated commit hashes identifying the target entry |
-| `--id` |  | str | optional |  | Entry ID (ULID) identifying the target entry to edit in the JSONL file |
-| `--type`, `--unset-type` |  | str | optional |  | New type value; also disambiguates a commit covered by several entries Values: `feature` (a new capability users can reach), `fix` (a user-visible defect that no longer happens), `breaking` (a change that requires action from users). `--unset-type` clears it. |
-| `--description`, `--unset-description` |  | str | optional |  | Replacement description text for the matched changelog entry `--unset-description` clears it. |
-| `--user-facing`, `--no-user-facing` |  | bool | optional |  | Set user_facing status on the matched entry (--user-facing to set true, --no-user-facing to set false) |
-| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Automatically commit the edited JSONL changelog file to git after modification (the handler commits when neither form is passed) |
-
-### Constraints
-
-The framework enforces these before the command runs.
-
-| Rule | What it requires |
-| --- | --- |
-| `entry-selection` | At least one of `--commits` (when supplied), `--id` (when supplied). |
+| `entry` |  | choice | required |  | Selection (not typed as a flag). Elect exactly one of `--id`, `--commits`. Which entry is edited |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--id` |  | str | required |  | Elects `entry` = `id`. Name the entry by its id, which no edit of another line changes Its value: The entry's id, as its line's own id field holds it |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--commits` |  | str | required |  | Elects `entry` = `commits`. Name the entry by the commits it names Its value: Comma-separated commit ids; the entry naming any of them is edited |
+| `--description`, `--unset-description` |  | str | optional |  | The entry's new description `--unset-description` clears it. |
+| `--type`, `--unset-type` |  | str | optional |  | The entry's new type; it also narrows several entries --commits matches to those of this type Values: `feature` (a new capability users can reach), `fix` (a user-visible defect that no longer happens), `breaking` (a change that requires action from users). `--unset-type` clears it. |
+| `--user-facing`, `--no-user-facing` |  | bool | optional |  | Make the entry user-facing (--user-facing) or internal (--no-user-facing) |
+| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Commit the rewritten file (committed when neither --auto-commit nor --no-auto-commit is passed) |
 
 ## changelog remove
 
-Delete one entry from a JSONL changelog file, selected by its ULID identifier or by the commits it covers. The file is rewritten atomically without that line; a released version's file is temporarily unlocked, re-locked, and followed by a CHANGELOG.md regeneration and a GitHub Release notes sync. Exactly one entry is removed: a selector matching several is refused with every match named, and a selector matching none is refused too.
+Delete one entry from unreleased.jsonl or a released version's file, named by --id or by --commits (a commit that no longer resolves is matched as written, since the entry of a commit a rewrite took away is the usual one to remove). A selector matching several entries is refused with every match named, and one matching none is refused. Removing from a released version's file keeps it read-only, regenerates CHANGELOG.md, and rewrites that version's GitHub Release from the record. Committed unless --no-auto-commit.
 
 **Effect:** mutating
 
@@ -101,14 +93,14 @@ Delete one entry from a JSONL changelog file, selected by its ULID identifier or
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `entry` |  | choice | required |  | Selection (not typed as a flag). Elect exactly one of `--id`, `--commits`. Which entry to remove. Exactly one addressing mode must be elected, and it must select exactly one entry. |
-| &nbsp;&nbsp;&nbsp;&nbsp;`--id` |  | str | required |  | Elects `entry` = `id`. Address the entry by its stable ULID identifier, which survives every unrelated edit to the file it sits in Its value: the entry's ULID identifier, as written in the JSONL line's own `id` member |
-| &nbsp;&nbsp;&nbsp;&nbsp;`--commits` |  | str | required |  | Elects `entry` = `commits`. Address the entry by the commits it covers, which is how an entry is named when its identifier is not at hand Its value: comma-separated commit hashes; the entry covering any of them is removed, and a list covering several entries is refused with each match named |
-| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Auto-commit the rewritten JSONL file (and, for a released version, the regenerated CHANGELOG.md) after removing the entry (the handler commits when neither form is passed) |
+| `entry` |  | choice | required |  | Selection (not typed as a flag). Elect exactly one of `--id`, `--commits`. Which entry is removed |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--id` |  | str | required |  | Elects `entry` = `id`. Name the entry by its id, which no edit of another line changes Its value: The entry's id, as its line's own id field holds it |
+| &nbsp;&nbsp;&nbsp;&nbsp;`--commits` |  | str | required |  | Elects `entry` = `commits`. Name the entry by the commits it names Its value: Comma-separated commit ids; the entry naming any of them is removed |
+| `--auto-commit`, `--no-auto-commit` |  | bool | optional |  | Commit the rewritten file (committed when neither --auto-commit nor --no-auto-commit is passed) |
 
 ## changelog remap
 
-Remap stale commit hashes in JSONL changelog files using a mapping of old SHAs to new SHAs. Reads the mapping from a file (--map-file), the safegit rewrite journal (--from-journal), or stdin (--stdin). At least one source is required. Auto-commits with Autogenerated trailer.
+Rewrite stale commit ids in every changelog file of the repository (every releasable's, and every retired release history's) through a map of old commits to new ones, read from --map-file (lines of "<old> <new>", as git's post-rewrite hook prints them), from safegit's rewrite journal (--from-journal: its last rewrite), or from standard input (--stdin, which the post-rewrite hook uses); sources may be combined, and an old commit two sources map differently is refused. Every other line keeps its bytes and a released file stays read-only; an entry whose commits map to one commit names it once. An abbreviated id the map cannot decide is refused before anything is written. What was rewritten is committed with the Autogenerated trailer.
 
 **Effect:** mutating
 
@@ -116,9 +108,9 @@ Remap stale commit hashes in JSONL changelog files using a mapping of old SHAs t
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--map-file` |  | str | optional |  | Path to a file of 'old_sha new_sha' lines (same format as git's post-rewrite hook) |
-| `--from-journal`, `--no-from-journal` |  | bool | optional |  | Read the commit map from safegit's rewrite journal (.git/safegit/rewrite-maps.jsonl) |
-| `--stdin`, `--no-stdin` |  | bool | optional |  | Read the old/new SHA map from stdin (for piping from git's post-rewrite hook) |
+| `--map-file` |  | str | optional |  | A file of "<old commit> <new commit>" lines, relative to this directory or absolute |
+| `--from-journal`, `--no-from-journal` |  | bool | optional |  | Read the map of the last rewrite safegit's rewrite journal records |
+| `--stdin`, `--no-stdin` |  | bool | optional |  | Read "<old commit> <new commit>" lines from standard input, as git's post-rewrite hook passes them |
 
 ### Constraints
 
