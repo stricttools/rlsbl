@@ -177,8 +177,9 @@ func TestOldLayoutResidueFailsUntilCleanupRemovesIt(t *testing.T) {
 	r.Write(".strictmetadata/releases/gizmo/v1.0.0.toml", "format_version = 2\n")
 	got := runCheck(t, inputs(t, r.Dir), "releasable-residue")
 	mustStatus(t, got, "fail")
-	mustMention(t, got, "widget/.rlsbl/: ", "`rlsbl monorepo cleanup` removes it", ".strictmetadata/releases/gizmo/", "does not remove it")
-	// What `rlsbl monorepo cleanup` deletes, and the record moved by hand.
+	mustMention(t, got, "widget/.rlsbl/: ", "`rlsbl monorepo cleanup` removes it", ".strictmetadata/releases/gizmo/", "keeps it: move it by hand")
+	// What `rlsbl monorepo cleanup` deletes, and the record moved by hand;
+	// internal/cli runs the cleanup itself (fix_instructions_test.go).
 	for _, p := range []string{"widget/.rlsbl", ".strictmetadata/releases/gizmo"} {
 		if err := os.RemoveAll(r.Path(p)); err != nil {
 			t.Fatal(err)

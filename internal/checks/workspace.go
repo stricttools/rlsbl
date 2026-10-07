@@ -376,7 +376,7 @@ func checkReleasableResidue(c *Context, r *strictcli.ErrorReporter) strictcli.Ch
 		if res.CleanupRemoves {
 			removable++
 		} else {
-			how = "`rlsbl monorepo cleanup` does not remove it: move it by hand"
+			how = "`rlsbl monorepo cleanup` keeps it: move it by hand where this item says"
 		}
 		problems = append(problems, fmt.Sprintf("%s: %s; %s", shown, res.Reason, how))
 	}

@@ -94,9 +94,22 @@ type Saferm struct {
 // script that records its argv and deletes nothing.
 func FakeSaferm(t testing.TB) *Saferm {
 	t.Helper()
+	return fakeSaferm(t, "")
+}
+
+// FakeDeletingSaferm is FakeSaferm whose script also deletes the path its
+// last argument names, as saferm does, for a test that performs a fix and
+// asserts what it leaves.
+func FakeDeletingSaferm(t testing.TB) *Saferm {
+	t.Helper()
+	return fakeSaferm(t, "for last; do :; done\nrm -rf -- \"$last\"\n")
+}
+
+func fakeSaferm(t testing.TB, deletion string) *Saferm {
+	t.Helper()
 	dir := t.TempDir()
 	calls := filepath.Join(dir, "saferm-calls.txt")
-	script := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"${0%/*}/saferm-calls.txt\"\n"
+	script := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"${0%/*}/saferm-calls.txt\"\n" + deletion
 	if err := os.WriteFile(filepath.Join(dir, "saferm"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}

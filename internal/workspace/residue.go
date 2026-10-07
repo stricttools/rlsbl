@@ -165,7 +165,7 @@ func (w *Workspace) memberRecords(m declarations.Member) ([]Residue, error) {
 		}
 		reason := fmt.Sprintf("records of a repository of its own, kept inside the member %q, which rlsbl does not read: this repository's records are under %s/ at its root", m.Name, declarations.MetadataDir)
 		if d.keep {
-			reason += "; they record what a subject released, so cleanup keeps them: move what this repository needs to its own records, and delete the rest by hand"
+			reason += fmt.Sprintf("; they record what a subject released, so cleanup keeps them: move what this repository needs into %s/ at its root, and delete the rest through saferm", d.dir)
 		}
 		out = append(out, Residue{Path: p, Directory: true, Reason: reason, CleanupRemoves: !d.keep})
 	}
@@ -218,7 +218,7 @@ func (w *Workspace) undeclaredState() ([]Residue, error) {
 			out = append(out, Residue{
 				Path:      root + "/" + entry.Name(),
 				Directory: true,
-				Reason:    fmt.Sprintf("release state of %q, which no releasable is declared as, so nothing releases from it; a subject that stopped releasing keeps its record under %s", entry.Name(), declarations.RetiredHistoryDir(entry.Name())),
+				Reason:    fmt.Sprintf("release state of %q, which no releasable is declared as, so nothing releases from it; a subject that stopped releasing keeps it as %s/", entry.Name(), declarations.RetiredHistoryDir(entry.Name())+"/"+path.Base(root)),
 			})
 		}
 	}
