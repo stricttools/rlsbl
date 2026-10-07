@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -62,6 +63,15 @@ func (w *Workspace) DetectResidue(tracked []string) ([]Residue, error) {
 		if info != nil {
 			add(oldLayout(p, info.IsDir()))
 		}
+		if !m.IsRoot() {
+			records, err := w.memberRecords(m)
+			if err != nil {
+				return nil, err
+			}
+			for _, r := range records {
+				add(r)
+			}
+		}
 		if !w.IsWorkspace() || m.IsRoot() || !m.Versioned() {
 			continue
 		}
@@ -106,6 +116,59 @@ func (w *Workspace) DetectResidue(tracked []string) ([]Residue, error) {
 		out = append(out, r)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
+	return out, nil
+}
+
+// memberRecordDirs are the directories of a repository's own records under
+// .strictmetadata/, as a repository absorbed into a workspace brings them
+// inside its member, where nothing reads them: the workspace's records are
+// at its root. keep marks the ones holding the record of what a subject
+// released, which cleanup never deletes; the rest are declarations,
+// generated state, or records `monorepo absorb` carried into the
+// workspace's own.
+var memberRecordDirs = []struct {
+	dir  string
+	keep bool
+}{
+	{declarations.ReleasablesDir, false},
+	{declarations.TestRunnerDir, false},
+	{declarations.ChangelogRoot, true},
+	{declarations.ReleasesRoot, true},
+	{declarations.BatchReleasesDir, false},
+	{path.Dir(declarations.TransitionsFile), false},
+	{declarations.HistoryRewritesDir, true},
+	{declarations.RetiredHistoriesRoot, true},
+	{declarations.ReleaseHooksRoot, false},
+	{path.Dir(declarations.ScaffoldStateFile), false},
+	{declarations.ScaffoldBasesDir, false},
+	{declarations.ChangelogValidationDir, false},
+	{declarations.ReleaseStateDir, false},
+	{lifecycleRecordDir, false},
+}
+
+// lifecycleRecordDir is the lifecycle-and-license record's directory, which
+// strictspec owns.
+const lifecycleRecordDir = declarations.MetadataDir + "/lifecycle-and-license"
+
+// memberRecords are the record directories present under the member's own
+// .strictmetadata/.
+func (w *Workspace) memberRecords(m declarations.Member) ([]Residue, error) {
+	var out []Residue
+	for _, d := range memberRecordDirs {
+		p := declarations.Join(m.Path, d.dir)
+		info, err := w.stat(p)
+		if err != nil {
+			return nil, err
+		}
+		if info == nil || !info.IsDir() {
+			continue
+		}
+		reason := fmt.Sprintf("records of a repository of its own, kept inside the member %q, which rlsbl does not read: this repository's records are under %s/ at its root", m.Name, declarations.MetadataDir)
+		if d.keep {
+			reason += "; they record what a subject released, so cleanup keeps them: move what this repository needs to its own records, and delete the rest by hand"
+		}
+		out = append(out, Residue{Path: p, Directory: true, Reason: reason, CleanupRemoves: !d.keep})
+	}
 	return out, nil
 }
 
