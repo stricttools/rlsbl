@@ -24,7 +24,7 @@ Every file rlsbl owns in a repository lives under `.strictmetadata/`, the direct
 | `.strictmetadata/releases/<releasable>/undo-audits.jsonl` | written by `release undo` | rlsbl | One line per undo, written before anything is deleted. |
 | `.strictmetadata/batch-releases/unreleased.toml` | authored | rlsbl | A workspace's batch release file. |
 | `.strictmetadata/transitions/transitions.jsonl` | written by the operations | rlsbl | The [transition record](conversions.md#the-transition-record): repository surgery only. |
-| `.strictmetadata/history-rewrites/<UTC time>.toml` | written by the rewrite | rlsbl | One archive per `release scrub` or `transition declassify` rewrite: commit ids, tags, the mode, and the reason, never what was removed. |
+| `.strictmetadata/history-rewrites/<UTC time>.toml` | written by the rewrite | rlsbl | One archive per `release scrub` or `transition declassify` rewrite: commit ids, tags, the mode, the reason, and a declassification's squash commits, never what was removed. |
 | `.strictmetadata/retired-release-histories/<subject>/` | a read-only record, written by the migration | rlsbl | The changelog and release archives of a subject whose lifecycle is `retired`. Nothing releases from here, and `releasable-residue` does not report it. |
 | `.strictmetadata/release-hooks/<releasable or member>/<hook>.sh` | authored | rlsbl | Hook scripts a declaration runs, where the migration moved a customized hook script. |
 | `.strictmetadata/go.mod` | generated, committed | none | A stub module (`module private.invalid/rlsbl-private`, no `go` directive) that keeps `.strictmetadata/` out of the Go module zip, `go build ./...`, and `go test ./...` of a Go module at the repository root. |

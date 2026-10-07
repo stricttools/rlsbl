@@ -263,12 +263,20 @@ func UserFacingProblem(entries []Entry, bump semver.Bump) string {
 
 // BatchCommitFindings name every entry of f with more commits than
 // MaxCommitsPerEntry that carries no batch_reason, with the commands that
-// replace it by an entry that does.
-func BatchCommitFindings(f *File) []string {
+// replace it by an entry that does. A commit in squashes (a
+// declassification's squash commit, which every entry of its squashed
+// period names) is not counted.
+func BatchCommitFindings(f *File, squashes map[string]bool) []string {
 	var findings []string
 	for _, l := range f.Lines {
 		e := l.Entry
-		if len(e.Commits) <= MaxCommitsPerEntry || e.BatchReason != "" {
+		counted := 0
+		for _, c := range e.Commits {
+			if !squashes[c] {
+				counted++
+			}
+		}
+		if counted <= MaxCommitsPerEntry || e.BatchReason != "" {
 			continue
 		}
 		shorts := make([]string, len(e.Commits))
@@ -283,12 +291,17 @@ func BatchCommitFindings(f *File) []string {
 
 // BatchEntryFindings name every commit that appears in more than
 // MaxEntriesPerCommit entries across files (the unreleased file and every
-// released version's), with each place it appears.
-func BatchEntryFindings(files []*File) []string {
+// released version's), with each place it appears. A commit in squashes (a
+// declassification's squash commit, which every entry of its squashed
+// period names) is left out.
+func BatchEntryFindings(files []*File, squashes map[string]bool) []string {
 	places := map[string][]string{}
 	for _, f := range files {
 		for _, l := range f.Lines {
 			for _, c := range dedupe(l.Entry.Commits) {
+				if squashes[c] {
+					continue
+				}
 				places[c] = append(places[c], fmt.Sprintf("%s:%d", f.Path, l.Number))
 			}
 		}

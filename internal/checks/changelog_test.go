@@ -176,3 +176,31 @@ func TestACommitInTooManyEntriesFails(t *testing.T) {
 	mustStatus(t, got, "fail")
 	mustMention(t, got, next[:12], "merge the entries")
 }
+
+// After a declassification every changelog entry of a squashed proprietary
+// period names the one squash commit, so the batch checks leave out a
+// commit a committed history-rewrite archive records as a declassification's
+// squash commit; a scrub's archive exempts nothing.
+func TestTheBatchChecksLeaveOutADeclassificationsSquashCommit(t *testing.T) {
+	hygiene.Isolate(t)
+	r, _, next := releasedPortal(t)
+	var lines string
+	for _, n := range []string{"1", "2", "3", "4", "5", "6"} {
+		lines += entryLine(n, next)
+	}
+	r.Write(unreleased, lines)
+	archive := func(operation, squash string) string {
+		return "format_version = 1\noperation = \"" + operation + "\"\nmode = \"squash\"\nreason = \"public\"\nold_head = \"" + strings.Repeat("a", 40) + "\"\nnew_head = \"" + next + "\"\ncommits_rewritten = 6\n" + squash + "\n[rewrites]\n\"" + strings.Repeat("a", 40) + "\" = \"" + next + "\"\n"
+	}
+	r.Write(".strictmetadata/history-rewrites/20260101T000000Z.toml", archive("scrub", ""))
+	mustStatus(t, runCheck(t, inputs(t, r.Dir), "changelog-batch-entries"), "fail")
+	r.Write(".strictmetadata/history-rewrites/20260101T000000Z.toml", archive("declassify", "squash_commits = [\""+next+"\"]\n"))
+	mustStatus(t, runCheck(t, inputs(t, r.Dir), "changelog-batch-entries"), "pass")
+
+	var commits []string
+	for _, c := range "bcdef" {
+		commits = append(commits, strings.Repeat(string(c), 40))
+	}
+	r.Write(unreleased, entryLine("1", append(commits, next)...))
+	mustStatus(t, runCheck(t, inputs(t, r.Dir), "changelog-batch-commits"), "pass")
+}

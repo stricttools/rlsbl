@@ -291,7 +291,7 @@ func TestTheBatchLimits(t *testing.T) {
 	reasoned := over
 	reasoned.ID, reasoned.BatchReason = id("2"), "one change"
 	f := &changelog.File{Path: "unreleased.jsonl", Lines: []changelog.Line{{Number: 1, Entry: over}, {Number: 2, Entry: reasoned}}}
-	findings := changelog.BatchCommitFindings(f)
+	findings := changelog.BatchCommitFindings(f, nil)
 	if len(findings) != 1 {
 		t.Fatalf("findings %v", findings)
 	}
@@ -302,13 +302,13 @@ func TestTheBatchLimits(t *testing.T) {
 		lines = append(lines, changelog.Line{Number: i + 1, Entry: internalEntry(string(rune('a'+i)), sha1)})
 	}
 	files := []*changelog.File{{Path: "unreleased.jsonl", Lines: lines[:3]}, {Path: "1.0.0.jsonl", Released: true, Lines: lines[3:]}}
-	entryFindings := changelog.BatchEntryFindings(files)
+	entryFindings := changelog.BatchEntryFindings(files, nil)
 	if len(entryFindings) != 1 {
 		t.Fatalf("entry findings %v", entryFindings)
 	}
 	requireContains(t, entryFindings[0], sha1[:12], "6 changelog entries", "unreleased.jsonl:1", "1.0.0.jsonl:6")
 	files[1].Lines = lines[3:5]
-	if got := changelog.BatchEntryFindings(files); len(got) != 0 {
+	if got := changelog.BatchEntryFindings(files, nil); len(got) != 0 {
 		t.Errorf("five entries per commit were refused: %v", got)
 	}
 }

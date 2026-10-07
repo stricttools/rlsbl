@@ -230,12 +230,24 @@ func checkChangelogUserFacing(c *Context, r *strictcli.WarnReporter) strictcli.C
 	return reportWarnings(r, []string{message}, "no user-facing entries", "")
 }
 
+// declassifySquashes are the squash commits of the repository's
+// declassifications, which the batch checks leave out: every changelog
+// entry of a squashed proprietary period names its period's one squash
+// commit. An archive that cannot be read leaves the checks unanswered.
+func declassifySquashes(c *Context) map[string]bool {
+	squashes, err := releaserecord.DeclassifySquashCommits(c.Root())
+	if err != nil {
+		panic(unanswered(fmt.Sprintf("the history-rewrite archives cannot be read, so which commits are a declassification's squash commits cannot be known: %v", err)))
+	}
+	return squashes
+}
+
 func checkChangelogBatchCommits(c *Context, r *strictcli.ErrorReporter) strictcli.CheckOutcome {
 	rel, ok := c.Releasable()
 	if !ok {
 		return r.Skipped(noReleasable(c))
 	}
-	findings := changelog.BatchCommitFindings(unreleasedFile(c, rel))
+	findings := changelog.BatchCommitFindings(unreleasedFile(c, rel), declassifySquashes(c))
 	return reportErrors(r, findings, fmt.Sprintf("%d entry(ies) over the limit of %d commits", len(findings), changelog.MaxCommitsPerEntry), "every entry is within the per-entry commit limit")
 }
 
@@ -248,6 +260,6 @@ func checkChangelogBatchEntries(c *Context, r *strictcli.ErrorReporter) strictcl
 	if err != nil {
 		panic(unanswered(fmt.Sprintf("the changelog cannot be read, so this check cannot be answered (changelog-schema and changelog-format-version name its refused lines): %v", err)))
 	}
-	findings := changelog.BatchEntryFindings(files)
+	findings := changelog.BatchEntryFindings(files, declassifySquashes(c))
 	return reportErrors(r, findings, fmt.Sprintf("%d commit(s) in more than %d entries", len(findings), changelog.MaxEntriesPerCommit), "every commit is within the per-commit entry limit")
 }

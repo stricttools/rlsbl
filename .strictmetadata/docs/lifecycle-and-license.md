@@ -111,7 +111,9 @@ Every command that changes the record closes the period in effect on the command
 2. repairs the changelog's commit ids and the archives' release commits through the rewrite, recording a release unrecoverable when its commit was folded into a commit carrying another tree;
 3. closes the proprietary license periods and opens the `--license` ones;
 4. removes the codenames, the distinctive terms, and the repository's index entry;
-5. writes a history-rewrite archive and commits everything;
+5. writes a history-rewrite archive, which records the squash commits, and commits everything;
 6. force-pushes the branch and every moved tag with leases taken before the first squash, rewrites each moved tag's GitHub Release from the record, and makes the GitHub repository public.
+
+Every changelog entry of a squashed period then names its period's one squash commit, so the changelog batch checks (`changelog-batch-commits` and `changelog-batch-entries`) leave out every commit a committed history-rewrite archive records as a declassification's squash commit, followed through any later rewrite.
 
 A run that stops is finished by running the same command again. It is refused while a release or a scrub is in progress, off a release branch, without an `origin` remote, and when `--reason` names a confidential term. It requires safegit 0.31.0 or newer. `--dry-run` prints the squashes and writes nothing.
