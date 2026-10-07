@@ -1,5 +1,5 @@
 +++
-description = "The checks rlsbl runs, grouped by tag with severity and option: running and scoping a check run, failing-checks, hook selections, target applicability, and unpublished-refs."
+description = "The checks rlsbl runs, grouped by tag with severity and option: running and scoping a check run, failing-checks, hook selections, what each check compares, target applicability, and unpublished-refs."
 +++
 
 # Check system

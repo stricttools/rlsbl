@@ -1,5 +1,5 @@
 +++
-description = "How rlsbl scaffold writes CI workflows, git hooks, scratch directories, and private-path exclusions, keeps test runners out of nested members, and three-way merges."
+description = "How rlsbl scaffold writes CI workflows, git hooks, the .rlsbl/version marker, scratch directories, and private-path exclusions, keeps test runners out of nested members, and three-way merges."
 +++
 
 # Scaffold system

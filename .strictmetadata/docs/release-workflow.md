@@ -1,5 +1,5 @@
 +++
-description = "The rlsbl release flow: the release checkout and its environment, the refusals before a push, the untagged candidate and its CI check, resume, version fates, backfill, abandon, and scrubs."
+description = "The rlsbl release flow: the release checkout and its environment, the pipeline steps and the files each writes, the refusals before a push, the untagged candidate and its CI check, resume, version fates, backfill, abandon, and scrubs."
 +++
 
 # Release workflow
