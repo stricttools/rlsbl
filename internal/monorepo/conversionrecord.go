@@ -77,7 +77,11 @@ func pendingIdentitiesOf(rec *lifecycle.Record, subjects []string) error {
 	var found []string
 	for _, id := range rec.Identities() {
 		if wanted[id.Subject] && id.Pending() {
-			found = append(found, fmt.Sprintf("the %s identity %q of %q, effective %s", id.Facet, id.Value, id.Subject, id.EffectiveVersion))
+			in := ""
+			if id.Facet.RegistryScoped() {
+				in = " in " + id.Registry
+			}
+			found = append(found, fmt.Sprintf("the %s identity %q%s of %q, effective %s", id.Facet, id.Value, in, id.Subject, id.EffectiveVersion))
 		}
 	}
 	if len(found) == 0 {
@@ -109,7 +113,7 @@ func closeSubjects(rec *lifecycle.Record, subjects []string, on time.Time) error
 	}
 	for _, id := range rec.Identities() {
 		if wanted[id.Subject] && !id.Pending() && id.Open() {
-			if err := rec.CloseIdentity(id.Subject, id.Facet, on); err != nil {
+			if err := rec.CloseIdentity(id.Subject, id.Facet, id.Registry, on); err != nil {
 				return err
 			}
 		}
@@ -141,7 +145,7 @@ func moveTagNamespace(rec *lifecycle.Record, subject, oldGlob, newGlob string, o
 		if !held {
 			continue
 		}
-		if err := rec.CloseIdentity(subject, id.Facet, on); err != nil {
+		if err := rec.CloseIdentity(subject, id.Facet, id.Registry, on); err != nil {
 			return err
 		}
 		next := lifecycle.Identity{
@@ -175,7 +179,7 @@ func closeRepositoryURL(rec *lifecycle.Record, subject, url string, from, on tim
 			if id.Value != url {
 				return fmt.Errorf("%s holds the open repository-url identity %q of %q, and the repository it arrives from is %s; correct the record of the repository it comes from, then run this again", lifecycle.RecordFile, id.Value, subject, url)
 			}
-			return rec.CloseIdentity(subject, lifecycle.FacetRepositoryURL, on)
+			return rec.CloseIdentity(subject, lifecycle.FacetRepositoryURL, "", on)
 		}
 		if id.Value == url {
 			return nil
@@ -222,7 +226,7 @@ func addEntries(rec *lifecycle.Record, m movedEntries) error {
 		held["licenses\x00"+periodKey(l.Subject, l.License, l.Period)] = true
 	}
 	identityKey := func(id lifecycle.Identity) string {
-		return strings.Join([]string{"identities", id.Subject, string(id.Facet), id.Value, id.EffectiveVersion, id.From.String()}, "\x00")
+		return strings.Join([]string{"identities", id.Subject, string(id.Facet), id.Registry, id.Value, id.EffectiveVersion, id.From.String()}, "\x00")
 	}
 	for _, id := range rec.Identities() {
 		held[identityKey(id)] = true

@@ -78,6 +78,24 @@ registry = "npm"
 tag_patterns = ["v*"]
 effective_version = "0.5.0"
 reason = "the client's name"
+
+[[identities]]
+subject = "portal"
+facet = "package-name"
+value = "portal"
+registry = "pypi"
+tag_patterns = ["v*"]
+from = 2026-01-01
+reason = "the first name"
+
+[[identities]]
+subject = "portal"
+facet = "package-name"
+value = "portal-client"
+registry = "pypi"
+tag_patterns = ["v*"]
+effective_version = "0.5.0"
+reason = "the client's name"
 `, license)
 }
 
@@ -258,11 +276,12 @@ func TestAReleaseRunsToItsGitHubReleaseAndConvertsThePendingIdentity(t *testing.
 	if _, err := os.Stat(repo.Path(".strictmetadata/changelog/portal/0.5.0.jsonl")); err != nil {
 		t.Errorf("the changelog was not finalized: %v", err)
 	}
-	// The pending identity of 0.5.0 is a dated period from the release
-	// commit's committer date, and the identity it replaces closes then.
+	// The pending identities of 0.5.0, one per registry, are dated periods
+	// from the release commit's committer date, and the identity each
+	// replaces in its registry closes then.
 	day := repo.Git("log", "-1", "--format=%cs", tag)
 	record := read(t, repo.Path(recordPath))
-	if strings.Contains(record, "effective_version") || !strings.Contains(record, "until = "+day) || strings.Count(record, "from = "+day) != 1 {
+	if strings.Contains(record, "effective_version") || strings.Count(record, "until = "+day) != 2 || strings.Count(record, "from = "+day) != 2 {
 		t.Errorf("the pending identity was not converted on %s:\n%s", day, record)
 	}
 	if _, found := loadState(t, repo); found {

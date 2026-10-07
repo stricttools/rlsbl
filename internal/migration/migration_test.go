@@ -414,6 +414,9 @@ func TestTransitionsSplitBetweenTheRecordsAndAClosedHistoryRetires(t *testing.T)
 		case id.Subject == "widget" && id.Value == "widget-client" && id.Pending() && id.EffectiveVersion == "0.4.0":
 			pending = true
 		}
+		if id.Facet == lifecycle.FacetPackageName && id.Registry == "" {
+			t.Errorf("a package-name identity names no registry: %+v", id)
+		}
 	}
 	if !gizmo || !gadget || !pending {
 		t.Fatalf("the identities: %+v", rec.Identities())

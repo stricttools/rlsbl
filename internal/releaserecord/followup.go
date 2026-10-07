@@ -49,11 +49,12 @@ func closedIdentities(identities []lifecycle.Identity, facet lifecycle.Facet) []
 }
 
 // successor is the value the identity changed to: the identity of the same
-// subject and facet starting the day it ended, and false when the record
+// subject and facet (and registry, for a registry-scoped facet) starting the
+// day it ended, and false when the record
 // holds none.
 func successor(identities []lifecycle.Identity, old lifecycle.Identity) (string, bool) {
 	for _, id := range identities {
-		if id.Subject == old.Subject && id.Facet == old.Facet && !id.Pending() && id.From.Equal(old.Until) {
+		if id.Fills(old.Subject, old.Facet, old.Registry) && !id.Pending() && id.From.Equal(old.Until) {
 			return id.Value, true
 		}
 	}

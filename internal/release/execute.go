@@ -567,7 +567,11 @@ func (x *execution) archive() error {
 		x.record = record
 		paths = append(paths, lifecycle.RecordFile)
 		for _, id := range converted {
-			x.req.Log(fmt.Sprintf("The %s of %s is %s from %s on, as recorded for %s", id.Facet, id.Subject, id.Value, date.Format(time.DateOnly), x.version))
+			in := ""
+			if id.Facet.RegistryScoped() {
+				in = " in " + id.Registry
+			}
+			x.req.Log(fmt.Sprintf("The %s of %s%s is %s from %s on, as recorded for %s", id.Facet, id.Subject, in, id.Value, date.Format(time.DateOnly), x.version))
 		}
 	}
 	regenerated, err := changelog.Regenerate(x.e, root, x.ws.Declarations, x.name(), nil)

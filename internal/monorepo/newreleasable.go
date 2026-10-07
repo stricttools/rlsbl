@@ -116,7 +116,7 @@ func recordCreatedReleasable(rec *lifecycle.Record, r declarations.Releasable, l
 		if id.Value == r.Name {
 			return nil
 		}
-		if err := rec.CloseIdentity(r.Name, lifecycle.FacetReleasableName, on); err != nil {
+		if err := rec.CloseIdentity(r.Name, lifecycle.FacetReleasableName, "", on); err != nil {
 			return err
 		}
 	}

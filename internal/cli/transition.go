@@ -43,8 +43,9 @@ const transitionLicenseHelp = "Close a releasable's license period on today's da
 
 const transitionIdentityHelp = "Record an identity period of a subject: its releasable name, package name, project name, Go module path, " +
 	"tag format, or repository URL (--facet), with --value, the registry it is a name in (--registry; none for an identity that is not a " +
-	"registry name), and the tag namespace it owned (--tag-pattern, repeatable, globs where * matches any run of characters). Without " +
-	"--from the identity starts today and the subject's open identity of the facet closes today; with --from (and --until for a closed " +
+	"registry name; a package name is a name in one registry, so its identity names one and is kept per registry), and the tag namespace it " +
+	"owned (--tag-pattern, repeatable, globs where * matches any run of characters). Without " +
+	"--from the identity starts today and the subject's open identity of the facet (in the same registry, for a package name) closes today; with --from (and --until for a closed " +
 	"one) it is recorded as given, a dead identity's included, whose tags are then accounted for instead of reported."
 
 const transitionUnversionedTagHelp = "Record a tag that releases no version (a nightly marker, an imported vendor tag), so release backfill, " +

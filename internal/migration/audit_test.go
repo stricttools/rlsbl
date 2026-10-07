@@ -196,6 +196,10 @@ func TestAReleasedIdentityTransitionClosesTheOldIdentity(t *testing.T) {
 		if id.Facet != lifecycle.FacetPackageName {
 			continue
 		}
+		// A package name is a name in the registry of the target carrying it.
+		if id.Registry != "npm" {
+			t.Errorf("the package-name identity %q names the registry %q, want npm", id.Value, id.Registry)
+		}
 		if id.Value == "portal-old" && !id.Open() && !id.Pending() {
 			closed = true
 		}
@@ -205,6 +209,30 @@ func TestAReleasedIdentityTransitionClosesTheOldIdentity(t *testing.T) {
 	}
 	if !closed || !open {
 		t.Fatalf("the package-name identities: %+v", rec.Identities())
+	}
+}
+
+// A package name is a name in one registry: a transition of a project
+// publishing to npm and PyPI becomes one identity chain per registry.
+func TestAPackageNameTransitionIsRecordedInEveryRegistryCarryingIt(t *testing.T) {
+	hygiene.Isolate(t)
+	f := standalone(t)
+	f.write("pyproject.toml", "[project]\nname = \"portal\"\nversion = \"0.1.0\"\nlicense = \"MIT\"\n")
+	f.edit(".rlsbl/config.json", `"targets": ["npm"]`, `"targets": ["npm", "pypi"]`)
+	f.write(".rlsbl/transitions.jsonl", `{"format_version":1,"`+oldKey+`":"identity-transition","id":"c1","recorded_at":"2026-09-01T10:00:00+02:00","facet":"package-name","old":"portal-old","new":"portal","effective_version":"0.1.0"}`+"\n")
+	f.commit("a second registry and an identity transition")
+	rec, err := lifecycle.Parse([]byte(planned(t, f.mustPlan(), lifecycle.RecordFile)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	open := map[string]bool{}
+	for _, id := range rec.Identities() {
+		if id.Facet == lifecycle.FacetPackageName && id.Value == "portal" && id.Open() {
+			open[id.Registry] = true
+		}
+	}
+	if len(open) != 2 || !open["npm"] || !open["pypi"] {
+		t.Fatalf("the open package-name identities are in %v, want npm and pypi: %+v", open, rec.Identities())
 	}
 }
 

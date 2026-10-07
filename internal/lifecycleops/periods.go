@@ -181,11 +181,11 @@ func (inv Invocation) Identity(req IdentityRequest) error {
 	}
 	if req.From.IsZero() {
 		id.From = on
-		if open := openIdentity(rec, req.Subject, req.Facet); open != nil {
+		if open := openIdentity(rec, req.Subject, req.Facet, req.Registry); open != nil {
 			if open.Value == req.Value {
 				return fmt.Errorf("%q's %s identity is already %q (since %s); nothing was written", req.Subject, req.Facet, req.Value, day(open.From))
 			}
-			if err := rec.CloseIdentity(req.Subject, req.Facet, on); err != nil {
+			if err := rec.CloseIdentity(req.Subject, req.Facet, req.Registry, on); err != nil {
 				return err
 			}
 		}
@@ -196,10 +196,11 @@ func (inv Invocation) Identity(req IdentityRequest) error {
 	return inv.save(m, rec, on, fmt.Sprintf("transition: %s %s identity %s", req.Subject, req.Facet, req.Value), outcome{fmt.Sprintf("Recorded %s's %s identity %q from %s.", req.Subject, req.Facet, req.Value, day(id.From)), fmt.Sprintf("Would record %s's %s identity %q from %s.", req.Subject, req.Facet, req.Value, day(id.From))})
 }
 
-// openIdentity is the subject's open dated identity of facet, or nil.
-func openIdentity(rec *lifecycle.Record, subject string, facet lifecycle.Facet) *lifecycle.Identity {
+// openIdentity is the subject's open dated identity of facet (in registry,
+// for a registry-scoped facet), or nil.
+func openIdentity(rec *lifecycle.Record, subject string, facet lifecycle.Facet, registry string) *lifecycle.Identity {
 	for _, id := range rec.Identities() {
-		if id.Subject == subject && id.Facet == facet && !id.Pending() && id.Open() {
+		if id.Fills(subject, facet, registry) && !id.Pending() && id.Open() {
 			return &id
 		}
 	}

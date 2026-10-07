@@ -480,7 +480,7 @@ func (r *renamer) renameSubjects(ws *workspace.Workspace) error {
 		if id.Subject != old || id.Pending() || !id.Open() {
 			continue
 		}
-		if err := rec.CloseIdentity(old, id.Facet, on); err != nil {
+		if err := rec.CloseIdentity(old, id.Facet, id.Registry, on); err != nil {
 			return err
 		}
 		next := lifecycle.Identity{

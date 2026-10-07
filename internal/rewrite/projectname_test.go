@@ -142,7 +142,7 @@ func TestEveryIdentityIsRenamedAndRecordedAsPending(t *testing.T) {
 	renameCommit := repo.Git("rev-parse", "HEAD~1")
 	requireContains(t, res.Stdout,
 		"Renamed portal -> gateway in 3 files.",
-		"Recorded the pending package-name gateway, effective 0.2.0.",
+		"Recorded the pending package-name gateway in npm, effective 0.2.0.",
 		"Remaining steps, in order:",
 		"Decide the command name:",
 		"Run `rlsbl scaffold`",
@@ -159,9 +159,53 @@ func TestEveryIdentityIsRenamedAndRecordedAsPending(t *testing.T) {
 	if err != nil {
 		t.Fatalf("%v\n%s", err, res.Stderr)
 	}
-	requireContains(t, res.Stdout, "Already recorded: package-name gateway, effective 0.2.0.", "Renamed portal -> gateway in 0 files.")
+	requireContains(t, res.Stdout, "Already recorded: package-name gateway in npm, effective 0.2.0.", "Renamed portal -> gateway in 0 files.")
 	if repo.Head() != head {
 		t.Error("a run with nothing to do committed")
+	}
+}
+
+// A package name is a name in one registry, so a project publishing to npm
+// and PyPI records one pending package-name identity in each, and none
+// without a registry.
+func TestAPackageNameInTwoRegistriesIsRecordedOncePerRegistry(t *testing.T) {
+	hygiene.Isolate(t)
+	testsupport.FakeSafegit(t)
+	repo := testsupport.NewRepo(t)
+	files := map[string]string{
+		".strictmetadata/releasables/releasables.toml": standaloneDeclarations,
+		"package.json":   "{\n  \"name\": \"portal\",\n  \"version\": \"0.1.0\"\n}\n",
+		"pyproject.toml": "[project]\nname = \"portal\"\nversion = \"0.1.0\"\n",
+		releaseFileRel:   nextRelease,
+	}
+	var rels []string
+	for rel, content := range files {
+		repo.Write(rel, content)
+		rels = append(rels, rel)
+	}
+	repo.Commit("the project", rels...)
+
+	res, err := renameProject(t, repo, true, "portal", "gateway")
+	if err != nil {
+		t.Fatalf("%v\n%s", err, res.Stderr)
+	}
+	requireContains(t, res.Stdout,
+		lifecycle.RecordFile+" package-name npm: record: pending package-name gateway in npm, effective 0.1.0",
+		lifecycle.RecordFile+" package-name pypi: record: pending package-name gateway in pypi, effective 0.1.0",
+	)
+	res, err = renameProject(t, repo, false, "portal", "gateway")
+	if err != nil {
+		t.Fatalf("%v\n%s", err, res.Stderr)
+	}
+	registries := map[string]bool{}
+	for _, id := range pendingOf(t, repo.Dir) {
+		if id.Facet != lifecycle.FacetPackageName || id.Value != "gateway" || id.EffectiveVersion != "0.1.0" {
+			t.Errorf("pending %+v", id)
+		}
+		registries[id.Registry] = true
+	}
+	if len(registries) != 2 || !registries["npm"] || !registries["pypi"] {
+		t.Fatalf("the pending package names are in %v, want npm and pypi", registries)
 	}
 }
 
@@ -231,7 +275,7 @@ func TestAPendingIdentityOfAnotherValueRefusesUntilItIsRemoved(t *testing.T) {
 	repo.Write(lifecycle.RecordFile, other)
 	repo.Commit("an earlier pending identity", lifecycle.ManifestFile, lifecycle.RecordFile)
 	_, err := renameProject(t, repo, true, "portal", "gateway")
-	if err == nil || !strings.Contains(err.Error(), `a pending package-name identity of portal, "portal-next" effective 0.1.0`) || !strings.Contains(err.Error(), "Delete that [[identities]] entry") {
+	if err == nil || !strings.Contains(err.Error(), `a pending package-name identity of portal in the registry "npm", "portal-next" effective 0.1.0`) || !strings.Contains(err.Error(), "Delete that [[identities]] entry") {
 		t.Fatalf("%v", err)
 	}
 	repo.CommitFile(lifecycle.RecordFile, "format_version = 1\n", "remove the earlier pending identity")

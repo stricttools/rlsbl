@@ -229,8 +229,10 @@ func (b *builder) convertLifecycle(d *declarations.Releasables) {
 		}
 		must(rec.OpenPeriod(lifecycle.TableLifecycle, subject, string(lifecycle.StatusRetired), b.history.closedAt[subject], reason))
 	}
-	b.addIdentities(rec, d, must)
+	// The registry names come first: a retired subject's package-name
+	// transitions take their registries from them.
 	b.addRegistryNames(rec, d, must)
+	b.addIdentities(rec, d, must)
 	for _, t := range b.history.unversioned {
 		must(rec.AddUnversionedTag(t.tag, t.reason, t.at))
 	}
@@ -371,45 +373,95 @@ func (b *builder) addIdentityTransitions(rec *lifecycle.Record, d *declarations.
 			b.p.add("%s records an identity transition of %q, which is neither a releasable nor a retired subject", changes[0].where, k.subject)
 			continue
 		}
-		registry := ""
-		if facet == lifecycle.FacetGoModulePath {
-			registry = declarations.TargetGo
+		registries := []string{""}
+		switch {
+		case facet == lifecycle.FacetGoModulePath:
+			registries = []string{declarations.TargetGo}
+		case facet.RegistryScoped():
+			var err error
+			if registries, err = b.packageRegistries(rec, d, k.subject); err != nil {
+				b.p.add("%s: %v", changes[0].where, err)
+				continue
+			}
+			if len(registries) == 0 {
+				b.p.add("%s records a %s transition of %q, and %q publishes to no registry carrying a package name (npm or pypi), so the registry the name is in cannot be told. Hand edit: delete the line if no registry ever carried the name, then migrate", changes[0].where, k.facet, k.subject, k.subject)
+				continue
+			}
 		}
 		patterns := []string{}
 		if declared {
 			patterns = tagGlob(r, r.Name)
 		}
-		value, from := changes[0].from, first
-		for i, c := range changes {
-			if c.from != value {
-				b.p.add("%s changes %s from %q, but the identity before it was %q; repair the record by hand", c.where, k.facet, c.from, value)
-				break
-			}
-			released, at, err := b.releasedOn(k.subject, retired, c.effectiveVersion)
-			if err != nil {
-				b.p.add("%s: %v", c.where, err)
-				break
-			}
-			if !released {
-				if i != len(changes)-1 {
-					b.p.add("%s is not released yet, and a later transition of the same identity follows it; delete one by hand", c.where)
-					break
-				}
-				must(rec.AddIdentity(lifecycle.Identity{Subject: k.subject, Facet: facet, Value: value, Registry: registry, TagPatterns: patterns, Period: lifecycle.Period{From: from}, Reason: "recorded when rlsbl's records moved to the .strictmetadata layout"}))
-				must(rec.AddPendingIdentity(lifecycle.Identity{Subject: k.subject, Facet: facet, Value: c.to, Registry: registry, TagPatterns: patterns, EffectiveVersion: c.effectiveVersion, Reason: "the identity the release of " + c.effectiveVersion + " takes"}))
-				value = ""
-				break
-			}
-			if from.After(at) {
-				from = at
-			}
-			must(rec.AddIdentity(lifecycle.Identity{Subject: k.subject, Facet: facet, Value: value, Registry: registry, TagPatterns: patterns, Period: lifecycle.Period{From: from, Until: at}, Reason: "recorded when rlsbl's records moved to the .strictmetadata layout"}))
-			value, from = c.to, at
-		}
-		if value != "" {
-			must(rec.AddIdentity(lifecycle.Identity{Subject: k.subject, Facet: facet, Value: value, Registry: registry, TagPatterns: patterns, Period: lifecycle.Period{From: from}, Reason: "recorded when rlsbl's records moved to the .strictmetadata layout"}))
+		for _, registry := range registries {
+			b.addIdentityChain(rec, k.subject, facet, registry, patterns, retired, changes, first, must)
 		}
 	}
+}
+
+// addIdentityChain records one identity's transitions in one registry
+// (empty for an identity that is not a registry name): released, the old
+// identity ends and the new one starts on the committer date of the release
+// commit of its effective version; not yet released, the new one is pending
+// on that version.
+func (b *builder) addIdentityChain(rec *lifecycle.Record, subject string, facet lifecycle.Facet, registry string, patterns []string, retired bool, changes []identityChange, first time.Time, must func(error)) {
+	value, from := changes[0].from, first
+	for i, c := range changes {
+		if c.from != value {
+			b.p.add("%s changes %s from %q, but the identity before it was %q; repair the record by hand", c.where, facet, c.from, value)
+			break
+		}
+		released, at, err := b.releasedOn(subject, retired, c.effectiveVersion)
+		if err != nil {
+			b.p.add("%s: %v", c.where, err)
+			break
+		}
+		if !released {
+			if i != len(changes)-1 {
+				b.p.add("%s is not released yet, and a later transition of the same identity follows it; delete one by hand", c.where)
+				break
+			}
+			must(rec.AddIdentity(lifecycle.Identity{Subject: subject, Facet: facet, Value: value, Registry: registry, TagPatterns: patterns, Period: lifecycle.Period{From: from}, Reason: "recorded when rlsbl's records moved to the .strictmetadata layout"}))
+			must(rec.AddPendingIdentity(lifecycle.Identity{Subject: subject, Facet: facet, Value: c.to, Registry: registry, TagPatterns: patterns, EffectiveVersion: c.effectiveVersion, Reason: "the identity the release of " + c.effectiveVersion + " takes"}))
+			value = ""
+			break
+		}
+		if from.After(at) {
+			from = at
+		}
+		must(rec.AddIdentity(lifecycle.Identity{Subject: subject, Facet: facet, Value: value, Registry: registry, TagPatterns: patterns, Period: lifecycle.Period{From: from, Until: at}, Reason: "recorded when rlsbl's records moved to the .strictmetadata layout"}))
+		value, from = c.to, at
+	}
+	if value != "" {
+		must(rec.AddIdentity(lifecycle.Identity{Subject: subject, Facet: facet, Value: value, Registry: registry, TagPatterns: patterns, Period: lifecycle.Period{From: from}, Reason: "recorded when rlsbl's records moved to the .strictmetadata layout"}))
+	}
+}
+
+// packageRegistries are the registries a package name of subject is a name
+// in, sorted: for a declared releasable, the targets of its members that
+// carry a package name (npm, pypi); for a retired subject, the registries of
+// the registry names recorded for it.
+func (b *builder) packageRegistries(rec *lifecycle.Record, d *declarations.Releasables, subject string) ([]string, error) {
+	found := map[string]bool{}
+	if _, declared := d.Releasable(subject); declared {
+		for _, m := range d.MembersOf(subject) {
+			ts, err := targets.MemberTargets(b.root, m)
+			if err != nil {
+				return nil, err
+			}
+			for _, t := range ts {
+				if t.Name == declarations.TargetNPM || t.Name == declarations.TargetPyPI {
+					found[t.Name] = true
+				}
+			}
+		}
+	} else {
+		for _, n := range rec.RegistryNames() {
+			if n.Subject == subject && (n.Registry == declarations.TargetNPM || n.Registry == declarations.TargetPyPI) {
+				found[n.Registry] = true
+			}
+		}
+	}
+	return sortedKeys(found), nil
 }
 
 // releasedOn reports whether the converted record holds a release of

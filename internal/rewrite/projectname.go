@@ -86,7 +86,7 @@ type ProjectRename struct {
 	moduleFiles                []ModuleFile
 
 	pending         []lifecycle.Identity
-	recordedAlready []string
+	recordedAlready []lifecycle.Identity
 	notes           []string
 	sourceDirs      []string
 	installPaths    []string
@@ -386,12 +386,10 @@ func (p *ProjectRename) planIdentities(repo git.Repo) error {
 		value    string
 		registry string
 	}
+	// A package name is a name in one registry: each registry carrying the
+	// name gets its own pending identity.
 	var want []wanted
-	if len(manifestRegistries) > 0 {
-		registry := ""
-		if len(manifestRegistries) == 1 {
-			registry = manifestRegistries[0]
-		}
+	for _, registry := range manifestRegistries {
 		want = append(want, wanted{lifecycle.FacetPackageName, p.New, registry})
 	}
 	if p.goCurrent != "" {
@@ -418,7 +416,7 @@ func (p *ProjectRename) planIdentities(repo git.Repo) error {
 		}
 		recorded := false
 		for _, existing := range rec.Identities() {
-			if existing.Subject != id.Subject || existing.Facet != id.Facet {
+			if !existing.Fills(id.Subject, id.Facet, id.Registry) {
 				continue
 			}
 			if existing.Pending() {
@@ -426,7 +424,7 @@ func (p *ProjectRename) planIdentities(repo git.Repo) error {
 					recorded = true
 					continue
 				}
-				return p.refuse("%s already holds a pending %s identity of %s, %q effective %s, and a subject has at most one pending identity per facet. Delete that [[identities]] entry from %s, commit it, and run again.", lifecycle.RecordFile, existing.Facet, existing.Subject, existing.Value, existing.EffectiveVersion, lifecycle.RecordFile)
+				return p.refuse("%s already holds a pending %s identity of %s in the registry %q, %q effective %s, and a subject has at most one pending identity per facet and registry. Delete that [[identities]] entry from %s, commit it, and run again.", lifecycle.RecordFile, existing.Facet, existing.Subject, existing.Registry, existing.Value, existing.EffectiveVersion, lifecycle.RecordFile)
 			}
 			if existing.Open() {
 				// The pending identity replaces the open one, and keeps
@@ -436,7 +434,7 @@ func (p *ProjectRename) planIdentities(repo git.Repo) error {
 			}
 		}
 		if recorded {
-			p.recordedAlready = append(p.recordedAlready, fmt.Sprintf("%s %s, effective %s", id.Facet, id.Value, id.EffectiveVersion))
+			p.recordedAlready = append(p.recordedAlready, id)
 			continue
 		}
 		p.pending = append(p.pending, id)
@@ -477,7 +475,21 @@ func (p *ProjectRename) planRemainingSteps(member declarations.Member) error {
 }
 
 func identitySummary(id lifecycle.Identity) string {
+	if id.Facet.RegistryScoped() {
+		return fmt.Sprintf("%s %s in %s, effective %s", id.Facet, id.Value, id.Registry, id.EffectiveVersion)
+	}
 	return fmt.Sprintf("%s %s, effective %s", id.Facet, id.Value, id.EffectiveVersion)
+}
+
+// identityKey is a pending identity's key in the plan: the record, the
+// facet, and the registry of a registry-scoped facet, whose identities are
+// kept per registry.
+func identityKey(id lifecycle.Identity) string {
+	key := lifecycle.RecordFile + " " + string(id.Facet)
+	if id.Facet.RegistryScoped() {
+		key += " " + id.Registry
+	}
+	return key
 }
 
 // observe is the whole plan: per file, per identity, and the two commits.
@@ -516,11 +528,10 @@ func (p *ProjectRename) observe(o previewapply.Observer) (previewapply.Preview, 
 		})
 	}
 	for _, id := range p.pending {
-		items = append(items, previewapply.Item{Key: lifecycle.RecordFile + " " + string(id.Facet), State: "record", Summary: "pending " + identitySummary(id)})
+		items = append(items, previewapply.Item{Key: identityKey(id), State: "record", Summary: "pending " + identitySummary(id)})
 	}
-	for _, line := range p.recordedAlready {
-		facet, _, _ := strings.Cut(line, " ")
-		items = append(items, previewapply.Item{Key: lifecycle.RecordFile + " " + facet, State: "already_recorded", Summary: line})
+	for _, id := range p.recordedAlready {
+		items = append(items, previewapply.Item{Key: identityKey(id), State: "already_recorded", Summary: identitySummary(id)})
 	}
 	for i, note := range p.notes {
 		items = append(items, previewapply.Item{Key: fmt.Sprintf("(note %d)", i+1), State: "note", Summary: note})
@@ -686,8 +697,8 @@ func RunProjectName(ctx *strictcli.Context, root, old, new string) error {
 		for _, id := range p.pending {
 			ctx.Info("Recorded the pending " + identitySummary(id) + ".")
 		}
-		for _, line := range p.recordedAlready {
-			ctx.Info("Already recorded: " + line + ".")
+		for _, id := range p.recordedAlready {
+			ctx.Info("Already recorded: " + identitySummary(id) + ".")
 		}
 		for _, note := range p.notes {
 			ctx.Info("Note: " + note)
