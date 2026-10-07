@@ -274,6 +274,7 @@ Append-only companion to `todo/go-rewrite-plan.md`. Each entry records an implem
 - `watch` has no `--target`: the Python accepted it and never read it (`run_cmd`'s `registry` parameter is unused), and a flag that changes nothing is an input the caller cannot verify. The positional argument keeps the Python's name, `sha`. Awaiting a ruling.
 - Changelog coverage: as with the earlier Go commits of this campaign, the scaffold, watch, and monorepo sync commits carry no changelog entry; coverage of the Go tree is settled when the switchover is released.
 - Under `--dry-run` scaffold says it would install or update each git hook (`Would install the pre-push hook (<path>)`), instead of reporting it installed.
+- The npm package publish job asks for `id-token: write` only when the workflow features allow build attestations, since npm publishes with `NPM_TOKEN` and the id token only records provenance; a confidential repository's workflow carried an OIDC permission it never used. The PyPI jobs keep it: Trusted Publishing authenticates with it. Test: `TestAnNpmPackageJobAsksForAnIDTokenOnlyToRecordProvenance`.
 
 ## Release notes and the status commands
 

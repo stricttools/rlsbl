@@ -151,7 +151,11 @@ func RenderPublishJob(t PublishTarget, f Features) (PublishJob, error) {
 			return PublishJob{}, fmt.Errorf("the npm pipeline %q has no registry to publish to", p.Name)
 		}
 		template = "npm/publish.jobs.tpl"
-		perms["id-token"] = "write"
+		// The publish authenticates with NPM_TOKEN; an id token only records
+		// provenance.
+		if f.BuildAttestations {
+			perms["id-token"] = "write"
+		}
 		vars.Merge(Vars{
 			"registryUrl":             t.RegistryURL,
 			"npm.setupPackageManager": setup,

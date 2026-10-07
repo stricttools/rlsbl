@@ -172,3 +172,20 @@ func TestConflictRegionsAreNamedByLine(t *testing.T) {
 		t.Fatal("a clean file has conflicts")
 	}
 }
+
+func TestAnNpmPackageJobAsksForAnIDTokenOnlyToRecordProvenance(t *testing.T) {
+	hygiene.Isolate(t)
+	npmPackage := PublishTarget{Pipeline: declarations.Pipeline{Name: "npm", Type: "npm", Target: "npm", Artifact: "package"}, Dir: ".", RegistryURL: "https://registry.npmjs.org", PackageManager: "npm"}
+	for _, c := range []struct {
+		features Features
+		idToken  bool
+	}{{confidential, false}, {public, true}} {
+		job, err := RenderPublishJob(npmPackage, c.features)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, asked := job.Permissions["id-token"]; asked != c.idToken {
+			t.Errorf("with build attestations %v, the npm package job's permissions are %v", c.features.BuildAttestations, job.Permissions)
+		}
+	}
+}
