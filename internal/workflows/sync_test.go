@@ -116,7 +116,9 @@ func TestSyncUnderDryRunWritesNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	res := testsupport.RunCommand(t, testsupport.CommandOptions{Effect: strictcli.EffectMutating, DryRun: true, Allowlist: previewapply.Prefixes()}, func(ctx *strictcli.Context) error {
-		_, err := Sync(ctx.Effects(), w, syncInputs(true))
+		in := syncInputs(true)
+		in.DryRun = true
+		_, err := Sync(ctx.Effects(), w, in)
 		return err
 	})
 	if res.ExitCode != 0 {
