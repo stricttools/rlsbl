@@ -45,7 +45,7 @@ A standalone layout has one member, the root (`path = "."`, `name = "root"`), ve
 | `release_branches` | yes | The branches a release may run from, at least one. Every release, `release scrub`, and `transition declassify` refuse to run elsewhere, and the pre-push hook refuses a manual push to one. |
 | `github_repository` | no | `owner/name`. Absent means the `origin` remote names the repository. |
 | `environment_file` | no | A `KEY=VALUE` file loaded into the release's environment: an absolute path, a `~/` path, or a path relative to the repository root. A line of any other form is refused, naming it. |
-| `[timeouts]` | no | `push_seconds`, `ci_seconds`, `check_seconds`, and `hook_seconds`, each optional. An absent key means the shipped timeout, which the help of the matching `rlsbl release run` flag states; an absent `hook_seconds` lets hooks run without a timeout. The release's `--push-timeout`, `--ci-timeout`, `--check-timeout`, and `--hook-timeout` flags override them for one run. |
+| `[timeouts]` | no | `push_seconds`, `ci_seconds`, `check_seconds`, and `hook_seconds`, each optional. An absent key means the shipped timeout, which the help of the matching release flag (`--push-timeout`, `--ci-timeout`, or `--check-timeout`) states; an absent `hook_seconds` lets hooks run without a timeout. The release's `--push-timeout`, `--ci-timeout`, `--check-timeout`, and `--hook-timeout` flags override them for one run. |
 | `[[releasables]]` | yes | The units of versioning. |
 | `[[members]]` | yes | The directories rlsbl knows, at least one. |
 
