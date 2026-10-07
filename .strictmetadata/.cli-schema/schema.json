@@ -4929,19 +4929,6 @@
       "subject": "tests",
       "scope": "workspace:non_dev_node"
     },
-    "mixed-tag-schemes": {
-      "tags": [
-        "workspace"
-      ],
-      "severity": "error",
-      "fast": true,
-      "pure": true,
-      "needs_network": false,
-      "depends_on": [],
-      "description": "No member directory mixes Go's path-based tags with @-style tags.",
-      "subject": "workspace",
-      "scope": "workspace"
-    },
     "name-consistency": {
       "tags": [
         "project"
