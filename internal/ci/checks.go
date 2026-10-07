@@ -32,9 +32,10 @@ const (
 	Skipped = "skipped"
 )
 
-// matrixLegSuffix separates a matrix job's name from its leg's parameters:
+// matrixEntrySuffix separates a matrix job's name from one matrix entry's
+// parameters:
 // "cli-ci / test" runs as "cli-ci / test (3.12)".
-const matrixLegSuffix = " ("
+const matrixEntrySuffix = " ("
 
 // CheckRun is one check run on a commit, or one job of a run, which Actions
 // names alike.
@@ -129,7 +130,7 @@ func newer(a, b CheckRun) bool {
 // one of that name that is not skipped, in whichever run (a run_all
 // dispatch's verdict beside a push run's skip, whatever order GitHub
 // recorded them in). Then a skip is dropped when a completed, unskipped
-// matrix leg of the same job exists ("<name> (...)"), since GitHub records a
+// matrix entry of the same job exists ("<name> (...)"), since GitHub records a
 // skipped matrix job under its bare name. Nothing else covers a skip. The
 // publish workflow's wait-for-ci job collapses alike. Sorted by name.
 func LatestCheckRuns(runs []CheckRun, pattern *regexp.Regexp, excludeRunID int64) []CheckRun {
@@ -180,7 +181,7 @@ func LatestCheckRuns(runs []CheckRun, pattern *regexp.Regexp, excludeRunID int64
 		if r.Conclusion == Skipped {
 			covered := false
 			for other, o := range byName {
-				if strings.HasPrefix(other, name+matrixLegSuffix) && hasVerdict(o) {
+				if strings.HasPrefix(other, name+matrixEntrySuffix) && hasVerdict(o) {
 					covered = true
 					break
 				}

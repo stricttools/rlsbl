@@ -66,14 +66,14 @@ func TestAVerdictSupersedesASkipWhicheverWasRecordedLater(t *testing.T) {
 	}
 }
 
-func TestOnlyTheJobsOwnMatrixLegsCoverItsSkip(t *testing.T) {
+func TestOnlyTheJobsOwnMatrixEntriesCoverItsSkip(t *testing.T) {
 	hygiene.Isolate(t)
-	legs := []CheckRun{
+	entries := []CheckRun{
 		run(1, "core-ci / test", "completed", "skipped", "2026-01-01T00:00:09Z"),
 		run(2, "core-ci / test (3.12)", "completed", "success", "2026-01-01T00:00:01Z"),
 		run(3, "core-ci / test (3.13)", "completed", "failure", "2026-01-01T00:00:01Z"),
 	}
-	got := conclusions(LatestCheckRuns(legs, corePattern, 0))
+	got := conclusions(LatestCheckRuns(entries, corePattern, 0))
 	if _, has := got["core-ci / test"]; has || got["core-ci / test (3.13)"] != "failure" {
 		t.Fatalf("got %v", got)
 	}
@@ -86,7 +86,7 @@ func TestOnlyTheJobsOwnMatrixLegsCoverItsSkip(t *testing.T) {
 			run(1, "core-ci / test", "completed", "skipped", "2026-01-01T00:00:09Z"),
 			run(2, "core-ci / test-extra", "completed", "success", "2026-01-01T00:00:01Z"),
 		},
-		"a skipped leg": {
+		"a skipped matrix entry": {
 			run(1, "core-ci / test", "completed", "skipped", "2026-01-01T00:00:09Z"),
 			run(2, "core-ci / test (3.12)", "completed", "skipped", "2026-01-01T00:00:01Z"),
 		},

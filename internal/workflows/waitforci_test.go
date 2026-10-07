@@ -80,11 +80,40 @@ func TestTheRouterJobPicksTheProjectByTagLongestSchemeFirst(t *testing.T) {
 	}
 }
 
-// bannedJobWords are words the house style keeps out of generated text,
-// spelled in parts so this file does not carry them.
-var bannedJobWords = []string{"ga" + "te", "rem" + "edy", "can" + "ary", "ki" + "nd"}
+// bannedWords match the words the house style keeps out of generated
+// prose, each spelled with a split so this file does not carry it.
+var bannedWords = regexp.MustCompile(`(?i)\b(` + strings.Join([]string{
+	"an" + "chor\\w*", "ar" + "m", "blem" + "ish\\w*", "can" + "ar(y|ies)", "cere" + "mon\\w*", "codi" + "f\\w*",
+	"cr" + "uft", "cu" + "te", "dan" + "c(e|es|ed|ing)", "disso" + "lv\\w*", "doss" + "ier\\w*", "envel" + "ope\\w*",
+	"ess" + "ays?", "exa" + "ctly", "fle" + "ets?", "foot" + "guns?", "ga" + "t(e|es|ed|ing)", "ga" + "tekeep\\w*",
+	"genu" + "inely", "gol" + "den", "ki" + "nd\\w*", "lan" + "ds?", "led" + "gers?", "le" + "gs?", "line" + "ages?",
+	"ora" + "cles?", "preci" + "sely", "prove" + "nance", "quies" + "cent", "rati" + "f\\w*", "re" + "al(ly|s)?",
+	"reme" + "d\\w*", "ri" + "d(e|es|ing)", "scratch" + "pads?", "sharp" + "en\\w*", "side" + "cars?", "so" + "ak\\w*",
+	"surv" + "iv\\w*", "tee" + "th", "tomb" + "stone\\w*", "trench" + "coats?", "unusu" + "ally", "wrin" + "kles?",
+	"par" + "k(s|ed|ing)?", "flo" + "ors?", "mat" + "ters",
+}, "|") + `)\b`)
 
-func TestNoGeneratedJobNameUsesABannedWord(t *testing.T) {
+// prose is the natural-language text of a generated workflow: job keys,
+// job and step names, and comments, with flags and code spans removed, since
+// a tool's own spelling may be quoted.
+func prose(text string) []string {
+	flagsAndCode := regexp.MustCompile("--[A-Za-z0-9-]+|`[^`]*`")
+	var out []string
+	for _, line := range strings.Split(text, "\n") {
+		trimmed := strings.TrimSpace(line)
+		trimmed = strings.TrimPrefix(trimmed, "- ")
+		switch {
+		case strings.HasPrefix(trimmed, "#"), strings.HasPrefix(trimmed, "name:"):
+		case strings.HasPrefix(line, "  ") && !strings.HasPrefix(line, "   ") && strings.HasSuffix(trimmed, ":"):
+		default:
+			continue
+		}
+		out = append(out, flagsAndCode.ReplaceAllString(trimmed, ""))
+	}
+	return out
+}
+
+func TestNoGeneratedWorkflowProseUsesABannedWord(t *testing.T) {
 	hygiene.Isolate(t)
 	standalone, err := WaitForCIJob("^(test)$")
 	if err != nil {
@@ -94,12 +123,38 @@ func TestNoGeneratedJobNameUsesABannedWord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, text := range []string{standalone, router} {
-		lower := strings.ToLower(text)
-		for _, word := range bannedJobWords {
-			if strings.Contains(lower, word) {
-				t.Fatalf("the wait-for-ci job carries %q:\n%s", word, text)
+	npm, err := NPMPackagingJobs(NPMPackaging{GoBinaryRelease: portalBinary(), Package: "portal", Dir: "npm", License: "MIT", Provenance: true, RepositoryURL: "https://github.com/acme/portal", Actions: testActions})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wheel, err := WheelJob(WheelPackaging{GoBinaryRelease: portalBinary(), Dir: ".", Attestations: true, Actions: testActions})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ciRouter, _, err := CIRouter(fixtureWorkspace(t, threeMembers, routerWorkspace(t, nil)), RouterInputs{Actions: routerActions})
+	if err != nil {
+		t.Fatal(err)
+	}
+	publish, err := PublishRouter(fixtureWorkspace(t, withTools, publishFixture(map[string]string{"packages/core/.github/workflows/publish.yml": goBinaryPublish(t)})), PublishInputs{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for label, text := range map[string]string{
+		"the wait-for-ci job": standalone, "the router's wait-for-ci job": router,
+		"the npm jobs": "jobs:\n" + npm, "the wheel job": "jobs:\n" + wheel,
+		"the CI router": ciRouter, "the publish router": publish.Text,
+	} {
+		lines := prose(text)
+		if len(lines) == 0 {
+			t.Fatalf("no prose was read from %s", label)
+		}
+		for _, line := range lines {
+			if word := bannedWords.FindString(line); word != "" {
+				t.Errorf("%s carries %q: %s", label, word, line)
 			}
 		}
+	}
+	if !strings.Contains(strings.Join(prose("jobs:\n"+npm), "\n"), "name: Publish the npm package portal-linux-x64") {
+		t.Error("the npm platform jobs' names were not read")
 	}
 }

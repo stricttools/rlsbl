@@ -29,7 +29,7 @@ import (
 //   - no matching check run within the grace window: refused.
 //
 // Same-named check runs collapse to the newest, except that a skip never
-// outranks a verdict of the same job (its matrix legs included): the rule
+// outranks a verdict of the same job (its matrix entries included): the rule
 // internal/ci applies before the release tags, so the two never disagree.
 //
 // Under the release's ordering CI has already gone green on the commit
@@ -148,9 +148,9 @@ while :; do
   # This project's check runs, minus this workflow run's own jobs. Same-named
   # check runs collapse to the newest (started_at, then id), except that a
   # skipped one gives way to the newest completed check run of the same name
-  # that is not skipped (a run_all dispatch of the CI router puts a real
+  # that is not skipped (a run_all dispatch of the CI router puts a
   # verdict beside the push run's skip, often recorded earlier). Then a skip
-  # is dropped when a completed, unskipped matrix leg of the same job exists
+  # is dropped when a completed, unskipped matrix entry of the same job exists
   # ("name (...)"), since GitHub records a skipped matrix job under the bare
   # name. Nothing else covers a skip.
   runs="$(jq -s --arg re "$CI_CHECK_PATTERN" --arg run_id "$GITHUB_RUN_ID" '
