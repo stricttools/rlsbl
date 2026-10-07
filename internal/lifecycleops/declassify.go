@@ -50,14 +50,6 @@ const (
 
 var declassifySteps = []string{stepRecords, stepCommitted, stepBranch, stepTags, stepReleases, stepPublic}
 
-// safegitSquashMinimum is the safegit release whose `scrub squash` the
-// declassification runs (the release that ships with this rlsbl).
-var safegitSquashMinimum = semver.Version{Major: 0, Minor: 31, Patch: 0}
-
-// safegitInterfaceVersion is the version of strictcli's machine-mode
-// document safegit prints under --json at safegitSquashMinimum.
-const safegitInterfaceVersion = 3
-
 // safegitSquashTimeout bounds one squash.
 const safegitSquashTimeout = 10 * time.Minute
 
@@ -417,7 +409,7 @@ var releaseVersion = regexp.MustCompile(`(\d+)\.(\d+)\.(\d+)`)
 // requireSafegit refuses a safegit that is missing or older than the
 // release whose squash the declassification runs.
 func requireSafegit(e *strictcli.Effects) error {
-	install := fmt.Sprintf("`rlsbl transition declassify` squashes history through `safegit scrub squash` of safegit %s or newer; install that safegit and run this again", safegitSquashMinimum)
+	install := fmt.Sprintf("`rlsbl transition declassify` squashes history through `safegit scrub squash` of safegit %s or newer; install that safegit and run this again", historyrewrite.SafegitMinimum)
 	done, err := e.Run([]interface{}{"safegit", "--version"}, strictcli.Check(false), strictcli.Timeout(15*time.Second))
 	if err != nil {
 		return fmt.Errorf("safegit could not be run (%v): %s", err, install)
@@ -437,7 +429,7 @@ func requireSafegit(e *strictcli.Effects) error {
 	if err != nil {
 		return fmt.Errorf("the safegit version cannot be read from %q (%v): %s", strings.TrimSpace(done.Stdout()), err, install)
 	}
-	if semver.Compare(found, safegitSquashMinimum) < 0 {
+	if semver.Compare(found, historyrewrite.SafegitMinimum) < 0 {
 		return fmt.Errorf("safegit %s is installed, and %s", found, install)
 	}
 	return nil
@@ -457,10 +449,10 @@ type squashPayload struct {
 }
 
 // parseSquashDocument reads safegit's --json stdout: strictcli's
-// machine-mode document at safegitInterfaceVersion, whose payload is the
+// machine-mode document at historyrewrite.SafegitInterfaceVersion, whose payload is the
 // squash's.
 func parseSquashDocument(stdout string) (*squashPayload, error) {
-	need := fmt.Sprintf("the declassification needs safegit %s or newer, whose --json prints strictcli's machine-mode document at interface_version %d", safegitSquashMinimum, safegitInterfaceVersion)
+	need := fmt.Sprintf("the declassification needs safegit %s or newer, whose --json prints strictcli's machine-mode document at interface_version %d", historyrewrite.SafegitMinimum, historyrewrite.SafegitInterfaceVersion)
 	var doc struct {
 		InterfaceVersion *int            `json:"interface_version"`
 		Payload          json.RawMessage `json:"payload"`
@@ -468,8 +460,8 @@ func parseSquashDocument(stdout string) (*squashPayload, error) {
 	if err := json.Unmarshal([]byte(strings.TrimSpace(stdout)), &doc); err != nil {
 		return nil, fmt.Errorf("safegit --json printed something that is not one JSON document (%v); %s", err, need)
 	}
-	if doc.InterfaceVersion == nil || *doc.InterfaceVersion != safegitInterfaceVersion {
-		return nil, fmt.Errorf("safegit printed no machine-mode document at interface_version %d; %s", safegitInterfaceVersion, need)
+	if doc.InterfaceVersion == nil || *doc.InterfaceVersion != historyrewrite.SafegitInterfaceVersion {
+		return nil, fmt.Errorf("safegit printed no machine-mode document at interface_version %d; %s", historyrewrite.SafegitInterfaceVersion, need)
 	}
 	if len(doc.Payload) == 0 || string(doc.Payload) == "null" {
 		return nil, fmt.Errorf("safegit's squash printed no payload; %s", need)

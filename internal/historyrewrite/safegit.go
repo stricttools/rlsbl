@@ -13,19 +13,19 @@ import (
 	"github.com/stricttools/rlsbl/internal/semver"
 )
 
-// safegitMinimum is the safegit release the scrub is built against: the
-// release that ships with this rlsbl, whose rewrites journal every commit
-// map, remap changelog ids at every rewritten commit (--remap-shas-in),
-// report their cleanup, and whose `scrub file` states its mode (--delete or
-// --replace-with) instead of inferring it.
-var safegitMinimum = semver.Version{Major: 0, Minor: 31, Patch: 0}
+// SafegitMinimum is the safegit release rlsbl's history rewrites (the
+// scrub, and the declassification's squash) are built against: the release
+// that ships with this rlsbl, whose rewrites journal every commit map, remap
+// changelog ids at every rewritten commit (--remap-shas-in), report their
+// cleanup, whose `scrub file` states its mode (--delete or --replace-with)
+// instead of inferring it, and which has `scrub squash`.
+var SafegitMinimum = semver.Version{Major: 0, Minor: 31, Patch: 0}
 
-// safegitInterfaceVersion is the version of strictcli's machine-mode
-// machine-mode document that safegit prints under --json at
-// safegitMinimum. Any other
+// SafegitInterfaceVersion is the version of strictcli's machine-mode
+// document that safegit prints under --json at SafegitMinimum. Any other
 // version is refused by name: reading another document shape as this one
-// would build a scrub state missing what the scrub needs.
-const safegitInterfaceVersion = 3
+// would build a rewrite state missing what the rewrite needs.
+const SafegitInterfaceVersion = 3
 
 // safegitVersionTimeout bounds `safegit --version`.
 const safegitVersionTimeout = 15 * time.Second
@@ -36,10 +36,10 @@ const safegitScrubTimeout = 10 * time.Minute
 var releaseVersion = regexp.MustCompile(`(\d+)\.(\d+)\.(\d+)`)
 
 // requireSafegit refuses a safegit that is missing or older than
-// safegitMinimum. `safegit --version` is on the observe allowlist, so the
+// SafegitMinimum. `safegit --version` is on the observe allowlist, so the
 // check runs under --dry-run too.
 func requireSafegit(e *strictcli.Effects) error {
-	install := fmt.Sprintf("`rlsbl release scrub` rewrites history through safegit %s or newer; install that safegit and run the scrub again", safegitMinimum)
+	install := fmt.Sprintf("`rlsbl release scrub` rewrites history through safegit %s or newer; install that safegit and run the scrub again", SafegitMinimum)
 	done, err := e.Run([]interface{}{"safegit", "--version"}, strictcli.Check(false), strictcli.Timeout(safegitVersionTimeout))
 	if err != nil {
 		return fmt.Errorf("safegit could not be run (%v): %s", err, install)
@@ -60,7 +60,7 @@ func requireSafegit(e *strictcli.Effects) error {
 	if err != nil {
 		return fmt.Errorf("the safegit version cannot be read from %q (%v): %s", printed, err, install)
 	}
-	if semver.Compare(found, safegitMinimum) < 0 {
+	if semver.Compare(found, SafegitMinimum) < 0 {
 		return fmt.Errorf("safegit %s is installed, and %s", found, install)
 	}
 	return nil
@@ -95,11 +95,11 @@ type machineDocument struct {
 // parseMachineDocument reads safegit's --json stdout, which is one document:
 // strictcli's machine-mode document. It returns the payload, nil when the
 // command emitted none (a scrub that found nothing to rewrite). Anything but
-// a machine-mode document of safegitInterfaceVersion is refused, naming the safegit the
+// a machine-mode document of SafegitInterfaceVersion is refused, naming the safegit the
 // scrub needs.
 func parseMachineDocument(stdout string) (*scrubPayload, error) {
 	text := strings.TrimSpace(stdout)
-	need := fmt.Sprintf("the scrub needs safegit %s or newer, whose --json prints strictcli's machine-mode document at interface_version %d", safegitMinimum, safegitInterfaceVersion)
+	need := fmt.Sprintf("the scrub needs safegit %s or newer, whose --json prints strictcli's machine-mode document at interface_version %d", SafegitMinimum, SafegitInterfaceVersion)
 	if text == "" {
 		return nil, fmt.Errorf("safegit --json printed nothing; %s", need)
 	}
@@ -110,7 +110,7 @@ func parseMachineDocument(stdout string) (*scrubPayload, error) {
 	if env.InterfaceVersion == nil {
 		return nil, fmt.Errorf("safegit --json printed a document that is not strictcli's machine-mode document (it has no interface_version); %s", need)
 	}
-	if *env.InterfaceVersion != safegitInterfaceVersion {
+	if *env.InterfaceVersion != SafegitInterfaceVersion {
 		return nil, fmt.Errorf("safegit's machine-mode document declares interface_version %d, which this rlsbl does not read; %s", *env.InterfaceVersion, need)
 	}
 	if len(env.Payload) == 0 || string(env.Payload) == "null" {

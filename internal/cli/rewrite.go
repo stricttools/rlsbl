@@ -47,7 +47,7 @@ const projectNameHelp = "Rename a standalone project's published identity. Rewri
 const uvPathSourcesHelp = "Convert the path- and workspace-sourced Python dependencies of the member whose directory holds the working directory into " +
 	"registry constraints floored at the version uv.lock resolves. Covers [project].dependencies, every [project.optional-dependencies] extra, and every " +
 	"PEP 735 [dependency-groups] group, keeping each entry's extras and environment marker, and deletes the matching [tool.uv.sources] entry so it stops " +
-	"overriding the new constraint (a list of marker-gated sources loses only its path and workspace elements). The lock is the one beside pyproject.toml, " +
+	"overriding the new constraint (a list of sources conditioned on environment markers loses only its path and workspace elements). The lock is the one beside pyproject.toml, " +
 	"or the lock of the uv workspace root that claims the directory. Each converted name is added to the member's internal_dep_floors in " +
 	".strictmetadata/releasables/releasables.toml, and the rlsbl:dep-floors option is switched on with an options entry (current and ideal error, scoped " +
 	"to the member in a workspace) when it is off. Each locked version is checked against PyPI's project document, which lists every published version: a " +

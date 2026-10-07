@@ -1,29 +1,31 @@
 package cli
 
 import (
+	"fmt"
 	"path/filepath"
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
 
 	"github.com/stricttools/rlsbl/internal/historyrewrite"
+	"github.com/stricttools/rlsbl/internal/release"
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
 
-const releaseScrubHelp = "Scrub content from the repository's git history through safegit, then repair every record the rewrite renamed and " +
-	"publish the result. --pattern rewrites every match of a regular expression (each replaced by --replace, or by random text of the same " +
-	"length under --mangle), --file rewrites one repository-relative file (every past version of it replaced by the copy on disk now, or removed " +
-	"from every commit when there is no copy on disk), and --recipe runs a safegit scrub recipe; --from-commit or --entire-history says how much " +
-	"of the history is rewritten. safegit remaps the changelog's commit ids at every rewritten commit; the scrub then requires every changelog " +
-	"commit id to name a commit (repairing ids from safegit's rewrite journal where it can), moves each archive's release commit through the " +
-	"rewrite (recording the rewritten trees, and a release-commit remap in the transition record), requires every generated changelog to be what " +
-	"generating it gives, deletes the changelog validation caches, writes the rewrite's archive to .strictmetadata/history-rewrites/<UTC " +
-	"time>.toml (commit ids, tags, the mode, and --reason only, never what was removed), and commits. It then force-pushes the branch and every " +
-	"moved tag, each guarded by the value origin held before the rewrite, and rewrites each moved tag's GitHub Release in place from the record " +
-	"(creating one a tag lacks); a Release is never deleted. A scrub that stops is finished by running the same command again, from the step " +
-	"that stopped it, with its state kept in .strictmetadata/.release-state/scrub-result.json. Requires safegit 0.31.0 or newer, whose --json " +
-	"machine-mode document is read at interface_version 3, and a release branch. Refused while a release is stopped mid-flight. --dry-run records the safegit " +
-	"invocation, which prints safegit's own counts, and writes nothing."
+var releaseScrubHelp = fmt.Sprintf("Scrub content from the repository's git history through safegit, then repair every record the rewrite renamed and "+
+	"publish the result. --pattern rewrites every match of a regular expression (each replaced by --replace, or by random text of the same "+
+	"length under --mangle), --file rewrites one repository-relative file (every past version of it replaced by the copy on disk now, or removed "+
+	"from every commit when there is no copy on disk), and --recipe runs a safegit scrub recipe; --from-commit or --entire-history says how much "+
+	"of the history is rewritten. safegit remaps the changelog's commit ids at every rewritten commit; the scrub then requires every changelog "+
+	"commit id to name a commit (repairing ids from safegit's rewrite journal where it can), moves each archive's release commit through the "+
+	"rewrite (recording the rewritten trees, and a release-commit remap in the transition record), requires every generated changelog to be what "+
+	"generating it gives, deletes the changelog validation caches, writes the rewrite's archive to .strictmetadata/history-rewrites/<UTC "+
+	"time>.toml (commit ids, tags, the mode, and --reason only, never what was removed), and commits. It then force-pushes the branch and every "+
+	"moved tag, each guarded by the value origin held before the rewrite, and rewrites each moved tag's GitHub Release in place from the record "+
+	"(creating one a tag lacks); a Release is never deleted. A scrub that stops is finished by running the same command again, from the step "+
+	"that stopped it, with its state kept in .strictmetadata/.release-state/scrub-result.json. Requires safegit %s or newer, whose --json "+
+	"machine-mode document is read at interface_version %d, and a release branch. Refused while a release is stopped mid-flight. --dry-run records the safegit "+
+	"invocation, which prints safegit's own counts, and writes nothing.", historyrewrite.SafegitMinimum, historyrewrite.SafegitInterfaceVersion)
 
 const releaseReconcileHelp = "Reconcile one releasable's published release metadata with what its records say it released: push the refs origin " +
 	"lacks, force-push the ones a recorded rewrite moved, and create the GitHub Releases that are absent. Every archived version's refs (its " +
@@ -105,7 +107,7 @@ func registerHistoryRewrites(r *commandSet, version string) {
 		consequential: true,
 		flags: []strictcli.Flag{
 			strictcli.ChoiceFlag("mode", "Which half of the reconcile runs", strictcli.Required(), reconcilePlanChoice, reconcileApplyChoice),
-			strictcli.IntFlag("push-timeout", "Seconds each ref push may take (push_seconds of the declarations when not passed, else 300)", strictcli.Optional()),
+			strictcli.IntFlag("push-timeout", timeoutHelp("Seconds each ref push may take", "push_seconds", release.ShippedPushTimeout), strictcli.Optional()),
 			strictcli.StringFlag("releasable", "The releasable to reconcile, where the working directory selects none", strictcli.Optional()),
 		},
 		run: func(ctx *strictcli.Context, kw map[string]any) (any, error) {

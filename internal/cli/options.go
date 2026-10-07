@@ -19,7 +19,7 @@ const optionsGroupHelp = "Print rlsbl's options registry, and write this reposit
 	"at its git root. Every rlsbl check is an option, rlsbl:<check name>, ranked error > warn > off for an error check and warn > off for a " +
 	"warning check, and a few options are not checks; `rlsbl options registry` lists every one. `rlsbl check` and every release apply each " +
 	"entry's current value (off: the check does not run; warn: it runs and reports, never blocking; error: as registered). The options " +
-	"standing for an adoption default to off and accept a path scope naming one workspace member. Invalid entries stop every check run and " +
+	"representing an adoption default to off and accept a path scope naming one workspace member. Invalid entries stop every check run and " +
 	"every release."
 
 const optionsRegistryHelp = "Print rlsbl's options registry: one option per check, rlsbl:<check name>, plus the options that are not checks, " +

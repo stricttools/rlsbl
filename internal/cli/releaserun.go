@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -32,7 +33,7 @@ const releaseResumeHelp = "Continue the release in progress of the releasable th
 	"none, the one releasable with a release in progress) from the step it stopped at. The resume pins again at the branch tip: what was " +
 	"committed since the release stopped (the fix after a red CI verdict, other sessions' work) is adopted, provided the changelog describes " +
 	"every adopted commit, and refused otherwise before anything is written, naming the `rlsbl changelog add` that records each. A resume " +
-	"adopting commits after the CI verdict pushes the tip as the candidate and waits for CI again, so the tag lands on what CI verified; one " +
+	"adopting commits after the CI verdict pushes the tip as the candidate and waits for CI again, so the tag is put on what CI verified; one " +
 	"adopting nothing past the verdict tags the commit the state records, which must still be on the branch. A failed deploy or post-release " +
 	"hook runs again. --dry-run reports what would be adopted and which steps would run, and writes nothing."
 
@@ -45,11 +46,17 @@ const releaseInitHelp = "Write the release file of the releasable the working di
 // releaseTimeoutFlags are the release's per-invocation timeouts.
 func releaseTimeoutFlags() []strictcli.Flag {
 	return []strictcli.Flag{
-		strictcli.IntFlag("push-timeout", "Seconds each push may take (push_seconds of the declarations when not passed, else 300)", strictcli.Optional()),
-		strictcli.IntFlag("ci-timeout", "Seconds the wait for CI's verdict on the candidate may take (ci_seconds of the declarations when not passed, else 3600)", strictcli.Optional()),
-		strictcli.IntFlag("check-timeout", "Seconds each program a check, the schema dump, selfdoc, or the deploy starts may take (check_seconds of the declarations when not passed, else 900)", strictcli.Optional()),
-		strictcli.IntFlag("hook-timeout", "Seconds each hook may take (hook_seconds of the declarations when not passed, else no bound)", strictcli.Optional()),
+		strictcli.IntFlag("push-timeout", timeoutHelp("Seconds each push may take", "push_seconds", release.ShippedPushTimeout), strictcli.Optional()),
+		strictcli.IntFlag("ci-timeout", timeoutHelp("Seconds the wait for CI's verdict on the candidate may take", "ci_seconds", release.ShippedCITimeout), strictcli.Optional()),
+		strictcli.IntFlag("check-timeout", timeoutHelp("Seconds each program a check, the schema dump, selfdoc, or the deploy starts may take", "check_seconds", release.ShippedCheckTimeout), strictcli.Optional()),
+		strictcli.IntFlag("hook-timeout", "Seconds each hook may take ([timeouts] hook_seconds of releasables.toml when not passed, else no bound)", strictcli.Optional()),
 	}
+}
+
+// timeoutHelp is the help of a timeout flag: what it bounds, and the
+// declaration and the shipped value it falls back to.
+func timeoutHelp(bounds, key string, shipped time.Duration) string {
+	return fmt.Sprintf("%s ([timeouts] %s of releasables.toml when not passed, else %d)", bounds, key, int64(shipped/time.Second))
 }
 
 func registerReleaseRun(r *commandSet, version string) {
