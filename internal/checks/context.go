@@ -46,6 +46,10 @@ type Inputs struct {
 	Home string
 	// IndexPath is the machine-local confidential-name index.
 	IndexPath string
+	// UVProjectEnvironment is UV_PROJECT_ENVIRONMENT as the caller read it
+	// (empty when unset): uv's own relocation of a project's environment,
+	// where the dev overlays are installed.
+	UVProjectEnvironment string
 }
 
 // Context is what every check of one run sees: the repository, its
@@ -355,6 +359,9 @@ func (c *Context) Home() string {
 	}
 	return c.in.Home
 }
+
+// UVProjectEnvironment is UV_PROJECT_ENVIRONMENT as the caller read it.
+func (c *Context) UVProjectEnvironment() string { return c.in.UVProjectEnvironment }
 
 // IndexPath is the confidential-name index file, refused when the caller
 // stated none.
