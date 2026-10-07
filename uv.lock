@@ -235,7 +235,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "ruamel-yaml", specifier = ">=0.19.1" },
-    { name = "strictcli", specifier = ">=0.44.0" },
+    { name = "strictcli", specifier = ">=0.46.0" },
     { name = "strictspec", specifier = ">=0.5.0" },
     { name = "tomlkit", specifier = ">=0.12" },
     { name = "tree-sitter", specifier = ">=0.24" },
@@ -290,14 +290,14 @@ wheels = [
 
 [[package]]
 name = "strictcli"
-version = "0.44.0"
+version = "0.46.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "tomlkit" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f2/cc/df3f095b22fe077e480be900890a60bd86e423f335c111dfcd6eeecb93b5/strictcli-0.44.0.tar.gz", hash = "sha256:0244e2aab645814fdcc5b486daa1464a5eefdff6431c7a95d505c7b9b5bb4927", size = 553645, upload-time = "2026-09-29T17:45:46.187Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e7/f8/0b2c397295924c992facba3dea74e6390cded797c0201cb1607d8543ad62/strictcli-0.46.0.tar.gz", hash = "sha256:f179c0f39e08be953b88ee09098eeceb46670583a2f6cf7f7b7fe670d734e6bc", size = 554815, upload-time = "2026-10-07T00:23:28.789Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b1/ed/8420b340be9f371b87e3aa96440e1ced6419293211963d804e322c602ec5/strictcli-0.44.0-py3-none-any.whl", hash = "sha256:ce9daa287062e00db94f5b11428de642cc727c835c33468192e23e386619194a", size = 240298, upload-time = "2026-09-29T17:45:44.573Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/48/bc528d11bcce874f74c49ddd150b9fa2aa31159e213865726c2bcfef5d82/strictcli-0.46.0-py3-none-any.whl", hash = "sha256:17ddbe66b0553b9f9a22fea360fbc2d81d5c237e0385bc942f4a314d38383939", size = 240625, upload-time = "2026-10-07T00:23:26.969Z" },
 ]
 
 [[package]]
