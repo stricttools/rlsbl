@@ -1,6 +1,10 @@
 format_version = 1
 
 [[accepted]]
+word = "mixin"
+meaning = "A class that adds one capability, such as token authentication, to the pipeline classes that inherit from it."
+
+[[accepted]]
 word = "prs"
 meaning = "The 'rlsbl prs' command, which lists the repository's open pull requests (PRs) before a release."
 
