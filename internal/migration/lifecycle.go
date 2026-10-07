@@ -335,6 +335,11 @@ func (b *builder) addIdentities(rec *lifecycle.Record, d *declarations.Releasabl
 		}
 		from := first
 		for _, step := range chain {
+			if from.After(step.at) {
+				// A history older than its commits (absorbed or rewritten)
+				// leaves the old name an empty period.
+				from = step.at
+			}
 			why := step.reason
 			if strings.TrimSpace(why) == "" {
 				why = reason
@@ -404,6 +409,9 @@ func (b *builder) addIdentityTransitions(rec *lifecycle.Record, d *declarations.
 				must(rec.AddPendingIdentity(lifecycle.Identity{Subject: k.subject, Facet: facet, Value: c.to, Registry: registry, TagPatterns: patterns, EffectiveVersion: c.effectiveVersion, Reason: "the identity the release of " + c.effectiveVersion + " takes"}))
 				value = ""
 				break
+			}
+			if from.After(at) {
+				from = at
 			}
 			must(rec.AddIdentity(lifecycle.Identity{Subject: k.subject, Facet: facet, Value: value, Registry: registry, TagPatterns: patterns, Period: lifecycle.Period{From: from, Until: at}, Reason: "recorded when rlsbl's records moved to the .strictmetadata layout"}))
 			value, from = c.to, at
