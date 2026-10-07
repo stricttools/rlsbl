@@ -20,7 +20,7 @@ var releaseScrubHelp = fmt.Sprintf("Scrub content from the repository's git hist
 	"of the history is rewritten. safegit remaps the changelog's commit ids at every rewritten commit; the scrub then requires every changelog "+
 	"commit id to name a commit (repairing ids from safegit's rewrite journal where it can), moves each archive's release commit through the "+
 	"rewrite (recording the rewritten trees, and a release-commit remap in the transition record), requires every generated changelog to be what "+
-	"generating it gives, deletes the changelog validation caches, writes the rewrite's archive to .strictmetadata/history-rewrites/<UTC "+
+	"generating it gives, deletes any file at the reserved changelog validation cache paths (which no rlsbl command writes), writes the rewrite's archive to .strictmetadata/history-rewrites/<UTC "+
 	"time>.toml (commit ids, tags, the mode, and --reason only, never what was removed), and commits. It then force-pushes the branch and every "+
 	"moved tag, each guarded by the value origin held before the rewrite, and rewrites each moved tag's GitHub Release in place from the record "+
 	"(creating one a tag lacks); a Release is never deleted. A scrub that stops is finished by running the same command again, from the step "+

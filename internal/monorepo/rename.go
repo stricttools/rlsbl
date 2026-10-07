@@ -302,7 +302,7 @@ func (r *renamer) sayPlan(nameInFormat bool) {
 		say(fmt.Sprintf("Would complete the interrupted rename of %q to %q, doing only what is left of:", old, new))
 	}
 	say(fmt.Sprintf("Would rename the releasable %q to %q in %s, with every member versioned under it.", old, new, declarations.ReleasablesFile))
-	say(fmt.Sprintf("Would move %s, %s, and %s to the new name, and remove the changelog validation cache of %q through saferm.", declarations.ChangelogDir(old), declarations.ReleasesDir(old), declarations.RunStateDir(old), old))
+	say(fmt.Sprintf("Would move %s, %s, and %s to the new name, and remove a file at the reserved changelog validation cache path of %q through saferm when one is there.", declarations.ChangelogDir(old), declarations.ReleasesDir(old), declarations.RunStateDir(old), old))
 	say(fmt.Sprintf("Would close every open period and identity of %q in %s and open each again under %q, the releasable-name identity taking the new name.", old, lifecycle.RecordFile, new))
 	say("Would regenerate the workspace's routers and commit all of it: " + RenameCommitMessage(old, new))
 	if !nameInFormat {
