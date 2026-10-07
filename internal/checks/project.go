@@ -115,7 +115,7 @@ func pathExists(path string) (bool, error) {
 }
 
 func checkLock(c *Context, r *strictcli.WarnReporter) strictcli.CheckOutcome {
-	stale, err := runstate.IsStale(c.Root())
+	stale, err := runstate.ExistsUnheld(c.Root())
 	if err != nil {
 		panic(unanswered(err.Error()))
 	}

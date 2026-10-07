@@ -294,7 +294,7 @@ func TestTheLockRefusesASecondHolder(t *testing.T) {
 	if err := syscall.Flock(int(other.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err == nil {
 		t.Fatal("the lock was not held")
 	}
-	stale, err := runstate.IsStale(root)
+	stale, err := runstate.ExistsUnheld(root)
 	must(t, err)
 	if stale {
 		t.Fatal("a held lock was reported stale")
@@ -303,7 +303,7 @@ func TestTheLockRefusesASecondHolder(t *testing.T) {
 	if err := lock.Release(); err == nil {
 		t.Fatal("a lock was released twice")
 	}
-	stale, err = runstate.IsStale(root)
+	stale, err = runstate.ExistsUnheld(root)
 	must(t, err)
 	if !stale {
 		t.Fatal("a released lock's file was not reported stale")
@@ -335,7 +335,7 @@ func TestANestedAcquireLeavesTheLockWithItsOuterHolder(t *testing.T) {
 		if err := inner.Release(); err != nil {
 			return err
 		}
-		if stale, err := runstate.IsStale(root); err != nil || stale {
+		if stale, err := runstate.ExistsUnheld(root); err != nil || stale {
 			t.Errorf("the inner release dropped the outer holder's lock (stale %v, %v)", stale, err)
 		}
 		return outer.Release()

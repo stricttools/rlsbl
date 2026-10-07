@@ -165,10 +165,11 @@ func (l *Lock) Release() error {
 	return closeErr
 }
 
-// IsStale reports whether the lock file exists while no process holds it:
-// left by a run that ended without releasing it, which the next acquire
-// takes over.
-func IsStale(root string) (bool, error) {
+// ExistsUnheld reports whether the lock file exists while no process holds
+// it. The file is never removed, so this is the state after every run that
+// ever took the lock, finished or interrupted; only a held lock says that a
+// live run owns the release state.
+func ExistsUnheld(root string) (bool, error) {
 	found, err := exists(root, LockPath)
 	if err != nil || !found {
 		return false, err
