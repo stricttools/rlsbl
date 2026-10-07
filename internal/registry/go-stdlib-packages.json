@@ -1,7 +1,7 @@
 {
   "generator": "internal/registry/gen",
   "source": "union of `go list std` over every GOOS/GOARCH in `go tool dist list`, CGO_ENABLED=1; import paths with an internal or vendor element excluded",
-  "go_version": "go1.26.6",
+  "go_version": "go1.26.8",
   "packages": [
     "archive/tar",
     "archive/zip",
