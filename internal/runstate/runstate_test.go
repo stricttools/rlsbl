@@ -115,7 +115,7 @@ func TestInProgressRefusals(t *testing.T) {
 	hygiene.Isolate(t)
 	valid := string(fullState().Render())
 	cases := []struct{ name, text, want string }{
-		{"unknown key", valid + "preid = \"rc\"\n", "preid"},
+		{"unknown key", "preid = \"rc\"\n" + valid, "preid"},
 		{"missing tag", strings.Replace(valid, "tag = \"v0.4.0\"\n", "", 1), "tag"},
 		{"other format", strings.Replace(valid, "format_version = 1", "format_version = 2", 1), "format_version 2"},
 		{"empty branch", strings.Replace(valid, "branch = \"main\"", "branch = \"\"", 1), "branch is empty"},
