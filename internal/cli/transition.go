@@ -79,7 +79,6 @@ const transitionInitMinimalRecordHelp = "Write the minimal lifecycle-and-license
 func registerTransition(r *commandSet) {
 	r.group([]string{"transition"}, transitionGroupHelp)
 	reason := strictcli.StringFlag("reason", "Why, in the operator's own words; the record keeps it", strictcli.Required())
-	subject := strictcli.StringFlag("subject", "The releasable (or, for a lifecycle, the member) the period is about", strictcli.Required())
 	r.add(command{
 		path:    []string{"transition", "show"},
 		help:    transitionShowHelp,
@@ -105,7 +104,7 @@ func registerTransition(r *commandSet) {
 		// A lifecycle decides whether a releasable may release at all.
 		consequential: true,
 		flags: []strictcli.Flag{
-			subject,
+			strictcli.StringFlag("subject", "The releasable or member whose lifecycle changes", strictcli.Required()),
 			strictcli.StringFlag("status", "The status from today", strictcli.Required(), strictcli.Choices(
 				strictcli.Ch(string(lifecycle.StatusActive), "released as usual"),
 				strictcli.Ch(string(lifecycle.StatusOnHold), "its releases are refused until it is active again"),
@@ -124,7 +123,7 @@ func registerTransition(r *commandSet) {
 		// A license is a legal decision only a person makes.
 		consequential: true,
 		flags: []strictcli.Flag{
-			subject,
+			strictcli.StringFlag("subject", "The releasable whose license changes", strictcli.Required()),
 			strictcli.StringFlag("license", "The SPDX identifier of the license from today", strictcli.Required()),
 			reason,
 		},
