@@ -69,3 +69,11 @@ path = ".strictspec/test-runner.schema.toml"
   lang    = "go"
   output  = "internal/declarations/testrunnerspec/rlsbl_test_runner_gen.go"
   package = "testrunnerspec"
+
+[[schemas]]
+path = ".strictspec/changelog-entry.schema.toml"
+
+  [[schemas.targets]]
+  lang    = "go"
+  output  = "internal/changelog/entryspec/rlsbl_changelog_entry_gen.go"
+  package = "entryspec"

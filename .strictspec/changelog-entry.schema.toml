@@ -1,0 +1,88 @@
+# strictspec schema for one line of a releasable's changelog:
+# .strictmetadata/changelog/<releasable>/unreleased.jsonl and each released
+# <version>.jsonl. One document is one JSONL line.
+#
+# The generated Go validator (internal/changelog/entryspec) is what every
+# read of a changelog line runs first, and what every entry rlsbl writes is
+# checked against before it is written. A line this schema refuses makes its
+# file unreadable: there is no tolerant read and no legacy mode.
+#
+# This schema owns the line's shape: the format version, the id's spelling,
+# the field types, the type values, unknown keys, and the fields a
+# user-facing entry needs. internal/changelog keeps what a single line cannot
+# show: whether each commit resolves, whether it is in the unreleased range
+# and in the releasable's scope, coverage of the range, and the batch limits
+# across lines and files.
+
+name = "rlsbl-changelog-entry"
+meta_version = 1
+format_version = 2
+document_syntax = "jsonl"
+role = "schema"
+root = "ChangelogEntry"
+description = "One changelog line: an entry describing one or more commits of a releasable."
+
+[types.ChangelogEntry]
+type = "record"
+
+[types.ChangelogEntry.fields.format_version]
+type = "literal"
+value = 2
+required = true
+description = "The line's format version. A line of the first format is converted by `rlsbl migrate records`."
+
+[types.ChangelogEntry.fields.id]
+type = "string"
+required = true
+regex = "^[0-9a-f]{48}$"
+description = "The entry's identifier, which `changelog edit` and `changelog remove` address it by: 16 hexadecimal digits of the nanosecond time it was written, then the 32 of a random UUID4, lowercase."
+
+[types.ChangelogEntry.fields.commits]
+type = "array"
+required = true
+min_len = 1
+description = "The commits the entry describes. rlsbl writes full commit ids; whether each resolves, and to a commit in the releasable's unreleased range, is checked by rlsbl."
+[types.ChangelogEntry.fields.commits.item]
+type = "string"
+non_empty = true
+
+[types.ChangelogEntry.fields.user_facing]
+type = "boolean"
+required = true
+description = "Whether the entry appears in CHANGELOG.md and the GitHub Release notes."
+
+[types.ChangelogEntry.fields.description]
+type = "string"
+required = false
+non_empty = true
+description = "A one-line markdown description. Required when the entry is user-facing."
+
+[types.ChangelogEntry.fields.type]
+type = "enum"
+required = false
+values = ["feature", "fix", "breaking"]
+description = "What the change is. Required when the entry is user-facing."
+
+[types.ChangelogEntry.fields.packages]
+type = "array"
+required = false
+description = "The member packages of the releasable the entry affects, printed as a bracketed prefix on the entry in CHANGELOG.md."
+[types.ChangelogEntry.fields.packages.item]
+type = "string"
+non_empty = true
+
+[types.ChangelogEntry.fields.batch_reason]
+type = "string"
+required = false
+non_empty = true
+description = "Why one entry describes more commits than the per-entry limit: the entry is exempt from changelog-batch-commits, and the reason is where the exemption is."
+
+[[types.ChangelogEntry.constraints]]
+form = "conditional-required"
+field = "description"
+when = { field = "user_facing", predicate = "equals", value = true }
+
+[[types.ChangelogEntry.constraints]]
+form = "conditional-required"
+field = "type"
+when = { field = "user_facing", predicate = "equals", value = true }
