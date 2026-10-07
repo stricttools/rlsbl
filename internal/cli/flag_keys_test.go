@@ -35,7 +35,7 @@ func dashedFlagKeys(t *testing.T, root string, files []string) []string {
 	}
 	dashed := func(e ast.Expr) (string, bool) {
 		lit, ok := e.(*ast.BasicLit)
-		if !ok || lit.Kind != token.STRING {
+		if !ok || !isStringLiteral(lit) {
 			return "", false
 		}
 		s, err := strconv.Unquote(lit.Value)
@@ -99,4 +99,9 @@ func run(kw map[string]any, e elected) {
 	if strings.Join(got, "|") != want {
 		t.Fatalf("offenders = %q", got)
 	}
+}
+
+// isStringLiteral is whether lit is an interpreted or raw string literal.
+func isStringLiteral(lit *ast.BasicLit) bool {
+	return strings.HasPrefix(lit.Value, `"`) || strings.HasPrefix(lit.Value, "`")
 }
