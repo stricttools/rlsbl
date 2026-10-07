@@ -404,6 +404,15 @@ func checkHooks(h Hooks, dir func(label, dir string), add func(string, ...any)) 
 func checkReleasables(d *Releasables) []string {
 	var problems []string
 	root := d.RootMember()
+	patterns := map[string]string{}
+	for i, r := range d.Releasables {
+		pattern := strings.ReplaceAll(r.TagFormat, "{name}", r.Name)
+		if other, ok := patterns[pattern]; ok {
+			problems = append(problems, fmt.Sprintf("%s: its tag format renders the tags %q, as the releasable %q's does; a tag names one releasable, so give one of them another tag format", releasableLabel(i, r.Name), pattern, other))
+		} else {
+			patterns[pattern] = r.Name
+		}
+	}
 	for i, r := range d.Releasables {
 		where := releasableLabel(i, r.Name)
 		add := func(format string, args ...any) {
