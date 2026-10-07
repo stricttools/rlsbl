@@ -26,7 +26,8 @@ var changelogAddHelp = fmt.Sprintf("Append an entry to the releasable's unreleas
 	"--description and --type; --no-user-facing marks an internal change that CHANGELOG.md and the release notes leave out. A commit an "+
 	"entry of the same type and user-facing value already names is refused. An entry naming more than %d commits needs --batch-reason "+
 	"saying why they are one change, which the entry carries and which exempts it from the per-entry limit; an entry within the limit "+
-	"refuses one. In a workspace the entry records the releasable's members the commits change. Committed unless --no-auto-commit.", changelog.MaxCommitsPerEntry)
+	"refuses one. A commit appears in at most %d entries. In a workspace the entry records the releasable's members the commits change. "+
+	"Committed unless --no-auto-commit.", changelog.MaxCommitsPerEntry, changelog.MaxEntriesPerCommit)
 
 const changelogGenerateHelp = "Write the releasable's CHANGELOG.md from its changelog files and release archives (the root CHANGELOG.md " +
 	"standalone; .strictmetadata/changelog/<releasable>/CHANGELOG.md and the root roll-up in a workspace), and commit what changed with the " +

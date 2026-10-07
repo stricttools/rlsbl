@@ -116,4 +116,4 @@ A command that opens a period closes the subject's period in effect on the comma
 
 Every changelog entry of a squashed period then names its period's one squash commit, so the changelog batch checks (`changelog-batch-commits` and `changelog-batch-entries`) leave out every commit a committed history-rewrite archive records as a declassification's squash commit, followed through any later rewrite.
 
-A run that stops is finished by running the same command again. It is refused while a release or a scrub is in progress, off a release branch, without an `origin` remote, and when `--reason` names a confidential term. It requires safegit 0.31.0 or newer. `--dry-run` prints the squashes and writes nothing.
+A run that stops is finished by running the same command again. It is refused while a release or a scrub is in progress, off a release branch, without an `origin` remote, and when `--reason` names a confidential term. It requires the safegit version `rlsbl transition declassify --help` names, or a newer one. `--dry-run` prints the squashes and writes nothing.
