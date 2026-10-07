@@ -242,8 +242,8 @@ const (
 	Blocked Verdict = "blocked"
 )
 
-// GateResult is the verdict with its reason and every piece of evidence.
-type GateResult struct {
+// Judgment is the verdict with its reason and every piece of evidence.
+type Judgment struct {
 	Verdict  Verdict    `json:"verdict"`
 	Reason   string     `json:"reason"`
 	Evidence []Evidence `json:"evidence"`
@@ -252,7 +252,7 @@ type GateResult struct {
 // judge decides: any published or publishing finding blocks; otherwise at
 // least one source must have observed the version's absence, and when none
 // did there is no authoritative evidence, which blocks too.
-func judge(evidence []Evidence) GateResult {
+func judge(evidence []Evidence) Judgment {
 	var published, publishing []string
 	unpublished := false
 	for _, e := range evidence {
@@ -265,7 +265,7 @@ func judge(evidence []Evidence) GateResult {
 			unpublished = true
 		}
 	}
-	result := GateResult{Verdict: Blocked, Evidence: append([]Evidence{}, evidence...)}
+	result := Judgment{Verdict: Blocked, Evidence: append([]Evidence{}, evidence...)}
 	switch {
 	case len(published) > 0:
 		result.Reason = "published: " + strings.Join(published, ", ")

@@ -11,7 +11,7 @@ import (
 
 const releaseEditHelp = "Rewrite one released version's GitHub Release in place from the record: the notes its changelog holds, the deprecate and " +
 	"yank notices its release archive records on top, the rlsbl-ci-sha marker naming the commit it shipped from, and the pre-release flag, set " +
-	"exactly when a notice is recorded. The version defaults to the latest release the archives record. A version the record holds no release " +
+	"when a notice is recorded and cleared otherwise. The version defaults to the latest release the archives record. A version the record holds no release " +
 	"of, and one without a GitHub Release, are refused before anything is written. Run from the directory of a member versioned under the " +
 	"releasable."
 
@@ -80,13 +80,13 @@ func registerReleaseOps(r *commandSet) {
 			strictcli.NewArg("version", "The released version whose Release is rewritten, bare (0.4.0); the latest release when omitted", strictcli.ArgOptional()),
 		},
 		run: func(ctx *strictcli.Context, kw map[string]any) (any, error) {
-			dir, _, err := workingRepository()
-			if err != nil {
-				return nil, err
-			}
 			version, given := strictcli.GetOpt[string](kw, "version")
 			if given && version == "" {
 				return nil, emptyArgument("version")
+			}
+			dir, _, err := workingRepository()
+			if err != nil {
+				return nil, err
 			}
 			return nil, releaseops.Edit(ctx, releaseops.EditRequest{Dir: dir, Version: version})
 		},
@@ -122,17 +122,17 @@ func registerReleaseOps(r *commandSet) {
 			strictcli.StringFlag("version", "An earlier release to undo, bare (0.3.0), without reverting its commits; the latest release when omitted", strictcli.Optional()),
 		},
 		run: func(ctx *strictcli.Context, kw map[string]any) (any, error) {
-			dir, _, err := workingRepository()
-			if err != nil {
-				return nil, err
-			}
-			req := releaseops.UndoRequest{Dir: dir, Now: time.Now}
+			req := releaseops.UndoRequest{Now: time.Now}
 			var given bool
 			if req.Target, given = strictcli.GetOpt[string](kw, "target"); given && req.Target == "" {
 				return nil, emptyArgument("--target")
 			}
 			if req.Version, given = strictcli.GetOpt[string](kw, "version"); given && req.Version == "" {
 				return nil, emptyArgument("--version")
+			}
+			var err error
+			if req.Dir, _, err = workingRepository(); err != nil {
+				return nil, err
 			}
 			return nil, releaseops.Undo(ctx, req)
 		},
@@ -172,11 +172,7 @@ func registerReleaseOps(r *commandSet) {
 			},
 			flags: noticeFlags(op.verb),
 			run: func(ctx *strictcli.Context, kw map[string]any) (any, error) {
-				dir, _, err := workingRepository()
-				if err != nil {
-					return nil, err
-				}
-				req := releaseops.NoticeRequest{Dir: dir, Version: strictcli.Get[string](kw, "version")}
+				req := releaseops.NoticeRequest{Version: strictcli.Get[string](kw, "version")}
 				if req.Version == "" {
 					return nil, emptyArgument("version")
 				}
@@ -186,6 +182,10 @@ func registerReleaseOps(r *commandSet) {
 				}
 				if req.Use, given = strictcli.GetOpt[string](kw, "use"); given && req.Use == "" {
 					return nil, emptyArgument("--use")
+				}
+				var err error
+				if req.Dir, _, err = workingRepository(); err != nil {
+					return nil, err
 				}
 				return nil, op.run(ctx, req)
 			},

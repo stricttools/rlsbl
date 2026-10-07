@@ -55,7 +55,7 @@ type undoPlan struct {
 	remoteTags map[string]string
 	remote     bool
 	release    bool
-	gate       GateResult
+	judgment   Judgment
 	revert     revertPlan
 	// restoreChangelog and restoreReleaseFile repair what the release's
 	// finalization recorded, when no reverted commit already undid it.
@@ -113,8 +113,8 @@ func Undo(ctx *strictcli.Context, req UndoRequest) (err error) {
 	if err != nil {
 		return err
 	}
-	if p.gate.Verdict != Cleared {
-		return gateRefusal(p)
+	if p.judgment.Verdict != Cleared {
+		return evidenceRefusal(p)
 	}
 	for _, line := range p.describe() {
 		ctx.Info(line)
@@ -126,14 +126,14 @@ func Undo(ctx *strictcli.Context, req UndoRequest) (err error) {
 	return p.execute(ctx, gh, slug, req.Now())
 }
 
-// gateRefusal is the refusal of an undo the evidence did not clear.
-func gateRefusal(p undoPlan) error {
-	lines := []string{fmt.Sprintf("cannot undo %s: %s.", p.tag, p.gate.Reason)}
-	for _, e := range p.gate.Evidence {
+// evidenceRefusal is the refusal of an undo the evidence did not clear.
+func evidenceRefusal(p undoPlan) error {
+	lines := []string{fmt.Sprintf("cannot undo %s: %s.", p.tag, p.judgment.Reason)}
+	for _, e := range p.judgment.Evidence {
 		lines = append(lines, "  "+e.String())
 	}
 	v := p.version
-	if slices.ContainsFunc(p.gate.Evidence, func(e Evidence) bool { return e.Finding == Published }) {
+	if slices.ContainsFunc(p.judgment.Evidence, func(e Evidence) bool { return e.Finding == Published }) {
 		lines = append(lines, "  The release is published, and deleting it would strand everyone who installed it. Nothing was changed. Remove it the way the registries allow instead:",
 			fmt.Sprintf("    rlsbl release yank %s --approve-consequential       # npm deprecate, a Go retraction, PyPI's yank", v),
 			fmt.Sprintf("    rlsbl release deprecate %s --approve-consequential  # a notice on the GitHub Release", v))
@@ -184,7 +184,7 @@ func planUndo(s Selection, gh github.Client, slug github.Repository, req UndoReq
 	p.tag = s.Scheme.Render(a.Version)
 	releaseCommit := ""
 	if a.Fate == releaserecord.FateRecorded {
-		sha, found, err := s.Repo.ResolveCommit(a.ReleaseCommit.Commit + "^{commit}")
+		sha, found, err := s.Repo.ResolveCommit(a.ReleaseCommit.Commit)
 		if err != nil {
 			return undoPlan{}, err
 		}
@@ -216,7 +216,7 @@ func planUndo(s Selection, gh github.Client, slug github.Repository, req UndoReq
 	if p.release, err = gh.ReleaseExists(slug, p.tag); err != nil {
 		return undoPlan{}, err
 	}
-	if p.gate, err = undoEvidence(s, gh, slug, p.version, p.tag, releaseCommit, p.remote); err != nil {
+	if p.judgment, err = undoEvidence(s, gh, slug, p.version, p.tag, releaseCommit, p.remote); err != nil {
 		return undoPlan{}, err
 	}
 	if err := p.planRestore(); err != nil {
@@ -260,9 +260,9 @@ func refuseUnrecordedInProgress(s Selection) error {
 	}
 	archive := releaserecord.ArchivePath(s.Record.Dir(), v)
 	if fate == releaserecord.FateNeverReleased {
-		return fmt.Errorf("a release of %s is in progress, and the record of %s holds %s as never released.%s\n  Nothing was changed.\n  %s", v, s.Releasable.Name, v, instead, LeftoverStateRemedy(v, archive, statePath))
+		return fmt.Errorf("a release of %s is in progress, and the record of %s holds %s as never released.%s\n  Nothing was changed.\n  %s", v, s.Releasable.Name, v, instead, LeftoverStateInstruction(v, archive, statePath))
 	}
-	return fmt.Errorf("a release of %s is in progress, and the record of %s does not contain it: undo reverts a recorded release, and there is no %s among the archives in %s, because the release stopped before the step that writes it (it completed %d steps).%s\n  Nothing was changed.\n  To finish %s, run `rlsbl release resume`; once %s is recorded, undo reverts it.\n  %s\n    %s", v, s.Releasable.Name, releaserecord.ArchiveName(v), s.Record.Dir(), len(state.CompletedSteps), instead, v, v, AbandonRemedy(v), statePath)
+	return fmt.Errorf("a release of %s is in progress, and the record of %s does not contain it: undo reverts a recorded release, and there is no %s among the archives in %s, because the release stopped before the step that writes it (it completed %d steps).%s\n  Nothing was changed.\n  To finish %s, run `rlsbl release resume`; once %s is recorded, undo reverts it.\n  %s\n    %s", v, s.Releasable.Name, releaserecord.ArchiveName(v), s.Record.Dir(), len(state.CompletedSteps), instead, v, v, AbandonInstruction(v), statePath)
 }
 
 // latestArchive is the archive of the releasable's latest release: the
@@ -309,7 +309,7 @@ func predecessorCommit(s Selection, v semver.Version) (string, error) {
 		if a.Fate != releaserecord.FateRecorded {
 			continue
 		}
-		sha, found, err := s.Repo.ResolveCommit(a.ReleaseCommit.Commit + "^{commit}")
+		sha, found, err := s.Repo.ResolveCommit(a.ReleaseCommit.Commit)
 		if err != nil {
 			return "", err
 		}
@@ -476,14 +476,14 @@ func (p *undoPlan) readRefs() error {
 }
 
 // undoEvidence gathers the evidence on version v and judges it.
-func undoEvidence(s Selection, gh github.Client, slug github.Repository, v semver.Version, tag, releaseCommit string, remote bool) (GateResult, error) {
+func undoEvidence(s Selection, gh github.Client, slug github.Repository, v semver.Version, tag, releaseCommit string, remote bool) (Judgment, error) {
 	pkgs, err := s.packages()
 	if err != nil {
-		return GateResult{}, err
+		return Judgment{}, err
 	}
 	reg, err := registry.New(registry.Reads(s.effects()))
 	if err != nil {
-		return GateResult{}, err
+		return Judgment{}, err
 	}
 	p := prober{reg: reg, repo: s.Repo, remote: remote}
 	var evidence []Evidence
@@ -584,8 +584,8 @@ func (p undoPlan) describe() []string {
 	if p.remote {
 		lines = append(lines, "  - push "+p.branch+" to origin")
 	}
-	lines = append(lines, "  - clear the in-progress release state, if any", "  Evidence ("+string(p.gate.Verdict)+": "+p.gate.Reason+"):")
-	for _, e := range p.gate.Evidence {
+	lines = append(lines, "  - clear the in-progress release state, if any", "  Evidence ("+string(p.judgment.Verdict)+": "+p.judgment.Reason+"):")
+	for _, e := range p.judgment.Evidence {
 		lines = append(lines, "    "+e.String())
 	}
 	return lines
@@ -605,9 +605,9 @@ func (p undoPlan) execute(ctx *strictcli.Context, gh github.Client, slug github.
 		Version:         p.version.String(),
 		Tag:             p.tag,
 		Latest:          p.latest,
-		Verdict:         p.gate.Verdict,
-		Reason:          p.gate.Reason,
-		Evidence:        append([]Evidence{}, p.gate.Evidence...),
+		Verdict:         p.judgment.Verdict,
+		Reason:          p.judgment.Reason,
+		Evidence:        append([]Evidence{}, p.judgment.Evidence...),
 		RevertedCommits: []string{},
 		DeletedTags:     []string{},
 		ReleaseDeleted:  p.release,

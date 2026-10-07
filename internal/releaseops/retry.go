@@ -103,6 +103,13 @@ func Retry(ctx *strictcli.Context, req RetryRequest) (err error) {
 	if err != nil {
 		return err
 	}
+	gh, slug, err := openGitHub(e, s)
+	if err != nil {
+		return err
+	}
+	if err := requireRelease(gh, slug, tag); err != nil {
+		return err
+	}
 	retryPath := runstate.RetryPath(s.Releasable.Name)
 	retry, haveFile, err := runstate.LoadRetry(s.Root(), s.Releasable.Name)
 	if err != nil {
@@ -140,13 +147,6 @@ func Retry(ctx *strictcli.Context, req RetryRequest) (err error) {
 			names = append(names, w.file)
 		}
 		return fmt.Errorf("%s names %s, which the tree %s tags holds no dispatchable workflow of; the dispatchable workflows there are %s. Correct the file, or remove it and run the retry again, which writes it from the tagged tree", retryPath, strings.Join(unknown, ", "), tag, joinOrNone(names))
-	}
-	gh, slug, err := openGitHub(e, s)
-	if err != nil {
-		return err
-	}
-	if err := requireRelease(gh, slug, tag); err != nil {
-		return err
 	}
 	before := map[string]map[int64]bool{}
 	if req.Watch && !ctx.DryRun() {

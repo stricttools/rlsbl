@@ -28,15 +28,15 @@ var abandonHeader = []string{
 	"by version arithmetic against the latest release.",
 }
 
-// AbandonRemedy is the sentence every refusal over an unrecorded attempt
+// AbandonInstruction is the sentence every refusal over an unrecorded attempt
 // prints to name the abandon.
-func AbandonRemedy(v semver.Version) string {
+func AbandonInstruction(v semver.Version) string {
 	return fmt.Sprintf("To abandon %s instead, run `%s`: it records %s as never released and deletes the in-progress state file. The attempt's commits stay where they are, and the next release bumps from %s when the version files name it.", v, AbandonInvocation, v, v)
 }
 
-// LeftoverStateRemedy is the remedy for an in-progress state file whose
+// LeftoverStateInstruction is the way out of an in-progress state file whose
 // version the record already holds as never released.
-func LeftoverStateRemedy(v semver.Version, archive, state string) string {
+func LeftoverStateInstruction(v semver.Version, archive, state string) string {
 	return fmt.Sprintf("%s is recorded as never released (%s), so this in-progress state file is left over from an attempt that was already abandoned. Run `%s`, which finishes that abandon and deletes the file: %s", v, archive, AbandonInvocation, state)
 }
 
