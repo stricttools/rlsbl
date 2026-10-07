@@ -234,48 +234,61 @@ func TestAFailingApplyNamesWhatItAlreadyWrote(t *testing.T) {
 	}
 }
 
+// countingReconciler plans one item counting "old" in the file at path, and
+// applies it by replacing every "old" with "new" after checking the count
+// still holds. When midApply is set, the apply first rewrites the file to it,
+// the way another writer could between the preview and the apply.
+func countingReconciler(path, midApply string) Reconciler {
+	count := func() (int, error) {
+		data, err := os.ReadFile(path)
+		return strings.Count(string(data), "old"), err
+	}
+	return Reconciler{
+		Observe: func(Observer) (Preview, error) {
+			n, err := count()
+			return Single(Item{Key: "go.mod", State: "rewrite", Data: n}), err
+		},
+		Apply: func(e *strictcli.Effects, it Item) error {
+			if midApply != "" {
+				if _, err := e.Write(path, midApply); err != nil {
+					return err
+				}
+			}
+			n, err := count()
+			if err != nil {
+				return err
+			}
+			if err := CountMoved(it.Key, it.Data.(int), n); err != nil {
+				return err
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			_, err = e.Write(path, strings.ReplaceAll(string(data), "old", "new"))
+			return err
+		},
+	}
+}
+
 // CountMoved's refusal names the fix (plan again with --dry-run, then apply);
 // performing it against the tree as it now is clears the refusal.
 func TestACountThatMovedIsRefusedAndAFreshPlanClearsIt(t *testing.T) {
 	hygiene.Isolate(t)
-	dir := t.TempDir()
-	path := filepath.Join(dir, "go.mod")
+	path := filepath.Join(t.TempDir(), "go.mod")
 	testsupport.WriteFile(t, path, "old old\n")
-	count := func() int {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return strings.Count(string(data), "old")
-	}
-	r := func(between func()) Reconciler {
-		return Reconciler{
-			Observe: func(Observer) (Preview, error) {
-				return Single(Item{Key: "go.mod", State: "rewrite", Data: count()}), nil
-			},
-			Apply: func(e *strictcli.Effects, it Item) error {
-				between()
-				if err := CountMoved(it.Key, it.Data.(int), count()); err != nil {
-					return err
-				}
-				data, _ := os.ReadFile(path)
-				_, err := e.Write(path, strings.ReplaceAll(string(data), "old", "new"))
-				return err
-			},
-		}
-	}
-	_, _, err := reconcileIn(t, false, r(func() { testsupport.WriteFile(t, path, "old old old\n") }))
+	_, _, err := reconcileIn(t, false, countingReconciler(path, "old old old\n"))
 	if err == nil || !strings.Contains(err.Error(), "counted 2 occurrence(s) in go.mod but it now has 3") || !strings.Contains(err.Error(), "--dry-run") {
 		t.Fatalf("err = %v", err)
 	}
-	res, p, err := reconcileIn(t, true, r(func() {}))
+	res, p, err := reconcileIn(t, true, countingReconciler(path, ""))
 	if err != nil || !strings.Contains(res.Stdout, "rewrite") {
 		t.Fatalf("the fresh plan: %v %q", err, res.Stdout)
 	}
 	if it, _ := p.Only(); it.Data.(int) != 3 {
 		t.Fatalf("the fresh plan counted %v", it.Data)
 	}
-	if _, _, err := reconcileIn(t, false, r(func() {})); err != nil {
+	if _, _, err := reconcileIn(t, false, countingReconciler(path, "")); err != nil {
 		t.Fatalf("applying after a fresh plan: %v", err)
 	}
 	if data, _ := os.ReadFile(path); string(data) != "new new new\n" {

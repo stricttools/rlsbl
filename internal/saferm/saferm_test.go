@@ -4,7 +4,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -16,32 +15,6 @@ import (
 	"github.com/stricttools/rlsbl/internal/saferm"
 	"github.com/stricttools/rlsbl/internal/testsupport"
 )
-
-// fakeSaferm puts a saferm first on PATH that records its argv and deletes
-// nothing, and returns the file the argv lines go to.
-func fakeSaferm(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	calls := filepath.Join(dir, "calls.txt")
-	script := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> " + calls + "\n"
-	if err := os.WriteFile(filepath.Join(dir, "saferm"), []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	return calls
-}
-
-func readCalls(t *testing.T, path string) []string {
-	t.Helper()
-	data, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		return nil
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
-	return strings.Split(strings.TrimRight(string(data), "\n"), "\n")
-}
 
 func TestArgsAlwaysCarryTheErrorModeAndTheDescription(t *testing.T) {
 	hygiene.Isolate(t)
@@ -70,19 +43,19 @@ func TestArgsAlwaysCarryTheErrorModeAndTheDescription(t *testing.T) {
 
 func TestDeleteRunsSafermInTheDirectory(t *testing.T) {
 	hygiene.Isolate(t)
-	calls := fakeSaferm(t)
+	fake := testsupport.FakeSaferm(t)
 	dir := t.TempDir()
 	testsupport.RunEffects(t, testsupport.CommandOptions{Effect: strictcli.EffectMutating}, func(e *strictcli.Effects) error {
 		return saferm.Delete(e, dir, saferm.Request{Path: "stale.txt", Description: "stale"})
 	})
-	if got := readCalls(t, calls); !slices.Equal(got, []string{"delete --description stale --on-error abort -- stale.txt"}) {
+	if got := fake.Calls(); !slices.Equal(got, []string{"delete --description stale --on-error abort -- stale.txt"}) {
 		t.Fatalf("saferm calls = %q", got)
 	}
 }
 
 func TestADryRunRecordsTheDeletion(t *testing.T) {
 	hygiene.Isolate(t)
-	calls := fakeSaferm(t)
+	fake := testsupport.FakeSaferm(t)
 	dir := t.TempDir()
 	res := testsupport.RunCommand(t, testsupport.CommandOptions{Effect: strictcli.EffectMutating, DryRun: true}, func(ctx *strictcli.Context) error {
 		return saferm.Delete(ctx.Effects(), dir, saferm.Request{Path: "stale.txt", Description: "stale"})
@@ -90,7 +63,7 @@ func TestADryRunRecordsTheDeletion(t *testing.T) {
 	if res.ExitCode != 0 {
 		t.Fatalf("exit %d: %s", res.ExitCode, res.Stderr)
 	}
-	if got := readCalls(t, calls); len(got) != 0 {
+	if got := fake.Calls(); len(got) != 0 {
 		t.Fatalf("a dry run ran saferm: %q", got)
 	}
 }
@@ -106,7 +79,7 @@ func TestAMissingSafermIsRefusedUntilItIsInstalled(t *testing.T) {
 	if res.ExitCode == 0 || !strings.Contains(res.Stderr, "saferm is not on PATH") {
 		t.Fatalf("exit %d, stderr %q", res.ExitCode, res.Stderr)
 	}
-	fakeSaferm(t)
+	testsupport.FakeSaferm(t)
 	testsupport.RunEffects(t, testsupport.CommandOptions{Effect: strictcli.EffectMutating}, func(e *strictcli.Effects) error {
 		return saferm.Delete(e, dir, saferm.Request{Path: "x", Description: "why"})
 	})

@@ -83,3 +83,36 @@ func PathOnly(t testing.TB, programs ...string) {
 	}
 	t.Setenv("PATH", dir)
 }
+
+// Saferm is a fake saferm installed for one test.
+type Saferm struct {
+	t     testing.TB
+	calls string
+}
+
+// FakeSaferm puts a saferm first on PATH for the rest of the test: a shell
+// script that records its argv and deletes nothing.
+func FakeSaferm(t testing.TB) *Saferm {
+	t.Helper()
+	dir := t.TempDir()
+	calls := filepath.Join(dir, "saferm-calls.txt")
+	script := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"${0%/*}/saferm-calls.txt\"\n"
+	if err := os.WriteFile(filepath.Join(dir, "saferm"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return &Saferm{t: t, calls: calls}
+}
+
+// Calls is the argv of every invocation, space-joined, in order.
+func (s *Saferm) Calls() []string {
+	s.t.Helper()
+	data, err := os.ReadFile(s.calls)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		s.t.Fatal(err)
+	}
+	return strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+}
