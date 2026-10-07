@@ -132,6 +132,16 @@ func TestLicenseChangesALicenseAndRefusesTheLastProprietaryOne(t *testing.T) {
 	})
 	requireExit(t, r, 1)
 	requireContains(t, r.Stderr, "only proprietary releasable", "rlsbl transition declassify --license portal=MIT")
+
+	// The fix the refusal names: the declassification takes the same
+	// license, and its preview is accepted.
+	g.repo.Git("remote", "set-url", "origin", g.repo.AddBareRemote("upstream"))
+	newFakeSafegit(t)
+	testsupport.FakeGH(t, ghAuth)
+	r = g.run(t, true, func(inv lifecycleops.Invocation, dir string) error {
+		return inv.Declassify(lifecycleops.DeclassifyRequest{Dir: dir, Licenses: map[string]string{"portal": "MIT"}, Reason: "going public"})
+	})
+	requireExit(t, r, 0)
 }
 
 func TestClassifyRefusesAPublicRepositoryUntilTheOwnerMakesItPrivate(t *testing.T) {

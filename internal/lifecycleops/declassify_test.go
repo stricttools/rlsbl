@@ -323,3 +323,115 @@ func TestDeclassifyRefusalsClearOnceFixed(t *testing.T) {
 		t.Fatalf("back on main: exit %d: %s", code, stderr)
 	}
 }
+
+// declassifyPreview is a repository with a proprietary portal on main, an
+// origin, a safegit new enough, and gh logged in, whose declassification
+// dry run passes; preview runs it.
+func declassifyPreview(t *testing.T, record string) (*testsupport.Repo, func() (int, string)) {
+	t.Helper()
+	repo := testsupport.NewRepo(t)
+	commitOn(t, repo, "2026-05-02", map[string]string{declarations.ReleasablesFile: portalDeclarations, lifecycle.RecordFile: record, lifecycle.ManifestFile: "owner = \"strictspec\"\n"}, "the project")
+	repo.AddBareRemote("origin")
+	newFakeSafegit(t)
+	testsupport.FakeGH(t, ghAuth)
+	fx := &fixture{repo: repo, index: filepath.Join(t.TempDir(), "index.toml")}
+	return repo, func() (int, string) {
+		r := fx.run(t, true, func(inv lifecycleops.Invocation, dir string) error {
+			return inv.Declassify(lifecycleops.DeclassifyRequest{Dir: dir, Licenses: map[string]string{"portal": "MIT"}, Reason: "the server goes open source"})
+		})
+		return r.ExitCode, r.Stderr
+	}
+}
+
+const proprietaryPortal = "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-05-01\nreason = \"server\"\n"
+
+// fakeSafegitVersion puts a safegit reporting version first on PATH.
+func fakeSafegitVersion(t *testing.T, version string) {
+	t.Helper()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "safegit"), []byte("#!/bin/sh\necho \"safegit "+version+"\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func TestDeclassifyRefusalsNamingAFixClearOnceItIsMade(t *testing.T) {
+	hygiene.Isolate(t)
+	var savedOrigin string
+	cases := []struct {
+		name  string
+		cause func(t *testing.T, repo *testsupport.Repo)
+		want  string
+		fix   func(t *testing.T, repo *testsupport.Repo)
+	}{
+		{
+			name:  "a release stopped mid-flight",
+			cause: func(t *testing.T, repo *testsupport.Repo) { repo.Write(runstate.InProgressPath("portal"), "stopped\n") },
+			want:  "rlsbl release abandon",
+			// What the abandon or the finished release leaves: no state.
+			fix: func(t *testing.T, repo *testsupport.Repo) {
+				removeFixtureFile(t, repo, runstate.InProgressPath("portal"))
+			},
+		},
+		{
+			name:  "a scrub in progress",
+			cause: func(t *testing.T, repo *testsupport.Repo) { repo.Write(runstate.ScrubResultPath, "{}\n") },
+			want:  "running the same `rlsbl release scrub` again",
+			// What the finished scrub leaves: no result file.
+			fix: func(t *testing.T, repo *testsupport.Repo) { removeFixtureFile(t, repo, runstate.ScrubResultPath) },
+		},
+		{
+			name: "no origin remote",
+			cause: func(t *testing.T, repo *testsupport.Repo) {
+				savedOrigin = repo.Git("remote", "get-url", "origin")
+				repo.Git("remote", "remove", "origin")
+			},
+			want: "git remote add origin <url>",
+			fix: func(t *testing.T, repo *testsupport.Repo) {
+				repo.Git("remote", "add", "origin", savedOrigin)
+			},
+		},
+		{
+			name:  "an old safegit",
+			cause: func(t *testing.T, repo *testsupport.Repo) { fakeSafegitVersion(t, "0.1.0") },
+			want:  "install that safegit",
+			fix:   func(t *testing.T, repo *testsupport.Repo) { newFakeSafegit(t) },
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			hygiene.Isolate(t)
+			repo, preview := declassifyPreview(t, proprietaryPortal)
+			if code, stderr := preview(); code != 0 {
+				t.Fatalf("before: exit %d: %s", code, stderr)
+			}
+			c.cause(t, repo)
+			if code, stderr := preview(); code != 1 || !strings.Contains(stderr, c.want) {
+				t.Fatalf("not refused naming %q: exit %d: %s", c.want, code, stderr)
+			}
+			c.fix(t, repo)
+			if code, stderr := preview(); code != 0 {
+				t.Fatalf("after the fix: exit %d: %s", code, stderr)
+			}
+		})
+	}
+}
+
+func TestDeclassifyRefusesACodenameTheSquashMessageNamesUntilItIsRemoved(t *testing.T) {
+	hygiene.Isolate(t)
+	repo, preview := declassifyPreview(t, "format_version = 1\ncodenames = [\"squash\"]\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-05-01\nreason = \"server\"\n")
+	if code, stderr := preview(); code != 1 || !strings.Contains(stderr, `Remove "squash" from the record's codenames`) {
+		t.Fatalf("a codename the squash message names: exit %d: %s", code, stderr)
+	}
+	repo.Write(lifecycle.RecordFile, proprietaryPortal)
+	if code, stderr := preview(); code != 0 {
+		t.Fatalf("with the codename removed: exit %d: %s", code, stderr)
+	}
+}
+
+func removeFixtureFile(t *testing.T, repo *testsupport.Repo, rel string) {
+	t.Helper()
+	if err := os.Remove(repo.Path(rel)); err != nil {
+		t.Fatal(err)
+	}
+}
