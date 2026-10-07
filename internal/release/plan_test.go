@@ -236,3 +236,54 @@ func TestThePlanTableNamesEveryEntry(t *testing.T) {
 		}
 	}
 }
+
+func TestExecutingTheBumpRefusesAPackedFileAnotherMemberOwns(t *testing.T) {
+	hygiene.Isolate(t)
+	fakeGitleaks(t)
+	repo := testsupport.NewRepo(t)
+	decl := strings.Replace(workspaceDeclarations, "publish_mode = \"none\"", "publish_mode = \"ci\"", 1)
+	decl = strings.Replace(decl, "[[members]]\npath = \"widget\"\nname = \"widget\"\nreleasable = \"widget\"\n", "[[members]]\npath = \"widget\"\nname = \"widget\"\nreleasable = \"widget\"\ntargets = [{ name = \"go\" }]\n\n[[members.pipelines]]\nname = \"go\"\ntype = \"go\"\ntarget = \"go\"\nlocal = false\nartifact = \"library\"\n", 1)
+	decl += "\n[[members]]\npath = \"widget/inner\"\nname = \"inner\"\nreleasable = \"gadget\"\n"
+	repo.Write(declarationsPath, decl)
+	repo.Write("widget/go.mod", "module example.com/widget\n\ngo 1.22\n")
+	repo.Write("widget/widget.go", "package widget\n")
+	repo.Write("widget/inner/notes.txt", "the gadget's own notes\n")
+	repo.Write("gadget/package.json", packageJSON("gadget", "0.2.0"))
+	repo.Write(".strictmetadata/releases/widget/version", "0.1.0\n")
+	repo.Write(".strictmetadata/releases/gadget/version", "0.2.0\n")
+	repo.Commit("the workspace", declarationsPath, "widget/go.mod", "widget/widget.go", "widget/inner/notes.txt", "gadget/package.json", ".strictmetadata/releases/widget/version", ".strictmetadata/releases/gadget/version")
+	in := release.BumpPlanInputs{Releasable: "widget", Representative: "widget", Current: version(t, "0.1.0"), Next: version(t, "0.2.0"), Primary: "go"}
+	execute := func() error {
+		plan := bumpPlan(t, repo.Dir, in)
+		if !strings.Contains(entryTypes(plan), "packed-artifact-contents") {
+			t.Fatalf("the plan checks no packed contents: %s", entryTypes(plan))
+		}
+		_, err := mutating(t, false, func(e *strictcli.Effects) error {
+			ws, err := workspace.Load(repo.Dir)
+			if err != nil {
+				return err
+			}
+			r, err := git.Open(e, repo.Dir)
+			if err != nil {
+				return err
+			}
+			idx, err := index.Load(filepath.Join(t.TempDir(), "confidential-names.toml"))
+			if err != nil {
+				return err
+			}
+			_, err = release.ExecuteBumpPlan(e, plan, release.BumpExecution{Workspace: ws, Releasable: "widget", Repo: r, LiveRoot: repo.Dir, Rerun: "run the release again", Record: &lifecycle.Record{}, Index: idx, Now: time.Date(2026, 10, 7, 0, 0, 0, 0, time.UTC), Log: func(string) {}})
+			return err
+		})
+		return err
+	}
+	err := execute()
+	if err == nil {
+		t.Fatal("a module zip carrying another member's file was not refused")
+	}
+	requireContains(t, err.Error(), "would publish files from outside its members' paths", "widget/inner/notes.txt", `the member "inner" owns`)
+	// The fix the refusal names: the file is no longer packed, the inner
+	// member a module of its own, which the module zip leaves out.
+	repo.Git("checkout", "--", ".")
+	repo.CommitFile("widget/inner/go.mod", "module example.com/widget/inner\n\ngo 1.22\n", "inner is a module of its own")
+	mustNotFail(t, execute())
+}

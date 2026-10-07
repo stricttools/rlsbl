@@ -439,3 +439,48 @@ func TestARecordDroppingWhatTheReleaseCommitHeldIsRefused(t *testing.T) {
 	_, err = validate(t, repo, nil, nil)
 	mustNotFail(t, err)
 }
+
+func TestADeployCommandOnAReleasableThatIsNoServerIsRefusedUntilDeleted(t *testing.T) {
+	hygiene.Isolate(t)
+	gitHub(t, "public", true)
+	repo := readyRepo(t, "")
+	declared := read(t, repo.Path(declarationsPath))
+	repo.CommitFile(declarationsPath, strings.Replace(declared, `publish_mode = "ci"`, "publish_mode = \"ci\"\ndeploy_command = [\"true\"]", 1), "deploy portal")
+	_, err := validate(t, repo, nil, nil)
+	if err == nil || !strings.Contains(err.Error(), "declares deploy_command, which only a server releasable declares") || !strings.Contains(err.Error(), "or delete deploy_command") {
+		t.Fatalf("a deploy command on a releasable that is no server was released: %v", err)
+	}
+	// The fix the refusal names: deploy_command deleted.
+	repo.CommitFile(declarationsPath, declared, "no deploy")
+	_, err = validate(t, repo, nil, nil)
+	mustNotFail(t, err)
+}
+
+const goLibrary = `targets = [{ name = "npm" }, { name = "go" }]
+
+[[members.pipelines]]
+name = "go"
+type = "go"
+target = "go"
+local = false
+artifact = "library"
+`
+
+func TestAGoLibraryOfAProprietaryReleasableIsRefusedUntilItPublishesNoLibrary(t *testing.T) {
+	hygiene.Isolate(t)
+	gitHub(t, "private", true)
+	repo := readyRepo(t, goLibrary)
+	repo.Write("go.mod", "module github.com/acme/portal\n\ngo 1.22\n")
+	repo.Write(releaseFilePath, releaseFile("minor", `"npm"`, `"go"`))
+	repo.Write(recordPath, strings.Replace(lifecycleRecord("active"), `license = "MIT"`, `license = "proprietary"`, 1))
+	repo.Commit("a proprietary go library", "go.mod", releaseFilePath, recordPath)
+	_, err := validate(t, repo, nil, nil)
+	if err == nil || !strings.Contains(err.Error(), "go-library") || !strings.Contains(err.Error(), `the go pipeline "go" of the member "root"`) {
+		t.Fatalf("a proprietary releasable's go library was released: %v", err)
+	}
+	// The fix: the pipeline publishing the library is gone.
+	declared := read(t, repo.Path(declarationsPath))
+	repo.CommitFile(declarationsPath, strings.Replace(declared, goLibrary, `targets = [{ name = "npm" }, { name = "go" }]`+"\n", 1), "publish no go library")
+	_, err = validate(t, repo, nil, nil)
+	mustNotFail(t, err)
+}
