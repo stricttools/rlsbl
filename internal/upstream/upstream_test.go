@@ -28,7 +28,7 @@ const (
 // cloned from it, and the fork's work tree: a clone of origin carrying one
 // commit and one tag of its own (nightly), both pushed, declaring the
 // upstream. The declared URL is redirected to the local upstream with git's
-// url.<base>.insteadOf, so the code runs the real git ls-remote against the
+// url.<base>.insteadOf, so the code runs git ls-remote itself against the
 // URL it derives.
 type fork struct {
 	t        *testing.T
