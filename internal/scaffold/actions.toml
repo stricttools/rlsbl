@@ -1,0 +1,21 @@
+# The GitHub Actions versions every workflow rlsbl generates pins, by action.
+# Templates name an action with {{action "owner/name"}} and read its version
+# with {{actionVersion "owner/name"}}; an action missing here is refused when
+# a template names it. Bump a version here and re-run rlsbl scaffold.
+
+"actions/checkout" = "v6"
+"actions/setup-node" = "v6"
+"actions/setup-go" = "v6"
+"actions/setup-python" = "v5"
+"astral-sh/setup-uv" = "v7"
+"pypa/gh-action-pypi-publish" = "release/v1"
+"goreleaser/goreleaser-action" = "v7.2.3"
+# Not an action: the goreleaser distribution the action installs, pinned
+# exactly and read through {{actionVersion "goreleaser/goreleaser"}} as the
+# action's version input. A floating "~> v2" resolved to 2.18.1, which reads
+# the tag named by GORELEASER_CURRENT_TAG before --skip=validate applies and
+# aborts when no tag carries that name: a release that published its module
+# and packages with no archives on its GitHub Release.
+"goreleaser/goreleaser" = "v2.18.1"
+"pnpm/action-setup" = "v4"
+"dorny/paths-filter" = "v4"
