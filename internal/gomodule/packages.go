@@ -32,7 +32,7 @@ type Package struct {
 // The go toolchain is the one source of a project's packages and of which of
 // them are main packages: hand-rolled globbing for main.go misreads entry
 // files with other names, _test.go files in package main directories, and a
-// root package main file without func main beside a real main under cmd/.
+// root package main file without func main beside the main package under cmd/.
 // Nothing here falls back to scanning files.
 
 // ListPackages enumerates every package of the module rooted at dir (an
@@ -156,8 +156,8 @@ func ValidateInstallPaths(r Runner, dir string, paths []string) ([]string, error
 
 // ResolveMainPackageDir is the one main package of the module rooted at dir,
 // for what needs a single binary (goreleaser's main, where version.go goes).
-// With install paths declared they must name exactly one main package;
-// without, the module must have exactly one. Anything else is an error
+// With install paths declared they must name one main package and no
+// more; without, the module must have one. Anything else is an error
 // naming what `go list` found.
 func ResolveMainPackageDir(r Runner, dir string, declared []string) (string, error) {
 	if declared != nil {
@@ -166,7 +166,7 @@ func ResolveMainPackageDir(r Runner, dir string, declared []string) (string, err
 			return "", err
 		}
 		if len(paths) != 1 {
-			return "", fmt.Errorf("the go pipeline's install_paths name %d main packages (%s), but goreleaser's main and the placement of version.go need exactly one", len(paths), strings.Join(declared, ", "))
+			return "", fmt.Errorf("the go pipeline's install_paths name %d main packages (%s), but goreleaser's main and the placement of version.go need one and no more", len(paths), strings.Join(declared, ", "))
 		}
 		return paths[0], nil
 	}

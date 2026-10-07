@@ -123,12 +123,12 @@ func TestAModuleWithoutAToolchainLineIsNamedAndTheNamedFixClearsIt(t *testing.T)
 
 func TestARetractionIsAppendedKeepingTheFileAndNotRepeated(t *testing.T) {
 	hygiene.Isolate(t)
-	before := "module example.com/portal\n\ngo 1.21 // the floor\n\n"
+	before := "module example.com/portal\n\ngo 1.21 // the oldest Go\n\n"
 	out, changed, err := AddRetraction("go.mod", []byte(before), "v1.2.3")
 	if err != nil || !changed {
 		t.Fatalf("changed %v, err %v", changed, err)
 	}
-	if want := "module example.com/portal\n\ngo 1.21 // the floor\n\nretract v1.2.3\n"; string(out) != want {
+	if want := "module example.com/portal\n\ngo 1.21 // the oldest Go\n\nretract v1.2.3\n"; string(out) != want {
 		t.Fatalf("got:\n%s", out)
 	}
 	if _, changed, err := AddRetraction("go.mod", out, "v1.2.3"); err != nil || changed {

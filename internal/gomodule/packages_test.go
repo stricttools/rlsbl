@@ -26,12 +26,13 @@ func goProject(t *testing.T, files ...file) string {
 
 // withGo runs fn with the effects handle of a read-only command, under
 // --dry-run too when dryRun is set: `go list -e -f` is on the observe
-// allowlist, so it runs for real either way.
+// allowlist, so it runs, not recorded, either way.
 func withGo(t *testing.T, dryRun bool, fn func(r Runner) error) {
 	t.Helper()
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("no Go toolchain on PATH")
 	}
+	t.Setenv("GOPROXY", "off")
 	testsupport.RunEffects(t, testsupport.CommandOptions{Effect: strictcli.EffectReadOnly, DryRun: dryRun, Allowlist: previewapply.Prefixes()}, func(e *strictcli.Effects) error {
 		return fn(e)
 	})

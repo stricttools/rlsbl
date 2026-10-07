@@ -454,8 +454,9 @@ func (s *goSource) symbolsIn(dir string) map[string]declaration {
 // package-level string var, uninitialized or initialized to a string
 // literal.
 func varSettable(typ ast.Expr, value ast.Expr) (string, bool) {
+	// A string literal's text opens with its quote: " or `.
 	literal := false
-	if lit, ok := value.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+	if lit, ok := value.(*ast.BasicLit); ok && (strings.HasPrefix(lit.Value, "\"") || strings.HasPrefix(lit.Value, "`")) {
 		literal = true
 	}
 	switch {
