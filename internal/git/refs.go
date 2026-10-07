@@ -85,18 +85,32 @@ func (r Repo) RequireToplevel() error {
 // CurrentBranch is the branch HEAD is on. A detached HEAD is an error: every
 // caller of this question acts on a named branch.
 func (r Repo) CurrentBranch() (string, error) {
-	args := []string{"symbolic-ref", "--quiet", "--short", "HEAD"}
-	res, err := r.read(localTimeout, nil, args...)
+	branch, attached, err := r.HeadBranch()
 	if err != nil {
 		return "", err
 	}
-	switch res.code {
-	case 0:
-		return strings.TrimSpace(res.stdout), nil
-	case 1:
+	if !attached {
 		return "", fmt.Errorf("HEAD is detached in %s: this operation acts on a named branch; check out the release branch", r.dir)
 	}
-	return "", r.failed(args, res)
+	return branch, nil
+}
+
+// HeadBranch is the branch HEAD is on; attached is false when HEAD is
+// detached, for a caller that reports the state rather than acting on a
+// branch.
+func (r Repo) HeadBranch() (branch string, attached bool, err error) {
+	args := []string{"symbolic-ref", "--quiet", "--short", "HEAD"}
+	res, err := r.read(localTimeout, nil, args...)
+	if err != nil {
+		return "", false, err
+	}
+	switch res.code {
+	case 0:
+		return strings.TrimSpace(res.stdout), true, nil
+	case 1:
+		return "", false, nil
+	}
+	return "", false, r.failed(args, res)
 }
 
 // TagCommit is the commit the local tag points at, peeled through an

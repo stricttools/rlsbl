@@ -120,6 +120,9 @@ func TestCurrentBranchRefusesADetachedHead(t *testing.T) {
 		if _, err := r.CurrentBranch(); err == nil || !strings.Contains(err.Error(), "detached") {
 			return errors.New("a detached HEAD was reported as a branch")
 		}
+		if b, attached, err := r.HeadBranch(); err != nil || attached || b != "" {
+			return fmt.Errorf("HeadBranch on a detached HEAD: %q, %v, %v", b, attached, err)
+		}
 		return nil
 	})
 }
