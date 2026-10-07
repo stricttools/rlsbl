@@ -72,7 +72,7 @@ The project's own test runner skips them too, by each ecosystem's own setting:
 
 ## Private paths
 
-A registry keeps every upload permanently, so an upload may not carry a private path: planning notes (`todo/`), family metadata (`.strictmetadata/`, and the old `.rlsbl/` and `.rlsbl-monorepo/`), tool state (`.selfdoc/`, `.strictcli/`), agent instructions (`CLAUDE.md`, `AGENTS.md`, `.claude/`), scratch output (`experiments/`, `screenshots/`), environment files (`.env*`), and anything named `*.local-only`. The plain names count at the package root, the rest at any depth outside a `testdata` directory. Scaffold writes each ecosystem's exclusion:
+A registry keeps every upload permanently, so an upload may not carry a private path: planning notes (`todo/`), family metadata (`.strictmetadata/`, and the older `stricttools/`, `.stricttools/`, `.rlsbl/`, and `.rlsbl-monorepo/`), tool state (`.selfdoc/`, `.strictcli/`), agent instructions (`CLAUDE.md`, `AGENTS.md`, `.claude/`), scratch output (`experiments/`, `screenshots/`), environment files (`.env*`), and anything named `*.local-only`. The plain names count at the package root, the rest at any depth outside a `testdata` directory. Scaffold writes each ecosystem's exclusion:
 
 | Ecosystem | What scaffold writes |
 | --- | --- |

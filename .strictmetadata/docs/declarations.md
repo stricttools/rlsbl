@@ -140,7 +140,7 @@ The check fails when the lock resolves a policed dependency the manifest declare
 
 ## The sandboxed test runner
 
-`.strictmetadata/test-runner/test-runner.toml` declares the sandboxed test runner, the outer layer of the testisolation floor: the suite runs in a throwaway copy of the tree with the repository bound read-only, a throwaway `HOME`, and no network. It belongs to the `rlsbl:test-sandbox` option (`on > off`, default `off`): required while the option is on and refused while it is off. `rlsbl scaffold` renders the runner script, and `testisolation-floor` holds the repository to it.
+`.strictmetadata/test-runner/test-runner.toml` declares the sandboxed test runner, the outer layer of testisolation's test isolation: the suite runs in a throwaway copy of the tree with the repository bound read-only, a throwaway `HOME`, and no network. It belongs to the `rlsbl:test-sandbox` option (`on > off`, default `off`): required while the option is on and refused while it is off. `rlsbl scaffold` renders the runner script, and `testisolation-floor` holds the repository to it.
 
 | Key | Required | Meaning |
 | --- | --- | --- |
