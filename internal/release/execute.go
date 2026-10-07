@@ -87,6 +87,9 @@ type execution struct {
 	// push started, since a push that timed out may have reached origin.
 	pushed, pushAttempted bool
 	candidate             string
+	// batch is the release's role in a batch release; the zero value is a
+	// release of its own.
+	batch batchRole
 }
 
 func (x *execution) name() string { return x.releasable.Name }
@@ -103,6 +106,9 @@ func (x *execution) complete(step string) error {
 }
 
 func (x *execution) rerun() string {
+	if x.batch.rerun != "" {
+		return x.batch.rerun
+	}
 	if x.resuming {
 		return RerunResume
 	}
@@ -156,6 +162,10 @@ func (x *execution) walk() error {
 	}
 	if err := x.bumpAndCommit(); err != nil {
 		return x.stop(StepCommitted, err)
+	}
+	if x.batch.deferCandidate {
+		x.req.Log(fmt.Sprintf("Committed the release of %s %s; the batch pushes one candidate for every releasable it commits and waits for CI once", x.name(), x.version))
+		return nil
 	}
 	if err := x.pushCandidate(); err != nil {
 		return x.stop(StepCandidatePushed, err)
@@ -314,6 +324,9 @@ func (x *execution) pushCandidate() error {
 		x.req.Log(fmt.Sprintf("Skipping the candidate push and the CI wait: CI verified %s earlier", short(x.candidate)))
 		return nil
 	}
+	if x.batch.verified != "" {
+		return x.adoptBatchCandidate()
+	}
 	x.candidate = x.co.Tip
 	x.state.ReleaseCommit = x.candidate
 	if err := x.save(); err != nil {
@@ -330,7 +343,7 @@ func (x *execution) pushCandidate() error {
 		remote = ""
 	}
 	needsPush := remote != x.candidate
-	window, err := judgeCandidateWindow(x.repo, x.ws, x.name(), x.candidate, remote, needsPush, x.state.Completed(StepCandidatePushed), x.state.CreatedCommits, x.version, x.state.Tag, x.branch)
+	window, err := judgeCandidateWindow(x.repo, x.ws, x.name(), x.candidate, remote, needsPush, x.state.Completed(StepCandidatePushed), x.state.CreatedCommits, x.version, x.state.Tag, x.branch, RerunResume)
 	if err != nil {
 		return err
 	}

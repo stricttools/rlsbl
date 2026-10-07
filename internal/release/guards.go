@@ -198,8 +198,9 @@ const (
 // end one way. A resume whose fix-forward honestly touches nothing of the
 // releasable (its candidate published once before) owes a run_all dispatch
 // instead. needsPush false means origin is at the candidate already, and
-// the window is the release's own commits.
-func judgeCandidateWindow(repo git.Repo, w *workspace.Workspace, releasable, candidate, remote string, needsPush, publishedBefore bool, created []string, v semver.Version, tag, branch string) (candidateWindow, error) {
+// the window is the release's own commits. rerun is what the refusal tells
+// the operator to run once a change is committed.
+func judgeCandidateWindow(repo git.Repo, w *workspace.Workspace, releasable, candidate, remote string, needsPush, publishedBefore bool, created []string, v semver.Version, tag, branch, rerun string) (candidateWindow, error) {
 	if !w.IsWorkspace() || remote == "" {
 		return windowTriggers, nil
 	}
@@ -278,7 +279,7 @@ func judgeCandidateWindow(repo git.Repo, w *workspace.Workspace, releasable, can
 	}
 	lines = append(lines, "  Changed in the window:", "    "+strings.Join(orNone(shown), "\n    ")+more, "",
 		fmt.Sprintf("The members' jobs would conclude skipped, and the publish workflow refuses a skipped check, so %s would exist for a version that can never publish. Nothing was pushed, tagged, released, or finalized, and %s is not burnt.", tag, v),
-		fmt.Sprintf("Commit a change under one of the filters above on %s (record it with `rlsbl changelog add`), then run `rlsbl release resume`.", branch),
+		fmt.Sprintf("Commit a change under one of the filters above on %s (record it with `rlsbl changelog add`), then %s.", branch, rerun),
 		"",
 		ci.RunAllFix)
 	return 0, &CIError{Message: strings.Join(lines, "\n")}

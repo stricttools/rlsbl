@@ -118,6 +118,12 @@ func waitNotice(log func(string)) func(string) {
 // would write are recorded, and it stops after the version-bumped step,
 // listing the steps it would take after it.
 func Release(e *strictcli.Effects, s *Session, req RunRequest) error {
+	return release(e, s, req, batchRole{})
+}
+
+// release is Release in the role batch gives it: none for `rlsbl release
+// run`, or a releasable's first pass of a batch release.
+func release(e *strictcli.Effects, s *Session, req RunRequest, batch batchRole) error {
 	if err := req.check(); err != nil {
 		return err
 	}
@@ -140,7 +146,7 @@ func Release(e *strictcli.Effects, s *Session, req RunRequest) error {
 		return err
 	}
 	now := req.Now()
-	v, err := Validate(e, Request{Root: s.Root, LiveRoot: s.LiveRoot, Dir: req.Dir, Releasable: req.Releasable, Fork: req.Fork, Now: now, GitHub: gh, Registry: reg, Environment: env, Log: req.Log})
+	v, err := validate(e, Request{Root: s.Root, LiveRoot: s.LiveRoot, Dir: req.Dir, Releasable: req.Releasable, Fork: req.Fork, Now: now, GitHub: gh, Registry: reg, Environment: env, Log: req.Log}, batch.file)
 	if err != nil {
 		return err
 	}
@@ -164,7 +170,7 @@ func Release(e *strictcli.Effects, s *Session, req RunRequest) error {
 		ws: v.Workspace, repo: v.Repo, releasable: v.Releasable, representative: v.Representative,
 		version: v.Decision.Version, current: v.Current, primary: v.Primary, syncs: v.Syncs,
 		environment: v.Environment, gh: gh, ghRepo: v.GitHub, reg: reg, record: v.Lifecycle,
-		publishesFromCI: v.PublishesFromCI, branch: v.Branch, now: now,
+		publishesFromCI: v.PublishesFromCI, branch: v.Branch, now: now, batch: batch,
 	})
 	if err != nil {
 		return err
@@ -317,6 +323,12 @@ func resumedReleasable(ws *workspace.Workspace, liveRoot, dir string) (string, e
 // entered. Under --dry-run it reports what the resume would adopt and which
 // steps it would take, and writes nothing.
 func ResumeIn(e *strictcli.Effects, s *Session, req RunRequest, releasable string) error {
+	return resumeIn(e, s, req, releasable, batchRole{})
+}
+
+// resumeIn is ResumeIn in the role batch gives it: none for `rlsbl release
+// resume`, or a releasable's second pass of a batch release.
+func resumeIn(e *strictcli.Effects, s *Session, req RunRequest, releasable string, batch batchRole) error {
 	state, found, err := runstate.LoadInProgress(s.LiveRoot, releasable)
 	if err != nil {
 		return err
@@ -432,7 +444,7 @@ func ResumeIn(e *strictcli.Effects, s *Session, req RunRequest, releasable strin
 	x, err := newExecution(e, s, req, executionSetup{
 		ws: ws, repo: repo, releasable: r, representative: rep, version: version, current: current,
 		primary: primary, syncs: syncs, environment: env, gh: gh, ghRepo: ghRepo, reg: reg, record: record,
-		publishesFromCI: publishesFromCI(ws, r), branch: branch, now: req.Now(), resuming: true,
+		publishesFromCI: publishesFromCI(ws, r), branch: branch, now: req.Now(), resuming: true, batch: batch,
 	})
 	if err != nil {
 		return err
@@ -520,6 +532,7 @@ type executionSetup struct {
 	branch          string
 	now             time.Time
 	resuming        bool
+	batch           batchRole
 }
 
 func newExecution(e *strictcli.Effects, s *Session, req RunRequest, in executionSetup) (*execution, error) {
@@ -561,7 +574,7 @@ func newExecution(e *strictcli.Effects, s *Session, req RunRequest, in execution
 		version: in.version, current: in.current, primary: in.primary, syncs: in.syncs,
 		env: in.environment, gh: in.gh, ghRepo: in.ghRepo, reg: in.reg, record: in.record,
 		index: idx, scanner: scanner, timeouts: timeouts, ecosystemTagging: !taggingOff,
-		publishesFromCI: in.publishesFromCI, branch: in.branch, now: in.now, resuming: in.resuming, req: req,
+		publishesFromCI: in.publishesFromCI, branch: in.branch, now: in.now, resuming: in.resuming, batch: in.batch, req: req,
 	}, nil
 }
 

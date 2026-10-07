@@ -99,6 +99,13 @@ type Validated struct {
 // environment file, and the dev overlays are read in the working tree;
 // everything committed is read under Root.
 func Validate(e *strictcli.Effects, req Request) (*Validated, error) {
+	return validate(e, req, nil)
+}
+
+// validate is Validate with the release's fields read from the releasable's
+// release file, or, for a releasable of a batch release (batch not nil),
+// taken from its table of the batch release file.
+func validate(e *strictcli.Effects, req Request, batch *releaserecord.ReleaseFile) (*Validated, error) {
 	log := req.Log
 	if log == nil {
 		log = func(string) {}
@@ -123,8 +130,16 @@ func Validate(e *strictcli.Effects, req Request) (*Validated, error) {
 	if v.CompletedState, err = refuseInProgress(repo, req.LiveRoot, v.Releasable); err != nil {
 		return nil, err
 	}
-	if v.ReleaseFile, err = releaserecord.ReadReleaseFile(req.Root, name); err != nil {
-		return nil, err
+	source := releaseFileSource{file: releaserecord.ReleaseFilePath(name)}
+	if batch == nil {
+		if v.ReleaseFile, err = releaserecord.ReadReleaseFile(req.Root, name); err != nil {
+			return nil, err
+		}
+	} else {
+		if source, err = batchSource(req.Root, req.LiveRoot, name); err != nil {
+			return nil, err
+		}
+		v.ReleaseFile = *batch
 	}
 	if v.Lifecycle, err = lifecycle.Load(req.Root); err != nil {
 		return nil, err
@@ -138,7 +153,7 @@ func Validate(e *strictcli.Effects, req Request) (*Validated, error) {
 	if err := live.RefuseStash("release", "The release commits, tags, and pushes this working tree, and a stash rides along in none of it."); err != nil {
 		return nil, refuse("%v", err)
 	}
-	if err := validateTargets(ws, v.Releasable, v.ReleaseFile); err != nil {
+	if err := validateTargets(ws, v.Releasable, v.ReleaseFile, source); err != nil {
 		return nil, err
 	}
 	v.Primary = v.ReleaseFile.Include[0]
@@ -154,7 +169,7 @@ func Validate(e *strictcli.Effects, req Request) (*Validated, error) {
 	if err := RefuseUntidyGoModules(e, req.Root, req.LiveRoot, v.Syncs, v.Environment); err != nil {
 		return nil, err
 	}
-	if err := refuseUserFacing(req.Root, name, v.ReleaseFile.Bump); err != nil {
+	if err := refuseUserFacing(req.Root, name, v.ReleaseFile.Bump, source); err != nil {
 		return nil, err
 	}
 	if err := refuseAppendOnlyBreach(repo, ws, v.Releasable, v.Lifecycle, req.Fork); err != nil {
@@ -359,14 +374,14 @@ func releaseTargets(ws *workspace.Workspace, releasable string) (map[string]bool
 // names a target rlsbl does not support, or whose include and exclude lists
 // do not between them name every target the releasable's members have and
 // nothing else.
-func validateTargets(ws *workspace.Workspace, r declarations.Releasable, rf releaserecord.ReleaseFile) error {
-	path := releaserecord.ReleaseFilePath(r.Name)
+func validateTargets(ws *workspace.Workspace, r declarations.Releasable, rf releaserecord.ReleaseFile, source releaseFileSource) error {
+	path := source.described()
 	if len(rf.Include) == 0 {
-		return refuse("the release file %s includes no target; add at least one to include", path)
+		return refuse("%s includes no target; add at least one to include", path)
 	}
 	for _, name := range append(append([]string(nil), rf.Include...), rf.Exclude...) {
 		if _, err := targets.Get(name); err != nil {
-			return refuse("the release file %s names a target: %v", path, err)
+			return refuse("%s names a target: %v", path, err)
 		}
 	}
 	detected, err := releaseTargets(ws, r.Name)
@@ -391,10 +406,10 @@ func validateTargets(ws *workspace.Workspace, r declarations.Releasable, rf rele
 	sort.Strings(missing)
 	sort.Strings(extra)
 	if len(missing) > 0 {
-		return refuse("the releasable %q has targets the release file %s names in neither include nor exclude: %s; add each to one of them", r.Name, path, strings.Join(missing, ", "))
+		return refuse("the releasable %q has targets %s names in neither include nor exclude: %s; add each to one of them", r.Name, path, strings.Join(missing, ", "))
 	}
 	if len(extra) > 0 {
-		return refuse("the release file %s names targets no member of the releasable %q has: %s; remove them from include and exclude", path, r.Name, strings.Join(extra, ", "))
+		return refuse("%s names targets no member of the releasable %q has: %s; remove them from include and exclude", path, r.Name, strings.Join(extra, ", "))
 	}
 	return nil
 }
@@ -477,7 +492,7 @@ func refuseVersionSkew(ws *workspace.Workspace, r declarations.Releasable, liveR
 // refuseUserFacing holds the unreleased changelog to the bump's rule: an
 // infra release has no user-facing entry, and every other release has at
 // least one.
-func refuseUserFacing(root, releasable string, bump semver.Bump) error {
+func refuseUserFacing(root, releasable string, bump semver.Bump, source releaseFileSource) error {
 	f, err := changelog.ReadUnreleased(root, changelog.Dir(releasable))
 	if err != nil {
 		return err
@@ -488,7 +503,7 @@ func refuseUserFacing(root, releasable string, bump semver.Bump) error {
 			userFacing = true
 		}
 	}
-	file := releaserecord.ReleaseFilePath(releasable)
+	file := source.file
 	if bump == semver.Infra && userFacing {
 		return refuse("an infra release has no user-facing changelog entry, and %s holds one; use patch, minor, or major in %s instead", f.Path, file)
 	}
