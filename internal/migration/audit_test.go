@@ -53,6 +53,8 @@ func TestEveryConfigKeyConverts(t *testing.T) {
 		{name: "npm_wrapper.enabled", config: `{"publish_mode": "ci", "targets": ["go", "npm"], "npm_wrapper": {"enabled": true}, "pipelines": {"go": {"type": "go", "target": "go", "local": false, "artifact": "binary"}, "npm": {"type": "npm", "target": "npm", "local": false}}}`,
 			setup:        goModule,
 			declarations: []string{`artifact = "go-binary"`, `binary_pipeline = "go"`}},
+		{name: "both batch limits", config: `{"publish_mode": "none", "targets": ["npm"], "pipelines": {}, "batch_limits": {"max_commits_per_entry": 7, "max_entries_per_commit": 3}}`,
+			notes: []string{"batch_limits.max_commits_per_entry is dropped", "batch_limits.max_entries_per_commit is dropped"}},
 		{name: "release_branches", config: `{"publish_mode": "none", "targets": ["npm"], "pipelines": {}, "release_branches": ["main"]}`, declarations: []string{`release_branches = ["main"]`}},
 		{name: "the deleted keys", config: `{"publish_mode": "none", "targets": ["npm"], "pipelines": {}, "changelog_format": "jsonl", "changelog_format_version_enforced": true, "private": false, "deploy": [], "services": [], "test_env": {}, "uv_sync_verbose": true}`,
 			notes: []string{"changelog_format is dropped", "changelog_format_version_enforced is dropped", "private is dropped", "deploy is dropped", "services is dropped", "test_env is dropped", "uv_sync_verbose is dropped"}},
@@ -252,4 +254,34 @@ func TestTheLibraryLintListsMoveToStrictcode(t *testing.T) {
 	contains(t, text, `ts = ["koa"]`)
 	contains(t, text, `ts = ["console.log"]`)
 	lacks(t, text, "argparse")
+}
+
+func TestAReleasableOmittingItsTagFormatInAWorkspaceTakesTheNameScopedOne(t *testing.T) {
+	hygiene.Isolate(t)
+	f := workspaceFixture(t)
+	d, err := declarations.Parse([]byte(planned(t, f.mustPlan(), declarations.ReleasablesFile)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"widget", "gadget"} {
+		r, ok := d.Releasable(name)
+		if !ok || r.TagFormat != "{name}@v{version}" {
+			t.Fatalf("the releasable %q declares the tag format %q", name, r.TagFormat)
+		}
+	}
+}
+
+func TestRuffLintSwitchedOffMovesNoCoverageToStrictcode(t *testing.T) {
+	hygiene.Isolate(t)
+	f := workspaceFixture(t)
+	f.write(".strictmetadata/options/manifest.toml", "owner = \"strictspec\"\n")
+	f.write(".strictmetadata/options/code.toml", "format_version = 1\n\n[[entry]]\nid = \"rlsbl:ruff-lint\"\ncurrent = \"off\"\nideal = \"error\"\nreason = \"not yet\"\n")
+	f.commit("ruff-lint off")
+	plan := f.mustPlan()
+	if writes(plan, StrictcodeFile) {
+		lacks(t, planned(t, plan, StrictcodeFile), "[python_tools.lint]")
+	}
+	code := planned(t, plan, ".strictmetadata/options/code.toml")
+	lacks(t, code, "strictcode:lint")
+	lacks(t, code, "rlsbl:ruff-lint")
 }
