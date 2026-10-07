@@ -174,7 +174,10 @@ func TestTheAttemptsLocalTagIsRefusedUntilTheBackfillRecordsIt(t *testing.T) {
 	requireExit(t, r, 1)
 	requireContains(t, r.Stderr, "the attempt's tag v0.4.0 exists in this repository", "rlsbl release backfill --dry-run")
 	// What the backfill does: record the release the tag is evidence of.
-	p.finalize("portal", "0.4.0", p.Git("rev-parse", "v0.4.0"))
+	// finalize tags the release commit itself, so the tag is taken off first.
+	tagged := p.Git("rev-parse", "v0.4.0^{commit}")
+	p.Git("tag", "-d", "v0.4.0")
+	p.finalize("portal", "0.4.0", tagged)
 	r = abandon(t, p, false)
 	if strings.Contains(r.Stderr, "exists in this repository") {
 		t.Fatalf("the refusal did not clear:\n%s", r.Stderr)

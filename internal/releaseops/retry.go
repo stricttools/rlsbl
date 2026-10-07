@@ -142,11 +142,15 @@ func Retry(ctx *strictcli.Context, req RetryRequest) (err error) {
 		}
 	}
 	if len(unknown) > 0 {
-		var names []string
-		for _, w := range workflows {
-			names = append(names, w.file)
+		names := "none"
+		if len(workflows) > 0 {
+			files := make([]string, len(workflows))
+			for i, w := range workflows {
+				files[i] = w.file
+			}
+			names = strings.Join(files, ", ")
 		}
-		return fmt.Errorf("%s names %s, which the tree %s tags holds no dispatchable workflow of; the dispatchable workflows there are %s. Correct the file, or remove it and run the retry again, which writes it from the tagged tree", retryPath, strings.Join(unknown, ", "), tag, joinOrNone(names))
+		return fmt.Errorf("%s names %s, which the tree %s tags holds no dispatchable workflow of; the dispatchable workflows there are %s. Correct the file, or remove it and run the retry again, which writes it from the tagged tree", retryPath, strings.Join(unknown, ", "), tag, names)
 	}
 	before := map[string]map[int64]bool{}
 	if req.Watch && !ctx.DryRun() {
