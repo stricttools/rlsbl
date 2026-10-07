@@ -63,3 +63,26 @@ Recorded by the session that deleted the removed targets; each is an implementat
 - Axiom: a registry name, once held, is never dropped, proprietary software included.
 - Axiom: proprietary software may be split into a thin client and a server holding the proprietary logic; registries only ever receive the client, which protects the source. For such projects, releasing means publishing the client and deploying the server (the reason rlsbl had deploy). wavescript is the first planned case, after its own rewrite from Python to Go.
 - The support matrix is kept.
+
+## Private repositories, clients, and servers
+
+- Private repositories are unknown to the public: their names appear nowhere public. A private project that has, or will have, a public client may be named.
+- browserbuddy's published npm and PyPI versions are deprecated and yanked quietly, with a neutral notice that says nothing about it going private or proprietary; its registry names are kept.
+- A server releasable declares a deploy command (for example `<infrastructure tool> deploy wavescript-server --version 0.4.0`, naming a private infrastructure tool only through the releasable's private config). After tagging, the release runs it and fails when it fails; `rlsbl release resume` retries the same version. Hosts, health checks, and rollback stay in the infrastructure tool, not in rlsbl.
+- Licenses are declared per releasable, with dated periods in the lifecycle-and-license record; the private-repository and no-public-output rules apply per releasable, so a private repository may hold a releasable under a public license (a published client).
+- The private-repository publishing guard (npm build provenance, PyPI attestations, Go module proxy notification) is kept and ported into the lifecycle-and-license library as a rule of private repositories: a release from a private repository refuses every publishing feature that records the repository's identity anywhere public.
+- A Go client of a private repository is published only as built binaries, through npm per-platform packages and PyPI wheels; rlsbl refuses a Go library target on a private repository.
+- Before publishing a client, rlsbl packs the artifact (npm pack, the wheel, the binaries) and refuses if any file comes from outside the client releasable's member paths, naming each file.
+
+## The Go rewrite
+
+- `private-hook-stale` is dropped.
+- `requires-services` is dropped, with the `services` and `test_env` config keys; no config uses them.
+- Every rlsbl config key is audited in the rewrite plan: declarations of what a project is move to `.strictmetadata/` subject directories, behavior switches become strictspec options or are deleted, and the Go rlsbl reads only the new places.
+- The Go module goes in place at the repository root (`go.mod`, `cmd/rlsbl`, `internal/...`); the Python stays until the Go version passes, then is deleted in one commit, recoverable from history.
+- On-disk record formats are redesigned freely, with a one-time migration command run and committed across every rlsbl repository (37 at the backfill dry run) before the switch; the Go rlsbl reads only the new formats.
+- The Go rlsbl is distributed as a Go module and as prebuilt binaries through npm per-platform packages and PyPI wheels under the existing `rlsbl` names.
+- The uncommitted version-agreement refusal another session left in `rlsbl/commands/init_cmd.py` (with its test `tests/test_scaffold_version_agreement.py`) is committed first, carried into the Go version, and deleted with the rest of the Python.
+- The checks moving to strictcode are ported into strictcode in Go and strictcode is released, and the Go rlsbl's release checks call it, before the Python rlsbl is deleted.
+- The rewrite is finished only when the Python is deleted and the Go rlsbl is released: the record migration is committed in every rlsbl repository (rlsbl-owned files only), strictcli, strictcode, selfdoc, safegit, saferm, and rlsbl are released as needed in dependency order, and the rlsbl guides under ~/Projects/CONTEXT are rewritten for the Go commands.
+- The last Python version is 0.131.0.
