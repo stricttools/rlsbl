@@ -76,6 +76,7 @@ func cleanupPayloadSchema() map[string]any {
 		"removed":   arraySchema(entry),
 		"kept":      arraySchema(entry),
 		"committed": booleanSchema(),
+		"dry_run":   booleanSchema(),
 	})
 }
 
@@ -88,15 +89,19 @@ func renderCleanup(payload any) string {
 	if len(p.Removed) == 0 {
 		lines = append(lines, "No residue to remove.")
 	}
+	verb := "Removed"
+	if p.DryRun {
+		verb = "Would remove"
+	}
 	for _, r := range p.Removed {
-		lines = append(lines, fmt.Sprintf("Removed %s: %s", r.Path, r.Reason))
+		lines = append(lines, fmt.Sprintf("%s %s: %s", verb, r.Path, r.Reason))
 	}
 	for _, r := range p.Kept {
 		lines = append(lines, fmt.Sprintf("Kept %s: %s", r.Path, r.Reason))
 	}
 	if p.Committed {
 		lines = append(lines, "Committed: "+monorepo.CleanupCommitMessage)
-	} else if len(p.Removed) > 0 {
+	} else if len(p.Removed) > 0 && !p.DryRun {
 		lines = append(lines, "Nothing was committed.")
 	}
 	return strings.Join(lines, "\n")

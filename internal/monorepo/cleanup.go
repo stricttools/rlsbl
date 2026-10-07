@@ -22,6 +22,8 @@ type Cleanup struct {
 	Kept []ResidueEntry `json:"kept"`
 	// Committed is whether the removals were committed.
 	Committed bool `json:"committed"`
+	// DryRun is whether the removals were previewed and not made.
+	DryRun bool `json:"dry_run"`
 }
 
 // ResidueEntry is one residue path and why nothing reads it.
@@ -44,7 +46,7 @@ func RunCleanup(e *strictcli.Effects, repo git.Repo, ws *workspace.Workspace, au
 	if err != nil {
 		return Cleanup{}, err
 	}
-	out := Cleanup{Removed: []ResidueEntry{}, Kept: []ResidueEntry{}}
+	out := Cleanup{Removed: []ResidueEntry{}, Kept: []ResidueEntry{}, DryRun: dryRun}
 	var paths []string
 	for _, r := range residue {
 		entry := ResidueEntry{Path: r.Path, Directory: r.Directory, Reason: r.Reason}
