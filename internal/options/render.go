@@ -53,8 +53,10 @@ type FrameworkCheck struct {
 	Description string
 }
 
-// FrameworkChecks are the checks strictcli registers into rlsbl's app. A
-// test of the app holds this list to the checks the framework registers.
+// FrameworkChecks are the checks strictcli registers into rlsbl's app. The
+// names and severities are the framework's, and a test of the app in
+// internal/cli holds them to the app's check listing; the subjects and
+// descriptions are rlsbl's, since strictcli declares neither for a check.
 var FrameworkChecks = []FrameworkCheck{
 	{"cli-test-coverage", "error", "tests", "Every registered command path appears in the committed test-coverage manifest."},
 	{"consequential-grant-agreement", "warn", "code", "Every command declaring a grant that leaves the process also declares itself consequential."},
