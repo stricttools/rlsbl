@@ -1,0 +1,60 @@
+# rlsbl's options registry: every rlsbl check is an option, rlsbl:<check name>,
+# validated by strictspec's built-in options-registry schema. Generated from
+# internal/checks/checks.toml by `go run ./internal/options/gen`; never edit it
+# by hand.
+
+format_version = 2
+
+[[option]]
+name = "cli-test-coverage"
+subject = "tests"
+values = "error > warn > off"
+default = "error"
+scope = "none"
+requires = []
+description = "Every registered command path appears in the committed test-coverage manifest."
+
+[[option]]
+name = "consequential-grant-agreement"
+subject = "code"
+values = "warn > off"
+default = "warn"
+scope = "none"
+requires = []
+description = "Every command declaring a grant that leaves the process also declares itself consequential."
+
+[[option]]
+name = "ecosystem-tagging"
+subject = "project"
+values = "on > off"
+default = "on"
+scope = "none"
+requires = []
+description = "Whether rlsbl tags the project as part of the rlsbl ecosystem: the rlsbl keyword in package.json and pyproject.toml, and the rlsbl topic on its GitHub repository, which `rlsbl discover` searches."
+
+[[option]]
+name = "effects-bypass"
+subject = "code"
+values = "error > warn > off"
+default = "error"
+scope = "none"
+requires = []
+description = "No process, filesystem-mutation, or network call reachable from a command handler bypasses the effects handle."
+
+[[option]]
+name = "observe-allowlist-breadth"
+subject = "code"
+values = "warn > off"
+default = "warn"
+scope = "none"
+requires = []
+description = "No proc_observe_allowlist prefix is a single token."
+
+[[option]]
+name = "test-sandbox"
+subject = "tests"
+values = "on > off"
+default = "off"
+scope = "path"
+requires = []
+description = "Whether the repository distributes the sandboxed test runner .strictmetadata/test-runner/test-runner.toml describes: scaffold renders the runner, and testisolation-floor requires every CI workflow the file names to invoke it."
