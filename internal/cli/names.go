@@ -69,7 +69,7 @@ func registerNames(r *commandSet) {
 		help:          claimNameHelp,
 		effect:        mutating,
 		consequential: true,
-		grants: []strictcli.Grant{newGrant(publishGrant,
+		grants: []strictcli.Grant{strictcli.NewGrant(publishGrant,
 			"claiming a name publishes a package to a public registry, and neither npm nor PyPI lets you take it back",
 			strictcli.ProcMutate)},
 		args: []strictcli.Arg{

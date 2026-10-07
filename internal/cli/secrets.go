@@ -37,7 +37,7 @@ func registerSecrets(r *commandSet) {
 		// Only a person may decide to replace the credential CI publishes
 		// with, across every repository the account can see with --all.
 		consequential: true,
-		grants: []strictcli.Grant{newGrant(setSecretGrant,
+		grants: []strictcli.Grant{strictcli.NewGrant(setSecretGrant,
 			"replaces the NPM_TOKEN Actions secret a repository's CI publishes to npm with",
 			strictcli.ProcMutate)},
 		flags: []strictcli.Flag{

@@ -178,7 +178,7 @@ func TestRegistrationRules(t *testing.T) {
 	})
 }
 
-// A grant built by newGrant authorizes the effect class it names: a run
+// A grant built by strictcli.NewGrant authorizes the effect class it names: a run
 // using it is accepted, and recorded under --dry-run.
 func TestNewGrantAuthorizesItsEffectClass(t *testing.T) {
 	hygiene.Isolate(t)
@@ -187,7 +187,7 @@ func TestNewGrantAuthorizesItsEffectClass(t *testing.T) {
 		path:   []string{"publish"},
 		help:   "Publish",
 		effect: mutating,
-		grants: []strictcli.Grant{newGrant("publish", "publishing cannot be undone", strictcli.ProcMutate)},
+		grants: []strictcli.Grant{strictcli.NewGrant("publish", "publishing cannot be undone", strictcli.ProcMutate)},
 		run: func(ctx *strictcli.Context, _ map[string]any) (any, error) {
 			_, err := ctx.Effects().Run([]interface{}{"true"}, strictcli.UseGrant("publish"))
 			return nil, err

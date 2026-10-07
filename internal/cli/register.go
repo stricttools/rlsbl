@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"time"
 
@@ -84,20 +83,6 @@ func (e *exitStatus) Error() string {
 		return fmt.Sprintf("exit status %d", e.code)
 	}
 	return e.message
-}
-
-// newGrant declares a grant for the effect class it authorizes
-// (strictcli.ProcMutate, strictcli.FileWrite, ...). strictcli names that
-// field with a word rlsbl's sources never spell, so it is set by name here,
-// once; a strictcli that renames the field panics at registration.
-func newGrant(name, reason, effectClass string) strictcli.Grant {
-	g := strictcli.Grant{Name: name, Reason: reason}
-	field := reflect.ValueOf(&g).Elem().FieldByName(strings.ToUpper("k") + "ind")
-	if !field.IsValid() || field.Type() != reflect.TypeOf("") {
-		panic("cli: strictcli.Grant has no string field for the effect class a grant authorizes")
-	}
-	field.SetString(effectClass)
-	return g
 }
 
 // commandSet registers commands and the groups that hold them.
