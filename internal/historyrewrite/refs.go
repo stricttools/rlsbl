@@ -5,32 +5,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
+	"github.com/stricttools/rlsbl/internal/release"
 )
 
 // origin is the remote every history rewrite publishes to.
 const origin = "origin"
 
-// shippedPushTimeout bounds one ref push when the declarations declare no
-// push timeout, as it bounds the release's pushes.
-const shippedPushTimeout = 300 * time.Second
-
-// PushTimeout is the timeout of one ref push: override when given is true
-// (the command was given --push-timeout), else the declarations'
+// PushTimeout is the timeout of one ref push, resolved as the release
+// resolves its own: --push-timeout when given, else the declarations'
 // push_seconds, else the shipped one.
-func PushTimeout(d *declarations.Releasables, override int, given bool) (time.Duration, error) {
-	if given {
-		if override <= 0 {
-			return 0, fmt.Errorf("--push-timeout must be a positive number of seconds, not %d", override)
-		}
-		return time.Duration(override) * time.Second, nil
-	}
-	if d != nil && d.Timeouts.PushSeconds > 0 {
-		return time.Duration(d.Timeouts.PushSeconds) * time.Second, nil
-	}
-	return shippedPushTimeout, nil
-}
+var PushTimeout = release.PushTimeout
 
 // tagName is the tag a refs/tags/ ref names, and false for any other ref.
 func tagName(ref string) (string, bool) {

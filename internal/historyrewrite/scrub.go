@@ -20,6 +20,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/github"
+	"github.com/stricttools/rlsbl/internal/release"
 	"github.com/stricttools/rlsbl/internal/releaserecord"
 	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/workspace"
@@ -375,33 +376,6 @@ func (r *scrubRun) requireReleaseBranch() error {
 	return nil
 }
 
-// removeReleaseCheckout removes the release checkout, whose detached HEAD
-// pins the history as it was before the rewrite. The next release creates
-// it afresh.
-func (r *scrubRun) removeReleaseCheckout() error {
-	common, err := r.repo.CommonDir()
-	if err != nil {
-		return err
-	}
-	checkout := filepath.Join(common, "rlsbl", "release-checkout")
-	resolved := checkout
-	if p, err := filepath.EvalSymlinks(checkout); err == nil {
-		resolved = p
-	}
-	worktrees, err := r.repo.Worktrees()
-	if err != nil {
-		return err
-	}
-	if !slices.Contains(worktrees, resolved) {
-		return nil
-	}
-	if err := r.repo.RemoveWorktree(checkout); err != nil {
-		return err
-	}
-	r.say(fmt.Sprintf("Removed the release checkout at %s: it pinned the history as it was before the rewrite. The next release creates it afresh.", checkout))
-	return nil
-}
-
 // rewrite runs safegit's rewrite and saves what it did. It returns nil state
 // when safegit found nothing to rewrite (after validating and repairing the
 // changelog and the archives from an earlier rewrite's journal).
@@ -413,7 +387,7 @@ func (r *scrubRun) rewrite(args []string) (*scrubState, error) {
 	if err := r.refuseStoppedReleases(); err != nil {
 		return nil, err
 	}
-	if err := r.removeReleaseCheckout(); err != nil {
+	if err := release.RemoveCheckout(r.repo, r.say); err != nil {
 		return nil, err
 	}
 	started := r.now()

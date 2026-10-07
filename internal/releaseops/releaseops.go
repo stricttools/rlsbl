@@ -27,16 +27,13 @@ import (
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/github"
+	"github.com/stricttools/rlsbl/internal/release"
 	"github.com/stricttools/rlsbl/internal/releaserecord"
 	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/semver"
 	"github.com/stricttools/rlsbl/internal/upstream"
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
-
-// shippedPushTimeout bounds a push when the declarations state no
-// push_seconds, as the release's own pushes are bounded.
-const shippedPushTimeout = 300 * time.Second
 
 // origin is the remote every release pushes to and every command here
 // reads.
@@ -102,12 +99,11 @@ func (s Selection) Root() string { return s.Workspace.Root }
 // abs is the absolute path of the repository-relative rel.
 func (s Selection) abs(rel string) string { return filepath.Join(s.Root(), filepath.FromSlash(rel)) }
 
-// pushTimeout bounds one push.
+// pushTimeout bounds one push, as the release bounds its own: the
+// declarations' push_seconds, else the shipped push timeout.
 func (s Selection) pushTimeout() time.Duration {
-	if seconds := s.Workspace.Declarations.Timeouts.PushSeconds; seconds > 0 {
-		return time.Duration(seconds) * time.Second
-	}
-	return shippedPushTimeout
+	timeout, _ := release.PushTimeout(s.Workspace.Declarations, 0, false)
+	return timeout
 }
 
 // ParseVersion reads a version argument. A version is MAJOR.MINOR.PATCH,
