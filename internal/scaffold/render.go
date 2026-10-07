@@ -14,7 +14,9 @@ import (
 //     actions.toml; an action it does not pin is refused.
 //   - {{#if name}}...{{/if}} keeps its body when the variable name is set to
 //     a non-empty string and drops the whole block otherwise. Blocks do not
-//     nest. A run of three or more newlines left behind is collapsed to two.
+//     nest. A run of three or more newlines at a block's edge, which
+//     dropping or keeping it left behind, is collapsed to two; a run
+//     anywhere else is the template's own and is kept.
 //   - {{name}} (a dotted name such as {{npm.nodeMatrix}} included) becomes
 //     the variable's value. A placeholder no variable answers is refused:
 //     a template never reaches disk with a placeholder in it.
@@ -26,11 +28,15 @@ import (
 // escapedOpen is what \{{ is held as while the passes run.
 const escapedOpen = "\x00rlsbl-escaped-open\x00"
 
+// blockEdge marks where a conditional block began and ended while the
+// passes run, so only the runs of newlines at its edges are collapsed.
+const blockEdge = "\x00rlsbl-block-edge\x00"
+
 var (
 	actionVersionPlaceholder = regexp.MustCompile(`\{\{actionVersion\s+"([^"]+)"\}\}`)
 	actionPlaceholder        = regexp.MustCompile(`\{\{action\s+"([^"]+)"\}\}`)
 	conditionalBlock         = regexp.MustCompile(`(?s)\{\{#if\s+(\w+(?:\.\w+)*)\}\}(.*?)\{\{/if\}\}`)
-	blankRun                 = regexp.MustCompile(`\n{3,}`)
+	blockEdgeRun             = regexp.MustCompile("\n*(?:" + blockEdge + "\n*)+")
 	variablePlaceholder      = regexp.MustCompile(`\{\{(\w+(?:\.\w+)*)\}\}`)
 )
 
@@ -68,11 +74,17 @@ func Render(source, text string, vars Vars) (string, error) {
 	out = conditionalBlock.ReplaceAllStringFunc(out, func(m string) string {
 		sub := conditionalBlock.FindStringSubmatch(m)
 		if vars[sub[1]] != "" {
-			return sub[2]
+			return blockEdge + sub[2] + blockEdge
 		}
-		return ""
+		return blockEdge
 	})
-	out = blankRun.ReplaceAllString(out, "\n\n")
+	out = blockEdgeRun.ReplaceAllStringFunc(out, func(run string) string {
+		newlines := strings.Count(run, "\n")
+		if newlines > 2 {
+			newlines = 2
+		}
+		return strings.Repeat("\n", newlines)
+	})
 	var missing []string
 	var b strings.Builder
 	last := 0

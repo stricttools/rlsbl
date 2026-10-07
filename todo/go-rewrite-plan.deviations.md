@@ -277,6 +277,7 @@ Append-only companion to `todo/go-rewrite-plan.md`. Each entry records an implem
 - Under `--dry-run` scaffold says it would install or update each git hook (`Would install the pre-push hook (<path>)`), instead of reporting it installed.
 - The npm package publish job asks for `id-token: write` only when the workflow features allow build attestations, since npm publishes with `NPM_TOKEN` and the id token only records provenance; a confidential repository's workflow carried an OIDC permission it never used. The PyPI jobs keep it: Trusted Publishing authenticates with it. Test: `TestAnNpmPackageJobAsksForAnIDTokenOnlyToRecordProvenance`.
 - Scaffold names a go module's binary, its release archives, and the binary its npm platform packages launch as `go build` names it (`gomodule.BinaryName`): the module path's last element, or the element before it when the last is a major version suffix, so `example.com/portal/v2` builds `portal`, not `v2`. Tests: `TestTheBinaryOfAMajorSuffixedModuleIsNamedAsGoNamesIt`, `TestTheBinaryOfAMajorSuffixedModuleIsNamedAfterItsProject`.
+- The template renderer collapses a run of three or more newlines to two only at a conditional block's edge, where dropping or keeping the block left it; a run anywhere else is the template's own and is kept (the two blank lines between the Python functions the sandbox runner embeds were rewritten to one). Test: `TestABlankRunAwayFromAnyBlockIsKept`.
 
 ## Release notes and the status commands
 

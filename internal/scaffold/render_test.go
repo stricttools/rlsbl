@@ -94,3 +94,20 @@ func TestAValueIsNeverRescanned(t *testing.T) {
 		t.Fatalf("got %q, %v", got, err)
 	}
 }
+
+func TestABlankRunAwayFromAnyBlockIsKept(t *testing.T) {
+	hygiene.Isolate(t)
+	text := "import sys\n\n\ndef main():\n    pass\n{{#if extra}}\nextra\n{{/if}}\n\n\n\nend\n"
+	for value, want := range map[string]string{
+		"":    "import sys\n\n\ndef main():\n    pass\n\nend\n",
+		"yes": "import sys\n\n\ndef main():\n    pass\n\nextra\n\nend\n",
+	} {
+		got, err := Render("t", text, Vars{"extra": value})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Errorf("with extra %q:\n%q\nwant\n%q", value, got, want)
+		}
+	}
+}
