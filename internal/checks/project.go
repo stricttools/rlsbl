@@ -641,18 +641,9 @@ func sortedNames(m map[string]any) []string {
 }
 
 func checkGoModuleIdentity(c *Context, r *strictcli.ErrorReporter) strictcli.CheckOutcome {
-	var dirs []string
-	seen := map[string]bool{}
-	for _, m := range c.Members() {
-		for _, t := range targetsOf(c, m) {
-			if t.target.Name() == targets.Go && !seen[t.dir] {
-				seen[t.dir] = true
-				dirs = append(dirs, t.dir)
-			}
-		}
-	}
+	dirs := goModuleDirs(c)
 	if len(dirs) == 0 {
-		return r.Skipped("no go target")
+		return r.Skipped(noGoTarget)
 	}
 	origin := ""
 	configured, err := c.Repo().RemoteConfigured("origin")
