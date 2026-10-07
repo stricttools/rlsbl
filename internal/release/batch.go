@@ -144,7 +144,7 @@ func union(list, more []string) []string {
 
 // PublishBatchCandidate pushes the branch tip, which holds the release
 // commit of every pending releasable, to origin as the batch's one
-// candidate, untagged and guarded by what origin held. It refuses first,
+// candidate, untagged and only as a fast-forward of what origin holds. It refuses first,
 // pushing nothing, commits on the branch since pin that no pending
 // releasable made, and a candidate whose diff window cannot trigger the CI
 // of one of them (named, its state recording the refusal). A releasable
@@ -184,7 +184,7 @@ func PublishBatchCandidate(e *strictcli.Effects, s *Session, req RunRequest, pen
 	sha := co.Tip
 	remote, found, err := live.RemoteRef(origin, ref)
 	if err != nil {
-		return "", fmt.Errorf("origin's %s could not be read, so the batch candidate push has no lease to go by: %w", branch, err)
+		return "", fmt.Errorf("origin's %s could not be read, so whether the batch candidate needs a push is unknown: %w", branch, err)
 	}
 	if !found {
 		remote = ""
@@ -214,7 +214,7 @@ func PublishBatchCandidate(e *strictcli.Effects, s *Session, req RunRequest, pen
 		}
 	}
 	if needsPush {
-		if err := live.Push(origin, git.RefUpdate{Ref: ref, New: sha, Expected: remote}, timeouts.Push); err != nil {
+		if err := live.PushFastForward(origin, ref, sha, timeouts.Push); err != nil {
 			return "", fmt.Errorf("the batch release candidate %s could not be pushed to origin/%s: %w\nNothing was tagged, released, or finalized, and no version is burnt: the release commits of %s stay on %s and their release states are kept. Once pushing works, %s; it continues them", short(sha), branch, err, strings.Join(pending, ", "), branch, RerunBatch)
 		}
 		req.Log(fmt.Sprintf("Pushed the batch release candidate %s to origin/%s (untagged, %d releasable(s))", short(sha), branch, len(pending)))

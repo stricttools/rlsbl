@@ -641,14 +641,7 @@ func (b *batch) archive() error {
 		return err
 	}
 	ref := co.BranchRef()
-	remote, found, err := b.live.RemoteRef("origin", ref)
-	if err == nil {
-		if !found {
-			remote = ""
-		}
-		err = b.live.Push("origin", git.RefUpdate{Ref: ref, New: co.Tip, Expected: remote}, timeouts.Push)
-	}
-	if err != nil {
+	if err := b.live.PushFastForward("origin", ref, co.Tip, timeouts.Push); err != nil {
 		return fmt.Errorf("every releasable of the batch is released, tagged, and on origin, and the archive of the batch release file is committed as %s, which was not pushed: %w\nThis is no failed release, and nothing is left to resume: %s is one commit ahead of origin, and the candidate push of the next release carries that commit", short(co.Tip), err, co.Branch)
 	}
 	b.req.Log(fmt.Sprintf("Pushed the archive commit %s to origin/%s", short(co.Tip), co.Branch))

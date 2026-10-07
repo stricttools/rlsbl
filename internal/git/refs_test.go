@@ -295,6 +295,45 @@ func TestPushIsGuardedByItsLease(t *testing.T) {
 	}
 }
 
+func TestPushFastForwardNeverOverwritesACommitTheRemoteGained(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := testsupport.NewRepo(t)
+	first := repo.CommitFile("a.txt", "a\n", "first")
+	second := repo.CommitFile("b.txt", "b\n", "second")
+	bare := repo.AddBareRemote("origin")
+	push := func(sha string) error {
+		_, err := writing(t, repo.Dir, false, func(r git.Repo) error {
+			return r.PushFastForward("origin", "refs/heads/main", sha, time.Minute)
+		})
+		return err
+	}
+	if err := push(first); err != nil {
+		t.Fatalf("creating main: %v", err)
+	}
+	if err := push(second); err != nil {
+		t.Fatalf("a fast-forward: %v", err)
+	}
+	// Someone else's commit on origin's main, which the local main lacks.
+	tree := strings.TrimSpace(repo.Git("rev-parse", second+"^{tree}"))
+	foreign := strings.TrimSpace(repo.Git("commit-tree", tree, "-p", second, "-m", "foreign"))
+	repo.Git("push", "-q", "origin", foreign+":refs/heads/main")
+	third := repo.CommitFile("c.txt", "c\n", "third")
+	if err := push(third); err == nil {
+		t.Fatal("a push that is no fast-forward overwrote the remote's commit")
+	}
+	if got := testsupport.Refs(t, bare)["refs/heads/main"]; got != foreign {
+		t.Fatalf("a refused push moved main to %s", got)
+	}
+	for _, bad := range [][2]string{{"refs/tags/v1", third}, {"main", third}, {"refs/heads/main", "HEAD"}} {
+		_, err := writing(t, repo.Dir, false, func(r git.Repo) error {
+			return r.PushFastForward("origin", bad[0], bad[1], time.Minute)
+		})
+		if err == nil {
+			t.Errorf("a fast-forward push of %s to %s was accepted", bad[1], bad[0])
+		}
+	}
+}
+
 func TestADryRunRecordsThePushInsteadOfPushing(t *testing.T) {
 	hygiene.Isolate(t)
 	repo := testsupport.NewRepo(t)

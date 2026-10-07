@@ -416,3 +416,33 @@ func TestResumeWithNothingInProgressIsRefused(t *testing.T) {
 		t.Fatalf("a resume with nothing in progress was not refused: %v", err)
 	}
 }
+
+// foreignOriginCommit puts a commit on origin's main, on top of what origin
+// holds, that the release's repository never saw: someone else's push.
+func foreignOriginCommit(t *testing.T, repo *testsupport.Repo) string {
+	t.Helper()
+	parent := remoteRef(t, repo, "refs/heads/main")
+	tree := strings.TrimSpace(repo.Git("rev-parse", parent+"^{tree}"))
+	foreign := strings.TrimSpace(repo.Git("commit-tree", tree, "-p", parent, "-m", "someone else's commit"))
+	repo.Git("push", "-q", "origin", foreign+":refs/heads/main")
+	return foreign
+}
+
+func TestAReleasePushNeverOverwritesACommitOriginGainedDuringTheRelease(t *testing.T) {
+	hygiene.Isolate(t)
+	testsupport.FakeGH(t, answers(validationAnswers("public"), ciRun(42, "failure"))...)
+	repo := runRepo(t, "", "MIT", map[string]string{".github/workflows/ci.yml": ciWorkflow})
+	if out, err := releaseCommand(t, repo, false, false); err == nil {
+		t.Fatalf("the red verdict did not stop the release:\n%s", out)
+	}
+	foreign := foreignOriginCommit(t, repo)
+	testsupport.FakeGH(t, answers(validationAnswers("public"), ciRun(43, "success"), releaseCreation("v0.5.0"))...)
+	out, err := releaseCommand(t, repo, true, false)
+	if got := remoteRef(t, repo, "refs/heads/main"); got != foreign {
+		t.Fatalf("the release overwrote origin's main (%s, was the foreign commit %s): %v\n%s", got, foreign, err, out)
+	}
+	if err == nil {
+		t.Fatalf("the resume pushed past a commit origin gained:\n%s", out)
+	}
+	requireContains(t, err.Error(), "only fast-forwards")
+}

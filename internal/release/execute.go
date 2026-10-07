@@ -308,7 +308,8 @@ func (x *execution) bumpAndCommit() error {
 
 // pushCandidate takes the candidate-pushed step: the branch tip, holding
 // the release commit, is recorded as the candidate and pushed to origin,
-// untagged, guarded by the value origin's branch held. A resume past the CI
+// untagged, only as a fast-forward of origin's branch, so a commit
+// someone else put there is never overwritten. A resume past the CI
 // verdict tags the candidate the state records instead, pushing nothing.
 func (x *execution) pushCandidate() error {
 	if x.state.Completed(StepCIVerified) {
@@ -337,7 +338,7 @@ func (x *execution) pushCandidate() error {
 	}
 	remote, found, err := x.live.RemoteRef(origin, x.branchRef())
 	if err != nil {
-		return fmt.Errorf("origin's %s could not be read, so the candidate push has no lease to go by: %w", x.branch, err)
+		return fmt.Errorf("origin's %s could not be read, so whether the candidate needs a push is unknown: %w", x.branch, err)
 	}
 	if !found {
 		remote = ""
@@ -356,7 +357,7 @@ func (x *execution) pushCandidate() error {
 	}
 	if needsPush {
 		x.pushAttempted = true
-		if err := x.live.Push(origin, git.RefUpdate{Ref: x.branchRef(), New: x.candidate, Expected: remote}, x.timeouts.Push); err != nil {
+		if err := x.live.PushFastForward(origin, x.branchRef(), x.candidate, x.timeouts.Push); err != nil {
 			return err
 		}
 		x.req.Log(fmt.Sprintf("Pushed the release candidate %s to origin/%s (untagged)", short(x.candidate), x.branch))
@@ -637,9 +638,9 @@ func (x *execution) tag() error {
 }
 
 // push takes the pushed step: the release branch, now carrying the
-// finalization commits, and then each tag on its own (GitHub starts nothing
-// for a push carrying more than three tags), each guarded by what origin
-// held. A tag origin holds at the release commit is pushed already; one at
+// finalization commits, pushed only as a fast-forward of origin's branch,
+// and then each tag on its own (GitHub starts nothing for a push carrying
+// more than three tags), each leased on origin holding no such tag. A tag origin holds at the release commit is pushed already; one at
 // another commit is refused.
 func (x *execution) push() error {
 	if err := x.guard(CheckpointFinalPush); err != nil {
@@ -661,7 +662,7 @@ func (x *execution) push() error {
 	}
 	if remote != tip {
 		x.pushAttempted = true
-		if err := x.live.Push(origin, git.RefUpdate{Ref: x.branchRef(), New: tip, Expected: remote}, x.timeouts.Push); err != nil {
+		if err := x.live.PushFastForward(origin, x.branchRef(), tip, x.timeouts.Push); err != nil {
 			return err
 		}
 	}

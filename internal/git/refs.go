@@ -323,6 +323,27 @@ func (r Repo) Push(remote string, u RefUpdate, timeout time.Duration) error {
 	return r.mutate(timeout, "push", "--no-verify", "--force-with-lease="+u.Ref+":"+u.Expected, remote, u.New+":"+u.Ref)
 }
 
+// PushFastForward moves the branch ref on remote to newCommit only as a
+// fast-forward: without force, the remote refuses the update unless the
+// commit its ref holds when the push arrives is an ancestor of newCommit, so
+// a commit someone else put on the branch is never overwritten, however long
+// ago its value was read. Like Push, it runs with --no-verify.
+func (r Repo) PushFastForward(remote, ref, newCommit string, timeout time.Duration) error {
+	if !strings.HasPrefix(ref, "refs/heads/") {
+		return fmt.Errorf("push refused: %q is not a full branch ref name (refs/heads/...)", ref)
+	}
+	if !IsObjectID(newCommit) {
+		return fmt.Errorf("push refused: %q is not a full object id", newCommit)
+	}
+	if timeout <= 0 {
+		return errors.New("push refused: no push timeout was declared")
+	}
+	if err := r.mutate(timeout, "push", "--no-verify", remote, newCommit+":"+ref); err != nil {
+		return fmt.Errorf("%w\nThe push only fast-forwards %s's %s: if it gained commits %s lacks, the push was refused rather than overwriting them; fetch %s and look at those commits before trying again", err, remote, strings.TrimPrefix(ref, "refs/heads/"), newCommit[:12], remote)
+	}
+	return nil
+}
+
 // FetchOrigin fetches origin's branches into the remote-tracking refs, and
 // no tag: a fetch following tags would create local tags, which no preview
 // may do and which a release must never take from origin unasked. It is the
