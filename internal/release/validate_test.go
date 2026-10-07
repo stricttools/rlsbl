@@ -299,10 +299,13 @@ func TestATagOnOriginIsRefusedUntilDeletedThere(t *testing.T) {
 	repo.Git("push", "-q", "origin", "v0.5.0")
 	repo.Git("tag", "-d", "v0.5.0")
 	_, err := validate(t, repo, nil, nil)
-	if err == nil || !strings.Contains(err.Error(), "git push origin :refs/tags/v0.5.0") {
-		t.Fatalf("a tag on origin was not refused naming its deletion: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "git push origin :refs/tags/v0.5.0") || !strings.Contains(err.Error(), "git tag -d v0.5.0") {
+		t.Fatalf("a tag on origin was not refused naming its deletion there and here: %v", err)
 	}
+	// The fetch of origin copied the tag here; the refusal names both
+	// deletions, and both together clear it.
 	repo.Git("push", "-q", "origin", ":refs/tags/v0.5.0")
+	repo.Git("tag", "-d", "v0.5.0")
 	_, err = validate(t, repo, nil, nil)
 	mustNotFail(t, err)
 }
