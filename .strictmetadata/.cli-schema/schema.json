@@ -2711,7 +2711,7 @@
             },
             "init": {
               "name": "init",
-              "help": "Write the batch release file .strictmetadata/batch-releases/unreleased.toml with one [releasables.<name>] table per releasable (the ones --releasables names, once per releasable, or every declared one), each with bump and description blank (a batch release refuses it until both are filled in), context blank, every target of the releasable's members in include, and exclude empty, and commit it. A releasable with no commit needing a changelog entry since its latest release is written commented out, and one with no target is refused. A batch release file nobody filled in yet is left as it is; one somebody filled in is refused, never overwritten.",
+              "help": "Write the batch release file .strictmetadata/batch-releases/unreleased.toml with one [releasables.<name>] table per releasable (the ones --releasables names, once per releasable, or every declared one), each with bump and description blank (a batch release refuses it until both are filled in), context blank, every target of the releasable's members in include, and exclude empty, and commit it. A releasable with no commit needing a changelog entry since its latest release is written commented out, and one with no target, or on hold or retired (it or a member), is refused, naming --releasables to leave it out. A batch release file nobody filled in yet is left as it is; one somebody filled in is refused, never overwritten.",
               "effect": "mutating",
               "dry_run_supported": false,
               "dry_run_unsupported_reason": "it writes one scaffolded file and commits it, and the file it would write is what this help describes",
