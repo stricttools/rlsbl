@@ -347,7 +347,7 @@ func (r *renamer) renameLocally() (*workspace.Workspace, error) {
 	}
 	// The lock writes the run-state directory's .gitignore when it is
 	// missing, which belongs with the rename's other changes.
-	commitPaths := []string{declarations.ReleasablesFile, declarations.ReleaseStateDir + "/.gitignore"}
+	commitPaths := []string{declarations.ReleasablesFile, declarations.ReleasablesDir + "/manifest.toml", declarations.ReleaseStateDir + "/.gitignore"}
 	for _, pair := range [][2]string{
 		{declarations.ChangelogDir(old), declarations.ChangelogDir(new)},
 		{declarations.ReleasesDir(old), declarations.ReleasesDir(new)},

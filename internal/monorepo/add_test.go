@@ -138,7 +138,9 @@ func TestADryRunAddWritesNothing(t *testing.T) {
 	hygiene.Isolate(t)
 	repo := addFixture(t)
 	before := readText(t, repo, declarations.ReleasablesFile)
-	text := mustRun(t, strictcli.EffectMutating, true, adding(gadgetRequest(repo)))
+	req := gadgetRequest(repo)
+	req.DryRun = true
+	text := mustRun(t, strictcli.EffectMutating, true, adding(req))
 	if readText(t, repo, declarations.ReleasablesFile) != before || exists(repo, "apps/gadget/.github") {
 		t.Fatal("the dry run wrote")
 	}
@@ -234,6 +236,7 @@ func TestAddRefusals(t *testing.T) {
 		fixed := gadgetRequest(repo)
 		c.change(&fixed)
 		c.fix(&fixed)
+		fixed.DryRun = true
 		mustRun(t, strictcli.EffectMutating, true, adding(fixed))
 	}
 }
@@ -246,6 +249,7 @@ func TestAddRefusesADirectoryWithoutATargetUntilOneIsNamed(t *testing.T) {
 	repo.Write("docs/README.md", "the docs\n")
 	req := gadgetRequest(repo)
 	req.Path, req.Releasable, req.TagFormat, req.PublishMode = "docs", NoReleasable, "", ""
+	req.DryRun = true
 	mustFail(t, strictcli.EffectMutating, true, adding(req), "no release target is detected in docs", "--target")
 	req.Target = "npm"
 	mustRun(t, strictcli.EffectMutating, true, adding(req))

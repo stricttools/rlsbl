@@ -142,6 +142,9 @@ func absorbFixture(t *testing.T, decls string, sourceFiles map[string]string) (r
 	testsupport.FakeGH(t, topicsAnswer)
 	src, s1, s2 = gizmoSource(t, sourceFiles)
 	repo = newWorkspace(t, decls, absorbFiles)
+	// The scaffold of the absorbed member writes its LICENSE, whose
+	// copyright holder is git's user.name.
+	repo.Git("config", "user.name", "Ada Lovelace")
 	return repo, src, s1, s2
 }
 
