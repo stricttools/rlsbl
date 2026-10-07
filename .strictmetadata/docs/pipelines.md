@@ -1,347 +1,84 @@
 +++
-description = "Pipeline architecture: the npm, pypi, go, and cloudflare-pages pipeline types, token and unauthenticated publishing, custom assets, and launcher shims."
+description = "Publish pipelines: the go, npm, and pypi pipeline types and their artifacts, publishing from CI or from this machine, Go binaries shipped through npm platform packages and PyPI binary wheels, Homebrew taps, and the publishing rules of private repositories."
 +++
 
 # Pipelines
 
-## Overview
+A **target** decides which files a release writes the version into; a **pipeline** decides where the release is published. Targets come from the member's manifests or its `targets` declaration ([release targets](targets.md)); pipelines are always declared, as `[[members.pipelines]]` tables in `.strictmetadata/releasables/releasables.toml`. A member with no pipelines still releases (version, tag, GitHub Release) and publishes to no registry, and a releasable declaring `publish_mode = "none"` publishes nothing at all and gets no publish workflow.
 
-Pipelines handle **publishing** — where and how a release is distributed. They are configured in `.rlsbl/config.json` under the `pipelines` key, which supports the built-in pipeline types and their two authentication patterns (token and unauthenticated). Each pipeline entry has a user-chosen name and specifies its type, auth mechanism, and optional asset configuration.
-
-Pipelines are distinct from targets: targets determine which files get version-bumped (auto-detected from manifests), while pipelines determine where the release artifact is published (explicitly configured). A project can have an npm target for versioning but a cloudflare-pages pipeline for publishing, or multiple pipelines publishing to different registries.
-
-## Targets vs pipelines
-
-| Concern | Targets | Pipelines |
-| --- | --- | --- |
-| Purpose | Version bumping | Publishing |
-| Discovery | Auto-detected from manifests | Explicitly configured |
-| Config location | Auto or `targets` array in config.json | `pipelines` object in config.json |
-| Cardinality | One per ecosystem per project | Any number, user-named |
-| Example | npm target bumps package.json version | npm pipeline runs `npm publish` in CI |
-
-A project with no pipelines configured simply does not publish anywhere — version bumps, tags, and GitHub Releases still happen via targets.
-
-### Publishing nowhere
-
-`pipelines` is always a **map** of pipeline name to pipeline config. There is no scalar form: `"pipelines": "none"` is a config error, not a way to opt out. Two shapes express "publish nowhere", and they mean different things:
-
-| Shape | Meaning |
-| --- | --- |
-| `"pipelines": {}` | The project releases (version bump, tag, GitHub Release) but publishes to no registry. |
-| `"publish_mode": "none"` | Publishing is suppressed entirely — no publish workflow is scaffolded at all. See [configuration](configuration.md). |
-
-Any other non-map value is rejected with a `ConfigError` naming both shapes, at config-check time and again in the release preflight — before the release mutates anything.
-
-## Configuration
-
-Pipelines are configured in `.rlsbl/config.json` under the `pipelines` key. Each entry is keyed by a user-chosen name (any valid JSON string) and requires a `type` field (one of 9 built-in types), a `local` boolean field indicating whether publishing happens on the developer machine or in CI, and a `target` link naming the release target it publishes for (or `null` for a targetless publisher):
-
-```json
-{
-  "pipelines": {
-    "my-pipeline-name": {
-      "type": "npm",
-      "local": false,
-      "target": "npm"
-    }
-  }
-}
+```toml
+[[members.pipelines]]
+name = "npm"            # the pipeline's name: letters, digits, '-' and '_'
+type = "npm"            # go, npm, or pypi
+target = "npm"          # a target the member has; the pipeline's type must be that target
+local = false           # true publishes from this machine during the release; false from CI
+artifact = "package"    # what it publishes (below)
 ```
 
-### Fields
-
-| Field | Type | Required | Description |
-| --- | --- | --- | --- |
-| `type` | string | Yes | One of the built-in pipeline types (see table below) |
-| `local` | bool | Yes | Whether to publish from the developer machine. `false` means CI handles it. |
-| `target` | string or null | Yes | The release target this pipeline publishes for. Must name an entry in the config's `targets` list, or be `null` for a targetless publisher (e.g. a docs deploy). There is no name-based inference. |
-| `artifact` | string | Yes (type `go`) | `binary` or `library`. Selects the go publish workflow. No default. See [go](#go). |
-| `token_var` | string | No | Env var name for the publish token. Each type has a default. |
-| `assets` | bool | No | Enable building and uploading target-specific artifacts to GitHub Releases. |
-| `max_asset_size_mb` | int | When `assets` or `custom_assets` is set | Maximum artifact size in MB. Release fails if any artifact exceeds this. |
-| `custom_assets` | array | No | List of custom build artifacts. Each entry: `{name, build}`. |
+| Field | Required | Meaning |
+| --- | --- | --- |
+| `name` | yes | Unique within the member. |
+| `type` | yes | `go`, `npm`, or `pypi`, the same as the target it publishes. |
+| `target` | yes | A target the member has. |
+| `local` | yes | `false`: the publish workflow publishes from CI after the GitHub Release is published. `true`: the release publishes from this machine at its `pipelines-published` step. |
+| `artifact` | yes | go: `binary` or `library`. npm and pypi: `package`, or `go-binary` to ship a go binary pipeline's binaries. |
+| `install_paths` | go, when `local = true` | The main packages a local go publish installs. Allowed on go pipelines only. |
+| `homebrew_tap` | no | The Homebrew tap repository a go `binary` pipeline publishes a formula to. |
+| `binary_pipeline` | npm and pypi `go-binary` | The member's go `binary` pipeline whose binaries it ships. Refused on any other pipeline. |
 
 ## Pipeline types
 
-The built-in pipeline types cover the npm, PyPI, and Go registries and Cloudflare Pages deployment. Each type implements ecosystem-specific authentication, build commands, and publish logic while sharing the common `BasePipeline` interface for custom assets and lifecycle hooks.
-
-:-: table-pipelines
-
-## Class hierarchy
-
-Every pipeline implementation inherits from `BasePipeline`, which provides no-op defaults for publish and build steps plus the shared `build_custom_assets()` implementation. An intermediate mixin adds an authentication pattern: `TokenPipeline` for single-token auth. Which pipeline uses it is the `Auth method` column of the table above.
-
-| Class | Auth pattern | Pipelines |
-| --- | --- | --- |
-| `BasePipeline` | None (direct subclass) | go (proxy notification), cloudflare-pages (selfdoc CLI) |
-| `TokenPipeline(BasePipeline)` | Single env var token | npm, pypi |
-
-`TokenPipeline` validates that the token env var is set before attempting publish and passes it to the ecosystem-specific publish command.
-
-## Custom assets
-
-Custom assets allow attaching arbitrary build artifacts to GitHub Releases alongside the source code archive. Each asset has a user-defined build command, an expected output filename, and a configurable maximum file size enforced via `max_asset_size_mb` (no default -- must be explicitly set when assets are enabled). The complete 7-step flow during `rlsbl release run`:
-
-1. Config defines build commands and output filenames in `custom_assets`
-2. Creates distribution directory: `.rlsbl/dist/<pipeline-name>/`
-3. Runs each build command with `$RLSBL_DIST_DIR` env var pointing to the dist directory
-4. Verifies each expected output file exists in `$RLSBL_DIST_DIR`
-5. Validates file size against `max_asset_size_mb` (hard error if exceeded)
-6. Uploads all artifacts to GitHub Release via `gh release upload <tag> --clobber`
-7. Cleans up the dist directory
-
-### Custom assets config example
-
-```json
-{
-  "pipelines": {
-    "release-bins": {
-      "type": "go",
-      "local": true,
-      "assets": true,
-      "max_asset_size_mb": 50,
-      "custom_assets": [
-        {
-          "name": "mytool-linux-amd64",
-          "build": "GOOS=linux GOARCH=amd64 go build -o $RLSBL_DIST_DIR/mytool-linux-amd64 ./cmd/mytool"
-        },
-        {
-          "name": "mytool-darwin-arm64",
-          "build": "GOOS=darwin GOARCH=arm64 go build -o $RLSBL_DIST_DIR/mytool-darwin-arm64 ./cmd/mytool"
-        }
-      ]
-    }
-  }
-}
-```
-
-## What decides whether a pipeline step runs
-
-A pipeline runs because it is configured, and it publishes for the target its
-`target` key links it to. Whether a target publishes at all is decided by that
-configuration — by `publish_mode`, and by whether a pipeline names the target —
-never by a property of the target itself. A target with no pipeline linked to it
-is a version-bump-only target (`spec` is the usual case): it gets
-its version written and its tag created, and no publish step runs for it because
-none is configured.
-
-The one target property a pipeline does consult is whether the target can ask its
-registry if a version is already published:
-
-| Property | Effect |
-| --- | --- |
-| `supports_publication_probe` | When true, the pipeline probes the registry before publishing and skips the publish when the version is already served. When false, the publish proceeds without a pre-check. |
-
-Targets answer that from whether they implement `publication_probe` — npm, PyPI
-and Go do. There is no declared capability set behind any of this: what a target
-supports is derived from the target, per axis. See
-[targets.md](targets.md#what-a-target-supports).
-
-## Migration from old publish key
-
-The old `publish` key in `.rlsbl/config.json` is no longer recognized. Running `rlsbl release run` with a `publish` key present produces a **hard error** — no fallback, no deprecation warning. The migration is mechanical: the new `pipelines` format is a strict superset of the old `publish` value, adding only a user-chosen name for each entry and an explicit `local` field. Most projects need fewer than 5 lines changed in their config.
-
-To migrate:
-
-1. Read the old `publish` value (it was a dict with `type` and optionally `local`)
-2. Create a `pipelines` entry with a descriptive name
-3. Copy `type` and `local` fields
-4. Add `token_var` if you were using a non-default env var
-5. Remove the old `publish` key
-
-Before:
-```json
-{
-  "publish": {
-    "type": "npm",
-    "local": false
-  }
-}
-```
-
-After:
-```json
-{
-  "pipelines": {
-    "npm-publish": {
-      "type": "npm",
-      "local": false
-    }
-  }
-}
-```
-
-## Example configs
-
-### npm publish via CI (most common)
-
-```json
-{
-  "pipelines": {
-    "npm": {
-      "type": "npm",
-      "local": false
-    }
-  }
-}
-```
-
-CI workflow uses `NPM_TOKEN` secret. No local publish step runs.
-
-### Local Cloudflare Pages deploy
-
-```json
-{
-  "pipelines": {
-    "docs": {
-      "type": "cloudflare-pages",
-      "local": true
-    }
-  }
-}
-```
-
-Publishes from the developer machine using selfdoc's deploy integration. Reads `CF_PAGES_API_TOKEN` and `CF_ACCOUNT_ID` from the environment.
-
-### Multiple pipelines
-
-```json
-{
-  "pipelines": {
-    "registry": {
-      "type": "pypi",
-      "local": false
-    },
-    "site": {
-      "type": "cloudflare-pages",
-      "local": true
-    }
-  }
-}
-```
-
-PyPI publishing happens in CI; docs deploy happens locally in a post-release hook.
-
-## Per-type reference
-
-### npm
-
-- **Class:** `TokenPipeline`
-- **Default token env var:** `NPM_TOKEN`
-- **Auth pattern:** Single token. CI workflow sets `//registry.npmjs.org/:_authToken` from the secret.
-- **Publish command:** `npm publish --provenance --access public` (always uses npm CLI directly for local publish, regardless of which package manager the project uses).
-- **CI template:** Detects which package manager the project uses (npm, pnpm, or yarn) and generates the appropriate install and publish steps for that package manager.
-- **Quirks:** Package manager detection is based on lockfile presence (`package-lock.json` for npm, `pnpm-lock.yaml` for pnpm, `yarn.lock` for yarn). Priority order is pnpm > yarn > npm. Detection walks up directories until it finds a `.git` directory. The detection only affects CI template selection, not the local publish command.
+| Type | Publishes to | Artifacts | Authenticates in CI | Authenticates locally |
+| --- | --- | --- | --- | --- |
+| `go` | the Go module proxy, and GitHub Release archives for a binary | `binary`, `library` | nothing: a Go module is published by its tag | nothing |
+| `npm` | the npm registry | `package`, `go-binary` | the `NPM_TOKEN` Actions secret | `NPM_TOKEN` |
+| `pypi` | the Python Package Index | `package`, `go-binary` | trusted publishing (OIDC), no secret | `PYPI_TOKEN` |
 
-### pypi
+The `ci-publish-secrets` check asks GitHub whether each secret a CI pipeline authenticates with exists on the repository, and `npm-token-synced` whether the `NPM_TOKEN` secret holds the token npm accepts on this machine; `rlsbl secrets sync-npm-token` copies it there.
 
-- **Class:** `TokenPipeline`
-- **Default token env var:** `PYPI_TOKEN` (fallback: `TWINE_PASSWORD`)
-- **Auth pattern:** Dual-token fallback. Checks `PYPI_TOKEN` first, then `TWINE_PASSWORD`. However, the preferred approach is OIDC Trusted Publishing, which requires no token at all — CI authenticates via GitHub's OIDC provider and `pypa/gh-action-pypi-publish`.
-- **Publish command:** `uv build` followed by `uv publish` (passes token via `UV_PUBLISH_TOKEN` env var). No twine fallback.
-- **CI template:** Uses `pypa/gh-action-pypi-publish` with `id-token: write` permission for OIDC.
-- **Quirks:** For new packages, a pending publisher must be configured on pypi.org before the first release. No local `uv publish` or token needed when using Trusted Publishing. Overrides the base `TokenPipeline.publish()` method to implement dual-token resolution.
+## Publishing from CI
 
-### go
+A releasable with `publish_mode = "ci"` gets `.github/workflows/publish.yml` from `rlsbl scaffold` (in a workspace, the publish router `rlsbl monorepo sync` generates). It runs on `release: published` and on `workflow_dispatch`, starts with the [wait-for-ci job](release-workflow.md#the-publish-workflow), and has one job per pipeline publishing from CI:
 
-- **Class:** `BasePipeline` (no token required)
-- **Default token env var:** None
-- **Auth pattern:** No authentication. Go modules are published by pushing a tagged commit — the Go module proxy picks it up automatically.
-- **Publish command:** Notifies the Go module proxy (`proxy.golang.org`) by requesting the module at the new version, then runs `go install <path>` for every path declared in `install_paths`.
-- **CI template:** Minimal — Go publish is just the tag push plus a proxy notification step.
-- **Required `artifact` key:** Every `type: "go"` pipeline **must** declare `artifact`, either `"binary"` or `"library"`. There is no default. The value selects the publish workflow that gets scaffolded:
-  - `"binary"` — a CLI/command whose GitHub Release assets are built by goreleaser (`publish.yml`).
-  - `"library"` — an importable module verified against the Go module proxy (`publish-library.yml`); no goreleaser, no release assets.
+- **go `library`**: asks the Go module proxy for the new version, so the module is listed and `pkg.go.dev` indexes it.
+- **go `binary`**: builds the binaries with goreleaser (`.goreleaser.yml`, which scaffold renders), scans them for secrets with gitleaks, and attaches the release archives to the GitHub Release; with `homebrew_tap`, goreleaser publishes the formula too.
+- **npm `package`**: packs the package, scans it for secrets with gitleaks, skips a version npm already lists, and runs `npm publish`, with build attestations (`--provenance`) when the repository may record its identity publicly.
+- **pypi `package`**: builds the sdist and wheel, scans them for secrets with gitleaks, and publishes through trusted publishing, with attestations unless the repository may not record its identity publicly. The CI workflow checks the built sdist and wheel for [private paths](scaffold.md#private-paths) on every push.
+- **npm `go-binary`** and **pypi `go-binary`**: below.
 
-  A wrong or missing value produces a broken workflow, so validation is a hard error rather than a silent guess. `rlsbl scaffold` sets the key automatically by auto-detecting the project layout (a project with no `package main` is a library, otherwise a binary), and the validation error message includes the same auto-detected suggestion — but the operator must commit the choice explicitly.
-- **Library tag handling:** The library publish workflow bakes the module path from `go.mod` at scaffold time (correct even for monorepo subdirectory modules, whose proxy-visible tags are the companion subdir tag `<subdir>/vX.Y.Z`) and derives the version from the release tag, handling plain (`v1.2.3`), releasable (`<name>@v1.2.3`), and subdir (`<subdir>/v1.2.3`) tag formats.
-- **Private modules:** A private Go module cannot be verified against the public proxy (`proxy.golang.org` refuses to serve private modules). Private Go libraries must set `publish_mode` `"none"` in `.rlsbl/config.json`, which suppresses the publish job entirely — no publish workflow is scaffolded.
-- **Quirks:** Pipelines with `local: true` **must** declare `install_paths` (a list of main-package dirs relative to the project root, e.g. `["./cmd/mytool"]`). Missing or invalid declarations are hard errors; each declared path is validated against `go list` (it must be a `package main` dir). There is no auto-detection fallback — detection only validates declarations.
+## Go binaries on npm and PyPI
 
-### cloudflare-pages
+A go `binary` pipeline's binaries can also ship through npm and PyPI, the way esbuild ships its binary, with no download at install time and no install script. One platform table serves both registries:
 
-- **Class:** `BasePipeline`
-- **Default token env var:** None (uses `CF_PAGES_API_TOKEN` and `CF_ACCOUNT_ID` env vars for local deploys).
-- **Auth pattern:** Requires `CF_ACCOUNT_ID` and `CF_PAGES_API_TOKEN` from the environment when publishing locally. These are reported by `required_env_vars()`.
-- **Publish command:** `selfdoc deploy --approve-consequential` (requires `selfdoc` on PATH). No Wrangler fallback. `selfdoc deploy` declares itself `consequential` — the deployment is live the moment it completes — so the pipeline passes the skip flag; the approval was already taken by `rlsbl release run` one level up.
-- **CI template:** Minimal — most Cloudflare Pages projects deploy locally from post-release hooks rather than CI.
-- **Quirks:** The simplest pipeline implementation. Primarily used for documentation sites that deploy alongside library releases. Requires `selfdoc` tool on PATH; errors if not found. 300-second timeout on the deploy command.
+| Platform | npm `os` and `cpu` | Go `GOOS`/`GOARCH` | PyPI wheel platform tag |
+| --- | --- | --- | --- |
+| `linux-x64` | `linux`, `x64` | `linux`/`amd64` | `manylinux_2_17_x86_64.manylinux2014_x86_64.musllinux_1_1_x86_64` |
+| `linux-arm64` | `linux`, `arm64` | `linux`/`arm64` | `manylinux_2_17_aarch64.manylinux2014_aarch64.musllinux_1_1_aarch64` |
+| `darwin-x64` | `darwin`, `x64` | `darwin`/`amd64` | `macosx_10_12_x86_64` |
+| `darwin-arm64` | `darwin`, `arm64` | `darwin`/`arm64` | `macosx_11_0_arm64` |
 
-## Launcher artifact kind
+There is no Windows platform.
 
-The `artifact: "launcher"` pipeline kind produces a wrapper package that downloads a pre-built binary from a GitHub Release. This is for projects that have a Go (or other compiled) binary and want to distribute it via npm and/or PyPI as a convenience shim.
+- An **npm `go-binary`** pipeline publishes one platform package per platform, named `<main package>-<platform>` (for `rlsbl`: `rlsbl-linux-x64`, `rlsbl-linux-arm64`, `rlsbl-darwin-x64`, `rlsbl-darwin-arm64`), each holding that platform's binary from the goreleaser archive with its `os` and `cpu` fields, and then the main package, whose `optionalDependencies` pin every platform package to the version and whose `bin/index.js` launcher (rendered by scaffold) runs the binary of the platform package npm installed. The main package's `package.json` is the project's own; scaffold checks it names the launcher and declares no install script. Each platform package takes its license from the [lifecycle-and-license record](lifecycle-and-license.md), and carries `repository` only where the repository may be named publicly.
+- A **pypi `go-binary`** pipeline assembles one wheel per platform, `<distribution>-<version>-py3-none-<platform tag>.whl`, with the binary under `<distribution>-<version>.data/scripts/` and its `METADATA`, `WHEEL`, and `RECORD`, and publishes them through trusted publishing.
 
-### Config shape
+A platform package name is a new registry name, and every registry name, once held, is held for good ([the rules](lifecycle-and-license.md#the-rules)).
 
-```json
-{
-  "pipelines": {
-    "go":   {"type": "go",   "local": false, "target": "go",   "artifact": "binary"},
-    "npm":  {"type": "npm",  "local": false, "target": "npm",  "artifact": "launcher",
-             "wraps": "go", "binary_source": "github-release", "download": "postinstall",
-             "provenance": true},
-    "pypi": {"type": "pypi", "local": false, "target": "pypi", "artifact": "launcher",
-             "wraps": "go", "binary_source": "github-release", "download": "first-run"}
-  }
-}
-```
+## Publishing from this machine
 
-### Required keys
+A pipeline with `local = true` publishes during the release, after the tag is pushed and the GitHub Release exists:
 
-| Key | Type | Description |
-| --- | --- | --- |
-| `artifact` | `"launcher"` | Selects the launcher publish template instead of the standard publish template |
-| `wraps` | string | Name of the pipeline that produces the binary. Must reference a pipeline with `artifact: "binary"`. |
-| `binary_source` | `"github-release"` | Where the launcher downloads binaries from. Only `"github-release"` is supported. |
-| `download` | `"first-run"` \| `"postinstall"` | **When** the binary is fetched. `"postinstall"` (npm only) downloads it at `npm install` time; `"first-run"` downloads it lazily on the first CLI invocation (zero network I/O at install). No default. |
+- **go**: notifies the Go module proxy of `<module>@v<version>` (`go list -json -m` with `GOPROXY=proxy.golang.org`) and runs `go install` for each of `install_paths`, which are validated as main packages first.
+- **npm**: `npm publish --access public` from the target's directory, with `NPM_TOKEN` in the environment (the project's `.npmrc` reads it, so the token never becomes an argument).
+- **pypi**: `uv build` and `uv publish`, with `PYPI_TOKEN` as uv's publish token.
 
-All four keys are mandatory when `artifact` is `"launcher"`. Missing or invalid values are hard errors at config validation and scaffold time. `download: "postinstall"` is an npm-only mechanism -- a non-npm launcher (e.g. PyPI, which has no install-time hook) with `download: "postinstall"` is a hard error and must use `"first-run"`.
+npm and PyPI are first asked, through the package's listing of every version, whether the version is already there; a listed version is skipped, so a resumed release does not publish twice. A missing token, or a missing `go`, `npm`, or `uv`, is an error naming it. A `go-binary` pipeline cannot publish locally: its platform packages come from release archives only CI builds.
 
-### `download` mode semantics
+## Private repositories and proprietary releasables
 
-The `download` key selects **when** the wrapped binary is fetched from GitHub Releases. This is a deployment-shape decision with no default -- the operator must explicitly choose between fetching at install time or lazily on first invocation. Each mode has different trade-offs for network behavior, install speed, and offline usability that affect how end users experience the tool:
+What a pipeline may publish depends on the [lifecycle-and-license record](lifecycle-and-license.md) and on GitHub's visibility of the repository:
 
-- **`postinstall` (npm only):** The wrapper ships a `postinstall` script (`scripts/postinstall.cjs`) that runs at `npm install` time. It maps `process.platform`/`process.arch` to goreleaser's OS/arch naming, downloads the matching release asset **and** the release's `checksums.txt`, SHA-256-verifies the asset against the matching `checksums.txt` line **before** installing it into the package's `vendor/` directory, and hard-fails on a checksum mismatch or a 404. A `bin/launcher.cjs` stub then execs the vendored binary, passing argv through. Node stdlib only -- zero runtime dependencies.
-- **`first-run` (npm and PyPI):** `npm install` performs **zero network I/O** -- no `postinstall` script is emitted. The wrapper ships a single self-contained `bin/launcher.cjs` (npm) or console-script module (PyPI) that, on the **first CLI invocation**, resolves the exact package version, downloads the matching release asset **and** `checksums.txt`, SHA-256-verifies before caching, extracts the binary to a platform-specific cache directory (`~/.cache/<tool>/` on Linux, `~/Library/Caches/<tool>/` on macOS, `%LOCALAPPDATA%\<tool>\` on Windows), then execs it -- passing argv through. Subsequent invocations exec the cached binary directly (no network). This is the required mode for consumers whose package must not touch the network at install time (e.g. library-only installs). Stdlib only -- zero runtime dependencies.
+- A **proprietary** releasable publishes nothing anywhere public: every pipeline it declares is refused by release validation.
+- A **confidential or private** repository publishes nothing that records the repository's identity publicly: no npm `--provenance`, no PyPI attestations, no Go module proxy request (so no go `library` pipeline and no local go pipeline), no Homebrew tap, and no manifest field naming the repository (`package.json` `repository`, `homepage`, `bugs`; `pyproject.toml` `[project.urls]`). A Go client of such a repository ships as binaries only, through npm platform packages and PyPI binary wheels. Scaffold renders the publish workflows of such a repository without attestations, proxy requests, or repository URLs; the `private-repo-publishing` check and release validation refuse what remains, each finding naming its fix.
 
-PyPI has no `postinstall` hook, so PyPI launchers always use `first-run`.
-
-Embedded platform wheels (building the binary into the wheel for each platform) are a different distribution model -- that is the per-platform binary-wrapper family, not the launcher. Launchers are download-at-install/run shims.
-
-### Manifest is the name authority
-
-Scaffold never invents or writes the package name field in the launcher target's manifest (`package.json` for npm, `pyproject.toml` for PyPI). The manifest at the launcher target's declared path is the name authority. If the manifest is absent, scaffold hard-errors and directs the user to create it with a `rlsbl check-name`'d name.
-
-Around that pre-existing manifest, scaffold generates the shim code and fills **only the missing non-name fields, exactly once** -- never touching the name or any value the user already set, so a second scaffold is a byte-level no-op:
-
-- **npm (`download: "postinstall"`):** `bin` (maps the command name to `bin/launcher.cjs`), `scripts.postinstall` (`node scripts/postinstall.cjs`), and `files` (`["bin", "scripts", "vendor"]`, so the shims ship in the tarball).
-- **npm (`download: "first-run"`):** `bin` and `files` (`["bin"]`) only. **No** `scripts.postinstall` -- installing the package performs zero network I/O.
-- **PyPI:** the `[project.scripts]` console-script entry (mapping the command name to the launcher module's `main`).
-
-The `wrapper-producer` check additionally hard-errors if one of these required fields is later deleted from the manifest, naming the field -- a deletion would silently break the published wrapper. The required-field set is `download`-mode-aware: in `first-run` mode `scripts.postinstall` is not required (and not expected), only `bin` and `files`.
-
-### Hard constraint: goreleaser default asset naming
-
-Launchers depend on goreleaser's **default** asset naming and the literal `checksums.txt` filename. The producer's `.goreleaser.yml` must emit assets named `<ProjectName>_<Version>_<Os>_<Arch>.<ext>` (tar.gz, or zip on Windows) and a checksum file named exactly `checksums.txt`. The scaffolded config does this out of the box.
-
-Both the CI verify step (which probes a representative asset URL and the `checksums.txt` URL for HTTP 404) and the install/first-run shims (which reconstruct these names to download and SHA-256-verify) are built on this contract. A custom `name_template` in `.goreleaser.yml` breaks it and is unsupported: the verify step turns the drift into a red publish job at the release that introduced it, rather than letting silent 404s reach every future install.
-
-### Verification closures
-
-Two structural closures work together to prevent broken wrapper packages from reaching registries. The first closure enforces ordering so the binary exists before the wrapper publishes, and the second closure verifies that the expected download URLs actually resolve. Both are enforced automatically in the generated CI workflows and cannot be bypassed:
-
-1. **`needs` dependency chain.** Every launcher publish job emits `needs: [gate, <producer-job-key>]` in the generated CI workflow. This ensures the binary producer's publish job (e.g., goreleaser) has finished and uploaded its assets before the launcher attempts to publish. The merged publish generator and the monorepo router both preserve this dependency. Without this, a shim could publish before its binary exists -- a permanently broken package on a registry that cannot un-publish.
-
-2. **URL verify-before-publish.** Before running `npm publish` or `uv publish`, the launcher workflow curls the constructed release-asset URL for a representative platform (linux/amd64) and hard-fails on HTTP 404. This catches goreleaser asset-naming drift (e.g., a custom `name_template` in `.goreleaser.yml`) at the release that introduced it, turning it into a red CI job instead of silent 404s for all future installs.
-
-### `wrapper-producer` check
-
-The `wrapper-producer` check (registered in the check system under the `project` and `preflight` tags) validates that every launcher pipeline's `wraps` field references an existing pipeline whose `artifact` is `"binary"`. This runs during `rlsbl check` and as part of the release preflight, catching misconfigurations before they reach CI.
-
-### Decision rule: launcher vs monorepo members
-
-- **One-off wrapper** (single Go binary distributed via npm or PyPI): use a subdirectory launcher target. The wrapper's `package.json` or `pyproject.toml` lives in a subdirectory (e.g., `packaging/npm/`), declared as an explicit target with a path.
-- **Complex multi-artifact** (multiple packages that need coordinated versioning): use monorepo members in a shared releasable. Each member gets its own version bump, changelog, and independent publish pipeline. Multi-artifact releasables publish every member at the shared version.
-
-Same-registry multiplicity is not a goal for launchers -- one launcher per registry per project.
+Before anything publishes, the release packs every artifact a publishing releasable ships (the npm tarball, the wheel, a Go library's module zip, and the files a Go binary is built from) and refuses any file that comes from outside the releasable's own members, naming each file and the artifact carrying it. In a public repository, every text file in those artifacts, the GitHub Release body, and the published changelog section are scanned for the names in the machine-local confidential-name index.
