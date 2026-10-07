@@ -65,6 +65,7 @@ func TestTheOperationsThroughTheApplication(t *testing.T) {
 	repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
 	testsupport.FakeGH(t,
 		testsupport.GHAnswer{Args: []string{"auth", "status", "--hostname", "github.com"}},
+		testsupport.GHAnswer{Args: []string{"api", "--method", "GET", "repos/acme/portal"}, Stdout: `{"full_name":"acme/portal","visibility":"public","private":false,"archived":false,"permissions":{"push":true}}`},
 		testsupport.GHAnswer{Args: []string{"release", "view", "v0.4.0", "--repo", "acme/portal", "--json", "tagName", "--jq", ".tagName"}, Stdout: "v0.4.0\n"})
 	app := appWith(t, testsupport.NewFakeHTTP(t))
 	for _, c := range []struct {
