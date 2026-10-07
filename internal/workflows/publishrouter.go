@@ -180,6 +180,21 @@ func tagCondition(tag TagParts) string {
 	return cond
 }
 
+// checksOut reports whether one of the job's steps checks the repository
+// out with actions/checkout.
+func checksOut(job *yaml.Node) bool {
+	steps := mapGet(job, "steps")
+	if !isSeq(steps) {
+		return false
+	}
+	for _, step := range steps.Content {
+		if uses := mapGet(step, "uses"); isScalar(uses) && strings.HasPrefix(uses.Value, "actions/checkout@") {
+			return true
+		}
+	}
+	return false
+}
+
 // composeWorkingDirectory roots a job's working directory under the
 // member's path: the member's path when the job sets none, the two joined
 // when it sets one relative to the member.
@@ -202,10 +217,11 @@ func composeWorkingDirectory(job *yaml.Node, memberPath, where string) error {
 
 // inlinePublishJobs transforms one publisher's jobs for the router: its own
 // wait-for-ci dropped, the workflow-level env, defaults.run, and permissions
-// pushed down, file inputs and the working directory rooted under the
-// member, each job run only for the member's tags (and not for the tags of a
-// longer scheme its prefix also starts), keys prefixed with the member's
-// name, and every job needing the router's wait-for-ci.
+// pushed down, file inputs rooted under the member, the working directory
+// too for a job that checks the repository out, each job run only for the
+// member's tags (and not for the tags of a longer scheme its prefix also
+// starts), keys prefixed with the member's name, and every job needing the
+// router's wait-for-ci.
 func inlinePublishJobs(p publisher, longer []TagParts, taken map[string]bool) ([]string, map[string]*yaml.Node, error) {
 	jobs := mapGet(p.root, "jobs")
 	if mapGet(jobs, RetiredWaitJobKey) != nil {
@@ -252,8 +268,12 @@ func inlinePublishJobs(p publisher, longer []TagParts, taken map[string]bool) ([
 			if err := rewriteMemberSteps(j, p.member.Path, where); err != nil {
 				return nil, nil, err
 			}
-			if err := composeWorkingDirectory(j, p.member.Path, where); err != nil {
-				return nil, nil, err
+			// A job that checks no repository out (the npm per-platform jobs
+			// work in $RUNNER_TEMP) has no member directory on its runner.
+			if checksOut(j) {
+				if err := composeWorkingDirectory(j, p.member.Path, where); err != nil {
+					return nil, nil, err
+				}
 			}
 		}
 		condition := cond

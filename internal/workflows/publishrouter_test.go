@@ -8,6 +8,7 @@ import (
 	"github.com/stricttools/testisolation/go/hygiene"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
+	"github.com/stricttools/rlsbl/internal/pipelines"
 )
 
 const memberPublish = `name: Publish
@@ -26,6 +27,7 @@ jobs:
     needs: wait-for-ci
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v6
       - uses: pypa/gh-action-pypi-publish@release/v1
   announce:
     needs: [wait-for-ci, publish]
@@ -99,7 +101,7 @@ func TestThePublishRouterInlinesEachPublishingMembersJobs(t *testing.T) {
 	if publish["defaults"].(map[string]any)["run"].(map[string]any)["working-directory"] != "packages/core" {
 		t.Fatalf("defaults: %v", publish["defaults"])
 	}
-	with := publish["steps"].([]any)[0].(map[string]any)["with"].(map[string]any)
+	with := publish["steps"].([]any)[1].(map[string]any)["with"].(map[string]any)
 	if with["packages-dir"] != "packages/core/dist/" {
 		t.Fatalf("packages-dir: %v", with)
 	}
@@ -194,5 +196,76 @@ func TestTheRootMembersJobsAreRenderedNotRead(t *testing.T) {
 	}
 	if job(t, doc, "root-publish")["defaults"].(map[string]any)["run"].(map[string]any)["working-directory"] != "." {
 		t.Fatalf("root-publish: %v", job(t, doc, "root-publish"))
+	}
+}
+
+// goBinaryPublish is the publish workflow of a go-binary member: its
+// goreleaser job, the npm per-platform and package jobs, and the wheel job.
+func goBinaryPublish(t *testing.T) string {
+	t.Helper()
+	npm, err := NPMPackagingJobs(NPMPackaging{GoBinaryRelease: portalBinary(), Package: "portal", Dir: "npm", License: "MIT", Actions: testActions})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wheel, err := WheelJob(WheelPackaging{GoBinaryRelease: portalBinary(), Dir: ".", Actions: testActions})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return `name: Publish
+on:
+  release:
+    types: [published]
+permissions:
+  contents: write
+jobs:
+  wait-for-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo waiting
+  goreleaser:
+    needs: wait-for-ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: goreleaser release --clean
+` + npm + wheel
+}
+
+func TestEveryInlinedJobGivenAWorkingDirectoryChecksTheRepositoryOut(t *testing.T) {
+	hygiene.Isolate(t)
+	w := fixtureWorkspace(t, withTools, publishFixture(map[string]string{"packages/core/.github/workflows/publish.yml": goBinaryPublish(t)}))
+	plan, err := PublishRouter(w, PublishInputs{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := parseYAML(t, plan.Text)
+	inlinedPlatformJobs := 0
+	for key, raw := range jobsOf(t, doc) {
+		j := raw.(map[string]any)
+		if strings.HasPrefix(key, "core-npm-") && key != "core-"+NPMPackageJobKey {
+			inlinedPlatformJobs++
+		}
+		defaults, _ := j["defaults"].(map[string]any)
+		run, _ := defaults["run"].(map[string]any)
+		dir, _ := run["working-directory"].(string)
+		if dir == "" {
+			continue
+		}
+		steps, _ := j["steps"].([]any)
+		checkedOut := false
+		for _, s := range steps {
+			if uses, _ := s.(map[string]any)["uses"].(string); strings.HasPrefix(uses, "actions/checkout@") {
+				checkedOut = true
+			}
+		}
+		if !checkedOut {
+			t.Errorf("the job %s runs in %s and checks no repository out, so that directory does not exist on the runner", key, dir)
+		}
+	}
+	if inlinedPlatformJobs != len(pipelines.Platforms()) {
+		t.Fatalf("the router inlined %d npm platform jobs, want %d:\n%s", inlinedPlatformJobs, len(pipelines.Platforms()), plan.Text)
+	}
+	if job(t, doc, "core-goreleaser")["defaults"] == nil {
+		t.Error("a job that checks the repository out lost its working directory under the member")
 	}
 }
