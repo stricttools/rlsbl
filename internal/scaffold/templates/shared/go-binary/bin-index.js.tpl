@@ -19,7 +19,7 @@ if (!pkg) {
 
 let binPath;
 try {
-  binPath = path.join(path.dirname(require.resolve(`${pkg}/package.json`)), "bin", "{{binaryName}}");
+  binPath = path.join(path.dirname(require.resolve(`${pkg}/package.json`)), "{{binaryName}}");
 } catch (e) {
   console.error(`Could not find binary package ${pkg}. Did npm install fail?`);
   process.exit(1);

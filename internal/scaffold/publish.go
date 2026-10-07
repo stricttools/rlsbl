@@ -2,163 +2,64 @@ package scaffold
 
 import (
 	"fmt"
-	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
-	"github.com/stricttools/rlsbl/internal/pipelines"
+	"github.com/stricttools/rlsbl/internal/workflows"
 )
 
 // The publish workflow is assembled from parts: a header (the release and
-// dispatch triggers, one run per tag, the permissions every job together
-// needs), the wait-for-ci job, and one job per pipeline publishing from CI,
-// keyed by the pipeline's name. Every publish job waits for wait-for-ci,
-// which confirms CI passed on the release commit before anything is
-// published, and a go-binary job also waits for the go binary job whose
-// archives it packages.
+// dispatch triggers, one run per tag, the permissions the jobs together
+// need), the wait-for-ci job, and the jobs of every pipeline publishing from
+// CI. A go or npm or pypi package pipeline renders one job keyed by the
+// pipeline's name from scaffold's templates; a go-binary pipeline's jobs,
+// and the wait-for-ci job every publish job waits for, are rendered by
+// internal/workflows, which the workspace's publish router shares.
 
-// WaitForCIJobKey is the key of the job every publish job waits for.
-const WaitForCIJobKey = "wait-for-ci"
+// publishWorkflowTemplate is the publish workflow's frame.
+const publishWorkflowTemplate = "shared/publish.yml.tpl"
 
-// The wait-for-ci job's limits, written into the job's environment so a
-// repository changes them by editing the workflow.
-const (
-	waitTimeoutMinutes      = 20
-	waitGraceMinutes        = 5
-	waitPollSeconds         = 15
-	waitMarkerAttempts      = 5
-	waitMarkerRetrySeconds  = 5
-	waitJobMarginMinutes    = 5
-	ciJobIndent             = "          "
-	defaultWheelsDir        = "rlsbl-wheels"
-	publishWorkflowTemplate = "shared/publish.yml.tpl"
-)
-
-// CIJobNames are the job names each target's CI workflow runs, which name
-// the check runs CI reports on a commit (a matrix job's runs add " (...)").
-var CIJobNames = map[string][]string{
-	declarations.TargetGo:   {"test"},
-	declarations.TargetNPM:  {"test"},
-	declarations.TargetPyPI: {"test"},
-}
-
-// CICheckPattern is the check-run name pattern of the targets' CI jobs and
-// their matrix expansions. A target without CI jobs is refused.
-func CICheckPattern(targets []string) (string, error) {
-	seen := map[string]bool{}
-	for _, t := range targets {
-		names, ok := CIJobNames[t]
-		if !ok {
-			return "", fmt.Errorf("the %q target has no CI workflow, so nothing would report the check runs a publish waits for", t)
-		}
-		for _, n := range names {
-			seen[n] = true
-		}
-	}
-	if len(seen) == 0 {
-		return "", fmt.Errorf("no target to wait for: a publish workflow waits for the CI of the targets it publishes")
-	}
-	var names []string
-	for n := range seen {
-		names = append(names, regexp.QuoteMeta(n))
-	}
-	sort.Strings(names)
-	return `^(` + strings.Join(names, "|") + `)( \(.*\))?$`, nil
-}
-
-// WaitForCI declares the wait-for-ci job.
-type WaitForCI struct {
-	// CheckPattern is the check-run name pattern the job waits for; empty
-	// when ResolverScript sets it at run time.
-	CheckPattern string
-	// ResolverScript, when set, is a shell script run first that writes
-	// CI_CHECK_REGEX into $GITHUB_ENV (a workspace's publish workflow, whose
-	// releasing project the tag names). Its lines are indented as written.
-	ResolverScript string
-	// TagInput passes the dispatch's tag input to the job as TAG_INPUT.
-	TagInput bool
-}
-
-// WaitForCIJob is the wait-for-ci job's YAML, indented to sit under jobs:.
-func WaitForCIJob(w WaitForCI) (string, error) {
-	if (w.CheckPattern == "") == (w.ResolverScript == "") {
-		return "", fmt.Errorf("the wait-for-ci job takes a check-run pattern or a script resolving one, and never both")
-	}
-	if strings.Contains(w.CheckPattern, "'") {
-		return "", fmt.Errorf("the check-run pattern %q holds a single quote, which the workflow's single-quoted value cannot carry", w.CheckPattern)
-	}
-	tagInput := ""
-	if w.TagInput {
-		tagInput = "1"
-	}
-	resolver := ""
-	if w.ResolverScript != "" {
-		resolver = indentBlock(w.ResolverScript, ciJobIndent)
-	}
-	text, err := renderTemplate("shared/wait-for-ci.job.tpl", Vars{
-		"jobTimeoutMinutes":  strconv.Itoa(waitTimeoutMinutes + waitJobMarginMinutes),
-		"timeoutMinutes":     strconv.Itoa(waitTimeoutMinutes),
-		"graceMinutes":       strconv.Itoa(waitGraceMinutes),
-		"pollSeconds":        strconv.Itoa(waitPollSeconds),
-		"markerAttempts":     strconv.Itoa(waitMarkerAttempts),
-		"markerRetrySeconds": strconv.Itoa(waitMarkerRetrySeconds),
-		"checkPattern":       w.CheckPattern,
-		"tagInput":           tagInput,
-		"resolverScript":     resolver,
-	})
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimRight(text, "\n"), nil
-}
-
-// indentBlock prefixes every non-empty line of text and drops its final
-// newline.
-func indentBlock(text, prefix string) string {
-	lines := strings.Split(strings.TrimRight(text, "\n"), "\n")
-	for i, l := range lines {
-		if l != "" {
-			lines[i] = prefix + l
-		}
-	}
-	return strings.Join(lines, "\n")
-}
-
-// PublishJob is one job of a publish workflow.
+// PublishJob is one or more jobs of a publish workflow, rendered for one
+// pipeline.
 type PublishJob struct {
-	// Key is the job's key under jobs:.
-	Key string
-	// Text is the job's YAML, starting with "  <key>:".
+	// Keys are the jobs' keys under jobs:.
+	Keys []string
+	// Text is the jobs' YAML, each key two spaces in, without a final
+	// newline.
 	Text string
-	// Permissions are the workflow permissions the job needs, by scope
+	// Permissions are the workflow permissions the jobs need, by scope
 	// ("read" or "write").
 	Permissions map[string]string
 }
 
-// PublishTarget is everything one pipeline's publish job is rendered from.
+// PublishTarget is everything one pipeline's publish jobs are rendered from.
 type PublishTarget struct {
 	Pipeline declarations.Pipeline
-	// Dir is the directory of the pipeline's target, repository-relative
-	// ("." for the repository root); a job of a target elsewhere runs its
-	// steps there.
+	// Dir is the directory of the pipeline's target relative to the
+	// directory the workflow's jobs run in (the member's directory: a
+	// workspace's publish router composes the member's own path); "." is
+	// that directory itself.
 	Dir string
-	// ModulePath is a go pipeline's module path.
+	// ModulePath is a go library pipeline's module path.
 	ModulePath string
-	// RegistryURL is an npm pipeline's registry.
+	// RegistryURL is an npm package pipeline's registry.
 	RegistryURL string
 	// PackageManager is an npm package pipeline's package manager: npm,
 	// pnpm, or yarn.
 	PackageManager string
-	// BinaryName is the binary a go binary pipeline builds, and the binary
-	// a go-binary pipeline packages.
+	// PackageName is an npm go-binary pipeline's main package name.
+	PackageName string
+	// BinaryName is the binary a go-binary pipeline packages.
 	BinaryName string
 	// HomebrewTap is set when a go binary pipeline publishes a formula.
 	HomebrewTap bool
-	// License is the releasable's license, written into the manifests a
-	// go-binary pipeline generates.
+	// License is the releasable's license, which the manifests a go-binary
+	// pipeline generates carry.
 	License string
+	// Tag is the releasable's tag scheme, from which a go-binary pipeline's
+	// jobs read the released version.
+	Tag workflows.TagParts
 }
 
 // Features are the publishing features a repository may render, from the
@@ -182,7 +83,21 @@ var packageManagerSteps = map[string]struct{ setupAction, install, pack, publish
 	"yarn": {"", "yarn install --immutable", `yarn pack --out "$RUNNER_TEMP/artifacts/package.tgz"`, "yarn npm publish"},
 }
 
-// RenderPublishJob renders the publish job of one pipeline publishing from
+// actionVersions is the pinned action table in the form internal/workflows
+// takes it.
+func actionVersions() (workflows.ActionVersions, error) {
+	table, err := actions()
+	if err != nil {
+		return nil, err
+	}
+	out := workflows.ActionVersions{}
+	for k, v := range table {
+		out[k] = v
+	}
+	return out, nil
+}
+
+// RenderPublishJob renders the publish jobs of one pipeline publishing from
 // CI. Publishing a feature the repository may not render is refused, naming
 // the rule: a go library asks the Go module proxy, and a Homebrew formula
 // names the repository.
@@ -191,7 +106,10 @@ func RenderPublishJob(t PublishTarget, f Features) (PublishJob, error) {
 	if p.Local {
 		return PublishJob{}, fmt.Errorf("the pipeline %q publishes from this machine (local = true), so the publish workflow has no job for it", p.Name)
 	}
-	vars := Vars{"jobKey": p.Name, "needs": WaitForCIJobKey}
+	if p.Artifact == declarations.ArtifactGoBinary {
+		return renderGoBinaryJobs(t, f)
+	}
+	vars := Vars{"jobKey": p.Name, "needs": workflows.WaitForCIJobKey}
 	var template string
 	perms := map[string]string{"contents": "read"}
 	switch {
@@ -244,40 +162,6 @@ func RenderPublishJob(t PublishTarget, f Features) (PublishJob, error) {
 			"pypi.packagesDir":    joinDir(t.Dir, "dist") + "/",
 			"pypi.noAttestations": boolVar(!f.BuildAttestations),
 		})
-	case (p.Type == declarations.TargetNPM || p.Type == declarations.TargetPyPI) && p.Artifact == declarations.ArtifactGoBinary:
-		if t.BinaryName == "" || p.BinaryPipeline == "" {
-			return PublishJob{}, fmt.Errorf("the %s pipeline %q packages a go binary pipeline's binaries, and names no binary pipeline whose binary it packages", p.Type, p.Name)
-		}
-		if strings.TrimSpace(t.License) == "" {
-			return PublishJob{}, fmt.Errorf("the %s pipeline %q generates platform packages, whose manifests carry the releasable's license, and the lifecycle-and-license record holds no license in effect for it", p.Type, p.Name)
-		}
-		perms["id-token"] = "write"
-		vars.Merge(Vars{
-			"needs":      "[" + WaitForCIJobKey + ", " + p.BinaryPipeline + "]",
-			"binaryName": t.BinaryName,
-			"binaryJob":  p.BinaryPipeline,
-			"license":    t.License,
-		})
-		var calls, names []string
-		for _, pl := range pipelines.Platforms() {
-			if p.Type == declarations.TargetNPM {
-				calls = append(calls, fmt.Sprintf("%splatform_package %s %s %s %s %s", ciJobIndent, pl.Name, pl.OS, pl.CPU, pl.GOOS, pl.GOARCH))
-				names = append(names, pl.Name)
-			} else {
-				calls = append(calls, fmt.Sprintf("%swheel %s %s %s", ciJobIndent, pl.WheelTag, pl.GOOS, pl.GOARCH))
-			}
-		}
-		if p.Type == declarations.TargetNPM {
-			template = "shared/go-binary/npm.jobs.tpl"
-			flag := ""
-			if f.BuildAttestations {
-				flag = " --provenance"
-			}
-			vars.Merge(Vars{"platformCalls": strings.Join(calls, "\n"), "platformNames": strings.Join(names, " "), "npm.provenanceFlag": flag})
-		} else {
-			template = "shared/go-binary/pypi.jobs.tpl"
-			vars.Merge(Vars{"wheelCalls": strings.Join(calls, "\n"), "wheelsDir": defaultWheelsDir, "pypi.noAttestations": boolVar(!f.BuildAttestations)})
-		}
 	default:
 		return PublishJob{}, fmt.Errorf("the pipeline %q (type %q, artifact %q) is not one rlsbl renders a publish job for", p.Name, p.Type, p.Artifact)
 	}
@@ -289,7 +173,67 @@ func RenderPublishJob(t PublishTarget, f Features) (PublishJob, error) {
 	if t.Dir != "." && t.Dir != "" {
 		text = jobsInDirectory(text, t.Dir)
 	}
-	return PublishJob{Key: p.Name, Text: text, Permissions: perms}, nil
+	return PublishJob{Keys: []string{p.Name}, Text: text, Permissions: perms}, nil
+}
+
+// renderGoBinaryJobs renders the jobs packaging a go binary pipeline's
+// binaries for npm or PyPI, through internal/workflows. Each job runs from
+// the directory the workflow's jobs run in and names the target's directory
+// itself.
+func renderGoBinaryJobs(t PublishTarget, f Features) (PublishJob, error) {
+	p := t.Pipeline
+	if p.BinaryPipeline == "" {
+		return PublishJob{}, fmt.Errorf("the %s pipeline %q packages a go binary pipeline's binaries and names no binary_pipeline in %s", p.Type, p.Name, declarations.ReleasablesFile)
+	}
+	versions, err := actionVersions()
+	if err != nil {
+		return PublishJob{}, err
+	}
+	release := workflows.GoBinaryRelease{BinaryJob: p.BinaryPipeline, Binary: t.BinaryName, Tag: t.Tag}
+	dir := t.Dir
+	if dir == "" {
+		dir = "."
+	}
+	perms := map[string]string{"contents": "read", "id-token": "write"}
+	switch p.Type {
+	case declarations.TargetNPM:
+		text, err := workflows.NPMPackagingJobs(workflows.NPMPackaging{
+			GoBinaryRelease: release,
+			Package:         t.PackageName,
+			Dir:             dir,
+			License:         t.License,
+			Provenance:      f.BuildAttestations,
+			Actions:         versions,
+		})
+		if err != nil {
+			return PublishJob{}, fmt.Errorf("the npm pipeline %q: %w", p.Name, err)
+		}
+		keys := jobKeys(text)
+		return PublishJob{Keys: keys, Text: strings.TrimRight(text, "\n"), Permissions: perms}, nil
+	case declarations.TargetPyPI:
+		text, err := workflows.WheelJob(workflows.WheelPackaging{
+			GoBinaryRelease: release,
+			Dir:             dir,
+			Attestations:    f.BuildAttestations,
+			Actions:         versions,
+		})
+		if err != nil {
+			return PublishJob{}, fmt.Errorf("the pypi pipeline %q: %w", p.Name, err)
+		}
+		return PublishJob{Keys: jobKeys(text), Text: strings.TrimRight(text, "\n"), Permissions: perms}, nil
+	}
+	return PublishJob{}, fmt.Errorf("the pipeline %q (type %q) cannot package a go binary; only npm and pypi pipelines can", p.Name, p.Type)
+}
+
+// jobKeys are the keys of the jobs in jobs text.
+func jobKeys(text string) []string {
+	var keys []string
+	for _, line := range strings.Split(text, "\n") {
+		if jobHeader.MatchString(line) {
+			keys = append(keys, strings.TrimSuffix(strings.TrimSpace(line), ":"))
+		}
+	}
+	return keys
 }
 
 func boolVar(b bool) string {
@@ -308,21 +252,23 @@ func joinDir(dir, rel string) string {
 }
 
 // PublishWorkflow assembles the publish workflow from the wait-for-ci job
-// and the publish jobs, in the order given. The workflow's permissions are
-// each scope's widest grant among the jobs; a job key used twice, or a key
-// clashing with wait-for-ci, is refused.
+// (workflows.WaitForCIJob) and the publish jobs, in the order given. The
+// workflow's permissions are each scope's widest grant among the jobs; a
+// job key used twice, or one clashing with wait-for-ci, is refused.
 func PublishWorkflow(waitForCI string, jobs []PublishJob) (string, error) {
 	if len(jobs) == 0 {
 		return "", fmt.Errorf("a publish workflow needs at least one publish job")
 	}
 	perms := map[string]string{}
-	seen := map[string]bool{WaitForCIJobKey: true}
-	texts := []string{waitForCI}
+	seen := map[string]bool{workflows.WaitForCIJobKey: true}
+	texts := []string{strings.TrimRight(waitForCI, "\n")}
 	for _, j := range jobs {
-		if seen[j.Key] {
-			return "", fmt.Errorf("the publish workflow would carry two jobs keyed %q; pipeline names must differ from each other and from %s", j.Key, WaitForCIJobKey)
+		for _, key := range j.Keys {
+			if seen[key] {
+				return "", fmt.Errorf("the publish workflow would carry two jobs keyed %q; rename the pipeline in %s so its jobs' keys differ from every other job's and from %s", key, declarations.ReleasablesFile, workflows.WaitForCIJobKey)
+			}
+			seen[key] = true
 		}
-		seen[j.Key] = true
 		for scope, level := range j.Permissions {
 			if perms[scope] != "write" {
 				perms[scope] = level

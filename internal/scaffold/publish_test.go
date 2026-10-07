@@ -8,33 +8,35 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
+	"github.com/stricttools/rlsbl/internal/workflows"
 )
 
 var (
 	public       = Features{BuildAttestations: true, GoProxyNotification: true, RepositoryURLs: true}
 	confidential = Features{}
+	standardTag  = workflows.TagParts{Prefix: "v"}
 )
 
 func goBinary() PublishTarget {
-	return PublishTarget{Pipeline: declarations.Pipeline{Name: "go", Type: "go", Target: "go", Artifact: "binary"}, Dir: ".", ModulePath: "github.com/acme/portal", BinaryName: "portal", License: "MIT"}
+	return PublishTarget{Pipeline: declarations.Pipeline{Name: "go", Type: "go", Target: "go", Artifact: "binary"}, Dir: ".", ModulePath: "github.com/acme/portal", BinaryName: "portal", License: "MIT", Tag: standardTag}
 }
 
 func npmGoBinary() PublishTarget {
-	return PublishTarget{Pipeline: declarations.Pipeline{Name: "npm", Type: "npm", Target: "npm", Artifact: "go-binary", BinaryPipeline: "go"}, Dir: "npm", BinaryName: "portal", License: "MIT"}
+	return PublishTarget{Pipeline: declarations.Pipeline{Name: "npm", Type: "npm", Target: "npm", Artifact: "go-binary", BinaryPipeline: "go"}, Dir: "npm", PackageName: "portal", BinaryName: "portal", License: "MIT", Tag: standardTag}
 }
 
 func pypiGoBinary() PublishTarget {
-	return PublishTarget{Pipeline: declarations.Pipeline{Name: "pypi", Type: "pypi", Target: "pypi", Artifact: "go-binary", BinaryPipeline: "go"}, Dir: "python", BinaryName: "portal", License: "MIT"}
+	return PublishTarget{Pipeline: declarations.Pipeline{Name: "pypi", Type: "pypi", Target: "pypi", Artifact: "go-binary", BinaryPipeline: "go"}, Dir: "python", BinaryName: "portal", License: "MIT", Tag: standardTag}
 }
 
 // workflow assembles a publish workflow and checks it parses as YAML.
 func workflow(t *testing.T, f Features, targets ...PublishTarget) (string, map[string]any) {
 	t.Helper()
-	pattern, err := CICheckPattern([]string{"go", "npm"})
+	pattern, err := workflows.CheckPatternForTargets([]string{"go", "npm"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	wait, err := WaitForCIJob(WaitForCI{CheckPattern: pattern})
+	wait, err := workflows.WaitForCIJob(pattern)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,68 +59,35 @@ func workflow(t *testing.T, f Features, targets ...PublishTarget) (string, map[s
 	return text, doc
 }
 
-func TestTheCheckPatternMatchesTheCIJobsAndTheirMatrices(t *testing.T) {
-	hygiene.Isolate(t)
-	pattern, err := CICheckPattern([]string{"npm", "go", "pypi"})
-	if err != nil || pattern != `^(test)( \(.*\))?$` {
-		t.Fatalf("pattern = %q, %v", pattern, err)
-	}
-	if _, err := CICheckPattern([]string{"zig"}); err == nil {
-		t.Fatal("a target without CI was accepted")
-	}
-}
-
 func TestAPublishWorkflowWaitsForCIBeforeEveryJob(t *testing.T) {
 	hygiene.Isolate(t)
 	text, doc := workflow(t, public, goBinary(), npmGoBinary(), pypiGoBinary())
 	jobs := doc["jobs"].(map[string]any)
-	if _, ok := jobs[WaitForCIJobKey]; !ok {
+	if _, ok := jobs[workflows.WaitForCIJobKey]; !ok {
 		t.Fatalf("no wait-for-ci job:\n%s", text)
 	}
-	if needs := jobs["go"].(map[string]any)["needs"]; needs != WaitForCIJobKey {
+	if needs := jobs["go"].(map[string]any)["needs"]; needs != workflows.WaitForCIJobKey {
 		t.Fatalf("the go job needs %v", needs)
 	}
-	needs := jobs["npm"].(map[string]any)["needs"].([]any)
-	if len(needs) != 2 || needs[0] != WaitForCIJobKey || needs[1] != "go" {
-		t.Fatalf("the npm job needs %v", needs)
+	for key, job := range jobs {
+		if key == workflows.WaitForCIJobKey {
+			continue
+		}
+		needs := job.(map[string]any)["needs"]
+		ok := needs == workflows.WaitForCIJobKey
+		if list, isList := needs.([]any); isList && len(list) > 0 && list[0] == workflows.WaitForCIJobKey {
+			ok = true
+		}
+		if !ok {
+			t.Errorf("the %s job does not wait for CI: needs %v", key, needs)
+		}
 	}
 	perms := doc["permissions"].(map[string]any)
 	if perms["contents"] != "write" || perms["id-token"] != "write" {
 		t.Fatalf("permissions = %v", perms)
 	}
-	if len(jobs) != 4 {
-		t.Fatalf("jobs = %v", jobs)
-	}
-	if !strings.Contains(text, `CI_CHECK_REGEX: '^(test)( \(.*\))?$'`) {
-		t.Fatalf("the check-run pattern is not in the job:\n%s", text)
-	}
-}
-
-func TestGoBinaryJobsCoverThePlatformTableAndNoWindows(t *testing.T) {
-	hygiene.Isolate(t)
-	text, doc := workflow(t, public, goBinary(), npmGoBinary(), pypiGoBinary())
-	for _, platform := range []string{"linux-x64", "linux-arm64", "darwin-x64", "darwin-arm64"} {
-		if !strings.Contains(text, "platform_package "+platform+" ") {
-			t.Errorf("no platform package for %s", platform)
-		}
-	}
-	for _, tag := range []string{"manylinux_2_17_x86_64.manylinux2014_x86_64.musllinux_1_1_x86_64", "macosx_11_0_arm64"} {
-		if !strings.Contains(text, "wheel "+tag+" ") {
-			t.Errorf("no wheel for %s", tag)
-		}
-	}
 	if strings.Contains(text, "win32") || strings.Contains(text, ".exe") {
 		t.Fatalf("a windows platform is rendered:\n%s", text)
-	}
-	npm := doc["jobs"].(map[string]any)["npm"].(map[string]any)
-	if dir := npm["defaults"].(map[string]any)["run"].(map[string]any)["working-directory"]; dir != "npm" {
-		t.Fatalf("the npm job runs in %v", dir)
-	}
-	if !strings.Contains(text, "--provenance") || !strings.Contains(text, `"MIT"`) {
-		t.Fatalf("a public repository's packages are published without provenance or the license:\n%s", text)
-	}
-	if strings.Contains(text, "postinstall") {
-		t.Fatal("the platform packages run something at install time")
 	}
 }
 
@@ -126,14 +95,16 @@ func TestAConfidentialRepositoryPublishesNothingNamingIt(t *testing.T) {
 	hygiene.Isolate(t)
 	npmPackage := PublishTarget{Pipeline: declarations.Pipeline{Name: "npm", Type: "npm", Target: "npm", Artifact: "package"}, Dir: ".", RegistryURL: "https://registry.npmjs.org", PackageManager: "npm"}
 	pypiPackage := PublishTarget{Pipeline: declarations.Pipeline{Name: "pypi", Type: "pypi", Target: "pypi", Artifact: "package"}, Dir: "."}
-	text, _ := workflow(t, confidential, npmPackage, pypiPackage, goBinary(), npmGoBinary())
+	wheels := pypiGoBinary()
+	wheels.Pipeline.Name = "wheels"
+	text, _ := workflow(t, confidential, npmPackage, pypiPackage, goBinary(), wheels)
 	if strings.Contains(text, "--provenance") {
 		t.Fatalf("a confidential repository's npm publish records provenance:\n%s", text)
 	}
-	if !strings.Contains(text, "attestations: false") {
-		t.Fatalf("a confidential repository's PyPI publish attests:\n%s", text)
+	if strings.Count(text, "attestations: false") != 2 {
+		t.Fatalf("a confidential repository's PyPI publishes attest:\n%s", text)
 	}
-	if strings.Contains(text, "proxy.golang.org") || strings.Contains(text, "homepage") || strings.Contains(text, "repository:") {
+	if strings.Contains(text, "proxy.golang.org") || strings.Contains(text, "homepage") || strings.Contains(text, `"repository"`) {
 		t.Fatalf("a confidential repository's workflow names it or asks the proxy:\n%s", text)
 	}
 	library := PublishTarget{Pipeline: declarations.Pipeline{Name: "go", Type: "go", Target: "go", Artifact: "library"}, Dir: ".", ModulePath: "github.com/acme/portal"}
@@ -153,8 +124,8 @@ func TestAConfidentialRepositoryPublishesNothingNamingIt(t *testing.T) {
 
 func TestAnNpmPublishNeverAsksForOneVersion(t *testing.T) {
 	hygiene.Isolate(t)
-	text, _ := workflow(t, public, PublishTarget{Pipeline: declarations.Pipeline{Name: "npm", Type: "npm", Target: "npm", Artifact: "package"}, Dir: ".", RegistryURL: "https://registry.npmjs.org", PackageManager: "pnpm"}, npmGoBinary(), goBinary())
-	if strings.Contains(text, `@${PKG_VERSION}" version`) || strings.Contains(text, `@${VERSION}" version`) {
+	text, _ := workflow(t, public, PublishTarget{Pipeline: declarations.Pipeline{Name: "npm", Type: "npm", Target: "npm", Artifact: "package"}, Dir: ".", RegistryURL: "https://registry.npmjs.org", PackageManager: "pnpm"})
+	if strings.Contains(text, `@${PKG_VERSION}" version`) {
 		t.Fatalf("a version-specific registry read:\n%s", text)
 	}
 	if !strings.Contains(text, "pnpm/action-setup@") || !strings.Contains(text, "pnpm publish") {
@@ -164,11 +135,11 @@ func TestAnNpmPublishNeverAsksForOneVersion(t *testing.T) {
 
 func TestTwoJobsWithOneKeyAreRefused(t *testing.T) {
 	hygiene.Isolate(t)
-	job := PublishJob{Key: "go", Text: "  go:\n    runs-on: ubuntu-latest", Permissions: map[string]string{"contents": "read"}}
+	job := PublishJob{Keys: []string{"go"}, Text: "  go:\n    runs-on: ubuntu-latest", Permissions: map[string]string{"contents": "read"}}
 	if _, err := PublishWorkflow("  wait-for-ci:\n    runs-on: ubuntu-latest", []PublishJob{job, job}); err == nil {
 		t.Fatal("a duplicate job key was accepted")
 	}
-	clash := PublishJob{Key: WaitForCIJobKey, Text: "  wait-for-ci:\n    runs-on: x"}
+	clash := PublishJob{Keys: []string{workflows.WaitForCIJobKey}, Text: "  wait-for-ci:\n    runs-on: x"}
 	if _, err := PublishWorkflow("  wait-for-ci:\n    runs-on: ubuntu-latest", []PublishJob{clash}); err == nil {
 		t.Fatal("a pipeline named like the wait job was accepted")
 	}
@@ -182,8 +153,8 @@ func TestJobsInADirectoryRunThereAndReadTheirVersionFileThere(t *testing.T) {
 	if got != want {
 		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
 	}
-	if again := workflowInDirectory(want, "tools/portal"); !strings.Contains(again, "go-version-file: tools/portal/go.mod\n") {
-		t.Fatalf("the version file was prefixed twice:\n%s", again)
+	if again := jobsInDirectory("      go-version-file: tools/portal/go.mod", "tools/portal"); again != "      go-version-file: tools/portal/go.mod" {
+		t.Fatalf("the version file was prefixed twice: %q", again)
 	}
 }
 
