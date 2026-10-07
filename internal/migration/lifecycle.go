@@ -447,7 +447,8 @@ func (b *builder) releasedOn(subject string, retired bool, version string) (bool
 }
 
 // addRegistryNames records the registry names of every releasable that
-// publishes from CI and has released at least once.
+// publishes from CI and has released at least once, and of every retired
+// subject that did.
 func (b *builder) addRegistryNames(rec *lifecycle.Record, d *declarations.Releasables, must func(error)) {
 	seen := map[string]bool{}
 	for _, r := range d.Releasables {
@@ -511,4 +512,5 @@ func (b *builder) addRegistryNames(rec *lifecycle.Record, d *declarations.Releas
 			}
 		}
 	}
+	b.addRetiredRegistryNames(rec, seen, must)
 }

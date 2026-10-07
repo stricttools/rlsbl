@@ -24,7 +24,8 @@ const migrateRecordsHelp = "Convert the rlsbl records of the repository holding 
 	"lifecycle-and-license record: one active lifecycle period and one license period per releasable from today, a retired " +
 	"period per closed release history (whose release state moves to .strictmetadata/retired-release-histories/), the " +
 	"releasable-name identities with their renames, the identity transitions (pending until their version is released), the " +
-	"registry names of every releasable that publishes from CI and has released, and the unversioned tags; and it records the " +
+	"registry names of every releasable and retired subject that published from CI (a retired subject's read at its release " +
+	"commits), and the unversioned tags; and it records the " +
 	"repository's confidential names in the machine-local index. A license comes from the package manifests or from --licenses, " +
 	"never from a LICENSE file. GitHub's visibility of the repository is read with gh. Every refusal is reported before anything " +
 	"is written, each naming its fix: a value the new layout has no place for, a target other than go, npm, and pypi, a retired " +

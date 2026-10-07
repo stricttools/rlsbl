@@ -658,3 +658,55 @@ func TestARepositoryNamingNoGitHubRepositoryIsRefusedUntilTheOriginIsAdded(t *te
 	f.repo.Git("remote", "add", "origin", "git@github.com:owner/portal.git")
 	f.mustPlan()
 }
+
+// retiredAfterPublishing is a workspace in which conformance was a
+// releasable publishing @acme/conformance to npm from CI, released 0.4.0
+// with the archive archive gives the release commit, and then had its
+// release history closed and its member removed.
+func retiredAfterPublishing(t *testing.T, archive func(releaseCommit string) string) *fixture {
+	t.Helper()
+	f := workspaceFixture(t)
+	workspaceToml := f.read(".rlsbl-monorepo/workspace.toml")
+	f.edit(".rlsbl-monorepo/workspace.toml", "[layers]", "[[releasables]]\nname = \"conformance\"\n\n[[projects]]\npath = \"conformance\"\nname = \"conformance\"\nreleasable = \"conformance\"\n\n[layers]")
+	f.write(".rlsbl-monorepo/releasables/conformance/config.json", `{"publish_mode": "ci"}`+"\n")
+	f.write("conformance/.rlsbl/config.json", `{"targets": ["npm"], "pipelines": {"npm": {"type": "npm", "target": "npm", "local": false}}}`+"\n")
+	f.write("conformance/package.json", `{"name": "@acme/conformance", "version": "0.4.0", "license": "MIT"}`+"\n")
+	releaseCommit := f.commit("conformance releases 0.4.0")
+	f.write(".rlsbl-monorepo/workspace.toml", workspaceToml)
+	f.remove("conformance")
+	f.write(".rlsbl-monorepo/releasables/conformance/version", "0.4.0\n")
+	f.write(".rlsbl-monorepo/releasables/conformance/releases/v0.4.0.toml", archive(releaseCommit))
+	f.write(".rlsbl-monorepo/transitions.jsonl", eventLine("release-history-closed", `"subject":"conformance","reason":"the suite stopped versioning separately"`))
+	f.commit("conformance retires")
+	return f
+}
+
+func TestARetiredSubjectThatPublishedKeepsItsRegistryNames(t *testing.T) {
+	hygiene.Isolate(t)
+	f := retiredAfterPublishing(t, func(c string) string { return oldArchive(c, otherSHA, "conformance") })
+	rec, err := lifecycle.Parse([]byte(planned(t, f.mustPlan(), lifecycle.RecordFile)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range rec.RegistryNames() {
+		if n.Registry == "npm" && n.Name == "@acme/conformance" && n.Subject == "conformance" {
+			return
+		}
+	}
+	t.Fatalf("the retired subject's registry name was dropped: %+v", rec.RegistryNames())
+}
+
+func TestARetiredSubjectWhoseReleasesRecordNoCommitIsRefusedUntilOneIsRestored(t *testing.T) {
+	hygiene.Isolate(t)
+	var releaseCommit string
+	f := retiredAfterPublishing(t, func(c string) string {
+		releaseCommit = c
+		return "format_version = 1\nbump = \"minor\"\ndescription = \"Cases\"\ninclude = [\"npm\"]\nexclude = []\nunrecoverable = true\n"
+	})
+	contains(t, f.refused(`the retired subject "conformance" released`), "rlsbl release backfill")
+
+	// The fix: the release commit is restored to the archive.
+	f.write(".rlsbl-monorepo/releasables/conformance/releases/v0.4.0.toml", oldArchive(releaseCommit, otherSHA, "conformance"))
+	f.commit("the release commit restored")
+	f.mustPlan()
+}
