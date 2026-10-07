@@ -57,6 +57,6 @@ func (inv Invocation) InitMinimalRecord(dir string) error {
 	if err := rec.Validate(on, nil); err != nil {
 		return err
 	}
-	inv.Say("Writing the minimal record " + lifecycle.RecordFile + ": the repository is public.")
-	return inv.write(root, repo, rec, on, "transition: write a minimal lifecycle-and-license record")
+	return inv.write(root, repo, rec, on, "transition: write a minimal lifecycle-and-license record",
+		outcome{"Wrote the minimal record " + lifecycle.RecordFile + ": the repository is public.", "Would write the minimal record " + lifecycle.RecordFile + ": the repository is public."})
 }

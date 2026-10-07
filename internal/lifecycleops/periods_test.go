@@ -377,3 +377,27 @@ func TestShowRefusesAConfidentialRepositoryWithoutAnOriginUntilOneIsAdded(t *tes
 		t.Fatalf("after adding the origin and the refresh: %+v", v)
 	}
 }
+
+func TestARecordValidationRefusesBeforeAnySuccessLineIsPrinted(t *testing.T) {
+	hygiene.Isolate(t)
+	// The record holds codenames while the repository is public, so every
+	// change to it is refused by the validation.
+	f := newFixture(t, "format_version = 1\ncodenames = [\"moonbeam\"]\n")
+	f.repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
+	for name, fn := range map[string]func(inv lifecycleops.Invocation, dir string) error{
+		"lifecycle": func(inv lifecycleops.Invocation, dir string) error {
+			return inv.Lifecycle(lifecycleops.PeriodRequest{Dir: dir, Subject: "portal", Value: "on-hold", Reason: "paused"})
+		},
+		"unversioned tag": func(inv lifecycleops.Invocation, dir string) error {
+			return inv.UnversionedTag(dir, "nightly", "a moving tag")
+		},
+	} {
+		r := f.run(t, false, fn)
+		if r.ExitCode == 0 || !strings.Contains(r.Stderr, "the record would not be valid") {
+			t.Fatalf("%s: the invalid record was not refused: exit %d\n%s", name, r.ExitCode, r.Stderr)
+		}
+		if strings.Contains(r.Stdout, "on-hold from") || strings.Contains(r.Stdout, "Recorded") {
+			t.Fatalf("%s: a success line was printed before the refusal:\n%s", name, r.Stdout)
+		}
+	}
+}

@@ -51,8 +51,7 @@ func (inv Invocation) Lifecycle(req PeriodRequest) error {
 	if err := rec.OpenPeriod(lifecycle.TableLifecycle, req.Subject, string(status), on, req.Reason); err != nil {
 		return err
 	}
-	inv.report(fmt.Sprintf("%s is %s from %s.", req.Subject, status, day(on)), fmt.Sprintf("Would record %s as %s from %s.", req.Subject, status, day(on)))
-	return inv.save(m, rec, on, fmt.Sprintf("transition: %s is %s", req.Subject, status))
+	return inv.save(m, rec, on, fmt.Sprintf("transition: %s is %s", req.Subject, status), outcome{fmt.Sprintf("%s is %s from %s.", req.Subject, status, day(on)), fmt.Sprintf("Would record %s as %s from %s.", req.Subject, status, day(on))})
 }
 
 // knownSubject reports whether subject is declared or held by the record's
@@ -138,8 +137,7 @@ func (inv Invocation) License(req PeriodRequest) error {
 	if err := rec.OpenPeriod(lifecycle.TableLicenses, req.Subject, license, on, req.Reason); err != nil {
 		return err
 	}
-	inv.report(fmt.Sprintf("%s is licensed %s from %s.", req.Subject, license, day(on)), fmt.Sprintf("Would record %s as licensed %s from %s.", req.Subject, license, day(on)))
-	return inv.save(m, rec, on, fmt.Sprintf("transition: %s is licensed %s", req.Subject, license))
+	return inv.save(m, rec, on, fmt.Sprintf("transition: %s is licensed %s", req.Subject, license), outcome{fmt.Sprintf("%s is licensed %s from %s.", req.Subject, license, day(on)), fmt.Sprintf("Would record %s as licensed %s from %s.", req.Subject, license, day(on))})
 }
 
 // IdentityRequest is a `transition identity`.
@@ -195,8 +193,7 @@ func (inv Invocation) Identity(req IdentityRequest) error {
 	if err := rec.AddIdentity(id); err != nil {
 		return err
 	}
-	inv.report(fmt.Sprintf("Recorded %s's %s identity %q from %s.", req.Subject, req.Facet, req.Value, day(id.From)), fmt.Sprintf("Would record %s's %s identity %q from %s.", req.Subject, req.Facet, req.Value, day(id.From)))
-	return inv.save(m, rec, on, fmt.Sprintf("transition: %s %s identity %s", req.Subject, req.Facet, req.Value))
+	return inv.save(m, rec, on, fmt.Sprintf("transition: %s %s identity %s", req.Subject, req.Facet, req.Value), outcome{fmt.Sprintf("Recorded %s's %s identity %q from %s.", req.Subject, req.Facet, req.Value, day(id.From)), fmt.Sprintf("Would record %s's %s identity %q from %s.", req.Subject, req.Facet, req.Value, day(id.From))})
 }
 
 // openIdentity is the subject's open dated identity of facet, or nil.
@@ -221,8 +218,7 @@ func (inv Invocation) UnversionedTag(dir, tag, reason string) error {
 	if err := m.record.AddUnversionedTag(tag, reason, on); err != nil {
 		return err
 	}
-	inv.report(fmt.Sprintf("Recorded %s as a tag that releases no version.", tag), fmt.Sprintf("Would record %s as a tag that releases no version.", tag))
-	return inv.save(m, m.record, on, "transition: "+tag+" releases no version")
+	return inv.save(m, m.record, on, "transition: "+tag+" releases no version", outcome{fmt.Sprintf("Recorded %s as a tag that releases no version.", tag), fmt.Sprintf("Would record %s as a tag that releases no version.", tag)})
 }
 
 // gitHubRepository is the GitHub repository the declarations or the origin
@@ -285,8 +281,7 @@ func (inv Invocation) Classify(dir, subject, reason string) error {
 	if err := rec.OpenPeriod(lifecycle.TableLicenses, subject, lifecycle.ProprietaryLicense, on, reason); err != nil {
 		return err
 	}
-	inv.report(fmt.Sprintf("%s is proprietary from %s; the repository is confidential.", subject, day(on)), fmt.Sprintf("Would record %s as proprietary from %s, which makes the repository confidential.", subject, day(on)))
-	return inv.save(m, rec, on, "transition: classify "+subject)
+	return inv.save(m, rec, on, "transition: classify "+subject, outcome{fmt.Sprintf("%s is proprietary from %s; the repository is confidential.", subject, day(on)), fmt.Sprintf("Would record %s as proprietary from %s, which makes the repository confidential.", subject, day(on))})
 }
 
 // headRecord is the record HEAD commits, nil when HEAD holds none.
