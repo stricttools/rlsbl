@@ -34,7 +34,9 @@ var layers = [][]string{
 
 // sameLayerImports names each import allowed between two packages of one
 // layer, importer first, with the reason for it.
-var sameLayerImports = map[[2]string]string{}
+var sameLayerImports = map[[2]string]string{
+	{"dependencies", "gomodule"}: "the lockfile evaluation reads go.mod's requirements and replacements through the one strict go.mod reader",
+}
 
 // testOnly is the package only _test.go files may import.
 const testOnly = "testsupport"
