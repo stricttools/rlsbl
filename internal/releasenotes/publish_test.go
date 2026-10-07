@@ -208,7 +208,7 @@ func TestPublishRefusesWhenGitHubCannotSay(t *testing.T) {
 
 func TestRepairTakesLatest(t *testing.T) {
 	hygiene.Isolate(t)
-	gh := testsupport.FakeGH(t,
+	testsupport.FakeGH(t,
 		testsupport.GHAnswer{Args: viewLatest, Stderr: "release not found\n", Exit: 1},
 		testsupport.GHAnswer{Args: viewLatest, Stdout: "v0.3.0\n"},
 	)

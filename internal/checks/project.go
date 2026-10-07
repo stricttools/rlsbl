@@ -74,6 +74,12 @@ func orPassed(message string) string {
 	return message
 }
 
+// firstLine is s up to its first newline.
+func firstLine(s string) string {
+	line, _, _ := strings.Cut(s, "\n")
+	return line
+}
+
 // memberTarget is one target of a member with the target's directory.
 type memberTarget struct {
 	target targets.Target
