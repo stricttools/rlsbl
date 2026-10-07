@@ -51,7 +51,7 @@ func (inv Invocation) Lifecycle(req PeriodRequest) error {
 	if err := rec.OpenPeriod(lifecycle.TableLifecycle, req.Subject, string(status), on, req.Reason); err != nil {
 		return err
 	}
-	inv.Say(fmt.Sprintf("%s is %s from %s.", req.Subject, status, day(on)))
+	inv.report(fmt.Sprintf("%s is %s from %s.", req.Subject, status, day(on)), fmt.Sprintf("Would record %s as %s from %s.", req.Subject, status, day(on)))
 	return inv.save(m, rec, on, fmt.Sprintf("transition: %s is %s", req.Subject, status))
 }
 
@@ -138,7 +138,7 @@ func (inv Invocation) License(req PeriodRequest) error {
 	if err := rec.OpenPeriod(lifecycle.TableLicenses, req.Subject, license, on, req.Reason); err != nil {
 		return err
 	}
-	inv.Say(fmt.Sprintf("%s is licensed %s from %s.", req.Subject, license, day(on)))
+	inv.report(fmt.Sprintf("%s is licensed %s from %s.", req.Subject, license, day(on)), fmt.Sprintf("Would record %s as licensed %s from %s.", req.Subject, license, day(on)))
 	return inv.save(m, rec, on, fmt.Sprintf("transition: %s is licensed %s", req.Subject, license))
 }
 
@@ -195,7 +195,7 @@ func (inv Invocation) Identity(req IdentityRequest) error {
 	if err := rec.AddIdentity(id); err != nil {
 		return err
 	}
-	inv.Say(fmt.Sprintf("Recorded %s's %s identity %q from %s.", req.Subject, req.Facet, req.Value, day(id.From)))
+	inv.report(fmt.Sprintf("Recorded %s's %s identity %q from %s.", req.Subject, req.Facet, req.Value, day(id.From)), fmt.Sprintf("Would record %s's %s identity %q from %s.", req.Subject, req.Facet, req.Value, day(id.From)))
 	return inv.save(m, rec, on, fmt.Sprintf("transition: %s %s identity %s", req.Subject, req.Facet, req.Value))
 }
 
@@ -221,7 +221,7 @@ func (inv Invocation) UnversionedTag(dir, tag, reason string) error {
 	if err := m.record.AddUnversionedTag(tag, reason, on); err != nil {
 		return err
 	}
-	inv.Say(fmt.Sprintf("Recorded %s as a tag that releases no version.", tag))
+	inv.report(fmt.Sprintf("Recorded %s as a tag that releases no version.", tag), fmt.Sprintf("Would record %s as a tag that releases no version.", tag))
 	return inv.save(m, m.record, on, "transition: "+tag+" releases no version")
 }
 
@@ -285,7 +285,7 @@ func (inv Invocation) Classify(dir, subject, reason string) error {
 	if err := rec.OpenPeriod(lifecycle.TableLicenses, subject, lifecycle.ProprietaryLicense, on, reason); err != nil {
 		return err
 	}
-	inv.Say(fmt.Sprintf("%s is proprietary from %s; the repository is confidential.", subject, day(on)))
+	inv.report(fmt.Sprintf("%s is proprietary from %s; the repository is confidential.", subject, day(on)), fmt.Sprintf("Would record %s as proprietary from %s, which makes the repository confidential.", subject, day(on)))
 	return inv.save(m, rec, on, "transition: classify "+subject)
 }
 

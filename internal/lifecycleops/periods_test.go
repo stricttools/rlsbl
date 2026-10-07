@@ -73,9 +73,20 @@ func TestADryRunWritesNoRecordAndNoIndex(t *testing.T) {
 	})
 	requireExit(t, r, 0)
 	requireContains(t, r.Stdout, "Would commit")
+	// What the dry run says names what it would record, never a state it
+	// did not bring about.
+	requireContains(t, r.Stdout, "Would record portal as retired from")
+	if strings.Contains(r.Stdout, "portal is retired from") {
+		t.Fatalf("a dry run reports the period as recorded:\n%s", r.Stdout)
+	}
 	if f.record(t) != before || f.repo.Head() != head {
 		t.Fatal("a dry run wrote the record or committed")
 	}
+	r = f.run(t, true, func(inv lifecycleops.Invocation, dir string) error {
+		return inv.UnversionedTag(dir, "nightly", "a marker")
+	})
+	requireExit(t, r, 0)
+	requireContains(t, r.Stdout, "Would record nightly as a tag that releases no version")
 }
 
 func TestLicenseRefusesProprietaryUntilClassifyMakesIt(t *testing.T) {

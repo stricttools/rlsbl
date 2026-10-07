@@ -104,10 +104,10 @@ func TestIdentityNeedsFromWithUntil(t *testing.T) {
 func TestTheTransitionDeclarationsPreviewTheirRecord(t *testing.T) {
 	hygiene.Isolate(t)
 	for argv, want := range map[string]string{
-		"transition lifecycle --subject portal --status on-hold --reason paused":                                 "portal is on-hold from ",
-		"transition license --subject portal --license MIT --reason relicensed":                                  "portal is licensed MIT from ",
-		"transition identity --subject portal --facet package-name --registry npm --value portal --reason named": `Recorded portal's package-name identity "portal" from `,
-		"transition unversioned-tag --tag nightly --reason builds":                                               "Recorded nightly as a tag that releases no version.",
+		"transition lifecycle --subject portal --status on-hold --reason paused":                                 "Would record portal as on-hold from ",
+		"transition license --subject portal --license MIT --reason relicensed":                                  "Would record portal as licensed MIT from ",
+		"transition identity --subject portal --facet package-name --registry npm --value portal --reason named": `Would record portal's package-name identity "portal" from `,
+		"transition unversioned-tag --tag nightly --reason builds":                                               "Would record nightly as a tag that releases no version.",
 	} {
 		t.Run(argv, func(t *testing.T) {
 			repo := releaseCommandsProject(t)
