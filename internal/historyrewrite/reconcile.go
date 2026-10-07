@@ -3,6 +3,7 @@ package historyrewrite
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -263,11 +264,22 @@ func (r *reconcileRun) dir() string { return releaserecord.ArchiveDir(r.req.Rele
 // Reconcile runs one half of `release reconcile` for one releasable of the
 // repository rooted at root. now stamps the plan and the transition
 // record's events.
-func Reconcile(ctx *strictcli.Context, root string, req ReconcileRequest, now func() time.Time) error {
+func Reconcile(ctx *strictcli.Context, root string, req ReconcileRequest, now func() time.Time) (err error) {
 	if req.Mode != ReconcilePlan && req.Mode != ReconcileApply {
 		return fmt.Errorf("the reconcile runs --mode plan or --mode apply, not %q", req.Mode)
 	}
 	e := ctx.Effects()
+	if !ctx.DryRun() {
+		// Both halves may move the archives' release commits, and the apply
+		// pushes refs and writes Releases: none of it beside a release.
+		lock, err := runstate.Acquire(e, root, runstate.AcquireOptions{Wait: runstate.WaitForHolder, OnWait: func(path string) {
+			ctx.Out(fmt.Sprintf("Another rlsbl process holds %s; waiting for it before reconciling.", path))
+		}})
+		if err != nil {
+			return err
+		}
+		defer func() { err = errors.Join(err, lock.Release()) }()
+	}
 	ws, err := workspace.Load(root)
 	if err != nil {
 		return err
@@ -471,13 +483,6 @@ func (r *reconcileRun) heal(repo git.Repo, x explanations) (map[string]string, e
 	}
 	sort.Strings(origins)
 	event.Rewrite = strings.Join(origins, "; ")
-	lock, err := runstate.Acquire(r.e, r.root, runstate.AcquireOptions{Wait: runstate.WaitForHolder, OnWait: func(path string) {
-		r.say(fmt.Sprintf("Another rlsbl process holds %s; waiting for it before rewriting the archives.", path))
-	}})
-	if err != nil {
-		return nil, err
-	}
-	defer lock.Release()
 	var touched []string
 	for _, m := range planned {
 		if err := releaserecord.WriteReleaseCommit(r.e, r.root, r.dir(), m.Version, releaserecord.ReleaseCommit{Commit: m.NewCommit, Trees: m.Trees}); err != nil {

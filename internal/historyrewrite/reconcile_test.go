@@ -1,6 +1,9 @@
 package historyrewrite_test
 
 import (
+	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -10,6 +13,7 @@ import (
 	"github.com/stricttools/testisolation/go/hygiene"
 
 	"github.com/stricttools/rlsbl/internal/historyrewrite"
+	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/testsupport"
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
@@ -403,4 +407,34 @@ func TestATagAClosedIdentityOwnedIsNotJudged(t *testing.T) {
 	// it.
 	f.repo.Write(".strictmetadata/lifecycle-and-license/lifecycle-and-license.toml", closedIdentityRecord)
 	requireExit(t, reconcile(t, f.repo.Dir, "", historyrewrite.ReconcilePlan, false), 0)
+}
+
+func TestTheApplyWritesUnderTheReleaseLock(t *testing.T) {
+	hygiene.Isolate(t)
+	f := newReleased(t, true)
+	gh(t, listed(),
+		testsupport.GHAnswer{Args: ghLatest, Stderr: "release not found", Exit: 1},
+		testsupport.GHAnswer{Args: ghCreate})
+	requireExit(t, reconcile(t, f.repo.Dir, "", historyrewrite.ReconcilePlan, false), 0)
+	// gh, as it creates the Release, records whether the lock is free.
+	fake, err := exec.LookPath("gh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	seen := filepath.Join(dir, "seen")
+	lock := f.repo.Path(runstate.LockPath)
+	script := fmt.Sprintf("#!/bin/sh\nif [ \"$1\" = release ] && [ \"$2\" = create ]; then if flock -n %[1]s true; then echo free > %[2]s; else echo held > %[2]s; fi; fi\nexec %[3]s \"$@\"\n", lock, seen, fake)
+	if err := os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	requireExit(t, reconcile(t, f.repo.Dir, "", historyrewrite.ReconcileApply, false), 0)
+	data, err := os.ReadFile(seen)
+	if err != nil {
+		t.Fatalf("the Release was not created: %v", err)
+	}
+	if strings.TrimSpace(string(data)) != "held" {
+		t.Fatal("the apply created a GitHub Release without holding the release lock")
+	}
 }

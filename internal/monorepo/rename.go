@@ -108,7 +108,7 @@ type renamer struct {
 //
 // A run whose declarations already name the new releasable and not the old
 // completes an interrupted rename: every step does only what is left.
-func RenameReleasable(e *strictcli.Effects, repo git.Repo, ws *workspace.Workspace, req RenameRequest) (Renamed, error) {
+func RenameReleasable(e *strictcli.Effects, repo git.Repo, ws *workspace.Workspace, req RenameRequest) (_ Renamed, err error) {
 	if req.Say == nil || req.Sync == nil {
 		return Renamed{}, errors.New("monorepo rename-releasable needs somewhere to report to and a router regeneration")
 	}
@@ -132,7 +132,7 @@ func RenameReleasable(e *strictcli.Effects, repo git.Repo, ws *workspace.Workspa
 	if err != nil {
 		return Renamed{}, err
 	}
-	defer lock.Release()
+	defer func() { err = errors.Join(err, lock.Release()) }()
 
 	renamedWS, err := r.renameLocally()
 	if err != nil {
