@@ -39,7 +39,7 @@ func (b BatchReleaseFile) Names() []string {
 
 type rawBatchReleaseFile struct {
 	FormatVersion int64                       `toml:"format_version,required"`
-	Releasables   map[string]rawReleaseFields `toml:"releasables,required"`
+	Releasables   map[string]RawReleaseFields `toml:"releasables,required"`
 }
 
 // ParseBatchReleaseFile parses a batch release file: format_version 2 and

@@ -85,9 +85,11 @@ const (
 
 var flowOwnedFields = []string{fieldReleaseCommit, fieldReleasedTrees, fieldUnrecoverable, fieldNeverReleased, fieldShippedAs, fieldReleaseNotices}
 
-// rawReleaseFields are the fields of one release, in the release file and in
-// each table of the batch release file.
-type rawReleaseFields struct {
+// RawReleaseFields are the fields of one release, in the release file and in
+// each table of the batch release file, as decoded. The type is exported
+// because the decoder flattens only an exported embedded struct into
+// rawReleaseDocument.
+type RawReleaseFields struct {
 	Bump           string             `toml:"bump,required"`
 	Include        []string           `toml:"include,required"`
 	Exclude        []string           `toml:"exclude,required"`
@@ -103,7 +105,7 @@ type rawReleaseFields struct {
 
 type rawReleaseDocument struct {
 	FormatVersion int64 `toml:"format_version,required"`
-	rawReleaseFields
+	RawReleaseFields
 }
 
 // document is one parsed release document, release file or archive.
@@ -212,7 +214,7 @@ func parseDocument(rel string, data []byte) (document, error) {
 	if err != nil {
 		return document{}, refuseFile(rel, err.Error())
 	}
-	d, problems := raw.rawReleaseFields.convert("")
+	d, problems := raw.RawReleaseFields.convert("")
 	if len(problems) > 0 {
 		return document{}, refuseFile(rel, problems...)
 	}
@@ -221,7 +223,7 @@ func parseDocument(rel string, data []byte) (document, error) {
 
 // convert checks one release's fields beyond the schema and builds them.
 // where prefixes every problem (a batch table names itself).
-func (r rawReleaseFields) convert(where string) (document, []string) {
+func (r RawReleaseFields) convert(where string) (document, []string) {
 	var problems []string
 	bump, err := semver.ParseBump(r.Bump)
 	if err != nil {
