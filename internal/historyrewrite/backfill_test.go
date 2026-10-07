@@ -313,3 +313,21 @@ func TestAnArchiveOfTheFirstFormatIsRefusedNamingTheMigration(t *testing.T) {
 	requireExit(t, r, 1)
 	requireStderr(t, r, "rlsbl migrate records")
 }
+
+// closedIdentityRecord closes portal's old package name, whose tags were
+// portal-old-v*, long after the fixtures' tags were made.
+const closedIdentityRecord = "format_version = 1\n\n[[identities]]\nsubject = \"portal\"\nfacet = \"package-name\"\nvalue = \"portal-old\"\nregistry = \"npm\"\ntag_patterns = [\"portal-old-v*\"]\nfrom = 2020-01-01\nuntil = 2099-01-01\nreason = \"the name before the rename\"\n"
+
+func TestATagAClosedIdentityOwnedIsExplained(t *testing.T) {
+	hygiene.Isolate(t)
+	f := newUnarchived(t, true, "v0.1.0")
+	f.repo.Git("tag", "portal-old-v0.0.9", f.A)
+	newSafegit(t, "0.31.0")
+	noRelease(t)
+	r := backfill(t, f.repo.Dir, "", false)
+	requireExit(t, r, 1)
+	requireStderr(t, r, "refusing to backfill", "portal-old-v0.0.9")
+	// The record naming the closed identity that owned the tag explains it.
+	f.repo.Write(".strictmetadata/lifecycle-and-license/lifecycle-and-license.toml", closedIdentityRecord)
+	requireExit(t, backfill(t, f.repo.Dir, "", true), 0)
+}

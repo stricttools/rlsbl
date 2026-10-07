@@ -389,3 +389,18 @@ func TestTheReleasableIsSelectedByTheDirectoryOrNamedWhereItSelectsNone(t *testi
 		t.Fatalf("from the member's directory: %v, %v", rel, err)
 	}
 }
+
+func TestATagAClosedIdentityOwnedIsNotJudged(t *testing.T) {
+	hygiene.Isolate(t)
+	f := newReleased(t, true)
+	f.repo.Git("push", "-q", "origin", f.h.B+":refs/tags/portal-old-v0.0.9")
+	f.repo.Git("tag", "portal-old-v0.0.9", f.h.A)
+	gh(t, listed("v0.1.0"))
+	r := reconcile(t, f.repo.Dir, "", historyrewrite.ReconcilePlan, false)
+	requireExit(t, r, 1)
+	requireStderr(t, r, "refs/tags/portal-old-v0.0.9")
+	// The record naming the closed identity that owned the tag accounts for
+	// it.
+	f.repo.Write(".strictmetadata/lifecycle-and-license/lifecycle-and-license.toml", closedIdentityRecord)
+	requireExit(t, reconcile(t, f.repo.Dir, "", historyrewrite.ReconcilePlan, false), 0)
+}
