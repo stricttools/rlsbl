@@ -40,16 +40,24 @@ type InitResult struct {
 	Idle        []string
 }
 
+// Selection is which releasables `rlsbl monorepo release init` writes a
+// table for: the ones Names lists, or, with All, every declared one. One of
+// the two is stated, never both: no table set is inferred from an empty
+// list.
+type Selection struct {
+	Names []string
+	All   bool
+}
+
 // Init is `rlsbl monorepo release init`: it writes the batch release file
 // of the workspace whose root is liveRoot, one [releasables.<name>] table
-// per releasable (the ones names lists, or every declared one when names is
-// empty) with bump and description blank, context blank, every target of
-// the releasable's members in include, and exclude empty, and commits it. A
-// releasable with no unreleased commit since its latest release is written
-// commented out. A batch release file nobody filled in is left as it is;
+// per releasable sel selects, with bump and description blank, context
+// blank, every target of the releasable's members in include, and exclude
+// empty, and commits it. A releasable with no unreleased commit since its
+// latest release is written commented out. A batch release file nobody filled in is left as it is;
 // one somebody filled in is refused, never overwritten. fork leaves a
 // fork's upstream history out of the unreleased commits.
-func Init(e *strictcli.Effects, liveRoot string, names []string, fork release.Fork) (InitResult, error) {
+func Init(e *strictcli.Effects, liveRoot string, sel Selection, fork release.Fork) (InitResult, error) {
 	ws, err := workspace.Load(liveRoot)
 	if err != nil {
 		return InitResult{}, err
@@ -69,7 +77,7 @@ func Init(e *strictcli.Effects, liveRoot string, names []string, fork release.Fo
 	case !errors.Is(err, fs.ErrNotExist):
 		return InitResult{}, err
 	}
-	selected, err := selectReleasables(ws, names)
+	selected, err := selectReleasables(ws, sel)
 	if err != nil {
 		return InitResult{}, err
 	}
@@ -133,12 +141,19 @@ func Init(e *strictcli.Effects, liveRoot string, names []string, fork release.Fo
 	return res, nil
 }
 
-// selectReleasables are the releasables names lists, in declaration order,
-// or every declared one when names is empty. A name no releasable has is
-// refused, naming the declared ones.
-func selectReleasables(ws *workspace.Workspace, names []string) ([]declarations.Releasable, error) {
-	if len(names) == 0 {
+// selectReleasables are the releasables sel names, in declaration order,
+// or every declared one when sel states All. A selection stating neither or
+// both is refused, and so is a name no releasable has, naming the declared
+// ones.
+func selectReleasables(ws *workspace.Workspace, sel Selection) ([]declarations.Releasable, error) {
+	names := sel.Names
+	switch {
+	case sel.All && len(names) > 0:
+		return nil, fmt.Errorf("--all and --releasables both say which releasables get a table; pass one of them")
+	case sel.All:
 		return ws.Releasables(), nil
+	case len(names) == 0:
+		return nil, fmt.Errorf("no releasable was named for a table; name them with --releasables (once per releasable), or pass --all for every declared one (%s)", strings.Join(declaredNames(ws), ", "))
 	}
 	wanted := map[string]bool{}
 	var unknown []string

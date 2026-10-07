@@ -27,7 +27,8 @@ const monorepoReleaseRunHelp = "Release the releasables the batch release file .
 	"--dry-run validates every releasable and reports the versions, tags, and order, writing nothing."
 
 const monorepoReleaseInitHelp = "Write the batch release file .strictmetadata/batch-releases/unreleased.toml with one [releasables.<name>] table " +
-	"per releasable (the ones --releasables names, once per releasable, or every declared one), each with bump and description blank (a batch " +
+	"per releasable (the ones --releasables names, once per releasable, or, with --all, every declared one; one of the two is " +
+	"required, so no set of releasables is inferred), each with bump and description blank (a batch " +
 	"release refuses it until both are filled in), context blank, every target of the releasable's members in include, and exclude empty, and " +
 	"commit it. A releasable with no commit needing a changelog entry since its latest release is written commented out, and one with no target, " +
 	"or on hold or retired (it or a member), is refused, naming --releasables to leave it out. A batch release file nobody filled in yet is left as it is; one somebody filled in is refused, never overwritten."
@@ -35,6 +36,15 @@ const monorepoReleaseInitHelp = "Write the batch release file .strictmetadata/ba
 const monorepoReleaseOrderHelp = "Report every member of the workspace, each after the members it depends on (its manifests' dependencies on " +
 	"other members and its depends_on), and every releasable in the order a batch release releases them: by the latest position any of its members " +
 	"takes, ties by name. A manifest that cannot be read and a dependency cycle are refused."
+
+var (
+	initNamedReleasables = strictcli.MemberChoice(
+		strictcli.StringFlag("releasables", "A releasable to write a table for; repeatable, once per releasable", strictcli.Required(), strictcli.Repeatable(), strictcli.Unique(true)),
+		"Write a table for each releasable named")
+	initAllReleasables = strictcli.MemberChoice(
+		strictcli.BoolFlag("all", "Write a table for every releasable the declarations declare", strictcli.Required()),
+		"Write a table for every declared releasable")
+)
 
 func registerMonorepoRelease(r *commandSet, version string) {
 	r.group([]string{"monorepo", "release"}, monorepoReleaseHelp)
@@ -62,7 +72,7 @@ func registerMonorepoRelease(r *commandSet, version string) {
 		effect:   mutating,
 		noDryRun: "it writes one scaffolded file and commits it, and the file it would write is what this help describes",
 		flags: []strictcli.Flag{
-			strictcli.StringFlag("releasables", "A releasable to write a table for; repeatable (every declared releasable when not passed)", strictcli.Optional(), strictcli.Repeatable(), strictcli.Unique(true)),
+			strictcli.MemberChoiceFlag("releasable-selection", "Which releasables get a table", strictcli.Required(), initNamedReleasables, initAllReleasables),
 		},
 		run: runMonorepoReleaseInit,
 	})
@@ -87,20 +97,25 @@ func runMonorepoReleaseInit(ctx *strictcli.Context, kw map[string]any) (any, err
 	if err != nil {
 		return nil, err
 	}
-	names, err := optionalStrings(kw, "releasables")
-	if err != nil {
-		return nil, err
-	}
-	for _, n := range names {
-		if n == "" {
-			return nil, emptyArgument("--releasables")
+	var sel batchrelease.Selection
+	elected := strictcli.GetElected(kw, "releasable_selection")
+	if elected.Is(initAllReleasables) {
+		sel.All = true
+	} else {
+		if sel.Names, err = optionalStrings(elected.Fields, "value"); err != nil {
+			return nil, err
+		}
+		for _, n := range sel.Names {
+			if n == "" {
+				return nil, emptyArgument("--releasables")
+			}
 		}
 	}
 	fork, err := forkHistory(ctx.Effects(), root)
 	if err != nil {
 		return nil, err
 	}
-	res, err := batchrelease.Init(ctx.Effects(), root, names, fork)
+	res, err := batchrelease.Init(ctx.Effects(), root, sel, fork)
 	if err != nil {
 		return nil, err
 	}

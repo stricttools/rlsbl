@@ -17,10 +17,17 @@ import (
 
 func initBatch(t *testing.T, repo *testsupport.Repo, names []string) (batchrelease.InitResult, error) {
 	t.Helper()
+	return initSelection(t, repo, batchrelease.Selection{Names: names, All: names == nil})
+}
+
+// initSelection runs Init with sel; initBatch states every releasable when
+// names is nil.
+func initSelection(t *testing.T, repo *testsupport.Repo, sel batchrelease.Selection) (batchrelease.InitResult, error) {
+	t.Helper()
 	var res batchrelease.InitResult
 	var ferr error
 	testsupport.RunCommand(t, testsupport.CommandOptions{Effect: strictcli.EffectMutating}, func(ctx *strictcli.Context) error {
-		res, ferr = batchrelease.Init(ctx.Effects(), repo.Dir, names, release.Fork{})
+		res, ferr = batchrelease.Init(ctx.Effects(), repo.Dir, sel, release.Fork{})
 		return ferr
 	})
 	return res, ferr
@@ -196,5 +203,24 @@ func TestInitInAStandaloneProjectIsRefused(t *testing.T) {
 	_, err := initBatch(t, repo, nil)
 	if err == nil || !strings.Contains(err.Error(), "`rlsbl release init`") {
 		t.Fatalf("a standalone project's batch init was not refused: %v", err)
+	}
+}
+
+func TestInitRefusesASelectionStatingNeitherNamesNorAll(t *testing.T) {
+	hygiene.Isolate(t)
+	testsupport.FakeSafegit(t)
+	repo := workspaceRepo(t, nil)
+	withWidgetFeature(t, repo)
+	for _, sel := range []batchrelease.Selection{{}, {Names: []string{}}, {Names: []string{"widget"}, All: true}} {
+		if _, err := initSelection(t, repo, sel); err == nil || !strings.Contains(err.Error(), "--releasables") || !strings.Contains(err.Error(), "--all") {
+			t.Fatalf("%+v: not refused naming --releasables and --all: %v", sel, err)
+		}
+	}
+	if _, err := os.Stat(repo.Path(batchFilePath)); !os.IsNotExist(err) {
+		t.Fatalf("a refused init wrote the batch release file: %v", err)
+	}
+	// The fix: state every releasable.
+	if res, err := initSelection(t, repo, batchrelease.Selection{All: true}); err != nil || !res.Written {
+		t.Fatalf("--all: %+v %v", res, err)
 	}
 }

@@ -133,7 +133,7 @@ The release dispatches it itself when it can see the case coming: a resumed rele
 
 `rlsbl monorepo release run --watch` releases several releasables in one flow, in topological order, each through the single-releasable [release](release-workflow.md) from one representative member, in the release checkout, under one CI wait.
 
-1. `rlsbl monorepo release init` writes `.strictmetadata/batch-releases/unreleased.toml` and commits it: one `[releasables.<name>]` table per declared releasable, or per releasable a repeated `--releasables <name>` names, with `bump` and `description` blank for a person to fill in and every target of the releasable's members in `include`. A releasable with no commit needing a changelog entry since its latest release is written commented out, and one with no target is refused, as is a file somebody already filled in.
+1. `rlsbl monorepo release init` writes `.strictmetadata/batch-releases/unreleased.toml` and commits it: one `[releasables.<name>]` table per releasable a repeated `--releasables <name>` names, or, with `--all`, per declared releasable (one of the two is required: the set is never inferred), with `bump` and `description` blank for a person to fill in and every target of the releasable's members in `include`. A releasable with no commit needing a changelog entry since its latest release is written commented out, and one with no target is refused, as is a file somebody already filled in.
 2. Edit each table: `bump`, `description`, and optionally `context`, `include`, `exclude`, as in a single release file.
 3. `rlsbl monorepo release run --watch --approve-consequential`.
 

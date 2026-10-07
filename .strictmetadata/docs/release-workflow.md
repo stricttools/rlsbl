@@ -27,7 +27,7 @@ rlsbl release resume --watch --approve-consequential
 
 ## The release file
 
-The release file, `.strictmetadata/releases/<releasable>/unreleased.toml`, states what the next release is. `rlsbl release init` writes it, with `bump` and `description` blank for a person to fill in, `context` blank, every target of the releasable's members in `include`, and `exclude` empty, and commits it. A release file nobody filled in yet is left as it is, one somebody filled in is refused rather than overwritten, and a member versioned under no releasable is refused, naming `rlsbl monorepo release init`. A filled-in file reads:
+The release file, `.strictmetadata/releases/<releasable>/unreleased.toml`, states what the next release is. `rlsbl release init` writes it, with `bump` and `description` blank for a person to fill in, `context` blank, every target of the releasable's members in `include`, and `exclude` empty, and commits it. A release file nobody filled in yet is left as it is, one somebody filled in is refused rather than overwritten, and a member versioned under no releasable is refused, naming `rlsbl monorepo release init --all` (or `--releasables <name>` once per releasable). A filled-in file reads:
 
 ```toml
 format_version = 2

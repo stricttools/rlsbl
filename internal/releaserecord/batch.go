@@ -50,7 +50,7 @@ func ParseBatchReleaseFile(rel string, data []byte) (BatchReleaseFile, error) {
 	if fields, err := tomledit.Unmarshal[map[string]any](data); err == nil {
 		var problems []string
 		if _, ok := (*fields)["packages"]; ok {
-			problems = append(problems, "a [packages] section is refused: a batch release names releasables; write one [releasables.<name>] table per releasable (`rlsbl monorepo release init` writes them)")
+			problems = append(problems, "a [packages] section is refused: a batch release names releasables; write one [releasables.<name>] table per releasable (`rlsbl monorepo release init --all`, or `--releasables <name>` once per releasable, writes them)")
 		}
 		if v, ok := (*fields)["format_version"].(int64); ok && v != FormatVersion {
 			problems = append(problems, fmt.Sprintf("format_version %d is not the batch release file format %d; rlsbl migrate records converts the first format", v, FormatVersion))
@@ -98,7 +98,7 @@ func ReadBatchReleaseFile(root string) (BatchReleaseFile, error) {
 		return BatchReleaseFile{}, err
 	}
 	if !found {
-		return BatchReleaseFile{}, fmt.Errorf("this workspace has no batch release file %s: write one with `rlsbl monorepo release init`, then fill in each releasable's bump and description", BatchReleaseFilePath)
+		return BatchReleaseFile{}, fmt.Errorf("this workspace has no batch release file %s: write one with `rlsbl monorepo release init --all` (or `--releasables <name>` once per releasable), then fill in each releasable's bump and description", BatchReleaseFilePath)
 	}
 	return ParseBatchReleaseFile(BatchReleaseFilePath, data)
 }

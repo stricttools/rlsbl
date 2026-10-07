@@ -49,7 +49,7 @@ func Init(e *strictcli.Effects, liveRoot, dir string) (InitResult, error) {
 	}
 	r, ok := ws.ReleasableOf(member)
 	if !ok {
-		return InitResult{}, &ValidationError{Message: fmt.Sprintf("the working directory lies in the member %q, which is versioned under no releasable, so it has no release file; run `rlsbl release init` from a member of a releasable, or `rlsbl monorepo release init` for a batch release", member.Name)}
+		return InitResult{}, &ValidationError{Message: fmt.Sprintf("the working directory lies in the member %q, which is versioned under no releasable, so it has no release file; run `rlsbl release init` from a member of a releasable, or `rlsbl monorepo release init --all` (or `--releasables <name>` once per releasable) for a batch release", member.Name)}
 	}
 	rel := releaserecord.ReleaseFilePath(r.Name)
 	abs := filepath.Join(liveRoot, filepath.FromSlash(rel))

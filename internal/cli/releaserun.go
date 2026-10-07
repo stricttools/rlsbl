@@ -46,7 +46,7 @@ const releaseInitHelp = "Write the release file of the releasable the working di
 	".strictmetadata/releases/<releasable>/unreleased.toml, with bump and description blank (a release refuses it until both are filled in), " +
 	"context blank, every target of the releasable's members in include, and exclude empty, and commit it. A release file nobody filled in yet " +
 	"is left as it is; one somebody filled in is refused, never overwritten. A member versioned under no releasable is refused, naming " +
-	"`rlsbl monorepo release init` for a batch release."
+	"`rlsbl monorepo release init --all` (or --releasables once per releasable) for a batch release."
 
 // releaseTimeoutFlags are the release's per-invocation timeouts.
 func releaseTimeoutFlags() []strictcli.Flag {
