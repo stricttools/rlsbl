@@ -1,2 +1,787 @@
-# rlsbl's checks registry, read by strictcli's check framework.
+# rlsbl's checks registry, read by strictcli's check framework and embedded
+# by package checks. Every check is also an option, rlsbl:<check name>, which
+# internal/options/gen renders into internal/options/registry.toml.
+#
+# pure means the check starts only programs the observe allowlist
+# (internal/previewapply/allowlist.go) admits, or none: a pure check still
+# runs under --dry-run. needs_network says whether the check needs the
+# network to answer at all.
+#
+# A check without a scope answers for one releasable, and refuses at a
+# workspace root, which names no releasable. A scope's tokens are interpreted
+# by package checks before the check runs: repository (the check answers for
+# the whole repository), workspace (it answers for the workspace, and skips
+# in a standalone repository), non_dev_only, non_dev_node, library, and
+# releasable (each narrows the members it sees), and push (it skips outside a
+# push).
+#
+# Hooks name the selection a git hook or the release runs: the installed
+# pre-push hook runs `rlsbl failing-checks --hook pre-push`, and the release's
+# preflight runs the pre-release hook's selection.
 app = "rlsbl"
+
+[hooks.pre-push]
+tag = "prepush"
+
+[hooks.pre-release]
+tag = "preflight"
+
+[checks.branch-sync]
+description = "The local branch is not behind its remote tracking branch (requires network)."
+subject = "release"
+tags = ["release"]
+severity = "error"
+fast = true
+pure = false
+needs_network = true
+depends_on = []
+
+[checks.changelog-batch-commits]
+description = "No changelog entry references more commits than the per-entry limit unless it carries a batch_reason."
+subject = "changelog"
+tags = ["changelog", "preflight-changelog"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.changelog-batch-entries]
+description = "No commit appears in more changelog entries than the per-commit limit."
+subject = "changelog"
+tags = ["changelog", "preflight-changelog"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.changelog-coverage]
+description = "Every unreleased commit appears in at least one JSONL changelog entry."
+subject = "changelog"
+tags = ["changelog", "preflight-changelog"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = ["changelog-hashes"]
+
+[checks.changelog-entry]
+description = "The releasable's generated CHANGELOG.md has a section for its current version."
+subject = "changelog"
+tags = ["changelog"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = ["version-consistency"]
+
+[checks.changelog-format-version]
+description = "Every line of every changelog file carries the changelog format version rlsbl reads."
+subject = "changelog"
+tags = ["changelog", "preflight-changelog"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.changelog-hashes]
+description = "Every commit hash in the JSONL changelog entries resolves in git."
+subject = "changelog"
+tags = ["changelog", "preflight-changelog"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.changelog-orphans]
+description = "No changelog entry has every hash unresolvable, out of range, or owned by another releasable."
+subject = "changelog"
+tags = ["changelog", "preflight-changelog"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.changelog-range]
+description = "Every resolved changelog hash falls within this checkout's unreleased commit range."
+subject = "changelog"
+tags = ["changelog", "preflight-changelog"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = ["changelog-hashes"]
+
+[checks.changelog-schema]
+description = "Every changelog entry passes schema validation: a user-facing entry carries a description and a type."
+subject = "changelog"
+tags = ["changelog", "preflight-changelog"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.changelog-user-facing]
+description = "At least one unreleased changelog entry is user-facing."
+subject = "changelog"
+tags = ["changelog", "preflight-changelog"]
+severity = "warn"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.ci-publish-secrets]
+description = "Every Actions secret the configured CI publish pipelines authenticate with exists on the repository (requires network)."
+subject = "release"
+tags = ["release"]
+severity = "error"
+fast = true
+pure = false
+needs_network = true
+depends_on = []
+
+[checks.confidential-names]
+description = "In a public repository, no tracked file and no changelog entry contains a name from the machine-local confidential-name index."
+subject = "project"
+tags = ["project", "preflight"]
+severity = "error"
+fast = false
+pure = true
+needs_network = false
+depends_on = []
+scope = "repository"
+
+[checks.cross-repo-path-sources]
+description = "No [tool.uv.sources] path entry in the committed pyproject.toml resolves outside the repository."
+subject = "dependencies"
+tags = ["project"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.declarations-valid]
+description = "The release declarations and the test runner's settings pass rlsbl's rules, every adoption declaration agrees with its option, and every deploy_command belongs to a proprietary releasable."
+subject = "project"
+tags = ["project"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.dep-floors]
+description = "Every ecosystem-internal dependency a member's internal_dep_floors names declares a >= floor at the version the lockfile resolves."
+subject = "dependencies"
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = ["declarations-valid"]
+
+[checks.dep-locks]
+description = "Every lockfile still resolves the manifest beside it."
+subject = "dependencies"
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.description-consistency]
+description = "Every detected target reports the same package description."
+subject = "project"
+tags = ["project"]
+severity = "warn"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.dev-only-boundary]
+description = "No member that is not dev-only has a runtime dependency on a dev-only member."
+subject = "workspace"
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.dev-overlay-drift]
+description = "Every rlsbl dev sync overlay is still an editable install of its declared checkout."
+subject = "dependencies"
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.dunder-version-missing]
+description = "A PyPI project that keeps a version constant in source names it __version__."
+subject = "project"
+tags = ["project"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.go-companion-tags]
+description = "Every releasable's publishing Go members have companion tags for its latest released version."
+subject = "workspace"
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.go-deprecation-published]
+description = "Every closed go-module-path identity of the lifecycle-and-license record serves a Deprecated notice through the Go module proxy (requires network)."
+subject = "release"
+tags = ["release"]
+severity = "error"
+fast = false
+pure = false
+needs_network = true
+depends_on = []
+
+[checks.go-module-identity]
+description = "Every go.mod's module path equals the repository's origin identity plus the module's subdirectory."
+subject = "project"
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.go-module-major-suffix]
+description = "No go.mod module path ends in a major-version suffix (/v2 and above)."
+subject = "project"
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.go-toolchain-declared]
+description = "Every Go module's go.mod carries a toolchain line."
+subject = "project"
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.go-workspace-replace]
+description = "No releasable Go member replaces a module with a directory in the workspace."
+subject = "project"
+tags = ["workspace", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.go-workspace-require-current]
+description = "No Go member requires a sibling workspace module below that module's latest release."
+subject = "project"
+tags = ["workspace", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.ldflags-symbol]
+description = "Every -X linker flag in the tracked build configuration names an injectable string variable the Go source declares."
+subject = "code"
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.license-consistency]
+description = "Every detected target reports the same license, and it is the license the lifecycle-and-license record holds for the releasable today."
+subject = "project"
+tags = ["project"]
+severity = "warn"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.license-file]
+description = "A LICENSE file exists, is non-empty, and has no unreplaced template variables."
+subject = "project"
+tags = ["project"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.lifecycle-record-valid]
+description = "The lifecycle-and-license record exists, passes every rule the record alone is judged by, and keeps every closed period and held registry name the record at the nearest release commit holds."
+subject = "project"
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "repository"
+
+[checks.lock]
+description = "No release is left interrupted: no releasable has an in-progress release state while no rlsbl process holds the release lock."
+subject = "release"
+tags = ["project"]
+severity = "warn"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.member-pytest-config]
+description = "When an enclosing member or the workspace root has a conftest.py, every member with a tests/ directory under it pins its own pytest rootdir."
+subject = "tests"
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace:non_dev_node"
+
+[checks.mixed-tag-schemes]
+description = "No member directory mixes Go's path-based tags with @-style tags."
+subject = "workspace"
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.name-consistency]
+description = "Every detected target reports the same package name."
+subject = "project"
+tags = ["project"]
+severity = "warn"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.nested-member-runner-exclusion]
+description = "Every member's test runner excludes the members nested inside it."
+subject = "tests"
+tags = ["workspace", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.nested-member-upload-contents]
+description = "A member's npm package and Go module zip carry no nested member's files."
+subject = "project"
+tags = ["workspace", "preflight"]
+severity = "error"
+fast = false
+pure = false
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.nested-member-uv-sources]
+description = "No member nested inside another member declares its own uv workspace sources."
+subject = "project"
+tags = ["workspace", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.npm-private-mismatch]
+description = "A package.json with private: true does not contradict publish_mode ci."
+subject = "project"
+tags = ["project"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.npm-token-synced]
+description = "The npm token in ~/.npmrc is accepted by npm, and the repository's NPM_TOKEN secret was set no earlier than that token was created (requires network)."
+subject = "release"
+tags = ["release", "preflight"]
+severity = "error"
+fast = true
+pure = false
+needs_network = true
+depends_on = []
+
+[checks.old-repo-archived]
+description = "Every repository a closed repository-url identity of the lifecycle-and-license record names is archived on GitHub (requires network)."
+subject = "release"
+tags = ["release"]
+severity = "error"
+fast = false
+pure = false
+needs_network = true
+depends_on = []
+
+[checks.path-tag-format-go-member]
+description = "A releasable's path-style tag_format names the path of one of its own Go members."
+subject = "workspace"
+tags = ["workspace", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.prepush-changelog-coverage]
+description = "Every pushed commit has a JSONL changelog entry."
+subject = "push"
+tags = ["prepush"]
+severity = "error"
+fast = false
+pure = true
+needs_network = false
+depends_on = []
+scope = "repository"
+
+[checks.prepush-gitignore-guard]
+description = "No rlsbl-managed file is gitignored."
+subject = "push"
+tags = ["prepush"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "repository"
+
+[checks.prepush-manual-warning]
+description = "No push to a release branch is made outside rlsbl release."
+subject = "push"
+tags = ["prepush"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "repository"
+
+[checks.private-repo-publishing]
+description = "A confidential or private repository's release uses no publishing feature that records the repository's identity publicly: build attestations, the Go module proxy, a Go library, a Homebrew tap, or a manifest naming the repository (requires network)."
+subject = "release"
+tags = ["release"]
+severity = "error"
+fast = true
+pure = false
+needs_network = true
+depends_on = []
+
+[checks.publish-mode-workflow]
+description = "A project with publish_mode none has no workflow that publishes to a public registry."
+subject = "release"
+tags = ["project"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.releasable-residue]
+description = "No old-layout rlsbl directory, member changelog, or release state of an undeclared subject is left behind; `rlsbl monorepo cleanup` removes it."
+subject = "workspace"
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.repository-visibility]
+description = "Whether the repository is confidential agrees with GitHub's visibility of it: confidential with private, public with public (requires network)."
+subject = "release"
+tags = ["release"]
+severity = "error"
+fast = true
+pure = false
+needs_network = true
+depends_on = []
+scope = "repository"
+
+[checks.router-filters-fresh]
+description = "The filters of the generated ci-router.yml match a fresh derivation from the workspace."
+subject = "workspace"
+tags = ["workspace", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.scaffold-conflicts]
+description = "Scaffold-managed files carry no unresolved merge conflict markers."
+subject = "scaffold"
+tags = ["project", "prepush", "release"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "repository"
+
+[checks.scaffold-gitignore-stale]
+description = "Every workspace member's .gitignore holds every rlsbl-managed entry."
+subject = "scaffold"
+tags = ["workspace"]
+severity = "warn"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.scaffold-unreplaced-vars]
+description = "Committed scaffold files carry no unreplaced rlsbl template variables."
+subject = "scaffold"
+tags = ["quality"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.selfdoc-version-drift]
+description = "The version in selfdoc.json matches the version of the releasable the project is versioned under."
+subject = "project"
+tags = ["project"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.stash-free]
+description = "The repository carries no git stash."
+subject = "release"
+tags = ["project"]
+severity = "error"
+fast = true
+pure = false
+needs_network = false
+depends_on = []
+
+[checks.strictcode]
+description = "strictcode implements every rule rlsbl requires, and `strictcode analyze` reports no error finding for the repository."
+subject = "code"
+tags = ["quality", "preflight"]
+severity = "error"
+fast = false
+pure = false
+needs_network = false
+depends_on = []
+scope = "repository"
+
+[checks.strictspec-generated-format]
+description = "Every validator strictspec.toml declares carries a GENERATED_CODE_FORMAT the linked strictspec runtime reads."
+subject = "code"
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.target-matrix-fresh]
+description = "The committed support matrix matches a fresh regeneration from rlsbl's registries."
+subject = "project"
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.target-version-readable]
+description = "Every detected target reads its version without error."
+subject = "project"
+tags = ["project"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.test-suite]
+description = "The project's test suite passes."
+subject = "tests"
+tags = ["prepush", "quality", "preflight"]
+severity = "error"
+fast = false
+pure = false
+needs_network = false
+depends_on = ["prepush-changelog-coverage"]
+scope = "repository"
+
+[checks.test-suite-workspace]
+description = "The test suites of the affected workspace members pass."
+subject = "tests"
+tags = ["prepush", "workspace"]
+severity = "error"
+fast = false
+pure = false
+needs_network = false
+depends_on = ["prepush-changelog-coverage"]
+scope = "workspace:non_dev_only"
+
+[checks.testisolation-floor]
+description = "An adopted testisolation floor has a working sandbox runner that every CI workflow test-runner.toml names invokes."
+subject = "tests"
+tags = ["project", "preflight"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = ["declarations-valid"]
+
+[checks.unpublished-refs]
+description = "Every archived release's refs exist locally and on origin at its release commit, and its primary tag carries a GitHub Release (requires network)."
+subject = "release"
+tags = ["release"]
+severity = "error"
+fast = false
+pure = false
+needs_network = true
+depends_on = ["version-consistency"]
+
+[checks.unversioned-boundary]
+description = "No releasable member has a runtime dependency on an unversioned member."
+subject = "workspace"
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.upload-private-paths]
+description = "No npm package or Go module zip carries a private path."
+subject = "project"
+tags = ["project", "preflight"]
+severity = "error"
+fast = false
+pure = false
+needs_network = false
+depends_on = []
+
+[checks.version-consistency]
+description = "Every detected target reports the same project version."
+subject = "project"
+tags = ["project"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+
+[checks.workspace-ci-router]
+description = "The generated ci-router.yml exists at the workspace root."
+subject = "workspace"
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.workspace-ci-synced]
+description = "Each in-scope member's CI jobs are inlined into the shared ci-router.yml."
+subject = "workspace"
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = ["workspace-ci-router"]
+scope = "workspace:non_dev_node"
+
+[checks.workspace-stale-entries]
+description = "No releasables.toml member points to a missing or manifest-less directory."
+subject = "workspace"
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.workspace-targets]
+description = "Every releasable, non-dev-only workspace member has at least one detectable target."
+subject = "workspace"
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.workspace-unbuildable]
+description = "Every workspace member syncs under uv sync --all-packages (pypi workspaces)."
+subject = "workspace"
+tags = ["workspace", "preflight"]
+severity = "error"
+fast = false
+pure = false
+needs_network = false
+depends_on = []
+scope = "workspace"
+
+[checks.workspace-unregistered]
+description = "No project directory with a manifest is missing from releasables.toml."
+subject = "workspace"
+tags = ["workspace"]
+severity = "error"
+fast = true
+pure = true
+needs_network = false
+depends_on = []
+scope = "workspace"
