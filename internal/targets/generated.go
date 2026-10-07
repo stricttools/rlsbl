@@ -64,7 +64,7 @@ func BuildMatrix() Matrix {
 		m.Tables.Axes.Rows = append(m.Tables.Axes.Rows, []string{a.Name, a.Doc})
 	}
 	m.Tables.Targets.Headers = []string{"Name", "Ecosystem", "Detection files", "Version files", "Companion tag", "Built-in tests", "Dev install (global)", "Dev install (venv)"}
-	for _, t := range registry {
+	for _, t := range supported {
 		f := t.Facts()
 		m.Targets = append(m.Targets, f)
 		m.Tables.Targets.Rows = append(m.Tables.Targets.Rows, []string{

@@ -163,7 +163,7 @@ func destroyedTag(v semver.Version, tag, recordName, record, commit, note string
 		"      re-running the release; or\n"+
 		"  (2) if the tag format changed, checking tag_format in %s: if %s was released under a\n"+
 		"      different tag, create the current tag %q at that release commit.",
-		v, recordName, record, tag, tag, note, tag, v, tag, commit, declarations.ReleasesFile, v, tag)
+		v, recordName, record, tag, tag, note, tag, v, tag, commit, declarations.ReleasablesFile, v, tag)
 }
 
 // refuseFinalizedChangelog refuses a first release of a version whose
