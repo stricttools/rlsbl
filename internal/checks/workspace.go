@@ -452,4 +452,3 @@ func checkMemberPytestConfig(c *Context, r *strictcli.ErrorReporter) strictcli.C
 	}
 	return reportErrors(r, problems, fmt.Sprintf("%d member(s) with tests but no [tool.pytest.ini_options] of their own under an enclosing conftest.py", len(problems)), "every member with tests under an enclosing conftest.py pins its own pytest configuration")
 }
-
