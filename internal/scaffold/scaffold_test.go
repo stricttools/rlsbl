@@ -84,10 +84,14 @@ func TestADryRunWritesNothing(t *testing.T) {
 	hygiene.Isolate(t)
 	repo := newProject(t, standalone("none", ""), goModule)
 	before := snapshot(t, repo.Dir)
-	mustScaffold(t, repo.Dir, func(in *Inputs) { in.DryRun = true })
+	s := mustScaffold(t, repo.Dir, func(in *Inputs) { in.DryRun = true })
 	sameFiles(t, before, snapshot(t, repo.Dir))
 	if exists(t, repo, ".git/hooks/pre-push") {
 		t.Error("a dry run installed the pre-push hook")
+	}
+	// What the dry run says names what it would do, never what it did.
+	if strings.Contains(s.text(), "Installed ") || !strings.Contains(s.text(), "Would install the pre-push hook") {
+		t.Errorf("a dry run reported the hooks as installed:\n%s", s.text())
 	}
 }
 

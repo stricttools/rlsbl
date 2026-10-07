@@ -123,7 +123,7 @@ func installInto(t *testing.T, dir string) (said []string, result strictcli.Resu
 		if err != nil {
 			return err
 		}
-		return installHooks(ctx.Effects(), changes, func(s string) { said = append(said, s) })
+		return installHooks(ctx.Effects(), changes, false, func(s string) { said = append(said, s) })
 	})
 	return said, result
 }

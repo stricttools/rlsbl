@@ -219,8 +219,9 @@ func indent(text, prefix string) string {
 	return strings.Join(lines, "\n")
 }
 
-// installHooks writes the planned hooks, executable, and says what it did.
-func installHooks(e *strictcli.Effects, changes []hookChange, say func(string)) error {
+// installHooks writes the planned hooks, executable, and says what it did,
+// or under --dry-run what it would do.
+func installHooks(e *strictcli.Effects, changes []hookChange, dryRun bool, say func(string)) error {
 	for _, c := range changes {
 		if c.action == "" {
 			continue
@@ -231,9 +232,14 @@ func installHooks(e *strictcli.Effects, changes []hookChange, say func(string)) 
 		if _, err := e.Write(c.path, c.content, strictcli.Mode(0o755)); err != nil {
 			return fmt.Errorf("writing the %s hook: %w", c.name, err)
 		}
-		if c.action == "install" {
+		switch {
+		case dryRun && c.action == "install":
+			say(fmt.Sprintf("Would install the %s hook (%s)", c.name, c.path))
+		case dryRun:
+			say(fmt.Sprintf("Would update the %s hook (%s), which is an earlier rlsbl version", c.name, c.path))
+		case c.action == "install":
 			say(fmt.Sprintf("Installed %s hook (%s)", c.name, c.path))
-		} else {
+		default:
 			say(fmt.Sprintf("Updated %s hook (%s), which was an earlier rlsbl version", c.name, c.path))
 		}
 	}

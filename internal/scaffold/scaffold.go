@@ -373,7 +373,7 @@ func scaffoldMember(e *strictcli.Effects, repo git.Repo, ws *workspace.Workspace
 		}
 		r.row(o.path, "removed ("+o.reason+")")
 	}
-	if err := installHooks(e, hooks, in.Say); err != nil {
+	if err := installHooks(e, hooks, in.DryRun, in.Say); err != nil {
 		return err
 	}
 	if err := WriteState(e, root, newState); err != nil {
