@@ -1,0 +1,301 @@
+package releasenotes_test
+
+import (
+	"os"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/testisolation/go/hygiene"
+
+	"github.com/stricttools/rlsbl/internal/git"
+	"github.com/stricttools/rlsbl/internal/github"
+	"github.com/stricttools/rlsbl/internal/previewapply"
+	"github.com/stricttools/rlsbl/internal/releasenotes"
+	"github.com/stricttools/rlsbl/internal/testsupport"
+)
+
+func TestMain(m *testing.M) {
+	if testsupport.IsFakeGH() {
+		os.Exit(testsupport.FakeGHMain())
+	}
+	os.Exit(m.Run())
+}
+
+var portal = github.Repository{Owner: "acme", Name: "portal"}
+
+// The gh argvs the client issues for v0.4.0 of acme/portal.
+var (
+	viewBody   = []string{"release", "view", "v0.4.0", "--repo", "acme/portal", "--json", "body", "--jq", ".body"}
+	viewExists = []string{"release", "view", "v0.4.0", "--repo", "acme/portal", "--json", "tagName", "--jq", ".tagName"}
+	viewLatest = []string{"release", "view", "--repo", "acme/portal", "--json", "tagName", "--jq", ".tagName"}
+	create     = []string{"release", "create", "v0.4.0", "--repo", "acme/portal", "--title", "v0.4.0", "--notes-file", "-", "--verify-tag"}
+	editNotes  = []string{"release", "edit", "v0.4.0", "--repo", "acme/portal", "--notes-file", "-"}
+	rewrite    = []string{"release", "edit", "v0.4.0", "--repo", "acme/portal", "--notes-file", "-", "--title", "v0.4.0", "--prerelease=false"}
+	rewritePre = []string{"release", "edit", "v0.4.0", "--repo", "acme/portal", "--notes-file", "-", "--title", "v0.4.0", "--prerelease"}
+)
+
+// withGH runs fn with a gh client in a mutating command carrying rlsbl's
+// observe allowlist, and returns fn's error.
+func withGH(t *testing.T, fn func(gh github.Client) error) error {
+	t.Helper()
+	var ferr error
+	testsupport.RunCommand(t, testsupport.CommandOptions{Effect: strictcli.EffectMutating, Allowlist: previewapply.Prefixes()}, func(ctx *strictcli.Context) error {
+		gh, err := github.New(ctx.Effects())
+		if err != nil {
+			ferr = err
+			return err
+		}
+		ferr = fn(gh)
+		return ferr
+	})
+	return ferr
+}
+
+func doc(t *testing.T, notices ...string) releasenotes.Document {
+	t.Helper()
+	return releasenotes.Document{Tag: "v0.4.0", Version: version(t, "0.4.0"), Notes: "- Fixed bug Y", Notices: notices, ReleaseCommit: commitA}
+}
+
+func requireCalls(t *testing.T, calls []testsupport.GHCall, want ...[]string) {
+	t.Helper()
+	if len(calls) != len(want) {
+		t.Fatalf("calls %+v, want %v", calls, want)
+	}
+	for i := range want {
+		if !slices.Equal(calls[i].Args, want[i]) {
+			t.Fatalf("call %d is %q, want %q", i, calls[i].Args, want[i])
+		}
+	}
+}
+
+func TestCreateWritesTheComposedDocument(t *testing.T) {
+	hygiene.Isolate(t)
+	gh := testsupport.FakeGH(t, testsupport.GHAnswer{Args: create})
+	if err := withGH(t, func(c github.Client) error {
+		return releasenotes.Create(c, portal, doc(t), true)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	calls := gh.Calls()
+	requireCalls(t, calls, create)
+	if calls[0].Stdin != "- Fixed bug Y\n\n"+markerA+"\n" {
+		t.Fatalf("notes %q", calls[0].Stdin)
+	}
+}
+
+func TestARepairCreationKeepsTheLatestBadgeWhereItIs(t *testing.T) {
+	hygiene.Isolate(t)
+	repair := append(append([]string(nil), create...), "--latest=false")
+	gh := testsupport.FakeGH(t, testsupport.GHAnswer{Args: repair})
+	if err := withGH(t, func(c github.Client) error {
+		return releasenotes.Create(c, portal, doc(t), false)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	requireCalls(t, gh.Calls(), repair)
+}
+
+func TestRewriteEditsInPlaceAndStatesTheFlag(t *testing.T) {
+	hygiene.Isolate(t)
+	gh := testsupport.FakeGH(t, testsupport.GHAnswer{Args: rewrite}, testsupport.GHAnswer{Args: rewritePre})
+	if err := withGH(t, func(c github.Client) error {
+		if err := releasenotes.Rewrite(c, portal, doc(t)); err != nil {
+			return err
+		}
+		return releasenotes.Rewrite(c, portal, doc(t, deprecated))
+	}); err != nil {
+		t.Fatal(err)
+	}
+	calls := gh.Calls()
+	requireCalls(t, calls, rewrite, rewritePre)
+	if calls[1].Stdin != deprecated+"\n\n- Fixed bug Y\n\n"+markerA+"\n" {
+		t.Fatalf("notes %q", calls[1].Stdin)
+	}
+	for _, c := range calls {
+		if c.Args[1] == "delete" || c.Args[1] == "create" {
+			t.Fatalf("a rewrite deleted or created a Release: %q", c.Args)
+		}
+	}
+}
+
+func TestRewriteOfAnUnrecoverableVersionKeepsTheMarkerGitHubHolds(t *testing.T) {
+	hygiene.Isolate(t)
+	gh := testsupport.FakeGH(t,
+		testsupport.GHAnswer{Args: viewBody, Stdout: "old notes\n\n" + markerB + "\n"},
+		testsupport.GHAnswer{Args: rewrite},
+	)
+	d := doc(t)
+	d.ReleaseCommit = ""
+	if err := withGH(t, func(c github.Client) error { return releasenotes.Rewrite(c, portal, d) }); err != nil {
+		t.Fatal(err)
+	}
+	calls := gh.Calls()
+	requireCalls(t, calls, viewBody, rewrite)
+	if calls[1].Stdin != "- Fixed bug Y\n\n"+markerB+"\n" {
+		t.Fatalf("notes %q", calls[1].Stdin)
+	}
+}
+
+func TestEnsureMarkerWritesOnlyWhenTheMarkerIsMissingOrStale(t *testing.T) {
+	hygiene.Isolate(t)
+	gh := testsupport.FakeGH(t,
+		testsupport.GHAnswer{Args: viewBody, Stdout: "notes\n\n" + markerA + "\n"},
+		testsupport.GHAnswer{Args: viewBody, Stdout: "notes\n\n" + markerB + "\n"},
+		testsupport.GHAnswer{Args: editNotes},
+	)
+	var first, second bool
+	if err := withGH(t, func(c github.Client) error {
+		var err error
+		if first, err = releasenotes.EnsureMarker(c, portal, doc(t)); err != nil {
+			return err
+		}
+		second, err = releasenotes.EnsureMarker(c, portal, doc(t))
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if first || !second {
+		t.Fatalf("wrote %v then %v", first, second)
+	}
+	calls := gh.Calls()
+	requireCalls(t, calls, viewBody, viewBody, editNotes)
+	if calls[2].Stdin != "notes\n\n"+markerA+"\n" {
+		t.Fatalf("notes %q", calls[2].Stdin)
+	}
+}
+
+func TestPublishCreatesOnlyWhatDoesNotExist(t *testing.T) {
+	hygiene.Isolate(t)
+	gh := testsupport.FakeGH(t,
+		testsupport.GHAnswer{Args: viewExists, Stderr: "release not found\n", Exit: 1},
+		testsupport.GHAnswer{Args: viewExists, Stdout: "v0.4.0\n"},
+		testsupport.GHAnswer{Args: create},
+		testsupport.GHAnswer{Args: rewrite},
+	)
+	var created []bool
+	if err := withGH(t, func(c github.Client) error {
+		for range 2 {
+			was, err := releasenotes.Publish(c, portal, doc(t), true)
+			if err != nil {
+				return err
+			}
+			created = append(created, was)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(created, []bool{true, false}) {
+		t.Fatalf("created %v", created)
+	}
+	requireCalls(t, gh.Calls(), viewExists, create, viewExists, rewrite)
+}
+
+func TestPublishRefusesWhenGitHubCannotSay(t *testing.T) {
+	hygiene.Isolate(t)
+	gh := testsupport.FakeGH(t, testsupport.GHAnswer{Args: viewExists, Stderr: "HTTP 502\n", Exit: 1})
+	err := withGH(t, func(c github.Client) error {
+		_, err := releasenotes.Publish(c, portal, doc(t), true)
+		return err
+	})
+	if err == nil {
+		t.Fatal("an unanswered existence question was read as an answer")
+	}
+	requireCalls(t, gh.Calls(), viewExists)
+}
+
+func TestRepairTakesLatest(t *testing.T) {
+	hygiene.Isolate(t)
+	gh := testsupport.FakeGH(t,
+		testsupport.GHAnswer{Args: viewLatest, Stderr: "release not found\n", Exit: 1},
+		testsupport.GHAnswer{Args: viewLatest, Stdout: "v0.3.0\n"},
+	)
+	var none, newer, older, pre bool
+	if err := withGH(t, func(c github.Client) error {
+		var err error
+		if none, err = releasenotes.RepairTakesLatest(c, portal, doc(t), nil); err != nil {
+			return err
+		}
+		if newer, err = releasenotes.RepairTakesLatest(c, portal, doc(t), func(latest string) (bool, error) { return latest == "v0.3.0", nil }); err != nil {
+			return err
+		}
+		if older, err = releasenotes.RepairTakesLatest(c, portal, doc(t), func(string) (bool, error) { return false, nil }); err != nil {
+			return err
+		}
+		pre, err = releasenotes.RepairTakesLatest(c, portal, doc(t, deprecated), nil)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !none || !newer || older || pre {
+		t.Fatalf("no Latest %v, newer %v, older %v, deprecated %v", none, newer, older, pre)
+	}
+}
+
+func TestTagNewerInHistory(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := testsupport.NewRepo(t)
+	repo.CommitFile("a.txt", "a\n", "first")
+	repo.Git("tag", "v0.3.0")
+	repo.CommitFile("b.txt", "b\n", "second")
+	repo.Git("tag", "v0.4.0")
+	repo.Git("tag", "widget@v0.1.0")
+	var answers []bool
+	var missing error
+	testsupport.RunCommand(t, testsupport.CommandOptions{Effect: strictcli.EffectReadOnly, Allowlist: previewapply.Prefixes()}, func(ctx *strictcli.Context) error {
+		r, err := git.Open(ctx.Effects(), repo.Dir)
+		if err != nil {
+			return err
+		}
+		for _, pair := range [][2]string{{"v0.4.0", "v0.3.0"}, {"v0.3.0", "v0.4.0"}, {"v0.4.0", "widget@v0.1.0"}} {
+			newer, err := releasenotes.TagNewerInHistory(r, pair[0], pair[1])
+			if err != nil {
+				return err
+			}
+			answers = append(answers, newer)
+		}
+		_, missing = releasenotes.TagNewerInHistory(r, "v0.4.0", "v0.2.0")
+		return nil
+	})
+	if !slices.Equal(answers, []bool{true, false, false}) {
+		t.Fatalf("answers %v", answers)
+	}
+	if missing == nil || !strings.Contains(missing.Error(), "git fetch origin --tags") {
+		t.Fatalf("a missing tag: %v", missing)
+	}
+}
+
+// The missing-tag refusal names fetching the tags; once the tag exists
+// locally the question is answered.
+func TestAMissingTagIsAnsweredOnceTheTagExists(t *testing.T) {
+	hygiene.Isolate(t)
+	upstream := testsupport.NewRepo(t)
+	upstream.CommitFile("a.txt", "a\n", "first")
+	upstream.Git("tag", "v0.3.0")
+	upstream.CommitFile("b.txt", "b\n", "second")
+	upstream.Git("tag", "v0.4.0")
+	clone := upstream.Clone()
+	clone.Git("tag", "-d", "v0.3.0")
+	ask := func() (bool, error) {
+		var newer bool
+		var ferr error
+		testsupport.RunCommand(t, testsupport.CommandOptions{Effect: strictcli.EffectReadOnly, Allowlist: previewapply.Prefixes()}, func(ctx *strictcli.Context) error {
+			r, err := git.Open(ctx.Effects(), clone.Dir)
+			if err != nil {
+				return err
+			}
+			newer, ferr = releasenotes.TagNewerInHistory(r, "v0.4.0", "v0.3.0")
+			return nil
+		})
+		return newer, ferr
+	}
+	if _, err := ask(); err == nil {
+		t.Fatal("a missing tag was answered")
+	}
+	clone.Git("fetch", "origin", "--tags")
+	if newer, err := ask(); err != nil || !newer {
+		t.Fatalf("after fetching the tags: %v, %v", newer, err)
+	}
+}
