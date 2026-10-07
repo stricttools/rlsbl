@@ -1,5 +1,5 @@
 +++
-description = "Configuration reference: config.json pipelines, per-target test settings, batch limits, the settings that belong to an option, external checks, and policed surfaces."
+description = "Configuration reference: .rlsbl/config.json keys, the npm, pypi, go, and cloudflare-pages pipeline types, batch limits and where a workspace keeps their exclusions."
 +++
 
 # Configuration reference

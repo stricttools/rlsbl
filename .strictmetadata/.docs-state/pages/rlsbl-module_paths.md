@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.module_paths"
-description = "The one module-prefix containment rule: a path is inside a prefix only at a separator boundary, so a neighbour with the same leading letters never matches."
+description = "One containment rule for module prefixes: a Go import path or a Python dotted name is inside a prefix only at a separator boundary."
 generated = true
 nav_group = "API Reference"
 nav_order = 125

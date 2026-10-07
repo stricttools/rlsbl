@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.pipelines.base"
-description = "Base classes for release pipelines, including no-op defaults for optional methods and token/credential authentication mixins."
+description = "Base classes for release pipelines: BasePipeline with no-op defaults for optional steps, and TokenPipeline for single-token authentication."
 generated = true
 nav_group = "API Reference"
 nav_order = 137

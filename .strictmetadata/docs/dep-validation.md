@@ -1,5 +1,5 @@
 +++
-description = "Dependency validation: unused/undeclared deps, dead modules with reason-gated exclusions, circular dependency detection, and which language ecosystems each covers."
+description = "Dependency validation for Python, npm, and Go: unused and undeclared dependencies, dead modules with reason-gated exclusions, circular imports, and library lint."
 +++
 
 # Dependency validation

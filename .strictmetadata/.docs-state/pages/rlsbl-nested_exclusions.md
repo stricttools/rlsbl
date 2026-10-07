@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.nested_exclusions"
-description = "Writes one path-exact exclusion per nested member into a member's pytest addopts or Deno exclude, and reports which exclusions a member is still missing."
+description = "Writes one path-exact pytest --ignore per nested member into a member's addopts, and reports which exclusions a member still lacks."
 generated = true
 nav_group = "API Reference"
 nav_order = 126

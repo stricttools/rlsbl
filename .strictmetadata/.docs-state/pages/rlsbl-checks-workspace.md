@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.checks.workspace"
-description = "Workspace checks (tag: workspace) validating monorepo CI routing, project registration, dev-only boundaries, and inter-project dependency declarations."
+description = "Workspace checks (tag: workspace): CI router and filter freshness, member registration, dev-only and unversioned boundaries, dependency declarations, and layers."
 generated = true
 nav_group = "API Reference"
 nav_order = 26

@@ -1,5 +1,5 @@
 +++
-description = "Utility commands: project status, unreleased-commit coverage, target detection, ecosystem discovery, pull requests, copying the npm token into NPM_TOKEN secrets, and the framework's --json envelope."
+description = "Utility commands: rlsbl commit, project status, unreleased-commit coverage, target detection, ecosystem discovery, pull requests, NPM_TOKEN syncing, and --json output."
 +++
 
 # Utility commands

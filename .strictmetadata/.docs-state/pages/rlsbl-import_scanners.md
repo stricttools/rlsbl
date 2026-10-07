@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.import_scanners"
-description = "Python and Dart import scanners for dependency-import validation, filtering workspace-relevant imports and distinguishing lib vs test contexts."
+description = "Python, npm, and Go import scanners for dependency-import validation, keeping workspace-relevant imports and telling library code from test code."
 generated = true
 nav_group = "API Reference"
 nav_order = 106

@@ -1,6 +1,6 @@
 +++
 title = "rlsbl"
-description = "Release orchestration and project scaffolding for npm, PyPI, Go, Deno, Zig, Swift, Hex, Docker and Maven: version bumps, changelogs, tags, and CI/CD."
+description = "Release orchestration and project scaffolding for npm, PyPI, and Go: version bumps, changelogs, tags, GitHub Releases, and CI/CD."
 generated = true
 nav_group = "API Reference"
 nav_order = 1

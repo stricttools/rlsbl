@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.commands.rewrite.go_module_path"
-description = "Renames one Go module path across a repository: go.mod tokens, import sites, and the schema dump's project_id, leaving a nested module's own path alone."
+description = "Renames one Go module path across a repository: go.mod tokens, import sites, and the project_id in .strictmetadata/.cli-schema/schema.json."
 generated = true
 nav_group = "API Reference"
 nav_order = 76

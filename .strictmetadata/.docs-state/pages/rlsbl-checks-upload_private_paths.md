@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.checks.upload_private_paths"
-description = "The upload-private-paths check: lists the npm package, Go module zip, and Docker build context offline and refuses any that carries a private path."
+description = "The upload-private-paths check: lists the npm package and the Go module zip offline and refuses any that carries a private path; PyPI uploads are checked in CI."
 generated = true
 nav_group = "API Reference"
 nav_order = 25

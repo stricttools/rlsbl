@@ -1,5 +1,5 @@
 +++
-description = "Local development: editable installs per target, sibling overlays via dev sync, overlay drift detection, CI watching with retry and a publish-start check that knows expired runs, and pre-push enforcement."
+description = "Local development: editable installs for the npm, pypi, and go targets, sibling overlays via dev sync and their drift detection, CI watching, and the pre-push hook."
 +++
 
 # Development workflow

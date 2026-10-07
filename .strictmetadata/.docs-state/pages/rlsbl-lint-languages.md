@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.lint.languages"
-description = "The single table of languages the library linter knows, kept apart from the release-target taxonomy: a language is written, a target is published."
+description = "The library linter's table of languages, kept apart from release targets: each language names its manifests, default excludes, and linters."
 generated = true
 nav_group = "API Reference"
 nav_order = 113

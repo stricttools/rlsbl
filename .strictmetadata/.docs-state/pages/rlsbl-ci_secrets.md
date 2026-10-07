@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.ci_secrets"
-description = "Does the repository carry the CI secrets its publish pipelines declare? Presence only, never a value, and fail-closed: an unanswerable probe is unknown."
+description = "Checks that the repository carries each CI secret its publish pipelines declare, such as npm's NPM_TOKEN, reading presence only and never a value."
 generated = true
 nav_group = "API Reference"
 nav_order = 29

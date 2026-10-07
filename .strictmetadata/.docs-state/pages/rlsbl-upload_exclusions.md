@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.upload_exclusions"
-description = "How scaffold spells the private-path rule in each ecosystem: hatchling sdist excludes, .npmignore and .dockerignore blocks, and stub go.mod files in Go."
+description = "How scaffold spells the private-path rule per ecosystem: hatchling sdist excludes, an .npmignore block, and stub go.mod files in Go modules."
 generated = true
 nav_group = "API Reference"
 nav_order = 187

@@ -1,5 +1,5 @@
 +++
-description = "Pipeline architecture: the built-in pipeline types and their auth patterns, custom assets, the pre-publish registry probe, launcher shims, and migration."
+description = "Pipeline architecture: the npm, pypi, go, and cloudflare-pages pipeline types, token and unauthenticated publishing, custom assets, and launcher shims."
 +++
 
 # Pipelines

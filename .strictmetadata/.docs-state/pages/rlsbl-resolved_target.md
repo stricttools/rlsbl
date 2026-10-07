@@ -1,6 +1,6 @@
 +++
 title = "rlsbl.resolved_target"
-description = "Resolution of a member's release surface into ResolvedTarget records, linking separately-configured targets and pipelines for the release flow."
+description = "Turns a member's separately configured targets and pipelines into ResolvedTarget records, one per target and pipeline pair, for the release flow."
 generated = true
 nav_group = "API Reference"
 nav_order = 160
