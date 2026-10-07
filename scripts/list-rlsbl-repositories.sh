@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # List every git repository that holds the old rlsbl layout, the repositories
-# `rlsbl migrate records` converts: each repository whose tracked tree holds a
+# `rlsbl migrate records` converts: each repository whose working tree holds a
 # .rlsbl/config.json, a .rlsbl/releasable.toml, or a
-# .rlsbl-monorepo/workspace.toml. Each repository's root is printed once.
+# .rlsbl-monorepo/workspace.toml that the repository does not ignore, tracked
+# or not (the migration reads the working tree). Each repository's root is
+# printed once.
 #
 # The walk skips .archive/ at the top, every node_modules/, experiments/, .git/
 # (and so every release checkout under .git/rlsbl/), and every *.local-only
