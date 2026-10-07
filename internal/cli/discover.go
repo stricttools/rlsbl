@@ -21,7 +21,7 @@ type discoverPayload struct {
 	Repositories []github.FoundRepository `json:"repositories"`
 }
 
-func registerDiscover(r *registry) {
+func registerDiscover(r *commandSet) {
 	r.add(command{
 		path:   []string{"discover"},
 		help:   discoverHelp,

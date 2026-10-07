@@ -9,7 +9,7 @@ import (
 	"github.com/stricttools/testisolation/go/hygiene"
 )
 
-func scratchRegistry() *registry {
+func scratchRegistry() *commandSet {
 	return newRegistry(strictcli.NewApp("scratch", "0.0.0", "A throwaway application for registration tests"))
 }
 

@@ -53,7 +53,7 @@ const uvPathSourcesHelp = "Convert the path- and workspace-sourced Python depend
 	"version it does not list is refused, naming the fix (release that dependency first), and so is a document PyPI fails to answer. Use --dry-run to print " +
 	"the per-dependency plan with entry counts."
 
-func registerRewrite(r *registry) {
+func registerRewrite(r *commandSet) {
 	r.group([]string{"rewrite"}, rewriteGroupHelp)
 	r.add(command{
 		path:   []string{"rewrite", "go-module-path"},

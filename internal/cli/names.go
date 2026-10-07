@@ -41,7 +41,7 @@ const claimNameHelp = "Claim a name on a package registry by publishing a minima
 // The grant claim-name publishes under.
 const publishGrant = "publish"
 
-func registerNames(r *registry) {
+func registerNames(r *commandSet) {
 	r.add(command{
 		path:   []string{"check-name"},
 		help:   checkNameHelp,

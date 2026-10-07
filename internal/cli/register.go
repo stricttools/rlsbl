@@ -87,19 +87,19 @@ func newGrant(name, reason, effectClass string) strictcli.Grant {
 	return g
 }
 
-// registry registers commands and the groups that hold them.
-type registry struct {
+// commandSet registers commands and the groups that hold them.
+type commandSet struct {
 	app    *strictcli.App
 	groups map[string]*strictcli.Group
 }
 
-func newRegistry(app *strictcli.App) *registry {
-	return &registry{app: app, groups: map[string]*strictcli.Group{}}
+func newRegistry(app *strictcli.App) *commandSet {
+	return &commandSet{app: app, groups: map[string]*strictcli.Group{}}
 }
 
 // group declares the group at path with its help; its parent group must be
 // declared first. A group is declared once.
-func (r *registry) group(path []string, help string) {
+func (r *commandSet) group(path []string, help string) {
 	key := strings.Join(path, " ")
 	if len(path) == 0 || help == "" {
 		panic(fmt.Sprintf("cli: group %q needs a path and a help text", key))
@@ -121,7 +121,7 @@ func (r *registry) group(path []string, help string) {
 
 // add registers a command. A declaration that breaks a rule is a
 // registration-time panic, like strictcli's own.
-func (r *registry) add(c command) {
+func (r *commandSet) add(c command) {
 	key := strings.Join(c.path, " ")
 	switch {
 	case len(c.path) == 0:
