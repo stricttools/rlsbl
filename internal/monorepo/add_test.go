@@ -45,7 +45,11 @@ func addFixture(t *testing.T) *testsupport.Repo {
 	t.Helper()
 	testsupport.FakeSafegit(t)
 	testsupport.FakeGH(t, topicsAnswer)
-	return newWorkspace(t, rootAndWidget, addFiles)
+	repo := newWorkspace(t, rootAndWidget, addFiles)
+	// The LICENSE the scaffold writes for a created releasable names its
+	// copyright holder from git's user.name.
+	repo.Git("config", "user.name", "Ada Lovelace")
+	return repo
 }
 
 // addFiles are the Go modules of the add fixture.
@@ -65,6 +69,7 @@ func gadgetRequest(repo *testsupport.Repo) AddRequest {
 		Releasable:  "gadget",
 		TagFormat:   "{name}@v{version}",
 		PublishMode: "none",
+		License:     "MIT",
 		AutoCommit:  true,
 		Version:     "0.132.0",
 		Now:         today,
@@ -114,7 +119,7 @@ func TestAddJoiningADeclaredReleasableAddsNoReleasable(t *testing.T) {
 	hygiene.Isolate(t)
 	repo := addFixture(t)
 	req := gadgetRequest(repo)
-	req.Releasable, req.TagFormat, req.PublishMode = "widget", "", ""
+	req.Releasable, req.TagFormat, req.PublishMode, req.License = "widget", "", "", ""
 	mustRun(t, strictcli.EffectMutating, false, adding(req))
 	ws := load(t, repo)
 	if len(ws.Releasables()) != 1 || len(ws.MembersOf("widget")) != 2 {
@@ -154,6 +159,7 @@ func TestADryRunAddWritesNothing(t *testing.T) {
 func TestAFailedAddPutsTheWorkingTreeBack(t *testing.T) {
 	hygiene.Isolate(t)
 	repo := newWorkspace(t, rootAndWidget, addFiles)
+	repo.Git("config", "user.name", "Ada Lovelace")
 	testsupport.PathOnly(t, "git")
 	testsupport.FakeGH(t, topicsAnswer)
 	deletingSaferm(t)
@@ -211,11 +217,11 @@ func TestAddRefusals(t *testing.T) {
 		{"an unknown dependency", func(r *AddRequest) { r.DependsOn = []string{"portal"} }, []string{`--depends-on names "portal"`, "root, widget"},
 			func(r *AddRequest) { r.DependsOn = []string{"widget"} }},
 		{"no releasable", func(r *AddRequest) { r.Releasable = "" }, []string{"--releasable is required", "--releasable false"},
-			func(r *AddRequest) { r.Releasable = NoReleasable; r.TagFormat, r.PublishMode = "", "" }},
+			func(r *AddRequest) { r.Releasable = NoReleasable; r.TagFormat, r.PublishMode, r.License = "", "", "" }},
 		{"a tag format for no releasable", func(r *AddRequest) { r.Releasable = NoReleasable }, []string{"--releasable false versions the member under none"},
-			func(r *AddRequest) { r.Releasable = NoReleasable; r.TagFormat, r.PublishMode = "", "" }},
+			func(r *AddRequest) { r.Releasable = NoReleasable; r.TagFormat, r.PublishMode, r.License = "", "", "" }},
 		{"a tag format for a declared releasable", func(r *AddRequest) { r.Releasable = "widget" }, []string{`the releasable "widget" is declared already`},
-			func(r *AddRequest) { r.Releasable = "widget"; r.TagFormat, r.PublishMode = "", "" }},
+			func(r *AddRequest) { r.Releasable = "widget"; r.TagFormat, r.PublishMode, r.License = "", "", "" }},
 		{"a created releasable without its tag format and publish mode", func(r *AddRequest) { r.TagFormat, r.PublishMode = "", "" }, []string{"pass --tag-format", "and --publish-mode"},
 			func(r *AddRequest) { r.TagFormat, r.PublishMode = "{name}@v{version}", "none" }},
 		{"a tag format without its version", func(r *AddRequest) { r.TagFormat = "gadget" }, []string{"--tag-format", "{version}"},
@@ -248,7 +254,7 @@ func TestAddRefusesADirectoryWithoutATargetUntilOneIsNamed(t *testing.T) {
 	repo := addFixture(t)
 	repo.Write("docs/README.md", "the docs\n")
 	req := gadgetRequest(repo)
-	req.Path, req.Releasable, req.TagFormat, req.PublishMode = "docs", NoReleasable, "", ""
+	req.Path, req.Releasable, req.TagFormat, req.PublishMode, req.License = "docs", NoReleasable, "", "", ""
 	req.DryRun = true
 	mustFail(t, strictcli.EffectMutating, true, adding(req), "no release target is detected in docs", "--target")
 	req.Target = "npm"

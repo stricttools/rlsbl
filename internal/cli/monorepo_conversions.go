@@ -44,8 +44,11 @@ const monorepoAbsorbHelp = "Bring the repository at <source_repo> into this work
 	"The arriving changelog and release directories and its CHANGELOG.md are then deleted (through saferm unless --delete-with-rm is passed); " +
 	"the rest of its .strictmetadata/ is residue `rlsbl monorepo cleanup` removes. The member is declared and scaffolded (which regenerates " +
 	"the routers), and the absorb is recorded in the transition record, each committed. --releasable joins a declared releasable; without " +
-	"it a releasable named after the member is created with the stated --tag-format, and with --publish-mode when the source declares none " +
-	"(the source's own otherwise). The source may be a standalone project in the new layout or declare nothing; one in the old layout or a " +
+	"it a releasable named after the member is created with the stated --tag-format and --license (an SPDX identifier, or proprietary, which " +
+	"requires GitHub to report this repository private), and with --publish-mode when the source declares none (the source's own otherwise); " +
+	"--license is refused with --releasable. The created releasable keeps the arriving lifecycle period and license period when the source's " +
+	"record holds them (a different --license is refused), and is given otherwise an active lifecycle period and a license period under " +
+	"--license from today, and its releasable-name identity under its own name. The source may be a standalone project in the new layout or declare nothing; one in the old layout or a " +
 	"workspace is refused. Refused before anything is written: a dirty source or workspace, a destination path taken, a name taken, a tag " +
 	"or version this workspace holds already, a version the source cannot state, and records the result would leave invalid. The source " +
 	"repository is never changed, and nothing is pushed. Use --dry-run to print the plan."
@@ -84,6 +87,7 @@ func registerMonorepoConversions(r *commandSet, version string) {
 					strictcli.Ch("ci", "publish from CI"),
 					strictcli.Ch("none", "publish nothing to any registry"),
 				)),
+			strictcli.StringFlag("license", licenseFlagHelp+"; required when the absorb creates a releasable, refused with --releasable", strictcli.Optional()),
 			strictcli.BoolFlag("delete-with-rm", "Delete with a plain removal instead of saferm (saferm when not passed)", strictcli.Optional()),
 		},
 		run: func(ctx *strictcli.Context, kw map[string]any) (any, error) {
@@ -156,6 +160,7 @@ func runMonorepoAbsorb(ctx *strictcli.Context, kw map[string]any, version string
 		Releasable:   optionalString(kw, "releasable"),
 		TagFormat:    optionalString(kw, "tag_format"),
 		PublishMode:  optionalString(kw, "publish_mode"),
+		License:      optionalString(kw, "license"),
 		DeleteWithRm: optionalBool(kw, "delete_with_rm", false),
 		Now:          time.Now(),
 		Version:      version,

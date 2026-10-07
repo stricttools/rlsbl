@@ -50,8 +50,8 @@ Extract keeps no state and has no resume: everything before the source's commit 
 ## Absorb
 
 ```bash
-rlsbl monorepo absorb ../widget packages/widget --tag-format '{name}@v{version}' --dry-run
-rlsbl monorepo absorb ../widget packages/widget --tag-format '{name}@v{version}' --approve-consequential
+rlsbl monorepo absorb ../widget packages/widget --tag-format '{name}@v{version}' --license MIT --dry-run
+rlsbl monorepo absorb ../widget packages/widget --tag-format '{name}@v{version}' --license MIT --approve-consequential
 ```
 
 `rlsbl monorepo absorb <source repository> <destination path>` brings a repository into the workspace as a member:
@@ -62,7 +62,7 @@ rlsbl monorepo absorb ../widget packages/widget --tag-format '{name}@v{version}'
 4. The arriving changelog and release directories and its `CHANGELOG.md` are deleted (through saferm unless `--delete-with-rm`); the rest of its `.strictmetadata/` is [residue](on-disk-layout.md#residue-of-the-old-layout) that `rlsbl monorepo cleanup` removes.
 5. The member is declared and scaffolded, which regenerates the routers, and the absorb is recorded in the transition record, each committed.
 
-`--releasable` joins a declared releasable. Without it, a releasable named after the member is created with the stated `--tag-format`, and with `--publish-mode` when the source declares none. `--name` and `--registry-name` fill the member's keys. The source may be a standalone project in the new layout or a repository declaring nothing; one in the old layout, and a workspace, are refused.
+`--releasable` joins a declared releasable. Without it, a releasable named after the member is created with the stated `--tag-format` and `--license`, and with `--publish-mode` when the source declares none; `--license` is refused with `--releasable`. The created releasable keeps the lifecycle period and the license period the source's record holds for it (a `--license` naming another license is refused), and otherwise gets an `active` lifecycle period and a license period under `--license` from today; its `releasable-name` identity takes its own name. A `proprietary` license requires GitHub to report this repository private. `--name` and `--registry-name` fill the member's keys. The source may be a standalone project in the new layout or a repository declaring nothing; one in the old layout, and a workspace, are refused.
 
 Absorb refuses, before anything is written: a dirty source or workspace; a destination path, a name, a tag, or a version this workspace holds already (one version is one release, and two records cannot both be it); a version the source cannot state; and records the result would leave invalid. The source repository is never changed, and nothing is pushed. A run that stops is completed by running the same command again.
 

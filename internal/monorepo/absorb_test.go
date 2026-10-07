@@ -160,7 +160,7 @@ func absorbing(repo, src *testsupport.Repo, dest string, change func(*AbsorbRequ
 		if err != nil {
 			return err
 		}
-		req := AbsorbRequest{Source: src.Dir, Dest: dest, TagFormat: "{name}@v{version}", Now: today, Version: "0.132.0", GitHub: gh, Say: say}
+		req := AbsorbRequest{Source: src.Dir, Dest: dest, TagFormat: "{name}@v{version}", License: "MIT", Now: today, Version: "0.132.0", GitHub: gh, Say: say}
 		if change != nil {
 			change(&req)
 		}
@@ -360,7 +360,7 @@ func TestAbsorbRefusesCreatingAReleasableThatIsDeclared(t *testing.T) {
 	repo, src, _, _ := absorbFixture(t, decls, nil)
 	repo.CommitFile("apps/gadget/go.mod", "module github.com/acme/gadget\n\ngo 1.26\n", "gadget")
 	absorbRefusedThenCleared(t, repo, src, "libs/gadget", nil, "pass --releasable gadget to join it", nil, func(r *AbsorbRequest) {
-		r.Releasable, r.TagFormat = "gadget", ""
+		r.Releasable, r.TagFormat, r.License = "gadget", "", ""
 	})
 }
 
@@ -374,7 +374,7 @@ func TestAbsorbRefusesATagFormatWhenJoining(t *testing.T) {
 	hygiene.Isolate(t)
 	repo, src, _, _ := absorbFixture(t, absorbDecls, nil)
 	absorbRefusedThenCleared(t, repo, src, "packages/gizmo", func(r *AbsorbRequest) { r.Releasable = "widget" }, "drop them", nil, func(r *AbsorbRequest) {
-		r.Releasable, r.TagFormat = "widget", ""
+		r.Releasable, r.TagFormat, r.License = "widget", "", ""
 	})
 }
 
@@ -400,7 +400,7 @@ func TestAbsorbRefusesAVersionTheJoinedReleasableReleased(t *testing.T) {
 	hygiene.Isolate(t)
 	repo, src, _, _ := absorbFixture(t, absorbDecls, nil)
 	repo.CommitFile(declarations.ChangelogDir("widget")+"/0.1.0.jsonl", "", "widget released 0.1.0")
-	absorbRefusedThenCleared(t, repo, src, "packages/gizmo", func(r *AbsorbRequest) { r.Releasable, r.TagFormat = "widget", "" }, "has released 0.1.0 already", nil, nil)
+	absorbRefusedThenCleared(t, repo, src, "packages/gizmo", func(r *AbsorbRequest) { r.Releasable, r.TagFormat, r.License = "widget", "", "" }, "has released 0.1.0 already", nil, nil)
 }
 
 func TestAbsorbRefusesASourceInTheOldLayout(t *testing.T) {

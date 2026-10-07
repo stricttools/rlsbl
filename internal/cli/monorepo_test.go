@@ -79,7 +79,13 @@ func TestMonorepoInitThroughTheApplication(t *testing.T) {
 	if r := app.Test([]string{"monorepo", "init", "--root-member", "root-releasable", "--release-branch", "main"}); r.ExitCode == 0 || !strings.Contains(r.Stderr, "releasable") {
 		t.Fatalf("a root releasable without its name: exit %d: %s", r.ExitCode, r.Stderr)
 	}
-	r := app.Test([]string{"monorepo", "init", "--root-member", "root-releasable", "--releasable", "portal", "--tag-format", "v{version}", "--publish-mode", "none", "--release-branch", "main"})
+	if r := app.Test([]string{"monorepo", "init", "--root-member", "root-releasable", "--releasable", "portal", "--tag-format", "v{version}", "--publish-mode", "none", "--release-branch", "main"}); r.ExitCode == 0 || !strings.Contains(r.Stderr, "--license") {
+		t.Fatalf("a root releasable without its license: exit %d: %s", r.ExitCode, r.Stderr)
+	}
+	if r := app.Test([]string{"monorepo", "init", "--root-member", "root-dev-node", "--license", "MIT", "--release-branch", "main"}); r.ExitCode == 0 || !strings.Contains(r.Stderr, "--license") {
+		t.Fatalf("a dev-node root with a license: exit %d: %s", r.ExitCode, r.Stderr)
+	}
+	r := app.Test([]string{"monorepo", "init", "--root-member", "root-releasable", "--releasable", "portal", "--tag-format", "v{version}", "--publish-mode", "none", "--license", "MIT", "--release-branch", "main"})
 	if r.ExitCode != 0 || !strings.Contains(r.Stdout, "Committed: monorepo: init workspace") {
 		t.Fatalf("exit %d\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
 	}

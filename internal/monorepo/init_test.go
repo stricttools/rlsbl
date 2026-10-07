@@ -8,6 +8,7 @@ import (
 	"github.com/stricttools/testisolation/go/hygiene"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
+	"github.com/stricttools/rlsbl/internal/github"
 	"github.com/stricttools/rlsbl/internal/testsupport"
 )
 
@@ -21,8 +22,21 @@ func emptyRepository(t *testing.T) *testsupport.Repo {
 }
 
 func initWith(repo *testsupport.Repo, r *declarations.Releasable, autoCommit bool) func(e *strictcli.Effects, say func(string)) error {
+	license := ""
+	if r != nil {
+		license = "MIT"
+	}
+	return initLicensed(repo, r, license, autoCommit)
+}
+
+// initLicensed is initWith stating license for the root releasable.
+func initLicensed(repo *testsupport.Repo, r *declarations.Releasable, license string, autoCommit bool) func(e *strictcli.Effects, say func(string)) error {
 	return func(e *strictcli.Effects, say func(string)) error {
-		return Init(e, InitRequest{Root: repo.Dir, ReleaseBranches: []string{"main"}, RootReleasable: r, AutoCommit: autoCommit, Say: say})
+		gh, err := github.New(e)
+		if err != nil {
+			return err
+		}
+		return Init(e, InitRequest{Root: repo.Dir, ReleaseBranches: []string{"main"}, RootReleasable: r, License: license, GitHub: gh, Now: today, AutoCommit: autoCommit, Say: say})
 	}
 }
 

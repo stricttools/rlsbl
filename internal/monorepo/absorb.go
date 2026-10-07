@@ -82,8 +82,12 @@ type AbsorbRequest struct {
 	// creates a releasable named after the member.
 	Releasable string
 	// TagFormat and PublishMode declare the releasable the absorb creates.
-	TagFormat    string
-	PublishMode  string
+	TagFormat   string
+	PublishMode string
+	// License is the license the releasable the absorb creates is created
+	// under: an SPDX identifier or proprietary. Required when the absorb
+	// creates a releasable, refused with Releasable.
+	License      string
 	DeleteWithRm bool
 	Now          time.Time
 	// Version is this rlsbl's version, which the member's scaffold records.
@@ -286,6 +290,14 @@ func observeArrival(o previewapply.Observer, ws *workspace.Workspace, req Absorb
 	}
 	if err := arr.observeReleasable(); err != nil {
 		return nil, err
+	}
+	if err := requireLicenseForCreated(arr.creates, req.License, fmt.Sprintf("the member joins the declared releasable %q", arr.releasable)); err != nil {
+		return nil, err
+	}
+	if arr.creates {
+		if err := requirePrivateForProprietary(req.License, req.GitHub, repo, ws.Declarations.GitHubRepository); err != nil {
+			return nil, err
+		}
 	}
 	sourceTags, err := src.TagCommits()
 	if err != nil {
@@ -796,6 +808,15 @@ func (arr *arrival) observeRecords(src git.Repo) error {
 	}
 	if err := closeRepositoryURL(rec, arr.name, arr.sourceURL, started, on, reason); err != nil {
 		return err
+	}
+	if arr.creates {
+		r, _ := arr.ws.Declarations.Releasable(arr.releasable)
+		if arr.created != nil {
+			r = *arr.created
+		}
+		if err := recordCreatedReleasable(rec, r, arr.req.License, on, reason); err != nil {
+			return err
+		}
 	}
 	if err := rec.Validate(on, arr.declaredAfter()); err != nil {
 		return fmt.Errorf("this repository's lifecycle-and-license record with the arriving entries would be refused: %w", err)

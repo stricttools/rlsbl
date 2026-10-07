@@ -4,7 +4,7 @@ description = "The lifecycle-and-license record: each releasable's dated lifecyc
 
 # Lifecycle and license
 
-Each repository keeps one record of what its releasables are over time: `.strictmetadata/lifecycle-and-license/lifecycle-and-license.toml`. The directory belongs to strictspec, which owns the record's schema and the library that evaluates it; rlsbl, selfdoc, and safegit link that library at the points where they enforce its rules. rlsbl writes the record through the `transition` commands and through the operations that change an identity (`monorepo rename-releasable`, `rewrite project-name`, `monorepo extract`, `monorepo absorb`).
+Each repository keeps one record of what its releasables are over time: `.strictmetadata/lifecycle-and-license/lifecycle-and-license.toml`. The directory belongs to strictspec, which owns the record's schema and the library that evaluates it; rlsbl, selfdoc, and safegit link that library at the points where they enforce its rules. rlsbl writes the record through the `transition` commands, through the commands creating a releasable (`monorepo init`, `monorepo add`, `monorepo absorb`), and through the operations that change an identity (`monorepo rename-releasable`, `rewrite project-name`, `monorepo extract`, `monorepo absorb`).
 
 ## The record
 

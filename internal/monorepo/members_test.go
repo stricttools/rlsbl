@@ -107,7 +107,7 @@ func TestRemoveRefusesTheOnlyMemberOfAReleasable(t *testing.T) {
 	repo := newWorkspace(t, rootAndWidget, addFiles)
 	mustFail(t, strictcli.EffectMutating, false, removing(repo, "packages/widget"), `the only member versioned under the releasable "widget"`, "rlsbl monorepo add <path> --releasable widget")
 	req := gadgetRequest(repo)
-	req.Releasable, req.TagFormat, req.PublishMode = "widget", "", ""
+	req.Releasable, req.TagFormat, req.PublishMode, req.License = "widget", "", "", ""
 	mustRun(t, strictcli.EffectMutating, false, adding(req))
 	mustRun(t, strictcli.EffectMutating, false, removing(repo, "packages/widget"))
 }

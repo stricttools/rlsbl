@@ -108,7 +108,7 @@ A workspace holds several members versioned under one or more releasables:
 
 ```
 rlsbl monorepo init --root-member root-dev-node --release-branch main
-rlsbl monorepo add packages/core --releasable core --tag-format '{name}@v{version}' --publish-mode ci
+rlsbl monorepo add packages/core --releasable core --tag-format '{name}@v{version}' --publish-mode ci --license MIT
 rlsbl monorepo sync --auto-commit    # regenerate and commit the CI router and publish router
 rlsbl monorepo graph --format tree   # the dependency graph; --json for the document
 rlsbl monorepo release run --watch --approve-consequential

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/lifecycle"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
@@ -53,8 +54,12 @@ type AddRequest struct {
 	Releasable string
 	// TagFormat and PublishMode declare the releasable the add creates when
 	// Releasable names none declared; both are refused otherwise.
-	TagFormat    string
-	PublishMode  string
+	TagFormat   string
+	PublishMode string
+	// License is the license the releasable the add creates is created
+	// under: an SPDX identifier or proprietary. Required when the add
+	// creates a releasable, refused otherwise.
+	License      string
 	RegistryName string
 	AutoCommit   bool
 	DryRun       bool
@@ -104,6 +109,14 @@ func Add(e *strictcli.Effects, req AddRequest) error {
 	if err != nil {
 		return err
 	}
+	repo, err := git.Open(e, ws.Root)
+	if err != nil {
+		return err
+	}
+	record, err := planAddRecord(ws, repo, edited, member, created, req)
+	if err != nil {
+		return err
+	}
 
 	if req.DryRun {
 		if _, err := declarations.Write(e, ws.Root, edited); err != nil {
@@ -112,20 +125,17 @@ func Add(e *strictcli.Effects, req AddRequest) error {
 		req.Say(fmt.Sprintf("Would declare the member %q at %s in %s.", member.Name, member.Path, declarations.ReleasablesFile))
 		if created != nil {
 			req.Say(fmt.Sprintf("Would declare the releasable %q (tag format %s, publish mode %s).", created.Name, created.TagFormat, created.PublishMode))
+			req.Say(fmt.Sprintf("Would record in %s that %q is active and licensed %s from %s, under its releasable name.", lifecycle.RecordFile, created.Name, req.License, req.Now.Format(time.DateOnly)))
 		}
 		req.Say("Would scaffold the member and regenerate the workspace's routers, then commit what the add wrote as one commit. The scaffold is not previewed: it renders from declarations this preview did not write.")
 		return nil
 	}
 
-	repo, err := git.Open(e, ws.Root)
-	if err != nil {
-		return err
-	}
 	before, err := snapshotWorkingTree(repo, ws.Root)
 	if err != nil {
 		return err
 	}
-	if err := addAndCommit(e, repo, ws.Root, edited, member, created, before, req); err != nil {
+	if err := addAndCommit(e, repo, ws.Root, edited, member, created, record, before, req); err != nil {
 		if restoreErr := restoreWorkingTree(e, repo, ws.Root, before); restoreErr != nil {
 			return fmt.Errorf("%w; putting the working tree back failed too: %v", err, restoreErr)
 		}
@@ -135,13 +145,19 @@ func Add(e *strictcli.Effects, req AddRequest) error {
 }
 
 // addAndCommit writes the declarations, scaffolds the member, and commits.
-func addAndCommit(e *strictcli.Effects, repo git.Repo, root string, edited []byte, member declarations.Member, created *declarations.Releasable, before snapshot, req AddRequest) error {
+func addAndCommit(e *strictcli.Effects, repo git.Repo, root string, edited []byte, member declarations.Member, created *declarations.Releasable, record *lifecycle.Record, before snapshot, req AddRequest) error {
 	if _, err := declarations.Write(e, root, edited); err != nil {
 		return err
 	}
 	req.Say(fmt.Sprintf("Declared the member %q at %s.", member.Name, member.Path))
 	if created != nil {
 		req.Say(fmt.Sprintf("Declared the releasable %q (tag format %s, publish mode %s).", created.Name, created.TagFormat, created.PublishMode))
+		// The record is written before the scaffold, which renders the
+		// member's LICENSE from the license it holds.
+		if err := record.Write(recordWriter{e}, root); err != nil {
+			return err
+		}
+		req.Say(fmt.Sprintf("Recorded in %s that %q is active and licensed %s from %s, under its releasable name.", lifecycle.RecordFile, created.Name, req.License, req.Now.Format(time.DateOnly)))
 	}
 	// The scaffold runs without committing, since the add commits what all
 	// of it wrote at once, so its own "not committed" line is not passed on.
@@ -176,6 +192,41 @@ func addAndCommit(e *strictcli.Effects, repo git.Repo, root string, edited []byt
 	}
 	req.Say("Committed: " + AddCommitMessage(member.Name))
 	return nil
+}
+
+// planAddRecord checks --license against what the add creates and, for a
+// releasable it creates, composes the lifecycle-and-license record with
+// the releasable's entries, validated against the declarations the add
+// writes; nil when it creates none.
+func planAddRecord(ws *workspace.Workspace, repo git.Repo, edited []byte, member declarations.Member, created *declarations.Releasable, req AddRequest) (*lifecycle.Record, error) {
+	joined := fmt.Sprintf("the member joins the declared releasable %q", member.Releasable)
+	if member.Releasable == "" {
+		joined = fmt.Sprintf("--releasable %s versions the member under none", NoReleasable)
+	}
+	if err := requireLicenseForCreated(created != nil, req.License, joined); err != nil {
+		return nil, err
+	}
+	if created == nil {
+		return nil, nil
+	}
+	if err := requirePrivateForProprietary(req.License, req.GitHub, repo, ws.Declarations.GitHubRepository); err != nil {
+		return nil, err
+	}
+	rec, err := lifecycle.Load(ws.Root)
+	if err != nil {
+		return nil, err
+	}
+	if err := recordCreatedReleasable(rec, *created, req.License, req.Now, "created by `rlsbl monorepo add`"); err != nil {
+		return nil, err
+	}
+	after, err := declarations.Parse(edited)
+	if err != nil {
+		return nil, err
+	}
+	if err := rec.Validate(req.Now, declaredSubjectsOf(after)); err != nil {
+		return nil, fmt.Errorf("the lifecycle-and-license record with the releasable %q would be refused, so nothing was written: %w", created.Name, err)
+	}
+	return rec, nil
 }
 
 // planMember checks the request against the workspace and builds the member

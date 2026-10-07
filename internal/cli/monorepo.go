@@ -22,16 +22,22 @@ const monorepoInitHelp = "Write .strictmetadata/releasables/releasables.toml for
 	"root-dev-node declares it dev-only and versioned under no releasable, so its files need no changelog entry; root-releasable versions it under " +
 	"the releasable --releasable names, created with the --tag-format and --publish-mode stated (neither has a default), and a root releasable " +
 	"publishing from CI states --publish-ci-check-pattern, the pattern of the check-run names the root's own CI reports, which publishing waits for. " +
-	"--release-branch names each branch a release may run from. A repository whose declarations exist is refused. The declarations are committed " +
-	"unless --no-auto-commit is passed; when the commit fails, the files the init created are removed again through saferm, so running it again " +
-	"starts afresh."
+	"The root releasable also states --license, an SPDX identifier or proprietary (which requires GitHub to report the repository private, as " +
+	"`rlsbl transition classify` does), and the lifecycle-and-license record gains its active lifecycle period, its license period, and its " +
+	"releasable-name identity owning its tag namespace, from today. " +
+	"--release-branch names each branch a release may run from. A repository whose declarations exist is refused. The declarations and the record " +
+	"are committed unless --no-auto-commit is passed; when the commit fails, the files the init created are removed again through saferm and a " +
+	"record it changed is put back as it was, so running it again starts afresh."
 
 const monorepoAddHelp = "Declare the directory at <path> (relative to the repository root) as a member of the workspace, then scaffold it as " +
 	"`rlsbl scaffold` does, which regenerates the workspace's CI router and publish router, and commit what the three wrote as one commit. The " +
 	"member is named --name, or its directory's name. It needs a release target: one detected from its manifests, or the one --target names, which " +
 	"the scaffold declares when it is not detected. --releasable names the releasable it is versioned under, or is false for none; naming a " +
 	"releasable the workspace does not declare creates it, and then --tag-format and --publish-mode are required, because a tag scheme and a publish " +
-	"mode are stated, never derived (both are refused when no releasable is created). --depends-on names a member it depends on (repeatable), " +
+	"mode are stated, never derived, and so is --license, an SPDX identifier or proprietary (which requires GitHub to report the repository " +
+	"private, as `rlsbl transition classify` does); all three are refused when no releasable is created. A created releasable gets its active " +
+	"lifecycle period, its license period, and its releasable-name identity owning its tag namespace in the lifecycle-and-license record, from " +
+	"today, written before the scaffold, which renders the member's LICENSE from it. --depends-on names a member it depends on (repeatable), " +
 	"--library and --dev-only mark it, and --registry-name is its name on the registries. Every refusal is made before anything is written. When " +
 	"the scaffold, the routers, or the commit fails, every path the add changed is put back as it was and nothing is committed. A path that had " +
 	"uncommitted changes before the add and is written by it is left uncommitted and named. --no-auto-commit leaves everything uncommitted. Under " +
@@ -89,6 +95,7 @@ func registerMonorepo(r *commandSet, version string) {
 					strictcli.Ch("ci", "publish from CI"),
 					strictcli.Ch("none", "publish nothing to any registry"),
 				)),
+			strictcli.StringFlag("license", licenseFlagHelp+"; required when the add creates a releasable, refused otherwise", strictcli.Optional()),
 			strictcli.StringFlag("registry-name", "The member's name on the registries, when it differs from its name", strictcli.Optional()),
 			strictcli.BoolFlag("auto-commit", "Commit what the add wrote as one commit (committed when neither --auto-commit nor --no-auto-commit is passed)", strictcli.Optional()),
 		},
@@ -120,6 +127,10 @@ func registerMonorepo(r *commandSet, version string) {
 	registerMonorepoRelease(r, version)
 }
 
+// licenseFlagHelp describes the --license of the commands creating a
+// releasable.
+const licenseFlagHelp = "The license of the releasable created: an SPDX identifier (MIT, Apache-2.0, ...) or proprietary, which requires GitHub to report the repository private"
+
 // The choices of monorepo init's --root-member.
 var (
 	monorepoRootDevNode = strictcli.Choice("root-dev-node",
@@ -134,6 +145,7 @@ var (
 				strictcli.Ch("none", "publish nothing to any registry"),
 			)),
 		strictcli.StringFlag("publish-ci-check-pattern", "The pattern of the check-run names the root's own CI reports, which publishing waits for on the release commit; required with --publish-mode ci", strictcli.Optional()),
+		strictcli.StringFlag("license", licenseFlagHelp, strictcli.Required()),
 	)
 )
 
@@ -171,14 +183,21 @@ func runMonorepoInit(ctx *strictcli.Context, kw map[string]any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	gh, err := github.New(ctx.Effects())
+	if err != nil {
+		return nil, err
+	}
 	req := monorepo.InitRequest{
 		Root:            root,
 		ReleaseBranches: branches,
 		AutoCommit:      optionalBool(kw, "auto_commit", true),
+		GitHub:          gh,
+		Now:             time.Now(),
 		Say:             ctx.Out,
 	}
 	elected := strictcli.GetElected(kw, "root_member")
 	if elected.Is(monorepoRootReleasable) {
+		req.License = strictcli.Get[string](elected.Fields, "license")
 		pattern, _ := strictcli.GetOpt[string](elected.Fields, "publish_ci_check_pattern")
 		req.RootReleasable = &declarations.Releasable{
 			Name:                  strictcli.Get[string](elected.Fields, "releasable"),
@@ -214,6 +233,7 @@ func runMonorepoAdd(ctx *strictcli.Context, kw map[string]any, version string) e
 		Releasable:   strictcli.Get[string](kw, "releasable"),
 		TagFormat:    optionalString(kw, "tag_format"),
 		PublishMode:  optionalString(kw, "publish_mode"),
+		License:      optionalString(kw, "license"),
 		RegistryName: optionalString(kw, "registry_name"),
 		AutoCommit:   optionalBool(kw, "auto_commit", true),
 		DryRun:       ctx.DryRun(),
