@@ -424,7 +424,7 @@ func (r *scrubRun) rewrite(args []string) (*scrubState, error) {
 	if done.ExitCode() != 0 {
 		return nil, r.failedRewrite(done, args, remote, started)
 	}
-	payload, err := parseEnvelope(done.Stdout())
+	payload, err := parseMachineDocument(done.Stdout())
 	if err != nil {
 		return nil, err
 	}
@@ -446,7 +446,7 @@ func (r *scrubRun) rewrite(args []string) (*scrubState, error) {
 // left to rewrite and never pushing the rewritten history.
 func (r *scrubRun) failedRewrite(done strictcli.Completed, args []string, remote map[string]string, started time.Time) error {
 	report := strings.TrimSpace(done.Stderr())
-	payload, perr := parseEnvelope(done.Stdout())
+	payload, perr := parseMachineDocument(done.Stdout())
 	if perr != nil || !payload.rewritten() {
 		return fmt.Errorf("safegit scrub failed (exit %d):\n%s", done.ExitCode(), report)
 	}
@@ -475,7 +475,7 @@ func (r *scrubRun) verifySavedRewrite(s *scrubState) error {
 		return fmt.Errorf("safegit scrub could not be run: %w", err)
 	}
 	if done.ExitCode() != 0 {
-		if again, perr := parseEnvelope(done.Stdout()); perr == nil && again.rewritten() {
+		if again, perr := parseMachineDocument(done.Stdout()); perr == nil && again.rewritten() {
 			composeRewrites(s, again)
 			if err := saveScrubState(r.e, r.root, s); err != nil {
 				return err
@@ -483,7 +483,7 @@ func (r *scrubRun) verifySavedRewrite(s *scrubState) error {
 		}
 		return unverifiedError(done.ExitCode(), strings.TrimSpace(done.Stderr()))
 	}
-	again, err := parseEnvelope(done.Stdout())
+	again, err := parseMachineDocument(done.Stdout())
 	if err != nil {
 		return err
 	}
@@ -807,8 +807,8 @@ func (r *scrubRun) commit(s *scrubState) error {
 			return err
 		}
 	}
-	// The ownership manifests a first write into a directory creates ride
-	// along; one already committed and unchanged is left out of the commit.
+	// The ownership manifests a first write into a directory creates are
+	// committed with them; one already committed and unchanged is left out of the commit.
 	paths := mergePaths(mergePaths(mergePaths(s.RemappedFiles, s.ReleaseCommitFiles), s.DeletedCaches), []string{s.ArchivePath, rewritesManifest, transitionsManifest})
 	if _, err := r.repo.Commit(git.CommitRequest{
 		Message:       fmt.Sprintf("scrub: %s\n\nScrub-remap: %s..%s", s.Reason, s.OldHead, s.NewHead),

@@ -52,7 +52,7 @@ func TestAScrubRewritesRepairsCommitsAndPublishes(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newScrubFixture(t)
 	sg := newSafegit(t, "0.31.0")
-	sg.Answer(f.rewriteScript(), envelope(t, f.rewritePayload(true)), 0)
+	sg.Answer(f.rewriteScript(), safegitDocument(t, f.rewritePayload(true)), 0)
 	fakeGH := releasePublished(t)
 
 	r := scrub(t, f.repo.Dir, mangleSecret, false)
@@ -210,7 +210,7 @@ func TestAPushOriginRefusesIsResumedByRunningAgain(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newScrubFixture(t)
 	sg := newSafegit(t, "0.31.0")
-	sg.Answer(f.rewriteScript(), envelope(t, f.rewritePayload(true)), 0)
+	sg.Answer(f.rewriteScript(), safegitDocument(t, f.rewritePayload(true)), 0)
 	releasePublished(t)
 	// Origin refuses every push until the hook is removed.
 	hook := f.bare + "/hooks/pre-receive"
@@ -244,7 +244,7 @@ func TestARerunWithOtherArgumentsDoesNotFinishASavedScrub(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newScrubFixture(t)
 	sg := newSafegit(t, "0.31.0")
-	sg.Answer(f.rewriteScript(), envelope(t, f.rewritePayload(true)), 0)
+	sg.Answer(f.rewriteScript(), safegitDocument(t, f.rewritePayload(true)), 0)
 	hook := f.bare + "/hooks/pre-receive"
 	testsupport.WriteFile(t, hook, "#!/bin/sh\nexit 1\n")
 	if err := os.Chmod(hook, 0o755); err != nil {
@@ -286,7 +286,7 @@ func TestARewriteSafegitFailedAfterIsConfirmedThenFinished(t *testing.T) {
 	f := newScrubFixture(t)
 	sg := newSafegit(t, "0.31.0")
 	// safegit rewrites, then fails its own verification.
-	sg.Answer(f.rewriteScript(), envelope(t, f.rewritePayload(false)), 1)
+	sg.Answer(f.rewriteScript(), safegitDocument(t, f.rewritePayload(false)), 1)
 
 	r := scrub(t, f.repo.Dir, mangleSecret, false)
 	requireExit(t, r, 1)
@@ -301,7 +301,7 @@ func TestARewriteSafegitFailedAfterIsConfirmedThenFinished(t *testing.T) {
 	// The prune is done: safegit, asked again, finds nothing more to rewrite
 	// and confirms; the scrub finishes.
 	f.prune(t)
-	sg.Answer("", envelope(t, map[string]any{"version": 1, "dry_run": false, "pattern": "SECRET", "commits_rewritten": 0, "old_head": f.new.S, "cleanup_ok": true}), 0)
+	sg.Answer("", safegitDocument(t, map[string]any{"version": 1, "dry_run": false, "pattern": "SECRET", "commits_rewritten": 0, "old_head": f.new.S, "cleanup_ok": true}), 0)
 	releasePublished(t)
 	r = scrub(t, f.repo.Dir, mangleSecret, false)
 	requireExit(t, r, 0)
@@ -317,7 +317,7 @@ func TestAFailedCleanupStopsTheScrubUntilThePruneIsDone(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newScrubFixture(t)
 	sg := newSafegit(t, "0.31.0")
-	sg.Answer(f.rewriteScript(), envelope(t, f.rewritePayload(false)), 0)
+	sg.Answer(f.rewriteScript(), safegitDocument(t, f.rewritePayload(false)), 0)
 
 	r := scrub(t, f.repo.Dir, mangleSecret, false)
 	requireExit(t, r, 1)
@@ -345,7 +345,7 @@ func TestNothingToRewriteRepairsTheChangelogFromTheJournal(t *testing.T) {
 	repo.AddBareRemote("origin")
 	repo.Git("push", "-q", "origin", "main")
 	sg := newSafegit(t, "0.31.0")
-	sg.Answer("", envelope(t, nil), 0)
+	sg.Answer("", safegitDocument(t, nil), 0)
 
 	r := scrub(t, repo.Dir, mangleSecret, false)
 	requireExit(t, r, 1)

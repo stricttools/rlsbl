@@ -22,7 +22,7 @@ const releaseScrubHelp = "Scrub content from the repository's git history throug
 	"moved tag, each guarded by the value origin held before the rewrite, and rewrites each moved tag's GitHub Release in place from the record " +
 	"(creating one a tag lacks); a Release is never deleted. A scrub that stops is finished by running the same command again, from the step " +
 	"that stopped it, with its state kept in .strictmetadata/.release-state/scrub-result.json. Requires safegit 0.31.0 or newer, whose --json " +
-	"envelope is read at interface_version 3, and a release branch. Refused while a release is stopped mid-flight. --dry-run records the safegit " +
+	"machine-mode document is read at interface_version 3, and a release branch. Refused while a release is stopped mid-flight. --dry-run records the safegit " +
 	"invocation, which prints safegit's own counts, and writes nothing."
 
 const releaseReconcileHelp = "Reconcile one releasable's published release metadata with what its records say it released: push the refs origin " +

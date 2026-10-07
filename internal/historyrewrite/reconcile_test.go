@@ -238,7 +238,7 @@ func TestADanglingReleaseCommitARecordExplainsIsHealedAndCommitted(t *testing.T)
 	writeJournal(t, f.repo, "rw1", map[string]string{missing: f.h.R}, true)
 	gh(t, listed("v0.1.0"))
 
-	// A dry run heals nothing and judges the world a real run would.
+	// A dry run heals nothing and judges the world a run without --dry-run would.
 	r := reconcile(t, f.repo.Dir, "", historyrewrite.ReconcilePlan, true)
 	requireExit(t, r, 0)
 	if !strings.Contains(readFile(t, f.repo, archivePath), missing) || !strings.Contains(r.Stdout, "already-correct") {

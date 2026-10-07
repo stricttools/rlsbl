@@ -400,8 +400,8 @@ func Reconcile(ctx *strictcli.Context, root string, req ReconcileRequest, now fu
 // and commits the rewritten archives with the transition record's event. A
 // dangling release commit no record explains is an error naming the
 // version. Under --dry-run nothing is written, and the healed commits it
-// returns are what keeps the preview truthful about the world a real run
-// would judge. A changed released tree refuses: this command did not
+// returns are what keeps the preview truthful about the world a run without
+// --dry-run would judge. A changed released tree refuses: this command did not
 // perform the rewrite, so it cannot say a changed tree is intended.
 func (r *reconcileRun) heal(repo git.Repo, x explanations) (map[string]string, error) {
 	versions, err := releaserecord.ArchivedVersions(r.root, r.dir())
@@ -457,7 +457,7 @@ func (r *reconcileRun) heal(repo git.Repo, x explanations) (map[string]string, e
 		event.Mappings = append(event.Mappings, releaserecord.CommitMapping{OldSHA: m.OldCommit, NewSHA: m.NewCommit})
 	}
 	if r.ctx.DryRun() {
-		r.say("  The archives were not rewritten (--dry-run); the verdicts below are those a real run judges after moving them.")
+		r.say("  The archives were not rewritten (--dry-run); the verdicts below are those a run without --dry-run judges after moving them.")
 		return healed, nil
 	}
 	sort.Strings(origins)

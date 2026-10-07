@@ -21,7 +21,8 @@ import (
 var safegitMinimum = semver.Version{Major: 0, Minor: 31, Patch: 0}
 
 // safegitInterfaceVersion is the version of strictcli's machine-mode
-// envelope that safegit prints under --json at safegitMinimum. Any other
+// machine-mode document that safegit prints under --json at
+// safegitMinimum. Any other
 // version is refused by name: reading another document shape as this one
 // would build a scrub state missing what the scrub needs.
 const safegitInterfaceVersion = 3
@@ -86,31 +87,31 @@ type scrubPayload struct {
 	CleanupErrors     []string          `json:"cleanup_errors"`
 }
 
-type safegitEnvelope struct {
+type machineDocument struct {
 	InterfaceVersion *int            `json:"interface_version"`
 	Payload          json.RawMessage `json:"payload"`
 }
 
-// parseEnvelope reads safegit's --json stdout, which is one document:
-// strictcli's machine-mode envelope. It returns the payload, nil when the
+// parseMachineDocument reads safegit's --json stdout, which is one document:
+// strictcli's machine-mode document. It returns the payload, nil when the
 // command emitted none (a scrub that found nothing to rewrite). Anything but
-// an envelope of safegitInterfaceVersion is refused, naming the safegit the
+// a machine-mode document of safegitInterfaceVersion is refused, naming the safegit the
 // scrub needs.
-func parseEnvelope(stdout string) (*scrubPayload, error) {
+func parseMachineDocument(stdout string) (*scrubPayload, error) {
 	text := strings.TrimSpace(stdout)
-	need := fmt.Sprintf("the scrub needs safegit %s or newer, whose --json prints strictcli's envelope at interface_version %d", safegitMinimum, safegitInterfaceVersion)
+	need := fmt.Sprintf("the scrub needs safegit %s or newer, whose --json prints strictcli's machine-mode document at interface_version %d", safegitMinimum, safegitInterfaceVersion)
 	if text == "" {
 		return nil, fmt.Errorf("safegit --json printed nothing; %s", need)
 	}
-	var env safegitEnvelope
+	var env machineDocument
 	if err := json.Unmarshal([]byte(text), &env); err != nil {
 		return nil, fmt.Errorf("safegit --json printed something that is not one JSON document (%v); %s", err, need)
 	}
 	if env.InterfaceVersion == nil {
-		return nil, fmt.Errorf("safegit --json printed a document that is not strictcli's envelope (it has no interface_version); %s", need)
+		return nil, fmt.Errorf("safegit --json printed a document that is not strictcli's machine-mode document (it has no interface_version); %s", need)
 	}
 	if *env.InterfaceVersion != safegitInterfaceVersion {
-		return nil, fmt.Errorf("safegit's envelope declares interface_version %d, which this rlsbl does not read; %s", *env.InterfaceVersion, need)
+		return nil, fmt.Errorf("safegit's machine-mode document declares interface_version %d, which this rlsbl does not read; %s", *env.InterfaceVersion, need)
 	}
 	if len(env.Payload) == 0 || string(env.Payload) == "null" {
 		return nil, nil

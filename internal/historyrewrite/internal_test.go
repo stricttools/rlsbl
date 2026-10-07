@@ -23,14 +23,14 @@ var (
 
 func TestTheEnvelopeIsReadWhole(t *testing.T) {
 	hygiene.Isolate(t)
-	p, err := parseEnvelope(`{"interface_version":3,"payload":{"rewrites":{"` + shaA + `":"` + shaB + `"},"new_head":"` + shaB + `","tags":[{"refname":"refs/tags/v1","old_sha":"` + shaA + `","new_sha":"` + shaB + `","annotated":false}],"cleanup_ok":true,"something_new":1},"writes":null}`)
+	p, err := parseMachineDocument(`{"interface_version":3,"payload":{"rewrites":{"` + shaA + `":"` + shaB + `"},"new_head":"` + shaB + `","tags":[{"refname":"refs/tags/v1","old_sha":"` + shaA + `","new_sha":"` + shaB + `","annotated":false}],"cleanup_ok":true,"something_new":1},"writes":null}`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !p.rewritten() || p.Rewrites[shaA] != shaB || p.NewHead != shaB || len(p.Tags) != 1 || p.CleanupOK == nil || !*p.CleanupOK {
 		t.Fatalf("the payload read as %+v", p)
 	}
-	if p, err := parseEnvelope(`{"interface_version":3,"payload":null}`); err != nil || p != nil {
+	if p, err := parseMachineDocument(`{"interface_version":3,"payload":null}`); err != nil || p != nil {
 		t.Fatalf("a null payload read as %+v, %v", p, err)
 	}
 }
@@ -39,14 +39,14 @@ func TestAnythingButTheEnvelopeIsRefusedNamingTheSafegitNeeded(t *testing.T) {
 	hygiene.Isolate(t)
 	for name, stdout := range map[string]string{
 		"empty":                "",
-		"bare pre-envelope":    `{"rewrites":{}}`,
+		"bare payload":         `{"rewrites":{}}`,
 		"earlier interface":    `{"interface_version":2,"payload":null}`,
 		"not JSON":             "Found 3 matches",
 		"two documents":        `{"interface_version":3,"payload":null}` + "\n" + `{"x":1}`,
 		"unknown interface":    `{"interface_version":4,"payload":null}`,
 		"interface not number": `{"interface_version":"3","payload":null}`,
 	} {
-		_, err := parseEnvelope(stdout)
+		_, err := parseMachineDocument(stdout)
 		if err == nil || !strings.Contains(err.Error(), "safegit 0.31.0 or newer") {
 			t.Errorf("%s: %v", name, err)
 		}
@@ -229,12 +229,12 @@ func TestTheBumpIsTheHighestComponentThatMoved(t *testing.T) {
 func TestADescriptionIsTakenFromTheBodysContentOnly(t *testing.T) {
 	hygiene.Isolate(t)
 	for body, want := range map[string]string{
-		"**Full Changelog**: https://x/compare/a...b":                "",
-		"":                                                           "",
-		"<!-- rlsbl-ci-sha: x -->\n## Notes":                         "",
-		"Fixes the parser.\nAnd the lexer.\n\n- a bullet":            "Fixes the parser. And the lexer.",
-		"## Fixes\n\n- Fixed the parser\n- Fixed the lexer":          "Fixed the parser",
-		"> A quoted summary":                                         "A quoted summary",
+		"**Full Changelog**: https://x/compare/a...b": "",
+		"":                                   "",
+		"<!-- rlsbl-ci-sha: x -->\n## Notes": "",
+		"Fixes the parser.\nAnd the lexer.\n\n- a bullet":          "Fixes the parser. And the lexer.",
+		"## Fixes\n\n- Fixed the parser\n- Fixed the lexer":        "Fixed the parser",
+		"> A quoted summary":                                       "A quoted summary",
 		"| file | size |\n| --- | --- |\n| portal.tar.gz | 1 MB |": "",
 	} {
 		if got := descriptionFromBody(body); got != want {

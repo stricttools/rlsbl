@@ -58,7 +58,7 @@ const subjectLimit = 5
 // placeholderDescription is a materialized archive's description when no
 // source yields one: it names the obligation instead of pretending the
 // version had no summary.
-const placeholderDescription = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes, nor the CHANGELOG.md section, nor the commit subjects in its tag range carried one). Author a real description from this version's changelog entries."
+const placeholderDescription = "RECOVERY OBLIGATION: no description was recoverable for this version (neither the GitHub Release notes, nor the CHANGELOG.md section, nor the commit subjects in its tag range carried one). Author a description from this version's changelog entries."
 
 // materializedHeader is the comment block of an archive the backfill
 // materialized: written after the fact, which a reader of a read-only

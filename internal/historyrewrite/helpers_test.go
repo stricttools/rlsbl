@@ -165,8 +165,8 @@ func (f *scrubFixture) rewrites() map[string]string {
 	return map[string]string{f.old.A: f.new.A, f.old.B: f.new.B, f.old.R: f.new.R, f.old.S: f.new.S}
 }
 
-// envelope is safegit's --json document for a scrub with payload.
-func envelope(t *testing.T, payload any) string {
+// safegitDocument is safegit's --json document for a scrub with payload.
+func safegitDocument(t *testing.T, payload any) string {
 	t.Helper()
 	data, err := json.Marshal(map[string]any{
 		"interface_version": 3, "app": "safegit", "app_version": "0.31.0", "command": "scrub match", "exit_code": 0,
