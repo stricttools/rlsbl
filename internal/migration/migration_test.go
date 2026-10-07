@@ -710,3 +710,29 @@ func TestARetiredSubjectWhoseReleasesRecordNoCommitIsRefusedUntilOneIsRestored(t
 	f.commit("the release commit restored")
 	f.mustPlan()
 }
+
+func TestAnIdentityBeginsAtTheEarliestCommitterDateWhereverItSitsInTheHistory(t *testing.T) {
+	hygiene.Isolate(t)
+	f := newFixture(t, "portal", "public")
+	for _, date := range []string{"2026-03-01T12:00:00Z", "2026-01-01T12:00:00Z"} {
+		t.Setenv("GIT_COMMITTER_DATE", date)
+		f.commit("a commit dated " + date)
+	}
+	t.Setenv("GIT_COMMITTER_DATE", "2026-05-01T12:00:00Z")
+	f.write("package.json", `{"name": "portal", "version": "0.1.0", "license": "MIT"}`+"\n")
+	f.write(".rlsbl/config.json", `{"publish_mode": "none", "targets": ["npm"], "pipelines": {}}`+"\n")
+	f.commit("the old layout")
+	rec, err := lifecycle.Parse([]byte(planned(t, f.mustPlan(), lifecycle.RecordFile)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range rec.Identities() {
+		if id.Subject == "portal" && id.Facet == lifecycle.FacetReleasableName {
+			if got := id.From.Format("2006-01-02"); got != "2026-01-01" {
+				t.Fatalf("the identity begins %s, not at the earliest committer date 2026-01-01", got)
+			}
+			return
+		}
+	}
+	t.Fatalf("no releasable-name identity for portal: %+v", rec.Identities())
+}

@@ -189,6 +189,27 @@ func (r Repo) CommitterDate(sha string) (time.Time, error) {
 	return when, nil
 }
 
+// EarliestCommitterDate is the earliest committer date of every commit rev
+// reaches, read in one walk: with clock skew or an absorbed history the
+// earliest date need not sit on the root commit. found is false when rev
+// reaches no commit.
+func (r Repo) EarliestCommitterDate(rev string) (earliest time.Time, found bool, err error) {
+	out, err := r.output("log", "--format=%cI", rev, "--")
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	for _, line := range lines(out) {
+		when, err := time.Parse(time.RFC3339, strings.TrimSpace(line))
+		if err != nil {
+			return time.Time{}, false, fmt.Errorf("a committer date %s reaches is unreadable: %w", rev, err)
+		}
+		if !found || when.Before(earliest) {
+			earliest, found = when, true
+		}
+	}
+	return earliest, found, nil
+}
+
 // TrailerValues lists the values of every trailer named key in commit sha's
 // message, in order.
 func (r Repo) TrailerValues(sha, key string) ([]string, error) {

@@ -276,25 +276,15 @@ func (b *builder) convertLifecycle(d *declarations.Releasables) {
 	}
 }
 
-// firstCommitDate is the committer date of the oldest commit HEAD reaches,
-// the earliest any identity of the repository can have begun.
+// firstCommitDate is the earliest committer date of the commits HEAD
+// reaches, the earliest any identity of the repository can have begun.
 func (b *builder) firstCommitDate() (time.Time, error) {
-	commits, err := b.repo.Commits([]string{"HEAD"}, nil)
+	first, found, err := b.repo.EarliestCommitterDate("HEAD")
 	if err != nil {
 		return time.Time{}, err
 	}
-	if len(commits) == 0 {
+	if !found {
 		return time.Time{}, errors.New("HEAD reaches no commit")
-	}
-	var first time.Time
-	for _, c := range []string{commits[0], commits[len(commits)-1]} {
-		at, err := b.repo.CommitterDate(c)
-		if err != nil {
-			return time.Time{}, err
-		}
-		if first.IsZero() || at.Before(first) {
-			first = at
-		}
 	}
 	return first, nil
 }
