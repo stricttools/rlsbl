@@ -3,6 +3,7 @@ package declarations
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	tomledit "github.com/stricttools/go-toml-edit"
@@ -74,7 +75,7 @@ func (ed *Editor) memberIndex(d *Releasables, p string) (int, error) {
 	}
 	var paths []string
 	for _, m := range d.Members {
-		paths = append(paths, m.Path)
+		paths = append(paths, strconv.Quote(m.Path))
 	}
 	return 0, fmt.Errorf("no member is declared at %q; the members are at %s", p, strings.Join(paths, ", "))
 }
@@ -219,6 +220,11 @@ func (ed *Editor) RemoveMember(path string) error {
 		return err
 	}
 	if err := ed.apply(func(doc *tomledit.Document) error {
+		// Deleting an entry of an array of tables leaves the headers of the
+		// tables nested in it, so the pipelines go first, by their key.
+		if err := doc.Delete(fmt.Sprintf("members[%d].pipelines", i)); err != nil {
+			return err
+		}
 		return doc.Delete(fmt.Sprintf("members[%d]", i))
 	}); err != nil {
 		return err
@@ -311,16 +317,29 @@ func (ed *Editor) insertAfterGroup(key, text string) error {
 	found := false
 	for _, node := range doc.Children() {
 		var path []string
+		var body []tomledit.Node
 		switch n := node.(type) {
 		case *tomledit.ArrayTableNode:
-			path = n.KeyPath()
+			path, body = n.KeyPath(), n.Children()
 		case *tomledit.TableNode:
-			path = n.KeyPath()
+			path, body = n.KeyPath(), n.Children()
 		default:
 			continue
 		}
 		if len(path) > 0 && path[0] == key {
+			// A table's span covers its header only; its body ends with the
+			// line of its last child.
 			at = node.Span().End.Offset
+			for _, child := range body {
+				if end := child.Span().End.Offset; end > at {
+					at = end
+				}
+			}
+			if nl := strings.IndexByte(string(ed.data[at:]), '\n'); nl >= 0 {
+				at += nl + 1
+			} else {
+				at = len(ed.data)
+			}
 			found = true
 		}
 	}

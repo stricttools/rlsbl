@@ -228,6 +228,9 @@ func (raw *rawReleasables) convert() (*Releasables, []string) {
 		}
 		switch v := m.Releasable.(type) {
 		case string:
+			if v == "" {
+				problems = append(problems, where+": releasable is empty; write a releasable's name, or false for a member versioned under none")
+			}
 			member.Releasable = v
 		case bool:
 			if v {

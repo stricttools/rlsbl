@@ -303,6 +303,8 @@ func TestAMemberNamesADeclaredReleasable(t *testing.T) {
 		t.Fatalf("the refusal does not name the reference and the declared releasables:\n%s", got)
 	}
 	refusal(t, strings.Replace(standaloneSample, "releasable = \"gadget\"", "releasable = true", 1))
+	refusal(t, strings.Replace(standaloneSample, "releasable = \"gadget\"", "releasable = \"\"", 1))
+	refusal(t, strings.Replace(standaloneSample, "releasable = \"gadget\"", "releasable = 1", 1))
 }
 
 func TestAReleasableNoMemberNamesIsRefused(t *testing.T) {
