@@ -362,12 +362,12 @@ func refuseReleaseInFlight(root string) error {
 		return err
 	}
 	if len(inProgress) > 0 {
-		return fmt.Errorf("a release is in progress for %s (%s); resume it with `rlsbl release resume` or abandon it with `rlsbl release abandon` first", strings.Join(inProgress, ", "), runstate.InProgressPath(inProgress[0]))
+		return fmt.Errorf("a release is in progress for %s (%s); resume it with `"+runstate.ResumeInvocation+"` or abandon it with `rlsbl release abandon` first", strings.Join(inProgress, ", "), runstate.InProgressPath(inProgress[0]))
 	}
 	if _, found, err := runstate.LoadBatchPlan(root); err != nil {
 		return err
 	} else if found {
-		return fmt.Errorf("a batch release is in progress (%s); finish it with `rlsbl monorepo release run` first", runstate.BatchPlanPath)
+		return fmt.Errorf("a batch release is in progress (%s); finish it with `"+runstate.BatchRunInvocation+"` first", runstate.BatchPlanPath)
 	}
 	if exists, err := pathExists(root, releaserecord.BatchReleaseFilePath); err != nil {
 		return err

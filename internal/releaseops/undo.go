@@ -262,7 +262,7 @@ func refuseUnrecordedInProgress(s Selection) error {
 	if fate == releaserecord.FateNeverReleased {
 		return fmt.Errorf("a release of %s is in progress, and the record of %s holds %s as never released.%s\n  Nothing was changed.\n  %s", v, s.Releasable.Name, v, instead, LeftoverStateInstruction(v, archive, statePath))
 	}
-	return fmt.Errorf("a release of %s is in progress, and the record of %s does not contain it: undo reverts a recorded release, and there is no %s among the archives in %s, because the release stopped before the step that writes it (it completed %d steps).%s\n  Nothing was changed.\n  To finish %s, run `rlsbl release resume`; once %s is recorded, undo reverts it.\n  %s\n    %s", v, s.Releasable.Name, releaserecord.ArchiveName(v), s.Record.Dir(), len(state.CompletedSteps), instead, v, v, AbandonInstruction(v), statePath)
+	return fmt.Errorf("a release of %s is in progress, and the record of %s does not contain it: undo reverts a recorded release, and there is no %s among the archives in %s, because the release stopped before the step that writes it (it completed %d steps).%s\n  Nothing was changed.\n  To finish %s, run `"+runstate.ResumeInvocation+"`; once %s is recorded, undo reverts it.\n  %s\n    %s", v, s.Releasable.Name, releaserecord.ArchiveName(v), s.Record.Dir(), len(state.CompletedSteps), instead, v, v, AbandonInstruction(v), statePath)
 }
 
 // latestArchive is the archive of the releasable's latest release: the

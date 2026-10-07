@@ -14,6 +14,17 @@ import (
 // InProgressFormatVersion is the format version of in-progress.toml.
 const InProgressFormatVersion = 1
 
+// ResumeInvocation, RunInvocation, and BatchRunInvocation are the command
+// lines every text naming the resume of a stopped release, a release run,
+// or a batch release run prints. Each command requires the watch choice, so
+// a line without it is refused as printed; stating the lines once keeps the
+// texts from drifting from them.
+const (
+	ResumeInvocation   = "rlsbl release resume --watch"
+	RunInvocation      = "rlsbl release run --watch"
+	BatchRunInvocation = "rlsbl monorepo release run --watch"
+)
+
 // InProgress is a release in progress: what it releases, where it stands,
 // and which steps finished or failed. It is written when the release starts
 // mutating, after every step, and removed once the release is provably

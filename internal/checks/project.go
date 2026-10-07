@@ -132,7 +132,7 @@ func checkLock(c *Context, r *strictcli.WarnReporter) strictcli.CheckOutcome {
 	}
 	var problems []string
 	for _, name := range interrupted {
-		problems = append(problems, fmt.Sprintf("the release of %q was interrupted: %s exists and no rlsbl process holds the release lock. Finish it with `rlsbl release resume`, or record its version as never released with `rlsbl release abandon`", name, runstate.InProgressPath(name)))
+		problems = append(problems, fmt.Sprintf("the release of %q was interrupted: %s exists and no rlsbl process holds the release lock. Finish it with `"+runstate.ResumeInvocation+"`, or record its version as never released with `rlsbl release abandon`", name, runstate.InProgressPath(name)))
 	}
 	return reportWarnings(r, problems, fmt.Sprintf("%d interrupted release(s)", len(problems)), "no release is left interrupted")
 }

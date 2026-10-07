@@ -6,13 +6,14 @@ import (
 	"github.com/stricttools/strictcli/go/strictcli"
 
 	"github.com/stricttools/rlsbl/internal/batchrelease"
+	"github.com/stricttools/rlsbl/internal/runstate"
 )
 
 const monorepoReleaseHelp = "Release several releasables of a workspace as one batch: write the batch release file, release what it names, and report the order a batch releases them in."
 
 const monorepoReleaseRunHelp = "Release the releasables the batch release file .strictmetadata/batch-releases/unreleased.toml names, one " +
 	"[releasables.<name>] table each with the fields of a release file, in the order `rlsbl monorepo release order` reports: each after the " +
-	"releasables its members depend on. The whole batch runs in the release checkout, as `rlsbl release run` does: an uncommitted change to a path " +
+	"releasables its members depend on. The whole batch runs in the release checkout, as `" + runstate.RunInvocation + "` does: an uncommitted change to a path " +
 	"the batch writes refuses it, naming the path, and every other uncommitted change is listed and left alone. The first run validates every " +
 	"releasable before anything is written and plans the batch (the version and tag each one ships) in .strictmetadata/.release-state/batch-plan.toml. " +
 	"Each releasable is then released up to its release commit; the branch tip, holding every release commit, is pushed untagged as one candidate, " +
@@ -20,9 +21,9 @@ const monorepoReleaseRunHelp = "Release the releasables the batch release file .
 	"that commit: its changelog finalized, its release archived, tagged, pushed, its GitHub Release created, its local pipelines published, its " +
 	"deploy_command run, and its post-release hooks run. A run after a stop follows the plan: a releasable released already is skipped, one committed " +
 	"short of the CI verdict joins the new candidate (a red verdict is fixed forward on the branch and continued at the same versions), and one past " +
-	"the verdict is refused, naming `rlsbl release resume`. The run releasing the last releasable archives the batch release file as " +
+	"the verdict is refused, naming `" + runstate.ResumeInvocation + "`. The run releasing the last releasable archives the batch release file as " +
 	".strictmetadata/batch-releases/batch-<UTC time>.toml, commits and pushes it, and removes the plan. A root member versioned under no releasable " +
-	"that declares selfdoc.json gets selfdoc gen and selfdoc check first. --watch and --no-watch apply to each releasable as in `rlsbl release run`. " +
+	"that declares selfdoc.json gets selfdoc gen and selfdoc check first. --watch and --no-watch apply to each releasable as in `" + runstate.RunInvocation + "`. " +
 	"--dry-run validates every releasable and reports the versions, tags, and order, writing nothing."
 
 const monorepoReleaseInitHelp = "Write the batch release file .strictmetadata/batch-releases/unreleased.toml with one [releasables.<name>] table " +
@@ -111,7 +112,7 @@ func runMonorepoReleaseInit(ctx *strictcli.Context, kw map[string]any) (any, err
 	if len(res.Idle) > 0 {
 		msg += " (commented out, with nothing to release: " + strings.Join(res.Idle, ", ") + ")"
 	}
-	ctx.Out(msg + "; fill in each table's bump and description, then run `rlsbl monorepo release run --watch`.")
+	ctx.Out(msg + "; fill in each table's bump and description, then run `" + runstate.BatchRunInvocation + "`.")
 	return nil, nil
 }
 

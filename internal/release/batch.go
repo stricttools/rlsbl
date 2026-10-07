@@ -33,7 +33,7 @@ import (
 
 // RerunBatch is what a refusal of a batch release tells the operator to run
 // once the cause is dealt with.
-const RerunBatch = "run `rlsbl monorepo release run --watch` again"
+const RerunBatch = "run `" + runstate.BatchRunInvocation + "` again"
 
 // batchRole is a release's part in a batch release; the zero value is a
 // release of its own.

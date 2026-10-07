@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/semver"
 )
 
@@ -40,7 +41,7 @@ func ciRedMessage(v semver.Version, tag, branch, candidate, detail string) strin
 	lines = append(lines, "",
 		fmt.Sprintf("The version is not burnt. Fix forward on %s:", branch),
 		fmt.Sprintf("  1. fix the failure and commit it on %s, recording it with `rlsbl changelog add`", branch),
-		fmt.Sprintf("  2. rlsbl release resume: it pushes the new tip as the candidate, waits for CI again, and completes %s when CI passes", v),
+		fmt.Sprintf("  2. "+runstate.ResumeInvocation+": it pushes the new tip as the candidate, waits for CI again, and completes %s when CI passes", v),
 		"",
 		"Do not start a release at a higher version to escape a red verdict, and do not run CI again on the same commit expecting another answer: a failure in the code fails the same way every time.")
 	return strings.Join(lines, "\n")
@@ -58,7 +59,7 @@ func ciNotRunMessage(v semver.Version, tag, branch, candidate, detail string) st
 	lines = append(lines, notTagged(v, tag)...)
 	lines = append(lines, "",
 		"This is neither a CI failure nor a timeout: the runs passed, but the releasable's own jobs in them never ran, and the publish workflow asks the same question, so tagging now would create a version that can never publish.",
-		fmt.Sprintf("The version is not burnt. Make the candidate hold a commit the releasable's CI runs on: commit a change under one of its members on %s (recording it with `rlsbl changelog add`), then run `rlsbl release resume`.", branch))
+		fmt.Sprintf("The version is not burnt. Make the candidate hold a commit the releasable's CI runs on: commit a change under one of its members on %s (recording it with `rlsbl changelog add`), then run `"+runstate.ResumeInvocation+"`.", branch))
 	return strings.Join(lines, "\n")
 }
 
@@ -77,7 +78,7 @@ func ciTimeoutMessage(v semver.Version, tag, branch, candidate, detail string) s
 	lines = append(lines, "",
 		"The version is not burnt:",
 		fmt.Sprintf("  1. check the runs: `rlsbl watch %s`", candidate),
-		fmt.Sprintf("  2. when they pass: `rlsbl release resume`, which completes %s", v),
+		fmt.Sprintf("  2. when they pass: `"+runstate.ResumeInvocation+"`, which completes %s", v),
 		fmt.Sprintf("  3. when they fail: fix forward on %s and resume; when they are only slow, give the resume a longer --ci-timeout, or declare ci_seconds in the declarations", branch))
 	return strings.Join(lines, "\n")
 }

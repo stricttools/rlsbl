@@ -302,11 +302,11 @@ func refuseInProgress(repo git.Repo, liveRoot string, r declarations.Releasable)
 	}
 	switch {
 	case fate.Released():
-		parts = append(parts, "). Run `rlsbl release resume` to continue it, or `rlsbl release undo` to roll it back.")
+		parts = append(parts, "). Run `"+runstate.ResumeInvocation+"` to continue it, or `rlsbl release undo` to roll it back.")
 	case fate == releaserecord.FateNeverReleased:
 		parts = append(parts, fmt.Sprintf("). %s is recorded as never released, so the in-progress state is left over from an attempt already abandoned: delete it (saferm delete --on-error abort --description \"an abandoned release's state\" %s) and run the release again.", state.Version, statePath))
 	default:
-		parts = append(parts, fmt.Sprintf("). Run `rlsbl release resume` to continue it. `rlsbl release undo` does not apply: %s stopped before the step that records it, so there is no recorded release to revert. To abandon %s instead, run `rlsbl release abandon --approve-consequential`: it records %s as never released and deletes the in-progress state.", state.Version, state.Version, state.Version))
+		parts = append(parts, fmt.Sprintf("). Run `"+runstate.ResumeInvocation+"` to continue it. `rlsbl release undo` does not apply: %s stopped before the step that records it, so there is no recorded release to revert. To abandon %s instead, run `rlsbl release abandon --approve-consequential`: it records %s as never released and deletes the in-progress state.", state.Version, state.Version, state.Version))
 	}
 	return nil, &ValidationError{Message: strings.Join(parts, "")}
 }

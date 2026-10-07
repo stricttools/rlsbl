@@ -306,7 +306,7 @@ func (inv Invocation) beginDeclassify(m managed, req DeclassifyRequest) (*declas
 	if names, err := runstate.InProgressReleasables(m.root); err != nil {
 		return nil, err
 	} else if len(names) > 0 {
-		return nil, fmt.Errorf("a release of %s is stopped mid-flight, and the declassification rewrites the history its state records; finish it with `rlsbl release resume` or give it up with `rlsbl release abandon`, then run this again", strings.Join(names, ", "))
+		return nil, fmt.Errorf("a release of %s is stopped mid-flight, and the declassification rewrites the history its state records; finish it with `"+runstate.ResumeInvocation+"` or give it up with `rlsbl release abandon`, then run this again", strings.Join(names, ", "))
 	}
 	if _, found, err := runstate.LoadScrubResult(m.root); err != nil {
 		return nil, err

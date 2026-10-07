@@ -85,7 +85,7 @@ func Retry(ctx *strictcli.Context, req RetryRequest) (err error) {
 		return err
 	}
 	if !found {
-		return fmt.Errorf("the release archives of %s in %s record no release, so there is nothing to retry. `rlsbl release retry` dispatches the workflows of a release that exists; a release that stopped part-way is finished with `rlsbl release resume`", s.Releasable.Name, s.Record.Dir())
+		return fmt.Errorf("the release archives of %s in %s record no release, so there is nothing to retry. `rlsbl release retry` dispatches the workflows of a release that exists; a release that stopped part-way is finished with `"+runstate.ResumeInvocation+"`", s.Releasable.Name, s.Record.Dir())
 	}
 	a, err := s.releasedArchive(latest)
 	if err != nil {
@@ -113,7 +113,7 @@ func Retry(ctx *strictcli.Context, req RetryRequest) (err error) {
 	retryPath := runstate.RetryPath(s.Releasable.Name)
 	retry, haveFile, err := runstate.LoadRetry(s.Root(), s.Releasable.Name)
 	if err != nil {
-		return fmt.Errorf("%w\n  Correct the file, or remove it and run the retry again, which writes it naming every dispatchable workflow at %s. `rlsbl release retry` dispatches the workflows of a completed release; a release that stopped part-way is finished with `rlsbl release resume`", err, tag)
+		return fmt.Errorf("%w\n  Correct the file, or remove it and run the retry again, which writes it naming every dispatchable workflow at %s. `rlsbl release retry` dispatches the workflows of a completed release; a release that stopped part-way is finished with `"+runstate.ResumeInvocation+"`", err, tag)
 	}
 	if !haveFile {
 		if len(workflows) == 0 {

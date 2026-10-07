@@ -14,6 +14,7 @@ import (
 
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
+	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/targets"
 )
 
@@ -291,7 +292,7 @@ func (b *builder) refuseRunsInProgress() {
 		}
 		switch path.Base(f) {
 		case "in-progress.json":
-			b.p.add("%s records a release in progress; finish it with `rlsbl release resume` or abandon it with `rlsbl release abandon` (the Python rlsbl 0.131.0), then migrate", f)
+			b.p.add("%s records a release in progress; finish it with `"+runstate.ResumeInvocation+"` or abandon it with `rlsbl release abandon` (the Python rlsbl 0.131.0), then migrate", f)
 		case "scrub-result.json":
 			b.p.add("%s records a history rewrite in progress; finish it by running `rlsbl release scrub` again (the Python rlsbl 0.131.0), then migrate", f)
 		case "reconcile-plan.toml":

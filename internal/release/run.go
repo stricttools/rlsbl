@@ -269,7 +269,7 @@ func Resume(e *strictcli.Effects, req RunRequest) (err error) {
 		return err
 	}
 	if req.Releasable != "" {
-		return errors.New("`rlsbl release resume` takes no --releasable: it continues the release in progress of the releasable the working directory selects")
+		return errors.New("release resume takes no --releasable: it continues the release in progress of the releasable the working directory selects")
 	}
 	live, err := git.Open(e, req.LiveRoot)
 	if err != nil {
@@ -312,11 +312,11 @@ func resumedReleasable(ws *workspace.Workspace, liveRoot, dir string) (string, e
 	}
 	switch len(names) {
 	case 0:
-		return "", &ValidationError{Message: "no release is in progress in this repository, so there is nothing to resume; `rlsbl release run` starts a release"}
+		return "", &ValidationError{Message: "no release is in progress in this repository, so there is nothing to resume; `" + runstate.RunInvocation + "` starts a release"}
 	case 1:
 		return names[0], nil
 	}
-	return "", &ValidationError{Message: fmt.Sprintf("the working directory lies in the member %q, which is versioned under no releasable, and releases of %s are in progress; run `rlsbl release resume` from a member of the releasable whose release it continues", member.Name, strings.Join(names, ", "))}
+	return "", &ValidationError{Message: fmt.Sprintf("the working directory lies in the member %q, which is versioned under no releasable, and releases of %s are in progress; run `"+runstate.ResumeInvocation+"` from a member of the releasable whose release it continues", member.Name, strings.Join(names, ", "))}
 }
 
 // ResumeIn resumes the release of releasable in a session the caller
@@ -335,7 +335,7 @@ func resumeIn(e *strictcli.Effects, s *Session, req RunRequest, releasable strin
 	}
 	statePath := filepath.Join(s.LiveRoot, filepath.FromSlash(runstate.InProgressPath(releasable)))
 	if !found {
-		return &ValidationError{Message: fmt.Sprintf("no release of %s is in progress (%s does not exist), so there is nothing to resume; `rlsbl release run` starts a release", releasable, statePath)}
+		return &ValidationError{Message: fmt.Sprintf("no release of %s is in progress (%s does not exist), so there is nothing to resume; `"+runstate.RunInvocation+"` starts a release", releasable, statePath)}
 	}
 	if unknown := state.UnknownSteps(StepNames()); len(unknown) > 0 {
 		return &ValidationError{Message: fmt.Sprintf("%s records steps this rlsbl does not have (%s): another version of rlsbl wrote it. Resume it with that version, or give the attempt up with `rlsbl release abandon --approve-consequential`", statePath, strings.Join(unknown, ", "))}
@@ -349,7 +349,7 @@ func resumeIn(e *strictcli.Effects, s *Session, req RunRequest, releasable strin
 		return err
 	}
 	if branch != state.Branch {
-		return &ValidationError{Message: fmt.Sprintf("the release of %s %s runs on %s, and the working tree is on %s; check out %s and run `rlsbl release resume` again", releasable, state.Version, state.Branch, branch, state.Branch)}
+		return &ValidationError{Message: fmt.Sprintf("the release of %s %s runs on %s, and the working tree is on %s; check out %s and run `"+runstate.ResumeInvocation+"` again", releasable, state.Version, state.Branch, branch, state.Branch)}
 	}
 	if err := live.RefuseStash("release resume", "The resume commits, tags, and pushes this working tree, and a stash rides along in none of it."); err != nil {
 		return &ValidationError{Message: err.Error()}

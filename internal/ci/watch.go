@@ -14,6 +14,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/stricttools/rlsbl/internal/github"
+	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/workflows"
 )
 
@@ -362,7 +363,7 @@ func (w Watcher) Watch(run github.WorkflowRun, label string, timeout time.Durati
 		class = ClassifyFailure(failureLog)
 	}
 	if class == Deterministic {
-		w.Log(fmt.Sprintf("%s: [%s] a deterministic failure, which a second run would repeat, so it is not run again. If the run died below the code (jobs that never got a runner, actions that did not resolve, a run cancelled while queued), run its failed jobs again and resume:\n  gh run rerun %d --failed --repo %s\n  rlsbl release resume", label, name, run.ID, w.Repo))
+		w.Log(fmt.Sprintf("%s: [%s] a deterministic failure, which a second run would repeat, so it is not run again. If the run died below the code (jobs that never got a runner, actions that did not resolve, a run cancelled while queued), run its failed jobs again and resume:\n  gh run rerun %d --failed --repo %s\n  "+runstate.ResumeInvocation, label, name, run.ID, w.Repo))
 		return res
 	}
 	if retried[name] {
@@ -578,7 +579,7 @@ func (w Watcher) WaitForCIGreen(in WaitInputs) (Verdict, []RunResult, error) {
 		if err != nil {
 			detail = fmt.Sprintf(" (the last listing failed: %v)", err)
 		}
-		return "", nil, &WaitError{Message: fmt.Sprintf("no CI run appeared for the release candidate %s within %s%s, and this repository declares push-triggered workflows: %s. The candidate is on the remote and nothing was tagged or published. Find out why the push started no run (branch or path filters, disabled workflows, the Actions quota), then run `rlsbl release resume`", in.Commit, grace, detail, strings.Join(expected, ", "))}
+		return "", nil, &WaitError{Message: fmt.Sprintf("no CI run appeared for the release candidate %s within %s%s, and this repository declares push-triggered workflows: %s. The candidate is on the remote and nothing was tagged or published. Find out why the push started no run (branch or path filters, disabled workflows, the Actions quota), then run `"+runstate.ResumeInvocation+"`", in.Commit, grace, detail, strings.Join(expected, ", "))}
 	}
 	remaining := func() time.Duration { return in.Timeout - w.Now().Sub(start) }
 	unresolvedAll := func(rs []github.WorkflowRun) []RunResult {

@@ -215,12 +215,12 @@ func (r *renamer) preflight() (declarations.Releasable, error) {
 		return declarations.Releasable{}, err
 	}
 	if len(inProgress) > 0 {
-		return declarations.Releasable{}, fmt.Errorf("a release is in progress for %s (%s); resume it with `rlsbl release resume` or abandon it with `rlsbl release abandon` before renaming", strings.Join(inProgress, ", "), runstate.InProgressPath(inProgress[0]))
+		return declarations.Releasable{}, fmt.Errorf("a release is in progress for %s (%s); resume it with `"+runstate.ResumeInvocation+"` or abandon it with `rlsbl release abandon` before renaming", strings.Join(inProgress, ", "), runstate.InProgressPath(inProgress[0]))
 	}
 	if _, found, err := runstate.LoadBatchPlan(r.ws.Root); err != nil {
 		return declarations.Releasable{}, err
 	} else if found {
-		return declarations.Releasable{}, fmt.Errorf("a batch release is in progress (%s); finish it with `rlsbl monorepo release run` before renaming", runstate.BatchPlanPath)
+		return declarations.Releasable{}, fmt.Errorf("a batch release is in progress (%s); finish it with `"+runstate.BatchRunInvocation+"` before renaming", runstate.BatchPlanPath)
 	}
 	if exists, err := pathExists(r.ws.Root, releaserecord.BatchReleaseFilePath); err != nil {
 		return declarations.Releasable{}, err

@@ -14,6 +14,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/releaserecord"
+	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/targets"
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
@@ -134,7 +135,7 @@ func scaffoldedReleaseFile(releasable string, include []string) string {
 		quoted[i] = fmt.Sprintf("%q", t)
 	}
 	return strings.Join([]string{
-		"# The next release of " + releasable + ". Fill in bump and description, then run `rlsbl release run`.",
+		"# The next release of " + releasable + ". Fill in bump and description, then run `" + runstate.RunInvocation + "`.",
 		"format_version = 2",
 		"# How the release moves the version: patch, minor, major, or infra (moved as a patch, recorded as infra).",
 		`bump = ""`,

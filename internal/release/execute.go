@@ -224,9 +224,9 @@ func (x *execution) stop(step string, err error) error {
 		return err
 	}
 	if timedOut && !x.pushed {
-		return fmt.Errorf("%w\nThe push of the candidate to origin/%s timed out, so whether it reached origin is unknown, and nothing was taken back. Nothing was tagged, released, or finalized, and %s is not burnt. Give the push more time and resume: `rlsbl release resume --push-timeout 900` (or declare push_seconds in %s)", err, x.branch, x.version, declarations.ReleasablesFile)
+		return fmt.Errorf("%w\nThe push of the candidate to origin/%s timed out, so whether it reached origin is unknown, and nothing was taken back. Nothing was tagged, released, or finalized, and %s is not burnt. Give the push more time and resume: `"+runstate.ResumeInvocation+" --push-timeout 900` (or declare push_seconds in %s)", err, x.branch, x.version, declarations.ReleasablesFile)
 	}
-	return fmt.Errorf("%w\nThe release candidate is on origin, so nothing was taken back. The release state is kept in %s: fix the cause and run `rlsbl release resume`, which continues from %s", err, x.statePath(), step)
+	return fmt.Errorf("%w\nThe release candidate is on origin, so nothing was taken back. The release state is kept in %s: fix the cause and run `"+runstate.ResumeInvocation+"`, which continues from %s", err, x.statePath(), step)
 }
 
 // discard throws away an attempt that stopped before its candidate reached
@@ -244,7 +244,7 @@ func (x *execution) discard(err error) error {
 		if serr := x.save(); serr != nil {
 			return errors.Join(err, serr)
 		}
-		return fmt.Errorf("%w\nThe release candidate was not pushed, and %s could not be taken back to where the release started: %s. The release commit stays on %s and the release state is kept: fix the cause and run `rlsbl release resume`, or run `rlsbl release abandon --approve-consequential` to record %s as never released", err, x.branch, reason, x.branch, x.version)
+		return fmt.Errorf("%w\nThe release candidate was not pushed, and %s could not be taken back to where the release started: %s. The release commit stays on %s and the release state is kept: fix the cause and run `"+runstate.ResumeInvocation+"`, or run `rlsbl release abandon --approve-consequential` to record %s as never released", err, x.branch, reason, x.branch, x.version)
 	}
 	if x.resuming {
 		if serr := runstate.SaveInProgress(x.e, x.session.LiveRoot, x.entry); serr != nil {
@@ -838,7 +838,7 @@ func (x *execution) epilogue() error {
 		for _, step := range failed {
 			lines = append(lines, fmt.Sprintf("  %s: %s", step, x.state.FailedSteps[step]))
 		}
-		lines = append(lines, fmt.Sprintf("The release state is kept in %s: fix the cause and run `rlsbl release resume` to take them again", x.statePath()))
+		lines = append(lines, fmt.Sprintf("The release state is kept in %s: fix the cause and run `"+runstate.ResumeInvocation+"` to take them again", x.statePath()))
 		return errors.New(strings.Join(lines, "\n"))
 	}
 	if missing := x.state.MissingSteps(StepNames()); len(missing) > 0 {

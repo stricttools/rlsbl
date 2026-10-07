@@ -16,6 +16,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/release"
 	"github.com/stricttools/rlsbl/internal/releaserecord"
+	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
 
@@ -192,7 +193,7 @@ func idleTable(releasable string, include []string, latest string) string {
 // them, the idle tables commented out.
 func scaffoldedBatchFile(tables, idle []string) string {
 	parts := []string{
-		"# The next batch release of this workspace, one table per releasable. Fill in each table's bump and description, then run `rlsbl monorepo release run --watch`.\nformat_version = 2",
+		"# The next batch release of this workspace, one table per releasable. Fill in each table's bump and description, then run `" + runstate.BatchRunInvocation + "`.\nformat_version = 2",
 	}
 	parts = append(parts, tables...)
 	parts = append(parts, idle...)

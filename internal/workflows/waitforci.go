@@ -212,7 +212,7 @@ while :; do
           echo "CI concluded '$conclusion' on the release commit."
           echo "rlsbl tags and releases a commit only after its CI went green, so CI was run again on a released commit and failed, a required check was added after the release, or the tag and Release were created outside rlsbl."
           echo "Dispatching this workflow again gives the same answer: the failure is in the code at this commit."
-          echo "Fix it on the release branch, release a new version with 'rlsbl release run', and mark this one with 'rlsbl release deprecate'."
+          echo "Fix it on the release branch, release a new version with 'rlsbl release run --watch', and mark this one with 'rlsbl release deprecate'."
           ;;
         cancelled)
           echo "A CI check run was cancelled, which proves nothing about the commit."

@@ -412,7 +412,7 @@ func TestResumeWithNothingInProgressIsRefused(t *testing.T) {
 	testsupport.FakeGH(t, validationAnswers("public")...)
 	repo := runRepo(t, "", "MIT", nil)
 	_, err := releaseCommand(t, repo, true, false)
-	if err == nil || !strings.Contains(err.Error(), "no release of portal is in progress") || !strings.Contains(err.Error(), "`rlsbl release run` starts a release") {
+	if err == nil || !strings.Contains(err.Error(), "no release of portal is in progress") || !strings.Contains(err.Error(), "`rlsbl release run --watch` starts a release") {
 		t.Fatalf("a resume with nothing in progress was not refused: %v", err)
 	}
 }

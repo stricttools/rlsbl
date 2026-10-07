@@ -8,6 +8,7 @@ import (
 	"github.com/stricttools/strictspec/go/lifecycle/index"
 
 	"github.com/stricttools/rlsbl/internal/release"
+	"github.com/stricttools/rlsbl/internal/runstate"
 )
 
 const releaseRunHelp = "Release the releasable the working directory selects (or --releasable, where the directory selects none): bump its " +
@@ -22,7 +23,7 @@ const releaseRunHelp = "Release the releasable the working directory selects (or
 	"one of them refuses the release, and every other uncommitted change is listed and left alone. Commits on the branch the release did not " +
 	"make are refused when it starts mutating, before the candidate push, after the CI verdict, and before the final push. A stop before the " +
 	"candidate push discards the attempt; a stop after it keeps the state in .strictmetadata/.release-state/<releasable>/in-progress.toml for " +
-	"`rlsbl release resume`, and a red CI verdict is fixed forward on the branch and resumed at the same version. --watch watches CI on the " +
+	"`" + runstate.ResumeInvocation + "`, and a red CI verdict is fixed forward on the branch and resumed at the same version. --watch watches CI on the " +
 	"release commit afterwards and asks the npm and PyPI package listings whether they list the version; --no-watch says the outcome was not " +
 	"verified. --dry-run validates, runs the changelog checks and the pure preflight checks, records every program and write up to the release " +
 	"commit, and names the steps after it."
@@ -109,7 +110,7 @@ func registerReleaseRun(r *commandSet, version string) {
 				return nil, err
 			}
 			if res.Written {
-				ctx.Out("Wrote and committed " + res.Path + "; fill in bump and description, then run `rlsbl release run`.")
+				ctx.Out("Wrote and committed " + res.Path + "; fill in bump and description, then run `" + runstate.RunInvocation + "`.")
 			} else {
 				ctx.Out(res.Path + " exists and nobody filled it in yet; nothing was written.")
 			}

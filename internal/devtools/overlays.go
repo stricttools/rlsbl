@@ -14,6 +14,7 @@ import (
 
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/dependencies"
+	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
 
@@ -105,7 +106,7 @@ func scopeRefusal(w *workspace.Workspace, pkg, path string) string {
 func staleRefusal(pkg, declared, abs string) string {
 	return fmt.Sprintf("[[overlay]] entry '%s' in %s: the checkout path does not exist: %s (resolved to %s).\n\n"+
 		"%s is the `rlsbl dev sync` overlay file: each [[overlay]] table names a sibling checkout to install editable over this member's locked environment. "+
-		"An entry pointing at nothing is stale: the checkout moved, or this project no longer depends on '%s' at all. `rlsbl release run` reads the same file, "+
+		"An entry pointing at nothing is stale: the checkout moved, or this project no longer depends on '%s' at all. `"+runstate.RunInvocation+"` reads the same file, "+
 		"so a stale entry blocks a release until it is resolved.\n\n"+
 		"Resolve it either way:\n"+
 		"  - point 'path' at the checkout's current location; or\n"+

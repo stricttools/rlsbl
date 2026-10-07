@@ -17,6 +17,7 @@ import (
 
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/github"
+	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/targets"
 	"github.com/stricttools/rlsbl/internal/workflows"
 	"github.com/stricttools/rlsbl/internal/workspace"
@@ -238,7 +239,7 @@ func (e *NotRunError) Error() string { return e.Message }
 const RunAllFix = "When the candidate's commits honestly touch few members (a fix-forward that touches only what it fixes), do not invent a commit to widen the push. Run the same commit with the router's path filters bypassed, then resume:\n" +
 	"  gh workflow run " + workflows.RouterFile + " --ref <branch> -f " + workflows.RunAllInput + "=true\n" +
 	"  gh run watch <run-id>\n" +
-	"  rlsbl release resume\n" +
+	"  " + runstate.ResumeInvocation + "\n" +
 	"The dispatched run executes every member's CI jobs on this commit; nothing is waived, and a job failing there still stops the release. Its verdicts supersede the skipped ones."
 
 // Verification is the question whether every project of Filters ran and

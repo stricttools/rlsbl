@@ -12,6 +12,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/ci"
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/releaserecord"
+	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/semver"
 	"github.com/stricttools/rlsbl/internal/workflows"
 	"github.com/stricttools/rlsbl/internal/workspace"
@@ -38,8 +39,8 @@ const (
 // fresh release has nothing in progress until it saves its state, and a
 // resume has.
 const (
-	RerunFresh  = "run `rlsbl release run` again"
-	RerunResume = "run `rlsbl release resume`"
+	RerunFresh  = "run `" + runstate.RunInvocation + "` again"
+	RerunResume = "run `" + runstate.ResumeInvocation + "`"
 )
 
 // ForeignCommitError is the refusal of commits the release did not make.
@@ -134,7 +135,7 @@ func RequireAdoptedCovered(repo git.Repo, w *workspace.Workspace, releasable str
 	}
 	lines := []string{fmt.Sprintf("the resume of %s would adopt commits made after the release stopped, and the changelog does not describe them:", version)}
 	lines = append(lines, subjectLines(repo, needing.Commits)...)
-	lines = append(lines, "", fmt.Sprintf("A resume pins again at the branch tip, so these ship under %s. Record each one, then run `rlsbl release resume`:", version))
+	lines = append(lines, "", fmt.Sprintf("A resume pins again at the branch tip, so these ship under %s. Record each one, then run `"+runstate.ResumeInvocation+"`:", version))
 	for _, c := range needing.Commits {
 		lines = append(lines, fmt.Sprintf("  rlsbl changelog add --commits %s --type fix --description \"...\"", short(c)))
 	}
@@ -147,9 +148,9 @@ func RequireAdoptedCovered(repo git.Repo, w *workspace.Workspace, releasable str
 // branch (ref). There is no fallback to the branch tip, which is not
 // evidence that CI ran on anything.
 func requireRecordedCandidate(repo git.Repo, ref, recorded string, v semver.Version, fate releaserecord.Fate, statePath string) (string, error) {
-	remedy := fmt.Sprintf(" The release cannot claim CI verification for %s. Put the commit CI verified back on the release branch and run `rlsbl release resume`; to give up on %s instead, run `rlsbl release abandon --approve-consequential`, which records it as never released.", v, v)
+	remedy := fmt.Sprintf(" The release cannot claim CI verification for %s. Put the commit CI verified back on the release branch and run `"+runstate.ResumeInvocation+"`; to give up on %s instead, run `rlsbl release abandon --approve-consequential`, which records it as never released.", v, v)
 	if fate.Released() {
-		remedy = fmt.Sprintf(" The release cannot claim CI verification for %s. Put the commit CI verified back on the release branch and run `rlsbl release resume`, or roll the release back with `rlsbl release undo`.", v)
+		remedy = fmt.Sprintf(" The release cannot claim CI verification for %s. Put the commit CI verified back on the release branch and run `"+runstate.ResumeInvocation+"`, or roll the release back with `rlsbl release undo`.", v)
 	}
 	if recorded == "" {
 		return "", &UnverifiedCandidateError{Message: fmt.Sprintf("%s records the ci-verified step but no release_commit, so the commit CI verified is unknown.%s", statePath, remedy)}
@@ -171,7 +172,7 @@ func requireRecordedCandidate(repo git.Repo, ref, recorded string, v semver.Vers
 	case git.NotAncestor:
 		return "", &UnverifiedCandidateError{Message: fmt.Sprintf("the commit CI verified for %s, %s, is not on the release branch, so the branch no longer contains it.%s", v, short(sha), remedy)}
 	}
-	return "", &UnverifiedCandidateError{Message: fmt.Sprintf("git cannot tell whether the commit CI verified for %s, %s, is on the release branch: the history is shallow or missing objects. Deepen it (`git fetch --unshallow`) and run `rlsbl release resume`.%s", v, short(sha), remedy)}
+	return "", &UnverifiedCandidateError{Message: fmt.Sprintf("git cannot tell whether the commit CI verified for %s, %s, is on the release branch: the history is shallow or missing objects. Deepen it (`git fetch --unshallow`) and run `"+runstate.ResumeInvocation+"`.%s", v, short(sha), remedy)}
 }
 
 // candidateWindow is the judgment of a candidate push's diff window against

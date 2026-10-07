@@ -19,6 +19,7 @@ import (
 	"github.com/stricttools/strictcli/go/strictcli"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
+	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/targets"
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
@@ -42,7 +43,7 @@ func requireWorkspace(ws *workspace.Workspace, command string) error {
 	if ws.IsWorkspace() {
 		return nil
 	}
-	return fmt.Errorf("`rlsbl monorepo %s` works on a workspace, and %s declares repository_layout = %q: a standalone project has one member, the root, and its commands are the top-level ones (rlsbl status, rlsbl release run). A repository becomes a workspace when that file declares repository_layout = %q",
+	return fmt.Errorf("`rlsbl monorepo %s` works on a workspace, and %s declares repository_layout = %q: a standalone project has one member, the root, and its commands are the top-level ones (rlsbl status, "+runstate.RunInvocation+"). A repository becomes a workspace when that file declares repository_layout = %q",
 		command, declarations.ReleasablesFile, declarations.LayoutStandalone, declarations.LayoutWorkspace)
 }
 

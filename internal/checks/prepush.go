@@ -9,6 +9,7 @@ import (
 
 	"github.com/stricttools/rlsbl/internal/changelog"
 	"github.com/stricttools/rlsbl/internal/git"
+	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
 
@@ -108,6 +109,6 @@ func checkPrepushManualWarning(c *Context, r *strictcli.ErrorReporter) strictcli
 	if len(branches) == 0 {
 		return r.Passed("the push updates no release branch")
 	}
-	message := fmt.Sprintf("a push to the release branch %s by hand: a release branch moves only through `rlsbl release run`, which pushes without running this hook, so never push it yourself", strings.Join(branches, ", "))
+	message := fmt.Sprintf("a push to the release branch %s by hand: a release branch moves only through `"+runstate.RunInvocation+"`, which pushes without running this hook, so never push it yourself", strings.Join(branches, ", "))
 	return reportErrors(r, []string{message}, message, "")
 }
