@@ -166,6 +166,12 @@ func answers(groups ...[]testsupport.GHAnswer) []testsupport.GHAnswer {
 // and returns what it printed and its error.
 func releaseCommand(t *testing.T, repo *testsupport.Repo, resume, dryRun bool) (string, error) {
 	t.Helper()
+	return releaseCommandWith(t, repo, resume, dryRun, nil)
+}
+
+// releaseCommandWith is releaseCommand with the request adjusted first.
+func releaseCommandWith(t *testing.T, repo *testsupport.Repo, resume, dryRun bool, adjust func(*release.RunRequest)) (string, error) {
+	t.Helper()
 	var ferr error
 	var out strings.Builder
 	say := func(s string) { out.WriteString(s + "\n") }
@@ -177,6 +183,9 @@ func releaseCommand(t *testing.T, repo *testsupport.Repo, resume, dryRun bool) (
 			Now:   func() time.Time { return validationDay },
 			Sleep: func(time.Duration) {},
 			Log:   say, Warn: say,
+		}
+		if adjust != nil {
+			adjust(&req)
 		}
 		if resume {
 			ferr = release.Resume(ctx.Effects(), req)

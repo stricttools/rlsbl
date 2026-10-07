@@ -105,11 +105,14 @@ func (x *execution) complete(step string) error {
 	return x.save()
 }
 
+// rerun is what a refusal tells the operator to run once the cause is dealt
+// with: once the candidate reached origin the state is kept whatever
+// stopped the release, so a fresh release's refusal names the resume too.
 func (x *execution) rerun() string {
 	if x.batch.rerun != "" {
 		return x.batch.rerun
 	}
-	if x.resuming {
+	if x.resuming || x.pushed {
 		return RerunResume
 	}
 	return RerunFresh
