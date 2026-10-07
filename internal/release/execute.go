@@ -213,7 +213,7 @@ func (x *execution) walk() error {
 func (x *execution) stop(step string, err error) error {
 	var ciErr *CIError
 	isCI := errors.As(err, &ciErr)
-	timedOut := x.pushAttempted && strings.Contains(err.Error(), " timed out: ")
+	timedOut := x.pushAttempted && pushTimedOut(err)
 	if !x.pushed && !timedOut && !isCI {
 		return x.discard(err)
 	}
@@ -230,6 +230,12 @@ func (x *execution) stop(step string, err error) error {
 		return fmt.Errorf("%w\nThe push of the candidate to origin/%s timed out, so whether it reached origin is unknown, and nothing was taken back. Nothing was tagged, released, or finalized, and %s is not burnt. Give the push more time and resume: `"+runstate.ResumeInvocation+" --push-timeout 900` (or declare push_seconds in %s)", err, x.branch, x.version, declarations.ReleasablesFile)
 	}
 	return fmt.Errorf("%w\nThe release candidate is on origin, so nothing was taken back. The release state is kept in %s: fix the cause and run `"+runstate.ResumeInvocation+"`, which continues from %s", err, x.statePath(), step)
+}
+
+// pushTimedOut reports whether err is a push stopped by its timeout:
+// strictcli's timeout error, never text that reads like one.
+func pushTimedOut(err error) bool {
+	return errors.Is(err, strictcli.ErrTimedOut)
 }
 
 // discard throws away an attempt that stopped before its candidate reached

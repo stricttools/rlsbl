@@ -294,6 +294,26 @@ func TestACandidatePushThatTimesOutStopsNamingALongerTimeout(t *testing.T) {
 	}
 }
 
+// A push origin refuses with a message that merely reads like a timeout is
+// not a push that timed out: the attempt is discarded, as for any push that
+// did not reach origin, and no longer push timeout is offered.
+func TestAPushRefusalReadingLikeATimeoutIsNotATimeout(t *testing.T) {
+	hygiene.Isolate(t)
+	testsupport.FakeGH(t, validationAnswers("public")...)
+	repo := runRepo(t, "", "MIT", nil)
+	writeExecutable(t, filepath.Join(bareOrigin(t, repo), "hooks", "pre-receive"), "#!/bin/sh\necho 'policy check timed out: try later' >&2\nexit 1\n")
+	out, err := releaseCommand(t, repo, false, false)
+	if err == nil {
+		t.Fatalf("a push origin refused did not stop the release:\n%s", out)
+	}
+	if strings.Contains(err.Error(), "--push-timeout") || !strings.Contains(err.Error(), "nothing reached origin") {
+		t.Fatalf("a refused push was taken for a timed-out one: %v", err)
+	}
+	if _, found := loadState(t, repo); found {
+		t.Fatal("the state of a release whose push was refused was kept")
+	}
+}
+
 func TestADiscardThatCannotTakeTheAdvanceBackKeepsTheStateNamingAbandon(t *testing.T) {
 	hygiene.Isolate(t)
 	testsupport.FakeGH(t, answers(validationAnswers("public"), releaseCreation("v0.5.0"))...)
