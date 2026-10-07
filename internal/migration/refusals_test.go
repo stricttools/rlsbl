@@ -1,6 +1,8 @@
 package migration
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -425,6 +427,79 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 				f.write(".rlsbl/changes/unreleased.jsonl", `{"format_version":1,"commits":["`+someCommit+`"],"user_facing":false}`+"\n")
 			},
 		},
+		{
+			name: "a config that is not JSON", fixture: standalone,
+			breakIt: standaloneConfig(`{"publish_mode": "ci", "targets": ["npm"],`),
+			want:    ".rlsbl/config.json is not valid JSON",
+			fix:     standaloneConfig(plainConfig),
+		},
+		{
+			name: "a changelog line that is not JSON", fixture: standalone,
+			breakIt: func(f *fixture) {
+				f.write(".rlsbl/changes/unreleased.jsonl", `{"format_version":1,"commits":["`+someCommit+`"],`+"\n")
+			},
+			want: "line 1 of .rlsbl/changes/unreleased.jsonl is not JSON",
+			fix: func(f *fixture) {
+				f.write(".rlsbl/changes/unreleased.jsonl", `{"format_version":1,"commits":["`+someCommit+`"],"user_facing":false}`+"\n")
+			},
+		},
+		{
+			name: "a transition line that is not JSON", fixture: standalone,
+			breakIt: func(f *fixture) {
+				f.write(".rlsbl/transitions.jsonl", `{"format_version":1,`+"\n")
+			},
+			want: "line 1 of .rlsbl/transitions.jsonl is not JSON",
+			fix: func(f *fixture) {
+				f.write(".rlsbl/transitions.jsonl", eventLine("non-version-tag", `"tag":"docs-latest","reason":"points at the published docs"`))
+			},
+		},
+		{
+			name: "an undo audit file that is not a JSON array", fixture: standalone,
+			breakIt: func(f *fixture) { f.write(".rlsbl/undo-audit.json", "[{\n") },
+			want:    ".rlsbl/undo-audit.json is not a JSON array of undo audits",
+			fix:     func(f *fixture) { f.write(".rlsbl/undo-audit.json", "[]\n") },
+		},
+		{
+			name: "an archive whose name is no version", fixture: standalone,
+			breakIt: func(f *fixture) {
+				f.write(".rlsbl/releases/vnext.toml", "format_version = 1\nbump = \"patch\"\ndescription = \"Old\"\ninclude = [\"npm\"]\nexclude = []\nnever_released = true\n")
+			},
+			want: ".rlsbl/releases/vnext.toml is an archive whose name carries no MAJOR.MINOR.PATCH version",
+			fix: func(f *fixture) {
+				f.write(".rlsbl/releases/v0.0.5.toml", f.read(".rlsbl/releases/vnext.toml"))
+				f.remove(".rlsbl/releases/vnext.toml")
+			},
+		},
+		{
+			name: "a changelog file whose name is no version", fixture: standalone,
+			breakIt: func(f *fixture) {
+				f.write(".rlsbl/changes/next.jsonl", `{"format_version":1,"id":"`+someID+`","commits":[],"user_facing":false}`+"\n")
+			},
+			want: ".rlsbl/changes/next.jsonl is a changelog file whose name is no MAJOR.MINOR.PATCH version",
+			fix:  func(f *fixture) { f.remove(".rlsbl/changes/next.jsonl") },
+		},
+		{
+			name: "a batch archive whose name carries no time", fixture: workspaceFixture,
+			breakIt: func(f *fixture) {
+				f.write(".rlsbl-monorepo/releases/batch-latest.toml", "[releasables.widget]\nbump = \"minor\"\ndescription = \"More\"\ninclude = [\"npm\"]\nexclude = []\n")
+			},
+			want: ".rlsbl-monorepo/releases/batch-latest.toml is a batch archive whose name carries no time",
+			fix: func(f *fixture) {
+				f.write(".rlsbl-monorepo/releases/batch-20260901-100000.toml", f.read(".rlsbl-monorepo/releases/batch-latest.toml"))
+				f.remove(".rlsbl-monorepo/releases/batch-latest.toml")
+			},
+		},
+		{
+			name: "two strictspec_gate sections", fixture: workspaceFixture,
+			breakIt: func(f *fixture) {
+				f.write("widget/.rlsbl/config.json", `{"targets": ["npm"], "publish_mode": "ci", `+npmPipeline+`, "strictspec_gate": {"certificate": "cert.json"}}`+"\n")
+				f.write("gadget/.rlsbl/config.json", `{"targets": ["pypi"], "publish_mode": "ci", "pipelines": {"pypi": {"type": "pypi", "target": "pypi", "local": false}}, "strictspec_gate": {"certificate": "cert.json"}}`+"\n")
+			},
+			want: "both declare a strictspec_gate, and strictcode.toml holds one [strictspec_certificate]; keep one by hand",
+			fix: func(f *fixture) {
+				f.write("gadget/.rlsbl/config.json", `{"targets": ["pypi"], "publish_mode": "ci", "pipelines": {"pypi": {"type": "pypi", "target": "pypi", "local": false}}}`+"\n")
+			},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -454,6 +529,35 @@ func TestLicensesThatContradictTheManifestsAreRefusedUntilTheyAgree(t *testing.T
 	refusal := f.refused("declares Apache-2.0 for \"portal\", but its npm manifest in . says MIT")
 	contains(t, refusal, `names "gizmo", which is no releasable of this repository`)
 	f.licenses = map[string]string{"portal": "MIT"}
+	f.mustPlan()
+}
+
+func TestAnInvalidLicensesFileIsRefusedUntilItIsCorrected(t *testing.T) {
+	hygiene.Isolate(t)
+	file := filepath.Join(t.TempDir(), "licenses.toml")
+	for _, c := range []struct{ content, want string }{
+		{"portal = \"MIT\n", "is not valid TOML"},
+		{"portal = 3\n", "portal = 3: a license is an SPDX identifier or \"proprietary\""},
+		{"portal = \" MIT\"\n", "written as a string without surrounding whitespace"},
+		{"portal = \"\"\n", "portal = \"\": a license is an SPDX identifier"},
+	} {
+		if err := os.WriteFile(file, []byte(c.content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		_, err := ReadLicenses(file)
+		if err == nil || !strings.Contains(err.Error(), c.want) {
+			t.Fatalf("ReadLicenses of %q = %v, want a refusal naming %q", c.content, err, c.want)
+		}
+	}
+	if err := os.WriteFile(file, []byte("portal = \"MIT\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	licenses, err := ReadLicenses(file)
+	if err != nil {
+		t.Fatalf("the corrected file is still refused: %v", err)
+	}
+	f := standalone(t)
+	f.licenses = licenses
 	f.mustPlan()
 }
 
