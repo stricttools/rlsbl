@@ -19,8 +19,9 @@ import (
 // rewrite's commit map, and narrows or drops what the rewrite did not carry.
 
 // MapCommit maps one possibly abbreviated commit id through a rewrite map:
-// exactly, or by the one key it is a prefix of. ambiguous is true when it is
-// the prefix of more than one key; next is empty when nothing maps it.
+// by the key it equals, or by the one key it is a prefix of. ambiguous is
+// true when it is the prefix of more than one key; next is empty when
+// nothing maps it.
 func MapCommit(h string, rewrites map[string]string) (next string, ambiguous bool) {
 	return mapCommit(h, rewrites)
 }
