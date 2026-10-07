@@ -92,7 +92,7 @@ type = "GitObjectHash"
 [types.ReleaseFile.fields.unrecoverable]
 type = "boolean"
 required = false
-description = "Written only as true, by the backfill: this version shipped, but the commit it shipped from cannot be recovered from any source. The version has consumers and its refs are real; only the record of where it came from is lost."
+description = "Written only as true, by the backfill: this version shipped, but the commit it shipped from cannot be recovered from any source. The version has consumers and its refs exist; only the record of where it came from is lost."
 
 [types.ReleaseFile.fields.never_released]
 type = "boolean"
