@@ -25,7 +25,8 @@ const transitionGroupHelp = "The lifecycle-and-license record, .strictmetadata/l
 const transitionShowHelp = "Print the lifecycle-and-license record and every rule's verdict on today's date: whether the repository's " +
 	"GitHub visibility agrees with its licenses (GitHub is asked; a visibility that cannot be had is unknown, with the reason), which " +
 	"releasables are refused public outputs, what a confidential or private repository does not publish, which releasables a lifecycle " +
-	"keeps from releasing, whether the confidential-name index holds the repository's names, the proprietary periods a declassification " +
+	"keeps from releasing, whether the confidential-name index holds the repository's names (and no entry while it is public), the " +
+	"proprietary periods a declassification " +
 	"squashes, the closed identities owning tags, and whether the record keeps every registry name and closed period the record HEAD " +
 	"commits holds. Problems that make the record invalid against the declarations are listed. Works in a repository without " +
 	"declarations or without a record."

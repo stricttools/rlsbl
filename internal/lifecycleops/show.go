@@ -4,11 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/stricttools/strictspec/go/lifecycle"
+	"github.com/stricttools/strictspec/go/lifecycle/index"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
@@ -164,8 +166,12 @@ func (inv Invocation) Show(dir string) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
+	names, err := inv.confidentialNamesVerdict(repo, rec, on)
+	if err != nil {
+		return Report{}, err
+	}
 	for _, rule := range lifecycle.Rules() {
-		verdicts, err := judge(rule, rec, previous, releasables, source, on)
+		verdicts, err := judge(rule, rec, previous, releasables, source, names, on)
 		if err != nil {
 			return Report{}, err
 		}
@@ -219,10 +225,98 @@ func verdictOf(rule lifecycle.Rule, subject string, err error, holds string) Ver
 	return v
 }
 
+// confidentialNamesVerdict compares the confidential-name index entry of
+// the repository's origin with the names the record makes confidential on
+// the date of on: a confidential repository's entry must hold them, and a
+// public repository must have none.
+func (inv Invocation) confidentialNamesVerdict(repo git.Repo, rec *lifecycle.Record, on time.Time) (Verdict, error) {
+	rule := lifecycle.RuleConfidentialNames
+	v := Verdict{Rule: string(rule), Class: string(rule.Class())}
+	confidential := rec.Confidential(on)
+	configured, err := repo.RemoteConfigured(origin)
+	if err != nil {
+		return Verdict{}, err
+	}
+	if !configured {
+		if confidential {
+			v.Verdict, v.Detail = VerdictRefuses, "the repository is confidential, and the confidential-name index records its names under its origin remote, which this repository lacks; add it (`git remote add origin <url>`), and the next mutating rlsbl command run in the repository records them"
+		} else {
+			v.Verdict, v.Detail = VerdictNotApplicable, "the repository is public and has no origin remote, so the index holds no entry for it"
+		}
+		return v, nil
+	}
+	url, err := repo.RemoteURL(origin)
+	if err != nil {
+		return Verdict{}, err
+	}
+	normalized, err := index.NormalizeOrigin(url)
+	if err != nil {
+		return Verdict{}, err
+	}
+	if inv.IndexPath == "" {
+		return Verdict{}, errors.New("no confidential-name index path was given to the command")
+	}
+	idx, err := index.Load(inv.IndexPath)
+	if err != nil {
+		return Verdict{}, err
+	}
+	var held []string
+	var present bool
+	for _, e := range idx.Entries() {
+		if e.Origin == normalized {
+			held, present = e.Names, true
+		}
+	}
+	const fix = "the next mutating rlsbl command run in the repository brings the entry in step"
+	if !confidential {
+		if present {
+			v.Verdict, v.Detail = VerdictRefuses, fmt.Sprintf("the repository is public, but the index %s still holds names under %s (%s); %s", inv.IndexPath, normalized, strings.Join(held, ", "), fix)
+		} else {
+			v.Verdict, v.Detail = VerdictNotApplicable, "the repository is public, and the index holds no entry for it"
+		}
+		return v, nil
+	}
+	want, err := rec.ConfidentialNames(on, path.Base(normalized))
+	if err != nil {
+		return Verdict{}, err
+	}
+	if !sameNames(held, want) {
+		v.Verdict, v.Detail = VerdictRefuses, fmt.Sprintf("the repository is confidential, and the index %s holds [%s] under %s where the record names [%s]; %s", inv.IndexPath, strings.Join(held, ", "), normalized, strings.Join(want, ", "), fix)
+		return v, nil
+	}
+	v.Verdict, v.Detail = VerdictHolds, fmt.Sprintf("the index %s holds the repository's names under %s, and publishing them is refused", inv.IndexPath, normalized)
+	return v, nil
+}
+
+// sameNames compares two name lists as the index stores them: trimmed,
+// without empty names, and ignoring case and order.
+func sameNames(a, b []string) bool {
+	set := func(names []string) map[string]bool {
+		out := map[string]bool{}
+		for _, n := range names {
+			if t := strings.TrimSpace(n); t != "" {
+				out[strings.ToLower(t)] = true
+			}
+		}
+		return out
+	}
+	x, y := set(a), set(b)
+	if len(x) != len(y) {
+		return false
+	}
+	for n := range x {
+		if !y[n] {
+			return false
+		}
+	}
+	return true
+}
+
 // judge is one rule's verdicts on the date of on. previous is the record
 // HEAD commits, which the permanent rules hold the working tree's record
-// to; nil when HEAD holds none.
-func judge(rule lifecycle.Rule, rec, previous *lifecycle.Record, releasables []string, source publishrules.VisibilitySource, on time.Time) ([]Verdict, error) {
+// to; nil when HEAD holds none. names is the confidential-names verdict,
+// decided against the index.
+func judge(rule lifecycle.Rule, rec, previous *lifecycle.Record, releasables []string, source publishrules.VisibilitySource, names Verdict, on time.Time) ([]Verdict, error) {
 	class := string(rule.Class())
 	switch rule {
 	case lifecycle.RuleProprietaryRequiresPrivate:
@@ -270,10 +364,7 @@ func judge(rule lifecycle.Rule, rec, previous *lifecycle.Record, releasables []s
 		}
 		return out, nil
 	case lifecycle.RuleConfidentialNames:
-		if !rec.Confidential(on) {
-			return []Verdict{{Rule: string(rule), Class: class, Verdict: VerdictNotApplicable, Detail: "the repository is public, so the index holds no names for it"}}, nil
-		}
-		return []Verdict{{Rule: string(rule), Class: class, Verdict: VerdictHolds, Detail: "the repository is confidential: its names go into the machine-local confidential-name index, and publishing them is refused"}}, nil
+		return []Verdict{names}, nil
 	case lifecycle.RuleProprietaryHistoryIsSquashed:
 		periods := rec.ProprietaryPeriods()
 		if len(periods) == 0 {

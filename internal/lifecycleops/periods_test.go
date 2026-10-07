@@ -276,6 +276,7 @@ func TestShowJudgesEveryRule(t *testing.T) {
 	f := newFixture(t, record)
 	f.repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
 	testsupport.FakeGH(t, ghVisibility("public"))
+	f.refreshIndex(t)
 	var report lifecycleops.Report
 	r := f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
 		var err error
@@ -304,5 +305,75 @@ func TestShowJudgesEveryRule(t *testing.T) {
 		if verdicts[key] != want {
 			t.Errorf("%s: %q, want %q (all: %v)", key, verdicts[key], want, verdicts)
 		}
+	}
+}
+
+// refreshIndex runs what every mutating command runs after it: the index
+// entry brought in step with the record.
+func (f *fixture) refreshIndex(t *testing.T) {
+	t.Helper()
+	requireExit(t, f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
+		return lifecycleops.RefreshIndex(inv.E, dir, f.index, today)
+	}), 0)
+}
+
+// confidentialNamesVerdict is show's confidential-names verdict.
+func (f *fixture) confidentialNamesVerdict(t *testing.T) lifecycleops.Verdict {
+	t.Helper()
+	var report lifecycleops.Report
+	requireExit(t, f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
+		var err error
+		report, err = inv.Show(dir)
+		return err
+	}), 0)
+	for _, v := range report.Verdicts {
+		if v.Rule == string(lifecycle.RuleConfidentialNames) {
+			return v
+		}
+	}
+	t.Fatalf("no confidential-names verdict in %+v", report.Verdicts)
+	return lifecycleops.Verdict{}
+}
+
+func TestShowReadsTheConfidentialNameIndexAndTheRefreshClearsAStaleEntry(t *testing.T) {
+	hygiene.Isolate(t)
+	confidential := "format_version = 1\ncodenames = [\"moonbeam\"]\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-01-01\nreason = \"server\"\n"
+	f := newFixture(t, confidential)
+	f.repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
+	testsupport.FakeGH(t, ghVisibility("private"))
+	v := f.confidentialNamesVerdict(t)
+	if v.Verdict != lifecycleops.VerdictRefuses || !strings.Contains(v.Detail, "moonbeam") || !strings.Contains(v.Detail, "mutating rlsbl command") {
+		t.Fatalf("a confidential repository missing from the index: %+v", v)
+	}
+	f.refreshIndex(t)
+	if v := f.confidentialNamesVerdict(t); v.Verdict != lifecycleops.VerdictHolds {
+		t.Fatalf("after the refresh: %+v", v)
+	}
+
+	// The repository goes public while the index keeps its entry.
+	public := "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"MIT\"\nfrom = 2026-01-01\nreason = \"open\"\n"
+	f.repo.Write(lifecycle.RecordFile, public)
+	v = f.confidentialNamesVerdict(t)
+	if v.Verdict != lifecycleops.VerdictRefuses || !strings.Contains(v.Detail, "public") || !strings.Contains(v.Detail, "mutating rlsbl command") {
+		t.Fatalf("a public repository the index still holds: %+v", v)
+	}
+	f.refreshIndex(t)
+	if v := f.confidentialNamesVerdict(t); v.Verdict != lifecycleops.VerdictNotApplicable {
+		t.Fatalf("after the refresh: %+v", v)
+	}
+}
+
+func TestShowRefusesAConfidentialRepositoryWithoutAnOriginUntilOneIsAdded(t *testing.T) {
+	hygiene.Isolate(t)
+	f := newFixture(t, "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-01-01\nreason = \"server\"\n")
+	testsupport.FakeGH(t, ghVisibility("private"))
+	v := f.confidentialNamesVerdict(t)
+	if v.Verdict != lifecycleops.VerdictRefuses || !strings.Contains(v.Detail, "git remote add origin") {
+		t.Fatalf("a confidential repository without an origin: %+v", v)
+	}
+	f.repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
+	f.refreshIndex(t)
+	if v := f.confidentialNamesVerdict(t); v.Verdict != lifecycleops.VerdictHolds {
+		t.Fatalf("after adding the origin and the refresh: %+v", v)
 	}
 }
