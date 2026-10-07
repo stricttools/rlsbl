@@ -126,3 +126,61 @@ func TestMovingTheReleaseStateTheResidueCheckKeepsWhereItSaysClearsIt(t *testing
 	repo.Git("mv", ".strictmetadata/changelog/old", ".strictmetadata/retired-release-histories/old/changelog")
 	mustCheckStatus(t, app, "releasable-residue", "pass")
 }
+
+func TestTheLicenseCommandTheRecordCheckNamesClearsAMissingRecord(t *testing.T) {
+	hygiene.Isolate(t)
+	scaffoldGoProject(t)
+	testsupport.FakeSafegit(t)
+	app := appWith(t, testsupport.NewFakeHTTP(t))
+	text := mustCheckStatus(t, app, "lifecycle-record-valid", "fail")
+	if !strings.Contains(text, "rlsbl transition license --subject <releasable> --license <SPDX identifier> --reason <why>") {
+		t.Fatalf("the finding names no license command:\n%s", text)
+	}
+	if r := app.Test([]string{"transition", "license", "--subject", "portal", "--license", "MIT", "--reason", "chosen by the owner", "--approve-consequential"}); r.ExitCode != 0 {
+		t.Fatalf("the command the finding names: exit %d\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
+	}
+	mustCheckStatus(t, app, "lifecycle-record-valid", "pass")
+}
+
+// widgetCI is a member CI workflow.
+const widgetCI = "name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n"
+
+func TestTheSyncTheRouterChecksNameClearsAMissingAndAStaleRouter(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := monorepoFixture(t)
+	repo.CommitFile("packages/widget/.github/workflows/ci.yml", widgetCI, "widget's CI")
+	testsupport.FakeSafegit(t)
+	testsupport.FakeDeletingSaferm(t)
+	app := appWith(t, testsupport.NewFakeHTTP(t))
+	sync := func() {
+		t.Helper()
+		if r := app.Test([]string{"monorepo", "sync", "--auto-commit"}); r.ExitCode != 0 {
+			t.Fatalf("the sync the finding names: exit %d\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
+		}
+	}
+	if text := mustCheckStatus(t, app, "workspace-ci-router", "fail"); !strings.Contains(text, "rlsbl monorepo sync") {
+		t.Fatalf("workspace-ci-router names no sync:\n%s", text)
+	}
+	sync()
+	for _, name := range []string{"workspace-ci-router", "workspace-ci-synced", "router-filters-fresh"} {
+		mustCheckStatus(t, app, name, "pass")
+	}
+	// A second member's CI leaves the router stale until the next sync.
+	repo.CommitFile("apps/gadget/.github/workflows/ci.yml", widgetCI, "gadget's CI")
+	if text := mustCheckStatus(t, app, "workspace-ci-synced", "fail"); !strings.Contains(text, "rlsbl monorepo sync") {
+		t.Fatalf("workspace-ci-synced names no sync:\n%s", text)
+	}
+	sync()
+	for _, name := range []string{"workspace-ci-router", "workspace-ci-synced", "router-filters-fresh"} {
+		mustCheckStatus(t, app, name, "pass")
+	}
+	// With no member CI left, the generated router routes nothing, and the
+	// sync removes it.
+	repo.Git("rm", "-q", "packages/widget/.github/workflows/ci.yml", "apps/gadget/.github/workflows/ci.yml")
+	repo.Git("commit", "-q", "-m", "no member CI")
+	if text := mustCheckStatus(t, app, "workspace-ci-router", "fail"); !strings.Contains(text, "rlsbl monorepo sync") {
+		t.Fatalf("workspace-ci-router names no sync:\n%s", text)
+	}
+	sync()
+	mustCheckStatus(t, app, "workspace-ci-router", "pass")
+}
