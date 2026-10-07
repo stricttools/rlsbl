@@ -56,6 +56,17 @@ releasable = "kit"
 
 func hookedWorkspace(t *testing.T, widgetDir string) *workspace.Workspace {
 	t.Helper()
+	ws, err := loadHookedWorkspace(t, widgetDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ws
+}
+
+// loadHookedWorkspace writes hookedDeclarations and loads them, returning
+// the load's error.
+func loadHookedWorkspace(t *testing.T, widgetDir string) (*workspace.Workspace, error) {
+	t.Helper()
 	root := t.TempDir()
 	testsupport.WriteFile(t, filepath.Join(root, filepath.FromSlash(declarations.ReleasablesFile)), fmt.Sprintf(hookedDeclarations, widgetDir))
 	for _, dir := range []string{"widget/src", "widget/inner", "gadget"} {
@@ -63,11 +74,7 @@ func hookedWorkspace(t *testing.T, widgetDir string) *workspace.Workspace {
 			t.Fatal(err)
 		}
 	}
-	ws, err := workspace.Load(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return ws
+	return workspace.Load(root)
 }
 
 func commands(runs []release.HookRun) string {
@@ -114,14 +121,14 @@ func TestAHookRunsWhereItsDeclarerIsWithTheReleasesVariables(t *testing.T) {
 
 func TestAHookDirInAnotherMembersTerritoryIsRefusedUntilDeclaredThere(t *testing.T) {
 	hygiene.Isolate(t)
-	ws := hookedWorkspace(t, "inner")
-	_, err := release.HookRuns(ws, "kit", "widget", release.PreChecks, release.HookContext{Version: "1.2.0"})
-	if err == nil || !strings.Contains(err.Error(), `the member "inner" owns`) || !strings.Contains(err.Error(), `hooks of the member "inner"`) {
+	// The refusal comes from loading the declarations, before any hook runs.
+	_, err := loadHookedWorkspace(t, "inner")
+	if err == nil || !strings.Contains(err.Error(), `dir "inner" lies in the member "inner"`) || !strings.Contains(err.Error(), "declare it on that member instead") {
 		t.Fatalf("a hook dir in a nested member was not refused naming it: %v", err)
 	}
 	// The fix the refusal names: the hook moves to the member owning the
 	// directory, which runs it from its own directory.
-	ws = hookedWorkspace(t, "src")
+	ws := hookedWorkspace(t, "src")
 	_, err = release.HookRuns(ws, "kit", "widget", release.PreChecks, release.HookContext{Version: "1.2.0"})
 	mustNotFail(t, err)
 }
