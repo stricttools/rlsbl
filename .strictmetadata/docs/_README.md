@@ -11,13 +11,13 @@ rlsbl is a release orchestration and project scaffolding CLI that bumps versions
 
 ## Install
 
-rlsbl is one Go binary.
+rlsbl is one Go binary, from its first release built in Go on (the releases before it are a Python package).
 
 ```
 go install github.com/stricttools/rlsbl/cmd/rlsbl@latest
 ```
 
-From npm or PyPI, which carry the prebuilt binary for Linux and macOS on x64 and arm64:
+From npm or PyPI, whose packages from that release on carry the prebuilt binary for Linux and macOS on x64 and arm64:
 
 ```
 npm i -g rlsbl

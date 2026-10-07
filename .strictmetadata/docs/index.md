@@ -8,7 +8,7 @@ rlsbl releases repositories: it bumps versions, validates a structured JSONL cha
 
 ## Getting started
 
-Install rlsbl with `go install github.com/stricttools/rlsbl/cmd/rlsbl@latest`, `npm i -g rlsbl`, or `uv tool install rlsbl` (the npm and PyPI packages carry the prebuilt binary). Then:
+Install rlsbl with `go install github.com/stricttools/rlsbl/cmd/rlsbl@latest`, `npm i -g rlsbl`, or `uv tool install rlsbl` (from rlsbl's first release built in Go on, the npm and PyPI packages carry the prebuilt binary; the releases before it are a Python package). Then:
 
 - declare the repository in `.strictmetadata/releasables/releasables.toml` ([declarations](declarations.md)), or `rlsbl monorepo init` for a workspace;
 - `rlsbl scaffold` to render its workflows and hooks;
