@@ -97,6 +97,11 @@ testisolation_tmp_prefix = "rlsbl-test-env-"
 testisolation_git_user_name = "rlsbl-test"
 testisolation_git_user_email = "rlsbl-test@example.invalid"
 testisolation_preserve = ["go_path", "go_mod_cache", "go_cache", "python_user_base"]
+# Delete a passing test's tmp_path at its teardown. pytest's default keeps every
+# test's directory until the session ends, and the sandboxed runner's TMPDIR is
+# a tmpfs, so thousands of fixture repositories accumulated as RAM for the whole
+# run. A failing test's directory is kept for inspection.
+tmp_path_retention_policy = "failed"
 norecursedirs = ["*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv", "{arch}", "experiments", "screenshots"]
 
 [tool.coverage.run]
