@@ -1,691 +1,162 @@
 +++
-description = "rlsbl monorepo workspaces: workspace.toml and member paths, the root member and loader refusals, nested members, batch releases, mirrors, and the CI router."
+description = "rlsbl workspaces: declaring members and releasables in releasables.toml, the root member, nested members, dev nodes, the dependency graph and impact analysis, the generated CI router and publish router with their derived path filters and run_all, batch releases, and the workspace checks."
 +++
 
-# Monorepo guide
+# Workspaces
 
-rlsbl supports monorepo workflows via the `rlsbl monorepo` command family. A monorepo workspace manages multiple independently-versioned projects sharing one git repository, coordinated through a single `.rlsbl-monorepo/workspace.toml` file at the repository root. A single workspace can contain any mix of the [supported release targets](targets.md).
+A **workspace** is a repository holding several members, each a directory, versioned under one or more releasables. `.strictmetadata/releasables/releasables.toml` declares it with `repository_layout = "workspace"` ([declarations](declarations.md)); a workspace whose only member is the root member is still a workspace.
+
+- A **member** is a directory rlsbl knows. It owns the files under its path that no deeper member claims.
+- A **releasable** is the unit of versioning: one version, one changelog, one tag scheme, one release at a time. A member is versioned under one releasable, or under none (`releasable = false`). Several members may share a releasable and release together under one version.
 
 ## Getting started
 
 ```bash
-# Initialize a monorepo workspace (creates .rlsbl-monorepo/ with workspace.toml).
-# The root member's kind is a required choice: --root-dev-node, or
-# --root-releasable <name> --tag-format <format> --publish-mode <ci|none>.
-rlsbl monorepo init --root-dev-node
+# Declare the workspace: the root member is a dev node, or versioned under a releasable
+rlsbl monorepo init --root-member root-dev-node --release-branch main
 
-# Add projects to the workspace (the path is a positional argument, and
-# --releasable is required -- a name, or the literal `false` to opt out).
-# A name that [[releasables]] does not declare yet is CREATED as a singleton
-# releasable, with its tag_format written out explicitly (see below).
-# Each add writes the entry, scaffolds the member, runs `rlsbl monorepo sync`,
-# and commits what the three wrote as one commit; if any of them fails, the add
-# exits 1 with the working tree as it was before it and nothing committed.
-rlsbl monorepo add packages/mylib --name mylib --library true --releasable mylib
-rlsbl monorepo add packages/cli --name cli --depends-on mylib --releasable cli
-rlsbl monorepo add packages/tests --name tests --dev-only true --releasable false
+# Add members; a releasable the workspace does not declare yet is created,
+# with its tag format and publish mode stated
+rlsbl monorepo add packages/core --releasable core --tag-format '{name}@v{version}' --publish-mode ci
+rlsbl monorepo add packages/cli --releasable cli --tag-format '{name}@v{version}' --publish-mode ci --depends-on core
+rlsbl monorepo add tests --releasable false --dev-only
 
-# Scaffold CI for all projects
-rlsbl scaffold
-
-# Sync per-project CI workflows to shared .github/workflows/
-rlsbl monorepo sync
-
-# Show workspace status (versions, unreleased commits)
-rlsbl monorepo status
-
-# List all projects
 rlsbl monorepo list
+rlsbl monorepo status
 ```
 
-## workspace.toml format
+`monorepo init` writes the declarations for a repository that declares nothing yet, with the root member alone, and commits them. `--root-member` states what the root member is: `root-dev-node` declares it dev-only and versioned under no releasable, so the root's files need no changelog entry; `root-releasable` versions it under the releasable `--releasable` names, created with the stated `--tag-format` and `--publish-mode` (neither has a default), and a root releasable publishing from CI also states `--publish-ci-check-pattern`, the pattern of the check-run names the root's own CI reports. `--release-branch` names each branch a release may run from. A repository whose declarations exist is refused.
 
-The workspace file lives at `.rlsbl-monorepo/workspace.toml` and serves as the single source of truth for all project registrations, dependency declarations, and architectural layer rules. It uses TOML array-of-tables syntax for project declarations, with one `[[projects]]` block per sub-project:
+`monorepo add <path>` declares a member, scaffolds it as `rlsbl scaffold` does (which regenerates the routers), and commits what the three wrote as one commit. The member is named `--name`, or after its directory. It needs a release target, detected or named with `--target`. `--releasable` names the releasable it is versioned under, or `false`; naming one the workspace does not declare creates it, and then `--tag-format` and `--publish-mode` are required, since a tag scheme and a publish mode are stated, never derived. `--depends-on` (repeatable), `--library`, `--dev-only`, and `--registry-name` fill the member's keys. When anything fails, every path the add changed is put back.
 
-```toml
-[[releasables]]
-name = "mylib"
+`monorepo remove <path>` deletes a member's declaration (the path as `releasables.toml` writes it), leaving its files and committing nothing. It refuses the root member, the only member of a releasable, a member another member depends on, and a member the lifecycle-and-license record holds an open or pending entry for.
 
-[[releasables]]
-name = "cli"
+## The root member
 
-[[projects]]
-path = "."
-name = "root"
-dev_only = true
-releasable = false
+Every workspace declares the repository root as a member, `path = "."`, named `root`. It exists so that no tracked file falls outside the ownership model: every file belongs to the member with the most specific path, and the root member owns whatever no other member claims. Job keys, router filters, and check-run names derive from its name, so the root member is always `root` and no other member may take the name.
 
-[[projects]]
-path = "packages/mylib"
-name = "mylib"
-library = true
-releasable = "mylib"
-depends_on = []
-
-[[projects]]
-path = "packages/cli"
-name = "cli"
-releasable = "cli"
-depends_on = ["mylib"]
-registry_name = "@org/cli"
-
-[[projects]]
-path = "packages/tests"
-name = "tests"
-dev_only = true
-releasable = false
-
-[layers]
-order = ["foundation", "app"]
-
-[layers.assignments]
-foundation = ["mylib"]
-app = ["cli"]
-
-[layers.overrides]
-unrestricted = ["tests"]
-```
-
-### Project fields
-
-Each `[[projects]]` block declares the project's identity, its inter-project relationships, and its behavioral flags. `path` is always required, and `releasable` is required of every project that is not opted out of versioning -- every other field either has a sensible default (like deriving `name` from the path basename) or is an opt-in feature that activates additional checks and behaviors. Note what is NOT declarable: what CI reacts to. The router's paths filters are derived from the workspace (see [Router paths filters](#router-paths-filters)), and a `watch` key is refused at load time.
-
-| Field | Required | Type | Description |
-| ----- | -------- | ---- | ----------- |
-| `path` | yes | string | Relative path from repo root to the project directory, in its one canonical spelling: `/`-separated, with no `.`, `..`, or empty segment, no leading or trailing `/`, and no backslash; the repository root is `.`. A member may sit inside another member's directory (see [Nested members](#nested-members)) |
-| `releasable` | yes | string or `false` | The `[[releasables]]` entry this project is versioned under, or `false` to opt out of versioning entirely |
-| `name` | no | string | Project name (defaults to basename of `path`; the member at `path = "."` must be named `root`) |
-| `depends_on` | no | list of strings | Explicit intra-workspace dependencies (project names) |
-| `library` | no | bool | Mark as a shared library (enables library-lint check) |
-| `dev_only` | no | bool | Mark as a dev-only project (no changelog, no CHANGELOG.md). A dev-only project outside every releasable is a **dev node** |
-| `import_name` | no | string | The name this member is imported under, when it differs from the project name (the import scanner attributes imports with it) |
-| `registry_name` | no | string | Override package name on the registry (e.g., scoped npm name) |
-| `description` | no | string | Short project description for documentation |
-| `test_only` | no | bool | Mark as test infrastructure; carried into the workspace snapshot |
-| `lint_allow` | no | list of strings | Imports the `library-lint` check allows for this member |
-
-The table is the member surface in full: it is bound in the suite to `rlsbl.workspace.MEMBER_KEYS`, the one constant the loader refuses against, so a key added there and not documented here fails a test. A release target is not among them — targets are detected from the member's own manifests, never declared here — and neither is any retired key, each of which is refused by name with its own remedy (see [What the loader refuses](#what-the-loader-refuses)).
-
-### The root member
-
-Every workspace declares the repository root itself as a member, at `path = "."`. It exists so that **no tracked file falls outside the ownership model**: territory is derived from declared member paths and never enumerated, so every file belongs to the member with the most specific declared path, and the root member owns everything no other member claims. That residual territory is exactly what the router renders for it — `**`, narrowed by a negated exclude of every other member's territory (see [Router paths filters](#router-paths-filters)).
-
-Its name is `root`, and the spelling is not a preference. Job keys, router filters and check regexes are all derived from it, so it cannot vary from repository to repository: the root member may be named nothing else, no other member may take the name, and omitting `name` on the root member applies it automatically.
-
-Its **kind** is a choice, and `rlsbl monorepo init` makes it a required one rather than picking for you:
-
-| Kind | Declaration | What it means |
+| Root member | Declared | Meaning |
 | --- | --- | --- |
-| Dev node | `dev_only = true`, `releasable = false` — `rlsbl monorepo init --root-dev-node` | The root files need no changelog coverage, and stand outside every releasable. |
-| Releasable member | `releasable = "<name>"` — `rlsbl monorepo init --root-releasable <name> --tag-format <format> --publish-mode <ci\|none>` | The root files get changelog coverage under that releasable, which must then declare `tag_format` explicitly. |
+| dev node | `dev_only = true`, `releasable = false` | The root's files need no changelog entry and stand outside every releasable. |
+| versioned | `releasable = "<name>"` | The root's files are covered by that releasable's changelog. A releasable owning the root member and publishing from CI declares `publish_ci_check_pattern`. |
 
-A releasable root member's config lives in `.rlsbl-monorepo/releasables/<name>/config.json`, never in a root `.rlsbl/`: the `root-rlsbl-conflict` check refuses a root `.rlsbl/` beside `.rlsbl-monorepo/`, and `rlsbl scaffold` does not scaffold the workspace root. `rlsbl monorepo init --root-releasable` writes that file. `--publish-mode` has no default. With `ci` and a release target detected at the root, init also writes the root's `targets` and their default `pipelines`, and requires `--publish-gate-check-regex`: the regex matching the check-run names of the root's hand-authored CI, which publishing waits for on the release commit. Refusals about the root member's config name that file.
+`rlsbl scaffold` does not scaffold the root member: `rlsbl monorepo sync` generates its workflows, and a root member publishing from CI has its publish jobs rendered from scaffold's templates into the publish router.
 
-### What the loader refuses
+## Nested members
 
-`workspace.toml` is validated as a whole every time it is loaded, and each refusal carries its own remedy. Structural facts about the member list are reported before per-member key errors, so a remedy for a stray key never presumes a member list that is itself unsound.
+A member may sit inside another member's directory: `draw` and `draw/cmd`, or `sdk` with `sdk/python` and `sdk/npm`. Nothing declares the nesting; it follows from the paths. Every file belongs to the most specific member: `draw/cmd/main.go` is `draw/cmd`'s, and everything rlsbl does with a member's files follows that.
 
-The rows are in the order the loader reports them.
-
-| Refusal | Remedy |
+| Area | What happens with nested members |
 | --- | --- |
-| A key at the top level that is neither section | Delete it, or fix the spelling of the section header it was meant to be. A workspace has no top-level scalar settings; the sections with a reader are `projects`, `releasables` and `layers`. It is reported first because a misspelled section header is why the sections below look wrong. |
-| No `[[releasables]]` section at all — the retired implicit mode | Add the section and give every releasable member a `releasable` key (a name, or `false`). The error also names the last rlsbl version that reads such a workspace, for a repository that genuinely cannot convert right now. |
-| A member path in any spelling but the canonical one (`draw/cmd/`, `./draw`, `draw//cmd`, `draw\cmd`, `..`, an absolute path) | Write the spelling the error names. A path that names no directory inside the repository has none, and gets a directory of its own. The same spellings are refused by `rlsbl monorepo add` and `rlsbl monorepo absorb`. |
-| More than one root member, or two members declaring the same path | Keep one and give the other a path of its own. Two members cannot own one territory. |
-| No root member | Add one, choosing its kind. The error prints both declarations in full. |
-| A `watch` key on any member | Delete it. Territory is derived from declared paths, never enumerated. A member that genuinely needs to own files outside its own directory declares that directory as a member of its own. |
-| A `subtree_remote` key on any member | Move the line into that member's `[[releasables]]` entry. A mirror's destination belongs to the unit that owns a version, a changelog and a tag scheme. |
-| A `dev_node` key on any member | Replace it with both halves it stood for: `dev_only = true` (what the member IS) and `releasable = false` (where it sits). If the member is not actually dev-only, give it `releasable = "<name>"` instead. |
-| Any other key a member table does not know | Delete it, or fix its spelling. The known keys are the [project fields](#project-fields) above. The retired keys are refused before this one so each keeps its own remedy. |
-| A key a `[[releasables]]` table does not know | Delete it, or fix its spelling. That surface's known keys are derived from the releasable model itself. |
-| A root member named anything but `root` | Set `name = "root"`, or omit `name` entirely. |
-| A non-root member named `root` | Rename it, or give it `path = "."` in place of the root member declared today. Which member owns the repository root is your decision, and rlsbl will not guess it. |
-| A releasable that owns the root member and declares no `tag_format` | Declare it: `v{version}` for bare version tags, `{name}@v{version}` to keep the workspace scheme. The repository's existing tags decide which, and only you can read them. |
+| Changelog | A commit is attributed to the members owning the files it changes. |
+| Tags | A tag belongs to a member only when its releasable's tag format renders it. |
+| CI filters | A member's filter excludes its nested members, except one holding a member it depends on. |
+| Test runners | `rlsbl scaffold` writes a path-exact `--ignore=<path>` per nested member into the member's pytest `addopts`, and `nested-member-runner-exclusion` fails while one is missing; the root member's are written by hand. |
+| Uploads | A member's npm package and Go module zip may not carry a nested member's files (`nested-member-upload-contents`); a Python upload is checked in the member's CI. |
+| uv sources | A `{ workspace = true }` source belongs in the uv workspace root's `pyproject.toml`, never in a nested member's (`nested-member-uv-sources`). |
+| Hooks and checks | A member's hook `dir` and external check `cwd` must lie in its own territory. |
+| Extract | `rlsbl monorepo extract` refuses a releasable one of whose members encloses a member that stays. |
 
-### Nested members
+A parent and its nested member may share a releasable. When both are Go modules, each gets its own [companion tag](targets.md#companion-tags) at every release: a releasable tagged `gfx/v{version}` with members `gfx` and `gfx/shader` creates `gfx/v0.2.0` and `gfx/shader/v0.2.0`. A path-style `tag_format` must name the path of one of the releasable's own Go members (`path-tag-format-go-member`).
 
-A member may sit inside another member's directory: `draw` and `draw/cmd`, or `sdk` with `sdk/python` and `sdk/npm`. Nothing declares the nesting; it follows from the declared paths. The member inside is a **nested member**, and the one around it is its **enclosing member**. The root member is the enclosing member of every other member.
+Go modules of one workspace reach each other through a committed `go.work`, never a `replace` pointing into the workspace (`go install <module>@<version>` refuses a module carrying one), which `go-workspace-replace` reports with the migration. rlsbl does not raise a dependent's `require` line when a sibling releases, because the dependent's `go.sum` needs the new version's hash, which exists only once the tag reaches the module proxy; `go-workspace-require-current` reports a requirement below the sibling's latest release, naming the `go get <module>@v<version>` to run.
 
-**Every file belongs to the most specific member.** `draw/cmd/main.go` is `draw/cmd`'s, not `draw`'s, and everything rlsbl does with a member's files follows that: changelog coverage and attribution, the lint and ldflags checks, the dependency import scan, CI filters, test runners, published uploads, scaffolding, extraction, and mirroring. What each one does about the members nested in a member:
+## Dev nodes
 
-| Area | What happens |
-| --- | --- |
-| Checks that read a member's sources | `library-lint`, `ruff-lint`, `ldflags-symbol`, and the dependency checks read the member's own files only. A Go import resolves to the longest module path containing it, so importing `M/kernel/vulkan` is a dependency on `kernel/vulkan`, not on `kernel`. |
-| Tags | A tag belongs to a member only when its tag format renders it: `kernel/v*` lists `kernel/vulkan/v0.1.0`, and that tag is still `kernel/vulkan`'s alone. |
-| CI filters | A member's filter excludes its nested members, except one holding a dependency of the member (see [Router paths filters](#router-paths-filters)). |
-| Test runners | `rlsbl scaffold` writes a path-exact `--ignore=<path>` per nested member into the member's pytest `addopts`, and `nested-member-runner-exclusion` fails while one is missing. Scaffold does not run at the workspace root, so the root member's exclusions are written by hand, as the finding names. pytest resolves `--ignore` against the directory it starts in, so run a member's tests from its own directory, as rlsbl and CI do. npm's test runner is the project's own choice, so rlsbl writes nothing for it. |
-| Published uploads | A member's upload may not carry a nested member's files. `nested-member-upload-contents` lists an npm package and a Go module zip offline; a Python upload is built and checked in the member's CI run (the pypi CI template adds the step for a member with nested members). |
-| uv workspace sources | A `{ workspace = true }` source belongs in the uv workspace root's `pyproject.toml`: uv refuses one declared in a nested member, which `nested-member-uv-sources` reports. |
-| Hooks | A hook's `dir` may not point into a nested member: the hook belongs on the member that owns the directory, in its own config. A releasable-level hook may name any of its releasable's members. |
-| Scaffold | A member's merge bases and a same-releasable nested member's live one inside the other; scaffolding the enclosing member leaves the nested member's alone. |
-| Extract and mirror | `rlsbl monorepo extract` refuses a releasable whose member encloses a member that is not leaving with it, and a mirrored releasable's member may not enclose another member at all. |
+A member that is dev-only and versioned under no releasable is a **dev node**: test infrastructure, conformance suites, development tools. A dev node has no changelog and no releases; `changelog add` and the release commands refuse it, and batch releases leave it out. Nothing that ships may depend on it at runtime: `dev-only-boundary` reports a member that is not dev-only with a runtime dependency on a dev-only one, and `unversioned-boundary` a releasable member with a runtime dependency on a member versioned under none. Dev dependencies are allowed.
 
-**A parent and its nested member may share a releasable.** When they are both Go modules, each gets its own module-proxy tag at every release: a releasable tagged `gfx/v{version}` whose members are `gfx` and `gfx/shader` creates `gfx/v0.2.0` and `gfx/shader/v0.2.0`, each pushed in a push of its own after the primary tag. A path-style `tag_format` must name the path of one of the releasable's own Go members (`path-tag-format-go-member`), and a module path may not end in a major-version suffix such as `/v2` (`go-module-major-suffix`).
+A dev node is outside releases but not outside their effects: when its `uv.lock` records a releasable sibling through an editable path source, a release bumping that sibling re-locks it in the version-bump commit, so the candidate is consistent from its first push.
 
-**Go modules in one workspace reach each other through a committed `go.work`**, not `replace`: `go install <module>@<version>` rejects a module carrying a `replace`, so `go-workspace-replace` refuses one pointing into the workspace and names the migration (`go work init` when the repository has no `go.work` yet, `go work use <module dirs>`, then `go mod edit -dropreplace` in the member). rlsbl does not raise a module's `require` line when a sibling module releases, because the dependent's `go.sum` needs the new version's hash, which exists only once the tag reaches the proxy; `go-workspace-require-current` refuses a require below the sibling's latest release and names the `go get <module>@v<version>` to run.
+## The dependency graph
 
-### Releasables section
-
-`[[releasables]]` names the units of versioning. Each entry has a `name` and two optional keys, `tag_format` and `subtree_remote`:
-
-```toml
-[[releasables]]
-name = "core"
-
-[[releasables]]
-name = "app"
-tag_format = "v{version}"
-
-[[releasables]]
-name = "uikit"
-subtree_remote = "git@github.com:owner/uikit.git"
-```
-
-`subtree_remote` binds the releasable to a standalone [mirror](#mirror). It is a releasable key, not a member key: a mirror carries one subtree's whole history, its tags and its GitHub Releases, and the releasable is the unit that owns a version, a changelog and a tag scheme. A member still carrying the key is a hard error at load time naming the exact edit, and **a releasable with more than one member may not declare one at all** -- there would be no single subtree to mirror.
-
-`tag_format` is **explicit or absent**, never implicitly filled in. An entry that omits it tags with the workspace scheme, `{name}@v{version}`; an entry that declares it tags with what it declared. Absence is carried through loading and saving, so a rewrite of `workspace.toml` neither invents the key nor deletes a line an operator wrote — including one that spells out the default.
-
-An entry is written by hand, or by one of the two commands that create a releasable from a member: `rlsbl monorepo add --releasable <name>` naming a group the workspace does not declare yet, and `rlsbl monorepo absorb` for an arriving member. Both create a **singleton** releasable holding that one member, and both write its `tag_format` out explicitly rather than letting it be inherited by accident. The format is derived from the member's primary target's monorepo scheme — `{name}@v{version}` for every target but Go, and the Go module proxy's `<path>/v{version}` for Go — and a member whose targets span BOTH schemes has no single answer, so it is refused with `--tag-format` named as the remedy. `--tag-format` states the format directly; it is illegal when `--releasable` names a releasable that already exists (which owns its own format) and with `--releasable false` (which creates none). `rlsbl monorepo sync` scaffolds the created releasable's state directory.
-
-A releasable is also the unit a repository boundary moves: `rlsbl monorepo extract` moves one out into a repository of its own and `rlsbl monorepo absorb` moves an external repository in as one. Splitting a member out of a releasable it shares with others is a workspace edit first -- see [Repository conversions](conversions.md).
-
-The distinction is not cosmetic. **A releasable that owns the root member (`path = "."`) must declare `tag_format`, and the loader refuses one that does not.** A repository root's releases are commonly tagged `v1.2.3` because the repository used to be a standalone one, and inheriting `{name}@v{version}` there would silently orphan every existing tag. Only the operator knows which scheme the repository's history already uses, so `rlsbl monorepo init --root-releasable <name>` requires `--tag-format` alongside it. That is the only command that creates the root member's releasable: every workspace the loader accepts already declares a root member, so `rlsbl monorepo add .` is refused as a path the workspace already claims.
-
-### Layers section
-
-The optional `[layers]` section enforces architectural dependency direction by grouping projects into ordered layers and blocking imports that violate the hierarchy. Higher layers may depend on lower layers, but not vice versa. See [layers.md](layers.md) for full configuration reference.
-
-## Project types
-
-### Regular projects
-
-Standard projects get the full release experience, including changelog enforcement, CI pipeline generation, and all workspace validation checks. This is the default project type when neither `library` nor `dev_only` is set:
-
-- JSONL changelog with commit coverage enforcement
-- Generated CHANGELOG.md
-- CI workflows (test + publish)
-- Pre-push hook enforcement
-- All workspace checks apply
-
-### Library projects (`library = true`)
-
-Libraries are packages consumed by other workspace projects as runtime or dev dependencies. They get everything regular projects have, plus additional quality checks that ensure shared code stays clean and is actually used within the workspace:
-
-- `library-lint` quality check (runs language-specific lint rules)
-- `dead-workspace-packages` detection (warns if the library has no dependents)
-- Built-in lint runs during `rlsbl release run` (non-libraries skip built-in lint)
-
-Lint config resolves at two levels: a member's own `.rlsbl/lint/<language>.toml` wins when present, otherwise a releasable member falls back to the shared `.rlsbl-monorepo/releasables/<name>/lint/<language>.toml`. `rlsbl monorepo cleanup` removes a member's `.rlsbl/lint/` only when it is byte-identical to that shared config (a genuine override is preserved).
-
-### Dev nodes (`dev_only = true`, `releasable = false`)
-
-Dev nodes are projects at the edge of the dependency graph that nothing user-facing depends on — test infrastructure, conformance suites, dev tooling, and internal utilities consumed only during development. A project is a dev node when it is `dev_only` *and* outside every releasable; a `dev_only` project that still declares `releasable = "<name>"` is an ordinary member of that releasable. Dev nodes cannot be released:
-
-- **No changelog system**: no `.rlsbl/changes/`, no `unreleased.jsonl`, no `CHANGELOG.md`. This is enforced, not merely expected: a member outside every releasable that carries its own `.rlsbl/changes/` is a hard error wherever that directory would be read — the changelog-directory enumeration behind hash validation and scrub remapping, `rlsbl monorepo status`, and the pre-push coverage check. Nothing finalizes entries there and no release record explains their range, so either the directory is residue and should be deleted, or its content belongs to a releasable
-- **No releases**: `rlsbl release run` and `rlsbl release edit` error with "non-releasable projects cannot be released"
-- `rlsbl changelog add` errors with "dev node projects don't use changelogs"
-- Scaffold skips changelog infrastructure
-- Pre-push check ignores dev node commits
-- Batch release (`rlsbl monorepo release run`) excludes dev nodes
-- Give the project a `releasable = "<name>"` in workspace.toml (dropping `dev_only` if it is genuinely not dev-only) to make it releasable
-- The `dev-only-boundary` check prevents non-dev-node projects from declaring runtime dependencies on dev nodes
-
-A dev node is excluded from releases but not from their consequences. When its `uv.lock` records a releasable sibling through an editable path source (`source = { editable = "../python" }`), that lock pins the sibling's version — and the version bump is what stales it. So the release runs `uv lock` in every non-releasable workspace project whose lock resolves a path source into a directory the bump touches, and the refreshed lock joins the version-bump commit. The candidate is then self-consistent from the first push: a dev node's lock-pin meta-test passes on it, instead of going red at the CI gate and forcing a dev-node-only fix-forward whose window no releasable's paths filter matches.
-
-## Dependency graph
-
-The workspace builds a directed dependency graph from two complementary sources, combining automatic manifest scanning with explicit declarations to capture all inter-project relationships. This graph drives topological release ordering, impact analysis, dead-package detection, and the dev-only boundary guardrail that prevents user-facing projects from depending on dev nodes:
-
-1. **Manifest scanning** — pluggable scanners (`PypiScanner`, `NpmScanner`, `DartScanner`) parse each project's manifest file looking for intra-workspace dependencies
-2. **Explicit `depends_on`** — the workspace.toml field adds edges the scanners cannot detect
-
-Dependencies have a `scope` attribute with 4 possible values: `runtime`, `dev`, `peer`, or `explicit`. The scope determines which edges the `dev-only-boundary` check considers (only 2 of the 4 scopes -- `runtime` and `explicit` -- trigger the boundary violation).
-
-### Viewing the graph
-
-The graph has two renderings selected by `--format` -- DOT for Graphviz and an indented text tree for terminal inspection -- plus the machine form under the framework-owned `--json`, which puts the structured graph in the envelope's `payload` (see [Machine output](utilities.md#machine-output)). Every form supports the same filtering options, including scoping to a single root package and its transitive dependencies, reverse dependency queries showing what depends on a given package, and depth limiting to control how many levels of the graph are traversed:
+The graph's edges come from the members' manifests (`pyproject.toml` dependencies, extras, and groups, and `package.json` dependency tables) and from their `depends_on` declarations, which state every other dependency, a Go module's on a sibling included, each edge with its scope (runtime, dev, peer, explicit). It decides the release order, impact, the boundaries, and the router filters. A manifest the graph cannot read is refused, never passed over.
 
 ```bash
-# Text tree, indented (default)
-rlsbl monorepo graph
-
-# DOT format for Graphviz
+rlsbl monorepo graph --format tree              # each member with its dependencies below it
 rlsbl monorepo graph --format dot --output graph.dot
-
-# Structured graph in the envelope's payload
-rlsbl monorepo graph --json
-
-# Filter to a single package's transitive dependencies
-rlsbl monorepo graph --root mylib
-
-# Filter to reverse dependencies (what depends on mylib)
-rlsbl monorepo graph --reverse mylib
-
-# Limit depth
-rlsbl monorepo graph --root mylib --depth 2
+rlsbl monorepo graph --format tree --root core --depth 2
+rlsbl monorepo graph --format tree --reverse core   # what depends on core
+rlsbl monorepo graph --format tree --json       # members in topological order, with versions, targets, edges
+rlsbl monorepo outdated                         # dependencies whose constraints exclude the sibling's version
 ```
 
-### Topological order
+`--json` prints the graph as a document: the members in topological order (each after the members it depends on) with their versions, targets, releasables, flags, dependencies, and dependents, and the edges in the same order. A cycle is refused, naming the members on it.
+
+### Impact analysis
 
 ```bash
-# Show release order (leaves first, dependents after their dependencies)
-rlsbl monorepo release order
+rlsbl monorepo impact core                 # by member name
+rlsbl monorepo impact ./packages/core/api.py   # by path relative to the repository root
+rlsbl monorepo impact --since v0.4.0       # the files the commits since a revision changed
+rlsbl monorepo impact core --depth 1
 ```
 
-Uses Kahn's algorithm. Projects with no dependencies appear first. Detects and reports circular dependencies as a hard error.
+The report names the members the change touches, the members depending on them directly, and every member depending on them within `--depth` steps (any distance without it): the ones to test and to consider releasing. An argument is a member's name or a path that exists; one that is neither, one naming a member that lies in another, and a path that is one of rlsbl's own records are refused, and so are arguments together with `--since`.
 
-## Impact analysis
+## The CI router and the publish router
 
-`rlsbl monorepo impact` computes the blast radius of a change by performing BFS on the reverse dependency graph, showing every direct and transitive dependent that could be affected. This helps determine which packages need testing and which are release candidates after a change.
+GitHub Actions reads workflows only from the repository root, so `rlsbl monorepo sync` regenerates two routers in `.github/workflows/`:
 
-### Three input modes
+- **`ci-router.yml`** inlines every member's own CI jobs (its `.github/workflows/ci.yml` and `ci-*.yml`) under keys and names prefixed with the member and file, and runs each member's jobs when its path filter matched the push, or when the router is dispatched with `run_all=true`.
+- **`publish.yml`** inlines the publish jobs of every member whose releasable publishes from CI, each run only for its releasable's tags, behind one `wait-for-ci` job that holds every publish until the releasing project's CI passed on the release commit ([the publish workflow](release-workflow.md#the-publish-workflow)).
 
-```bash
-# By package name
-rlsbl monorepo impact mylib
+Jobs are inlined because GitHub refuses a workflow calling 20 or more reusable workflows. Each inlined job is named `<prefix> / <job>`, the check-run names the CI check patterns match. Both routers are written read-only with a generated-file header. A member whose Python package directory is named other than the member gets that name declared as its `import_name`. The sync removes, through saferm, a router left with nothing to route, the publish workflows of members publishing nothing, and per-member workflow copies an older sync left at the root. `--auto-commit` commits what it wrote and removed. Scaffolding a member regenerates both routers too.
 
-# By file path (maps to containing package)
-rlsbl monorepo impact packages/mylib/src/core.py
+### Router path filters
 
-# By git diff range (all changed files since a ref)
-rlsbl monorepo impact --since v0.5.0
-```
+Each member's filter is derived from the workspace, never declared. It holds:
 
-### Output (impact)
+- the member's own territory, `path/**`;
+- the territory of every member it depends on, at any distance and in every scope (a dev dependency's change breaks the dependent's tests);
+- the manifests and lockfiles present at the repository root, so a root dependency change runs every member;
+- the router itself;
+- the changelog file every release of its releasable writes;
+- a negated exclude of every member nested in its territory, except one holding a member it depends on (for the root member, `**` narrowed by every other member's territory).
 
-The command reports a structured breakdown of the blast radius across 5 output sections, organized by dependency distance from the changed package. Each section helps answer a different question about what to test, review, and release:
+The filter step declares `predicate-quantifier: some-with-excludes`: under the action's default a negated pattern matches everything outside itself. The `router-filters-fresh` check compares the committed filters with a fresh derivation; `rlsbl monorepo sync` regenerates them.
 
-| Section | Meaning |
-| ------- | ------- |
-| Input packages | The directly changed packages |
-| Direct dependents | Packages with an immediate edge to the changed package |
-| Transitive dependents | All packages reachable via BFS on reverse deps |
-| Test scope | Packages that should be tested (input + all dependents) |
-| Release candidates | Packages that may need a new release |
+Every release of a releasable writes its changelog file, which every member's filter holds, so a release commit runs the CI jobs of every member of the releasable, including members whose code did not change. That is the accepted cost: neither the release's CI check nor the publish workflow's `wait-for-ci` job reads a skipped check run as a pass, since a skipped check proves nothing about the commit.
 
-Supports `--depth N` to limit BFS traversal depth (default: unlimited, traverses the full transitive closure). The same breakdown is available as a structured document under the framework-owned `--json`, in the envelope's `payload` (see [Machine output](utilities.md#machine-output)).
+### Running every job on one commit
 
-## Batch release
-
-`rlsbl monorepo release run` releases multiple releasables in a single coordinated flow, respecting topological order so that leaf releasables (those whose members have no intra-workspace dependencies) are released first, followed by their dependents. This ensures downstream packages always reference the latest versions of their workspace dependencies.
-
-The unit of a batch is the **releasable**, not the package: a releasable's position in the order is the highest topological position of any of its member packages, and each releasable is released through one representative member.
-
-### Workflow
-
-1. Run `rlsbl monorepo release init` to scaffold `.rlsbl-monorepo/releases/unreleased.toml`
-2. Edit the file: set bump type, description, and context per releasable
-3. Run `rlsbl monorepo release run --watch --approve-consequential`
-
-### release init scaffolding
-
-`rlsbl monorepo release init` auto-detects release targets for each releasable's members and generates a TOML file with pre-populated per-releasable sections. Releasables with no unreleased commits are commented out, and dev nodes are excluded entirely since they cannot be released:
-
-```toml
-[releasables.mylib]
-bump = "patch"
-description = ""
-include = ["pypi"]
-
-[releasables.cli]
-bump = "minor"
-description = ""
-include = ["npm"]
-
-# [releasables.tests]
-# No unreleased commits since tests@v0.3.0
-```
-
-`[releasables.<name>]` is the only section form a batch release file takes. A file carrying a `[packages]` section is refused with the rewrite it needs -- there is no per-package batch mode, because there is no workspace mode without `[[releasables]]` (the loader refuses one).
-
-- Dev nodes are excluded entirely (they have no changelog)
-- Releasables with zero unreleased commits since their last tag are rendered as commented-out sections
-- Each section's `include` list is pre-populated from the targets detected across the releasable's members
-
-### Execution
-
-Each releasable is released sequentially through the standard single-package release flow (validation, tests, version bump, commit, tag, push, GitHub Release), run from one representative member. The batch orchestrator determines execution order from the workspace dependency graph:
-
-1. Validate all listed releasables exist in workspace.toml
-2. Build topological order from the full workspace graph
-3. Map each releasable to its highest-positioned member, preserving topological order
-4. Release each releasable in order
-
-The resolved base version, target version and tag of every item are written to a companion plan file (`unreleased.plan.json`) beside the batch file before anything is released, and the plan is never regenerated mid-flight -- so a re-run skips exactly the items it can prove already shipped.
-
-### Partial failure
-
-If a releasable's release fails mid-batch, there is no automatic resume of the batch itself. The command prints what succeeded, then re-raises the error. To recover, fix the issue and re-run: items the plan proves are already released are skipped.
-
-A re-run that finds every item of the plan released archives the plan. When the batch file is unchanged since the plan was resolved from it, it is the file that batch ran, and the re-run archives it too, which finishes a batch whose closing archive commit failed; a batch file written or edited since is the next batch's, and is left in place.
-
-## Snapshot
-
-`rlsbl monorepo snapshot` generates a committed JSON artifact at `.rlsbl-monorepo/snapshot.json` that captures the entire workspace state, including package metadata, dependency edges, and the computed topological order. This artifact is useful for CI verification and external tooling that needs to inspect workspace structure without parsing TOML.
-
-```bash
-# Generate and commit snapshot
-rlsbl monorepo snapshot
-
-# Verify snapshot is up-to-date (exits 1 if stale)
-rlsbl monorepo snapshot-check
-```
-
-The snapshot contains:
-
-- All package names, paths, versions, and targets
-- Dependency edges with type, constraint, and scope
-- Graph metadata (topological order, leaf nodes, root nodes)
-- Timestamp of generation
-
-The snapshot is auto-committed with an `Autogenerated: true` trailer (exempt from changelog coverage). Use `rlsbl monorepo snapshot-check` in CI to ensure the snapshot stays current: it is read-only and exits 1 when the artifact is stale or missing.
-
-## Mirror
-
-`rlsbl monorepo mirror <project>` reconciles a workspace project's subtree mirror — a standalone git repository containing only that project's subtree history, plus its own rlsbl scaffold and CI workflows so the mirrored code builds and tests on its own. Consumers can clone just the one project, or resolve it by URL, without the full monorepo.
-
-The mirror does **not** publish. Its scaffold renders no publish workflow, and any publish workflow that reaches the mirror by another route is swept on the next convergence: a mirror's tags and GitHub Releases are written by the monorepo's release flow (see [A mirror never releases itself](#release-tags-on-the-mirror)).
-
-### The mirror is tool-owned
-
-The mirror is a **derived artifact**: it is regenerated from the monorepo and **nothing is ever authored on it by hand**. Because the mirror is fully derived, force-push (with lease) is the *routine* write, not an exceptional one — every convergence rewrites `main` to match the monorepo's current state.
-
-Treat mirror repositories as read-only downstreams. To change a project, change it in the monorepo and re-run `mirror`. Never commit to a mirror directly: a hand-authored commit is a contract violation that the reconciler refuses to erase silently (see the tripwire below).
-
-### Requirements
-
-- The releasable the project belongs to must declare `subtree_remote` in workspace.toml, and that releasable must have exactly one member
-- SSH host must be consistent between `subtree_remote` and origin
-- Recommended: enable **branch protection** on the mirror's `main` for humans while allowing the automation identity to force-push, so the tool-owned contract is enforced at the remote too
-
-### Plan and apply
-
-The mirror command follows an observe-then-converge reconciliation pattern. In dry-run mode it inspects the current state of the remote mirror and the local monorepo, produces a human-readable plan describing what would change, and exits without writing anything. In apply mode it executes the convergence steps, force-pushing with lease to update the mirror to match the current subtree state:
-
-- `rlsbl monorepo mirror <project> --dry-run` — observe and print a plan; makes **zero writes** (beyond the loose objects a branchless subtree split leaves in the monorepo's own object store).
-- `rlsbl monorepo mirror <project>` — observe, then converge (apply).
-
-The desired state of the mirror's `main` is exactly one scaffold commit atop the **current split-ancestry commit**, where that commit is the deterministic branchless `git subtree split` of the project's current history, and the scaffold commit touches only scaffold-owned paths.
-
-The scaffold layer is rendered by a standalone `rlsbl scaffold` in a clone of the split. A member the monorepo scaffolded carries its `.rlsbl/managed-files.json` in the split, while its merge bases live in its releasable's state directory, outside the split; the mirror copies those bases, as committed at the monorepo's HEAD, into the clone's `.rlsbl/bases/` first, so the mirror's scaffold three-way merges over the member's files as the member's own scaffold would. A member whose registry has no bases committed there is refused before scaffolding, naming `rlsbl scaffold` in the member as the fix.
-
-Observation reports one of the following for the mirror's **branch**, and, beside it, one item per released version for the mirror's **tags** (see [Release tags on the mirror](#release-tags-on-the-mirror)):
-
-| State | Meaning | What apply does |
-| --- | --- | --- |
-| `converged` | Scaffold commit atop the current split. | Nothing — clean no-op. |
-| `scaffold-stale` | A scaffold layer atop the current split, but the tip carries a publish workflow (from an older scaffold layer, or through the split from the member's own directory). Named on the plan. | Re-push the split (with lease) and rebuild the layer without it — a mirror never releases itself. |
-| `behind` | A scaffold layer atop an **older** split; a new split is available (shows old → new). | Force-push the new split (with lease), then re-scaffold. |
-| `scaffold-missing` | The tip is a bare split commit with no scaffold layer (the pre-scaffold-layer shape). May also be behind. | Add the scaffold commit (and push a new split first if behind). |
-| `contract-violated` | A foreign, hand-authored commit exists on the mirror. | **Hard error, touches nothing.** Lists the offending commit(s) and paths, and tells you to either port the change into the monorepo or reset the mirror branch, then re-run. |
-| `ancestry-undetermined` | Git could not determine whether the mirror's commits descend from the current split (typically objects that were pruned, or never fetched), and no split boundary could be confirmed. | **Hard error, touches nothing.** Names the unanswerable commit(s) and points at fetching/deepening the history, never at resetting the mirror. |
-| `remote-missing-or-empty` | Virgin remote. | Push the split, then scaffold CI. |
-
-Apply is **idempotent**: re-running on a converged mirror is a clean no-op, and an interrupted apply (killed between the split push and the scaffold commit) heals on the next run — it re-observes as `scaffold-missing` and adds the scaffold layer.
-
-### The tripwire
-
-Convergence never blindly overwrites the mirror. The remote tip must be **either** a bare split-ancestry commit (the current split SHA or an older one — this covers legacy mirrors that never received a scaffold layer) **or** exactly one commit atop a split-ancestry commit whose changed paths are all scaffold-owned (`.rlsbl/`, `.github/`, and a small set of root files like `CHANGELOG.md`). Anything else is a foreign commit: apply refuses and reports it. This makes contract violations *loud* instead of silently force-erased.
-
-> Note: `rlsbl monorepo sync` does **not** update mirror repositories. `sync` regenerates the monorepo's own `.github/workflows`. Mirrors are updated only by re-running `rlsbl monorepo mirror <project>` (for example after a release).
-
-### Release tags on the mirror
-
-The mirror carries every released version under its own **standalone** tag name (`v1.2.3`, not the workspace's `{name}@v1.2.3`, which is exactly what a consumer resolving the mirror by URL cannot read). The commit each tag stands at is derived, never guessed: it is the subtree split of the commit that version's release archive release commits -- the commit CI verified.
-
-That makes the tags a second dimension of the same reconciliation. A mirror can be perfectly converged on `main` and still carry none of its releasable's tags (a mirror bound after the fact, a tag push that failed at release time, a mirror that was reset), so observation reports one item per released version beside the branch's own verdict:
-
-| State | Meaning | What apply does |
-| --- | --- | --- |
-| `present` | The mirror already carries the tag. | Nothing. |
-| `materialize` | The mirror has no such tag. The subtree split of the version's recorded release commit is the commit it belongs at. | Push the tag at that commit, then create the mirror's GitHub Release with that version's notes. |
-| `underivable` | No mirror commit for this version can be derived: its release archive records no commit at all, or records one the subtree split cannot answer for — typically a release commit predating the member's own directory, from a release absorbed out of another repository. | **Nothing, and nothing is guessed.** The version is named with the reason it could not be derived; the branch and every other version reconcile as usual. |
-| `never-released` | The version's archive records `never_released = true`: the version number exists in the release record, but no release was ever published under it. Not a failure to derive anything — there is no commit to restore and nothing ever shipped under that number. | **Nothing.** The version is named with that reason, distinctly from `underivable`, so nobody goes looking for a lost commit. |
-
-A tag standing at a **different** commit is never moved. That is a hard error naming both commits: a released tag names what shipped, and choosing which commit a version shipped from is never the reconciler's decision.
-
-Two invariants follow:
-
-- **A mirror never releases itself.** Its scaffold deliberately renders no publish workflow, and every convergence sweeps any publish workflow that reached the mirror another way — a leftover in an older scaffold layer, or one that rode in through the subtree split because the member's own directory carries it. (The member keeps its copy in the monorepo; only the mirror's is swept.) A mirror's Releases are written by the monorepo's release flow, or by this command materializing what the flow missed.
-- **A mirrored package's identity manifests name the mirror.** The scaffold commit rewrites them -- Go's `go.mod` `module` directive is the case that exists, since it IS the fetch URL -- and those files are scaffold-owned on the mirror as a result. A mirror remote whose URL names no module host is a hard error rather than a `go.mod` nobody can `go get`.
-
-### The release flow's own mirror steps
-
-Releasing a releasable that declares a `subtree_remote` does both halves without a separate command. After the primary release is published, `rlsbl release run` converges the mirror's branch through the same reconciler this chapter describes, then publishes that version's tag and GitHub Release on the mirror. The tag's commit is the subtree split of the release's **recorded release commit** — the CI-verified candidate — not the mirror's branch tip, so the mirror's tag names the same code the monorepo's does even though the finalization commits have moved `main` on since.
-
-Both steps are **non-fatal**: the primary release has already shipped and nothing is rolled back. A failure is still recorded on the release state, so the run exits non-zero, stays resumable, and names its healer — `rlsbl monorepo mirror <project>` for the mirror, `rlsbl release reconcile` for this repository's own release refs.
-
-### Extracting a mirrored releasable promotes the mirror
-
-The mirror already holds this subtree's standalone history: every commit that touched the member has a synthetic counterpart there, produced by the deterministic subtree split, and consumers already resolve those commit ids. So [extracting](conversions.md) a mirrored releasable does not filter a second history out of the monorepo -- it **promotes** the mirror. Same command, different engine:
-
-- the destination is a clone of the mirror, whose remote becomes its origin;
-- the monorepo-to-mirror correspondence is derived by splitting each commit the conversion has to translate, and every changelog hash and release commit is remapped through it;
-- deleting the monorepo's copy is justified by **tree-hash equality**: `HEAD:<member>` in the monorepo must equal the root tree of the mirror's pre-scaffold split commit. A mirror that is behind stops the promotion and says to run `rlsbl monorepo mirror <project>` first;
-- the correspondence is persisted into the extracted repository's transition record as a `promotion-split-map` event, so the promoted repository can explain its own hashes without the monorepo.
-
-After a promotion the mirror is no longer a derived artifact: nothing regenerates it, and a force-push to it is destructive. It also carries no publish workflow (a mirror's scaffold renders none), so a repository that publishes needs `rlsbl scaffold` run in it.
-
-## Sync
-
-`rlsbl monorepo sync` folds every project's CI jobs into a single generated router at the repository root's shared `.github/workflows/` directory, performing template variable resolution along the way. This is required because GitHub Actions only reads workflows from the repository root, not from individual project subdirectories.
-
-The sync also adds rlsbl's run-state entries (its locks, in-progress release state, and scrub results) to the repository root's `.gitignore` when they are missing, keeping the lines already there, and commits the file with the routers: `rlsbl scaffold` writes them into each member's `.gitignore` but does not run at the workspace root.
-
-The sync process:
-
-1. For each project in the workspace, reads its scaffolded CI workflow
-2. Injects `working-directory` into job steps so they run in the correct subdirectory
-3. Inlines every project's jobs into one generated `ci-router.yml`, keyed by a per-file prefix and gated on a `detect` job's paths filter, and inlines publish jobs into `publish.yml` the same way
-4. Removes any stale per-project workflow copy left at the root by an older sync (via saferm)
-5. Commits the generated routers
-
-Jobs are inlined rather than invoked as reusable workflows: GitHub rejects a workflow file that references 20 or more of them, so `uses:`-based routing cannot scale past a certain workspace size. A guardrail refuses to emit a generated router containing any reusable call at all. Each inlined job gets an explicit `name: "{prefix} / {job}"`, so check-run names are identical to the ones the reusable-workflow era produced and the publish gate's regexes and any branch protection rules keep matching.
-
-This ensures every project has its CI pipeline properly wired even when using different targets or custom workflow steps.
-
-### Router paths filters
-
-The generated router filters each project's inlined jobs on a `dorny/paths-filter` entry **derived from the workspace**. Nothing is declared per project; the entry is composed of:
-
-- the project's own territory -- its declared `path` -- as `path/**`;
-- the territory of every workspace project it depends on, transitively and in every dependency scope (`runtime`, `dev`, `peer`, `explicit`): a change to a dev-scoped dependency breaks the dependent's tests, which is what its CI job runs;
-- the workspace-root manifests and lockfiles that are actually present (`pyproject.toml`, `uv.lock`, `package.json`, `go.mod`, and their kin), so a root dependency bump triggers every member;
-- the generated router itself, so a change to it re-runs everything;
-- a negated exclude of every member nested inside the project's territory, since those members own their files: for the root member, whose territory is the residual, that is `**` narrowed by every other member's territory. A nested member whose territory holds one of the project's dependencies -- the dependency itself, or a member enclosing it -- is never excluded: an exclude is final (see below), so it would silence the dependency even with its territory included.
-
-The step declares `predicate-quantifier: some-with-excludes`. Under the action's default (`some`) a negated pattern matches everything *outside* itself, so the excludes would match the very paths they exclude. Under `some-with-excludes` an excluded file cannot be included back by another pattern, which is why a territory holding a dependency is never excluded.
-
-A push whose diff matches none of a project's patterns leaves that project's CI job `skipped` on the pushed commit. `rlsbl check --name router-filters-fresh` re-derives the block and fails when the committed router no longer matches the workspace; regenerate with `rlsbl monorepo sync`.
-
-In explicit releasable mode, one more pattern is appended to **every** member of a releasable: the releasable's own `CHANGELOG.md` under `.rlsbl-monorepo/releasables/<name>/`. It is a single path shared by all members, so any commit that touches it matches all of their filters at once. This is a deliberate run-everything hook. A release commit may touch nothing under a member's own directory -- guaranteed on a first release, where the version write is a no-op -- and the publish gate refuses to treat that member's `skipped` check as passing, with no re-runnable recovery. Since the release commit always regenerates and commits the releasable `CHANGELOG.md`, release-commit recording every member's filter on it makes the release commit verifiable for all members.
-
-Be aware of the cost: **releasing a releasable runs the CI jobs of every one of its members**, including members whose own code did not change. That is the accepted trade, not a bug -- see [Publish gating](release-workflow.md#the-releasable-run-everything-hook) in the release workflow docs for the full rationale, including why the gate is never relaxed to accept `skipped`, and what a push that touches only non-member paths (a dev node's directory, for instance) looks like.
-
-### Running every job on one commit (`run_all`)
-
-The router declares a `workflow_dispatch` input, `run_all`. Dispatching with `run_all=true` short-circuits the paths filter: every inlined job's condition is `(needs.detect.outputs.<project> == 'true' || inputs.run_all)`, so all of them run on the dispatched commit.
+The CI router declares a `workflow_dispatch` input, `run_all`. Dispatched with `run_all=true`, every inlined job runs on the dispatched commit, whatever the filters say:
 
 ```bash
 gh workflow run ci-router.yml --ref main -f run_all=true
 ```
 
-This is the sanctioned exit from a candidate whose push window is honestly narrow. A first release candidate rides the run-everything hook and runs every member's CI; if some of those jobs fail, the fix-forward commits that heal them touch only the members they fix. The *next* candidate's window therefore covers only those members, every other member's job concludes `skipped`, and the release gate refuses -- correctly, because a skipped check proves nothing about the commit. Widening the window would mean committing churn under paths that did not change, which lies in both the history and the changelog. Dispatching `run_all` re-runs the **same** commit with the filter short-circuited instead.
+This is the way out for a candidate whose commits touch few members: after a red verdict, the fix-forward commits touch only the members they fix, so on the next candidate every other member's jobs are skipped. Inventing a commit to widen the push would put churn into the history and the changelog; running the same commit with the filters bypassed does not. Nothing is waived: the jobs run, and a failure still blocks the release. When a same-named check run is skipped on the push and concluded on the dispatch, the concluded one counts; a matrix job skipped under its bare name is covered by its expanded runs. The router's concurrency group includes the input, so a dispatch never cancels the push run.
 
-Nothing is waived by the dispatch. The jobs execute for real, and a job that fails there still blocks the release. Both gates group matching check runs by name across every check suite on the commit, and a `skipped` conclusion loses to any completed, non-skipped conclusion of the same name -- so the dispatched run's verdict supersedes the push run's `skipped`, and a red verdict supersedes just as readily as a green one. Ordering does not enter into it: rlsbl dispatches as soon as the candidate is pushed, while the push run's project jobs are still queued behind `detect`, so the `skipped` check run is routinely stamped *after* the dispatched run has already concluded. A name that is only ever skipped still blocks the release. The router's concurrency group includes the input, so a `run_all` dispatch never cancels an in-flight push run for the same commit (a cancelled run is a red verdict at the workflow-run level, before any per-check collapse happens).
+The release dispatches it itself when it can see the case coming: a resumed release whose new candidate would leave members skipped, after an earlier attempt already pushed a candidate, pushes the candidate, dispatches `run_all`, ties the created run to the candidate by its commit, and reads that run. A fresh release whose own candidate would leave a member skipped is refused before the push, since that is a defect of the filters.
 
-One complication both gates handle explicitly: GitHub does not expand a matrix for a job its `if` skipped. The skipped job collapses to a single check run under the unsuffixed name (`cli-ci / test`), while the run that executes it emits one per leg (`cli-ci / test (3.12)`). They never share a name, so a plain per-name collapse would leave the skip standing. A `skipped` check is therefore dropped when a completed, non-skipped check run for the **same job** -- its matrix expansion, matched by name -- exists; the legs are then judged on their own conclusions, so a red leg still blocks. Nothing else can cover a skip: not a sibling job, not a merely prefix-sharing name (`test-extra` is a different job), and not a leg that was itself skipped.
+## Batch releases
 
-Typical sequence when a release stops at a skipped member, after the run has already concluded:
+`rlsbl monorepo release run` releases several releasables in one flow, in topological order, each through the single-releasable [release](release-workflow.md) from one representative member, in the release checkout, under one CI wait.
 
-```bash
-gh workflow run ci-router.yml --ref main -f run_all=true
-gh run watch <run-id>
-rlsbl release resume
-```
+1. `rlsbl monorepo release init --releasables <names>` writes `.strictmetadata/batch-releases/unreleased.toml`, one `[releasables.<name>]` table per releasable with its targets, for the bump and description to be filled in.
+2. Edit each table: `bump`, `description`, and optionally `context`, `include`, `exclude`, as in a single release file.
+3. `rlsbl monorepo release run --watch --approve-consequential`.
 
-### rlsbl dispatches it itself when a resume's window is empty
+`rlsbl monorepo release order` prints the order. A releasable's position is the highest of its members', so every releasable is released after the releasables its members depend on. Before anything is released, the version and tag of every item are written to `.strictmetadata/.release-state/batch-plan.toml` and never recomputed mid-flight, so a run after a failure skips the items the plan proves shipped. A releasable whose lifecycle is on hold or retired is refused, and a server releasable is ordered after the clients it depends on. An uncommitted change to a path the batch writes refuses it, naming the path; every other is listed and left alone. A finished batch archives its file as `.strictmetadata/batch-releases/batch-<UTC time>.toml`.
 
-The dispatch above needs the commit **on the remote**, because it resolves a ref. That used to deadlock: a resume whose fix-forward touched none of the releasing project's paths was refused by the pre-push window guard, and the refusal withheld the very push the prescribed remedy required.
+## Status and listing
 
-So on exactly that shape -- a push is owed **and** an earlier attempt already published a candidate (`BRANCH_PUSHED` is recorded) -- the release no longer refuses. It pushes the candidate, dispatches `ci-router.yml` with `run_all=true` itself, correlates the created run to the pushed commit by head SHA, and then runs the CI gate on it. The dispatch is recorded as owed on the release state before the push, so a crash in between is repaired by `rlsbl release resume` rather than walking into a skipped-check refusal.
+| Command | What it reports |
+| --- | --- |
+| `rlsbl monorepo list` | Every member in declaration order: name, path, releasable, flags. |
+| `rlsbl monorepo status` | Per releasable: its version file's version, its latest release, its changelog coverage (counted as `rlsbl status` counts it), and its members. Per member: targets, version, releasable, flags, and dependency counts. |
+| `rlsbl monorepo outdated` | Every dependency between members with the depended-on member's version: `ok`, `outdated`, or `versioned` (a constraint the evaluation does not read); a path, npm workspace, or explicit dependency shows its form. |
+| `rlsbl monorepo check-names --target <target>` | The name of every member that is not dev-only (its `registry_name` as declared, or its name with `--prefix` and `--suffix`), with `check-name`'s verdicts and exit codes. |
 
-Nothing is relaxed by this. Every member's real jobs run on the candidate, a failure still blocks the release, and the correlation is fail-closed: if the dispatched run belongs to some other commit (something else reached the branch in between), that is a hard error rather than a gate on a run nobody established.
+## Maintenance
 
-The refusal stays for every other empty window -- most of all a **fresh** release whose own version-bump commit matches none of its filters, which is a configuration defect and not an honestly narrow fix-forward. A workspace with no generated `ci-router.yml` on disk has nothing to dispatch, so it keeps the refusal too.
+| Command | What it does |
+| --- | --- |
+| `rlsbl monorepo sync` | Regenerates the routers. |
+| `rlsbl monorepo cleanup` | Removes the old layout's residue through saferm ([residue](on-disk-layout.md#residue-of-the-old-layout)). |
+| `rlsbl monorepo rename-releasable <old> <new>` | Renames a releasable: its declarations, its directories, its record entries, and its routers, in one commit; when the tag format holds `{name}`, past archives record their old tag in `shipped_as` and one boundary alias tag is pushed at the current version ([renaming a releasable](conversions.md#renaming-a-releasable)). |
+| `rlsbl monorepo extract`, `rlsbl monorepo absorb` | Move a releasable out of the workspace into its own repository, or a repository in ([repository conversions](conversions.md)). |
 
 ## Workspace checks
 
-Fourteen checks run under `rlsbl check --tag workspace`, covering CI configuration consistency, project registration hygiene, dependency boundary enforcement, buildability, and code liveness. All error-severity checks block releases when they fail:
-
-| Check | Severity | Description |
-| ----- | -------- | ----------- |
-| `workspace-ci-router` | error | Verifies the generated `ci-router.yml` exists at the repo root (it holds every project's inlined jobs; per-project coverage is `workspace-ci-synced`) |
-| `workspace-ci-synced` | error | Verifies each in-scope project's CI jobs are inlined into the shared `ci-router.yml`. A member with no CI workflow file of its own is skipped with a note (sync inlines nothing for it); the root member's generated routers are never read as its own workflows |
-| `workspace-targets` | error | Every project must have at least one detectable release target |
-| `workspace-unregistered` | error | Detects project directories with manifests that are not in workspace.toml |
-| `workspace-stale-entries` | error | Detects workspace.toml entries pointing to non-existent directories |
-| `dev-only-boundary` | error | Non-dev-only projects cannot have runtime dependencies on dev-only projects |
-| `unversioned-boundary` | error | Releasable projects cannot have runtime dependencies on unversioned (`releasable = false`) projects |
-| `dead-workspace-packages` | warn | Library projects with zero dependents (may indicate unused code) |
-| `subtree-remote-reachable` | error | All configured subtree_remote URLs must be accessible (network check) |
-| `workspace-unbuildable` | error | Workspace members build under `uv sync --all-packages` (pypi workspaces only); also tagged `preflight`, so a manifest that stopped resolving blocks the release rather than only narrowing the router's derived filters |
-| `scaffold-gitignore-stale` | warn | Workspace project `.gitignore` files contain all rlsbl-managed entries |
-| `root-rlsbl-conflict` | error | Root `.rlsbl/` must not coexist with `.rlsbl-monorepo/`; the finding names the root releasable's `config.json` as the destination of its keys |
-| `go-companion-tags` | warn | Non-private Go members of releasables have companion tags for the current version |
-| `test-suite-workspace` | error | Runs tests for affected workspace projects (also tagged `prepush`) |
-
-Run all workspace checks:
-
-```bash
-rlsbl check --tag workspace
-```
-
-See [checks.md](checks.md) for the full check reference across all tags.
-
-## Dev node boundary
-
-The `dev-only-boundary` check is a structural guardrail that prevents misuse of the `dev_only` flag by ensuring dev-only projects remain true leaf nodes in the dependency graph, consumed by nothing user-facing. The rule:
-
-> If a non-dev-only project has a **runtime dependency** on a `dev_only` project, `rlsbl check --tag workspace` errors.
-
-This ensures dev nodes are truly leaf nodes consumed by nothing user-facing. The check distinguishes:
-
-- **Runtime dependencies** (scope: `runtime` or `explicit`) — carry changes to users. These trigger the boundary violation.
-- **Dev dependencies** (scope: `dev`) — only affect test/build environments. These are allowed.
-
-If the boundary check fails, either:
-1. Remove `dev_only = true` from the dependency (it is not actually a dev-only project)
-2. Move the runtime dependency to a dev dependency in the consumer's manifest
-
-## Examples
-
-### Setting up a monorepo from scratch
-
-```bash
-cd ~/Projects/my-monorepo
-git init
-
-# Initialize the workspace
-rlsbl monorepo init --root-dev-node
-#   Initialized monorepo workspace in .rlsbl-monorepo/
-#   Root member 'root' is a dev node.
-
-# Add a Python library. "core" is not declared in [[releasables]] yet, so this
-# creates it as a singleton releasable with tag_format = "{name}@v{version}".
-mkdir -p packages/core
-# ... create packages/core/pyproject.toml ...
-rlsbl monorepo add packages/core --name core --library true --releasable core
-
-# Add an npm CLI that depends on the library ("cli" is created the same way)
-mkdir -p packages/cli
-# ... create packages/cli/package.json ...
-rlsbl monorepo add packages/cli --name cli --depends-on core --releasable cli
-
-# Add a test suite (dev node -- no changelog, no releases)
-mkdir -p packages/tests
-rlsbl monorepo add packages/tests --name tests --dev-only true --releasable false
-
-# Scaffold CI for each project
-cd packages/core && rlsbl scaffold && cd ../..
-cd packages/cli && rlsbl scaffold && cd ../..
-
-# Sync all CI workflows to the repo root
-rlsbl monorepo sync
-#   Synced packages/core CI -> .github/workflows/ci-router.yml
-#   Synced packages/cli CI -> .github/workflows/ci-router.yml
-```
-
-### Releasing multiple packages
-
-```bash
-# Check workspace status
-rlsbl monorepo status
-#   core   0.1.0  2 commits ahead of core@v0.1.0
-#   cli    0.2.0  3 commits ahead of cli@v0.2.0
-#   tests  (dev node -- not releasable)
-
-# Scaffold the release file
-rlsbl monorepo release init
-#   Created .rlsbl-monorepo/releases/unreleased.toml
-
-# Edit the release file:
-#   [releasables.core]
-#   bump = "minor"
-#   description = "Add async support to core API"
-#
-#   [releasables.cli]
-#   bump = "patch"
-#   description = "Update CLI to use new async core API"
-
-# Release in dependency order (core first, then cli)
-rlsbl monorepo release run --watch --approve-consequential
-#   Release order: core, cli
-#   Releasing core 0.1.0 -> 0.2.0 ...
-#     Validating ... OK
-#     Tests ... OK
-#     Committing core@v0.2.0 ... OK
-#   Releasing cli 0.2.0 -> 0.2.1 ...
-#     Validating ... OK
-#     Tests ... OK
-#     Committing cli@v0.2.1 ... OK
-#   Watching CI ...
-```
-
-### Analyzing the impact of a change
-
-```bash
-# What breaks if we change the core library?
-rlsbl monorepo impact core
-#   Input packages:     core
-#   Direct dependents:  cli
-#   Test scope:         core, cli
-#   Release candidates: core, cli
-
-# What changed since the last release?
-rlsbl monorepo impact --since core@v0.1.0
-#   Changed packages:   core
-#   Direct dependents:  cli
-#   Test scope:         core, cli
-```
-
-### Viewing the dependency graph
-
-```bash
-# Text tree format
-rlsbl monorepo graph --format text
-#   core
-#     <- cli
-#   tests (dev node)
-
-# DOT format for visualization
-rlsbl monorepo graph --format dot --output workspace.dot
-dot -Tpng workspace.dot -o workspace.png
-```
-
-## Workspace module
-
-The workspace module handles discovery, loading, saving, and resolution of monorepo workspaces. It walks the directory tree upward to locate the nearest `workspace.toml`, parses the TOML structure into validated `WorkspaceProject` entries, and writes changes back atomically using tomlkit to preserve formatting and comments.
-
-:-: ref path="rlsbl.workspace"
+`rlsbl check --tag workspace`, run from the workspace root or any member, runs the workspace's checks; the list, with what each verifies, is in [the check system](checks.md#workspace).
