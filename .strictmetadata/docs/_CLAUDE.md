@@ -19,7 +19,7 @@ Everything rlsbl owns is under `.strictmetadata/` ([on-disk layout](.strictmetad
 - `.strictmetadata/changelog/<releasable>/`: `unreleased.jsonl` and each released version's read-only `<version>.jsonl`.
 - `.strictmetadata/releases/<releasable>/`: the release file `unreleased.toml`, the archives `v<version>.toml`, and a workspace releasable's `version`.
 - `.strictmetadata/lifecycle-and-license/lifecycle-and-license.toml`: each releasable's lifecycle, license, and identities. See [lifecycle and license](.strictmetadata/docs/lifecycle-and-license.md).
-- `.strictmetadata/options/`: options entries, the only way to soften or switch off a check.
+- `.strictmetadata/options/`: options entries, each setting an option's value (softening or switching off a check, or switching on an adoption) for the repository or one member, with its reason.
 - `.strictmetadata/.release-state/`: run state, ignored by git.
 
 `.rlsbl/`, `.rlsbl-monorepo/`, and `<member>/.rlsbl/` are the old layout: rlsbl reads none of them, `releasable-residue` reports what remains, and `rlsbl monorepo cleanup` removes it.
