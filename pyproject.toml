@@ -2,38 +2,14 @@
 name = "rlsbl"
 version = "0.131.0"
 description = "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more"
-license = "MIT"
-authors = [{ name = "smm-h" }]
 readme = "README.md"
-requires-python = ">=3.11"
-keywords = [
-    "release",
-    "release-automation",
-    "changelog",
-    "versioning",
-    "monorepo",
-    "npm",
-    "pypi",
-    "go",
-    "scaffold",
-    "rlsbl",
-]
+license = "MIT"
+keywords = ["release", "release-automation", "changelog", "versioning", "monorepo", "npm", "pypi", "go", "scaffold", "rlsbl"]
 classifiers = [
-    "Programming Language :: Python :: 3",
     "Environment :: Console",
-    "Operating System :: OS Independent",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
     "Intended Audience :: Developers",
-]
-dependencies = [
-    "ruamel-yaml>=0.19.1",
-    "strictcli>=0.46.0",
-    "strictspec>=0.5.0",
-    "tomlkit>=0.12",
-    "tree-sitter>=0.24",
-    "tree-sitter-go>=0.23",
-    "tree-sitter-javascript>=0.23",
-    "tree-sitter-python>=0.23",
-    "tree-sitter-typescript>=0.23",
 ]
 
 [project.urls]
@@ -42,100 +18,3 @@ Documentation = "https://smmh.dev/rlsbl/"
 Repository = "https://github.com/stricttools/rlsbl"
 Issues = "https://github.com/stricttools/rlsbl/issues"
 Changelog = "https://github.com/stricttools/rlsbl/blob/main/CHANGELOG.md"
-
-[project.scripts]
-rlsbl = "rlsbl:main"
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[dependency-groups]
-dev = [
-    "pytest>=9.0.3",
-    "pytest-cov>=5.0",
-    "pytest-xdist>=3.5",
-    "ruff>=0.15.20",
-    # rlsbl distributes the testisolation floor's outer layer (the bwrap runner and
-    # the testisolation-floor check), so it runs the published plugin rather than a
-    # private copy of it. Floor at the version that first shipped every ini key
-    # used below (the five safety keys plus threshold / tmp_prefix / git
-    # identity / preserve).
-    "testisolation>=0.3.0",
-]
-
-# The testisolation floor's configuration. Installing the plugin IS adoption: the
-# five safety keys are required and a missing one aborts the session.
-#
-# Stances, and why:
-#   sockets = deny        the suite reaches no network. Every outward call
-#                         (urlopen, socket.create_connection, gh, the registry
-#                         probes) is mocked; the sandbox has no network at all.
-#   *_allowlist = []      nothing is exempt from the above.
-#   loopback = deny       no test binds or dials a local port.
-#   sandbox_required      rlsbl HAS the runner (scripts/test.sh, emitted from
-#                         the test_sandbox config family), so the bare-run
-#                         threshold is enforced.
-#   threshold = 50        a targeted run (one file, a -k slice) stays bare-
-#                         runnable for iteration speed; anything bigger must go
-#                         through the sandbox.
-#   tmp_prefix            names rlsbl's throwaway env dirs recognizably.
-#   git identity          the session commit identity real-git fixtures inherit
-#                         when they configure none of their own.
-#   preserve              toolchain caches that must survive the HOME repoint:
-#                         the Go caches (the safegit_bin fixture go-installs the
-#                         pinned binary) and PYTHONUSERBASE (the extract/absorb
-#                         tests shell out to a system-python git-filter-repo).
-[tool.pytest.ini_options]
-testisolation_sockets = "deny"
-testisolation_socket_allowlist = []
-testisolation_unix_socket_allowlist = []
-testisolation_loopback = "deny"
-testisolation_sandbox_required = "true"
-testisolation_threshold = "50"
-testisolation_tmp_prefix = "rlsbl-test-env-"
-testisolation_git_user_name = "rlsbl-test"
-testisolation_git_user_email = "rlsbl-test@example.invalid"
-testisolation_preserve = ["go_path", "go_mod_cache", "go_cache", "python_user_base"]
-# Delete a passing test's tmp_path at its teardown. pytest's default keeps every
-# test's directory until the session ends, and the sandboxed runner's TMPDIR is
-# a tmpfs, so thousands of fixture repositories accumulated as RAM for the whole
-# run. A failing test's directory is kept for inspection.
-tmp_path_retention_policy = "failed"
-norecursedirs = ["*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv", "{arch}", "experiments", "screenshots"]
-
-[tool.coverage.run]
-source = ["rlsbl"]
-
-[tool.ruff]
-target-version = "py311"
-src = ["rlsbl", "tests"]
-# The test tree is in scope: an unused import there is the same defect it is in
-# the package, and an assigned-but-unused name in a test is routinely a missing
-# assertion rather than a stray variable.
-include = ["rlsbl/**/*.py", "tests/**/*.py"]
-
-[tool.ruff.lint]
-select = ["F401", "F841"]
-
-[tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401"]
-
-[tool.hatch.build.targets.sdist]
-exclude = [
-    "/todo/",
-    "/experiments/",
-    "/screenshots/",
-    "/stricttools/",
-    ".rlsbl/",
-    ".rlsbl-monorepo/",
-    ".strictmetadata/",
-    ".stricttools/",
-    ".claude/",
-    ".selfdoc/",
-    ".strictcli/",
-    "CLAUDE.md",
-    "AGENTS.md",
-    ".env*",
-    "*.local-only",
-]

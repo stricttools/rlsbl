@@ -2,24 +2,18 @@
   "name": "rlsbl",
   "version": "0.131.0",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more",
-  "homepage": "https://smmh.dev/rlsbl/",
   "license": "MIT",
-  "bin": {
-    "rlsbl": "bin/cli.js"
-  },
-  "files": [
-    "bin/"
-  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/stricttools/rlsbl.git"
   },
-  "bugs": {
-    "url": "https://github.com/stricttools/rlsbl/issues"
+  "homepage": "https://smmh.dev/rlsbl/",
+  "bin": {
+    "rlsbl": "bin/index.js"
   },
-  "engines": {
-    "node": ">=18"
-  },
+  "files": [
+    "bin/"
+  ],
   "keywords": [
     "release",
     "release-automation",
@@ -32,5 +26,11 @@
     "scaffold",
     "rlsbl"
   ],
+  "bugs": {
+    "url": "https://github.com/stricttools/rlsbl/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "author": "smm-h"
 }

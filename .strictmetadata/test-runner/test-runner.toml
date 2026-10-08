@@ -1,5 +1,5 @@
 format_version = 1
 caches = ["go"]
-ci_workflows = [".github/workflows/ci-pypi.yml"]
+ci_workflows = [".github/workflows/ci-go.yml"]
 command = "scripts/go-suite.sh"
 runner_path = "scripts/test.sh"

@@ -14,20 +14,31 @@ publish_mode = "ci"
 [[members]]
 path = "."
 name = "root"
+description = "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, Go and more"
 releasable = "rlsbl"
 internal_dep_floors = ["strictcli", "strictspec"]
-targets = [{ name = "npm" }, { name = "pypi" }]
+targets = [{ name = "go" }, { name = "npm" }, { name = "pypi" }]
+
+[[members.pipelines]]
+name = "go"
+type = "go"
+target = "go"
+local = false
+artifact = "binary"
+install_paths = ["./cmd/rlsbl"]
 
 [[members.pipelines]]
 name = "npm"
 type = "npm"
 target = "npm"
 local = false
-artifact = "package"
+artifact = "go-binary"
+binary_pipeline = "go"
 
 [[members.pipelines]]
 name = "pypi"
 type = "pypi"
 target = "pypi"
 local = false
-artifact = "package"
+artifact = "go-binary"
+binary_pipeline = "go"

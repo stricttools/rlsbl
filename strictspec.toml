@@ -15,30 +15,6 @@ path = ".strictspec/release-file.schema.toml"
   package = "releasefilespec"
 
 [[schemas]]
-path = ".strictspec/config.schema.toml"
-
-  [[schemas.targets]]
-  lang    = "python"
-  output  = "rlsbl/strictspec_gen/config_validator.py"
-  package = "rlsbl.strictspec_gen"
-
-[[schemas]]
-path = ".strictspec/adjudication.schema.toml"
-
-  [[schemas.targets]]
-  lang    = "python"
-  output  = "rlsbl/strictspec_gen/adjudication_validator.py"
-  package = "rlsbl.strictspec_gen"
-
-[[schemas]]
-path = ".strictspec/changelog-entry-commit-mode.schema.toml"
-
-  [[schemas.targets]]
-  lang    = "python"
-  output  = "rlsbl/strictspec_gen/changelog_entry_commit_validator.py"
-  package = "rlsbl.strictspec_gen"
-
-[[schemas]]
 path = ".strictspec/transition-record-event.schema.toml"
 
   [[schemas.targets]]
