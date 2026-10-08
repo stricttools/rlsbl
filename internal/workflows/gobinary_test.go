@@ -221,3 +221,73 @@ func TestTheWheelRecordCarriesEachFilesDigestAndSize(t *testing.T) {
 		t.Fatalf("got:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }
+
+// runWheelMetadata runs the wheel job's metadata script over the
+// pyproject.toml text at version, returning METADATA, or the script's
+// output and false when it refuses.
+func runWheelMetadata(t *testing.T, pyproject string, files map[string]string, version string) (string, bool) {
+	t.Helper()
+	python, err := exec.LookPath("python3")
+	if err != nil {
+		t.Fatalf("the wheel job's metadata script runs on python3: %v", err)
+	}
+	dir := t.TempDir()
+	testsupport.WriteFile(t, filepath.Join(dir, "pkg", "pyproject.toml"), pyproject)
+	for rel, content := range files {
+		testsupport.WriteFile(t, filepath.Join(dir, "pkg", rel), content)
+	}
+	out := filepath.Join(dir, "out")
+	if err := os.MkdirAll(out, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(python, "-", filepath.Join(dir, "pkg", "pyproject.toml"), version, out)
+	cmd.Stdin = strings.NewReader(wheelMetadataScript)
+	if combined, err := cmd.CombinedOutput(); err != nil {
+		return string(combined), false
+	}
+	data, err := os.ReadFile(filepath.Join(out, "METADATA"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data), true
+}
+
+// The wheels' METADATA carries what PyPI shows on the project page: the
+// readme as the description body with its content type, the keywords, and
+// the classifiers.
+func TestTheWheelMetadataCarriesTheReadmeKeywordsAndClassifiers(t *testing.T) {
+	hygiene.Isolate(t)
+	pyproject := `[project]
+name = "portal"
+version = "1.2.3"
+description = "A portal"
+readme = "README.md"
+license = "MIT"
+keywords = ["one", "two"]
+classifiers = ["Environment :: Console", "Operating System :: MacOS"]
+`
+	got, ok := runWheelMetadata(t, pyproject, map[string]string{"README.md": "# Portal\n\nIt opens.\n"}, "1.2.3")
+	if !ok {
+		t.Fatalf("the metadata script refused: %s", got)
+	}
+	want := "Metadata-Version: 2.4\nName: portal\nVersion: 1.2.3\nSummary: A portal\nLicense-Expression: MIT\nKeywords: one,two\nClassifier: Environment :: Console\nClassifier: Operating System :: MacOS\nDescription-Content-Type: text/markdown\n\n# Portal\n\nIt opens.\n"
+	if got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
+
+	table := strings.Replace(pyproject, `readme = "README.md"`, `readme = { file = "README.rst", content-type = "text/x-rst" }`, 1)
+	got, ok = runWheelMetadata(t, table, map[string]string{"README.rst": "Portal\n======\n"}, "1.2.3")
+	if !ok || !strings.HasSuffix(got, "Description-Content-Type: text/x-rst\n\nPortal\n======\n") {
+		t.Fatalf("a readme table: %v\n%s", ok, got)
+	}
+
+	for name, text := range map[string]string{
+		"a readme file that is missing":   strings.Replace(pyproject, `"README.md"`, `"MISSING.md"`, 1),
+		"a readme of an unknown suffix":   strings.Replace(pyproject, `"README.md"`, `"README.adoc"`, 1),
+		"a readme table without its type": strings.Replace(pyproject, `readme = "README.md"`, `readme = { file = "README.md" }`, 1),
+	} {
+		if got, ok := runWheelMetadata(t, text, map[string]string{"README.md": "x\n", "README.adoc": "x\n"}, "1.2.3"); ok {
+			t.Errorf("%s was accepted:\n%s", name, got)
+		}
+	}
+}

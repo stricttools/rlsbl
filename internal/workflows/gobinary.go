@@ -320,8 +320,8 @@ func jsString(s string) string {
 type WheelPackaging struct {
 	GoBinaryRelease
 	// Dir is the directory of the pyproject.toml whose [project] table gives
-	// the wheels their name, version, description, license, and urls,
-	// relative to the directory the job runs in.
+	// the wheels their name, version, description, license, urls,
+	// keywords, classifiers, and readme, relative to the directory the job runs in.
 	Dir string
 	// Attestations publishes with PyPI attestations, which scaffold gives
 	// only when its workflow features allow build attestations.
@@ -331,9 +331,10 @@ type WheelPackaging struct {
 }
 
 // wheelMetadataScript reads pyproject.toml's [project] table into the
-// wheel's METADATA and its distribution name, refusing a version other than
-// the released one.
-const wheelMetadataScript = `import sys, tomllib
+// wheel's METADATA (with the readme as its description body, which PyPI
+// shows on the project page) and its distribution name, refusing a version
+// other than the released one.
+const wheelMetadataScript = `import os, sys, tomllib
 path, version, out = sys.argv[1:4]
 with open(path, "rb") as f:
     project = tomllib.load(f).get("project")
@@ -355,8 +356,35 @@ elif license is not None:
     sys.exit(f"::error::{path} declares its license as a table; write it as an SPDX expression string")
 for label, url in (project.get("urls") or {}).items():
     lines.append(f"Project-URL: {label}, {url}")
+keywords = project.get("keywords")
+if keywords:
+    lines.append("Keywords: " + ",".join(keywords))
+for classifier in project.get("classifiers") or []:
+    lines.append(f"Classifier: {classifier}")
+body = ""
+readme = project.get("readme")
+if readme is not None:
+    types = {".md": "text/markdown", ".rst": "text/x-rst", ".txt": "text/plain"}
+    if isinstance(readme, str):
+        file, text = readme, None
+        content_type = types.get(os.path.splitext(readme)[1].lower())
+        if content_type is None:
+            sys.exit(f"::error::{path} names the readme {readme}, whose suffix is none of {', '.join(types)}; write readme as a table with its content-type")
+    else:
+        file, text, content_type = readme.get("file"), readme.get("text"), readme.get("content-type")
+        if not content_type:
+            sys.exit(f"::error::{path} declares its readme as a table without a content-type")
+    if text is None:
+        readme_path = os.path.join(os.path.dirname(path), file)
+        try:
+            with open(readme_path, encoding="utf-8") as f:
+                text = f.read()
+        except OSError as e:
+            sys.exit(f"::error::{path} names the readme {file}, which cannot be read: {e}")
+    lines.append(f"Description-Content-Type: {content_type}")
+    body = "\n" + text
 with open(out + "/METADATA", "w") as f:
-    f.write("\n".join(lines) + "\n")
+    f.write("\n".join(lines) + "\n" + body)
 with open(out + "/name", "w") as f:
     f.write(name)
 `
