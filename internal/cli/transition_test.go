@@ -9,6 +9,7 @@ import (
 	"github.com/stricttools/strictspec/go/lifecycle"
 	"github.com/stricttools/testisolation/go/hygiene"
 
+	"github.com/stricttools/rlsbl/internal/lifecycleops"
 	"github.com/stricttools/rlsbl/internal/testsupport"
 )
 
@@ -30,6 +31,7 @@ func TestTheTransitionCommandsAreClassified(t *testing.T) {
 		"classify":            {strictcli.EffectMutating, true},
 		"declassify":          {strictcli.EffectMutating, true},
 		"init-minimal-record": {strictcli.EffectMutating, false},
+		"public-client":       {strictcli.EffectMutating, true},
 	} {
 		cmd, ok := group.Commands[name]
 		if !ok || cmd.Effect != want.effect || cmd.Consequential != want.consequential {
@@ -130,5 +132,31 @@ func TestClassifyRefusesACheckoutNamingNoGitHubRepository(t *testing.T) {
 	r := appWith(t, testsupport.NewFakeHTTP(t)).Test([]string{"transition", "classify", "--subject", "portal", "--reason", "closed", "--dry-run"})
 	if r.ExitCode != 1 || !strings.Contains(r.Stderr, "no GitHub repository is declared (github_repository)") {
 		t.Fatalf("exit %d:\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
+	}
+}
+
+func TestPublicClientNeedsASubjectAndAReason(t *testing.T) {
+	hygiene.Isolate(t)
+	releaseCommandsProject(t)
+	app := appWith(t, testsupport.NewFakeHTTP(t))
+	for _, args := range [][]string{
+		{"transition", "public-client", "--approve-consequential", "--reason", "a client"},
+		{"transition", "public-client", "--approve-consequential", "--subject", "portal"},
+		{"transition", "public-client", "--approve-consequential", "--subject", "portal", "--reason", ""},
+	} {
+		if r := app.Test(args); r.ExitCode == 0 {
+			t.Errorf("%q was accepted:\n%s", args, r.Stdout)
+		}
+	}
+}
+
+func TestTransitionShowRendersThePublicClients(t *testing.T) {
+	hygiene.Isolate(t)
+	out := renderTransitionShow(lifecycleops.Report{RecordFile: lifecycle.RecordFile, Present: true, Date: "2026-06-01", Confidential: true,
+		PublicClients: []lifecycleops.ReportPublicClient{{Subject: "portal", Reason: "a thin public client is planned", Declared: "2026-06-01"}}})
+	for _, want := range []string{"Public clients", "portal", "2026-06-01", "a thin public client is planned"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in:\n%s", want, out)
+		}
 	}
 }

@@ -58,6 +58,7 @@
   "transition.init-minimal-record",
   "transition.license",
   "transition.lifecycle",
+  "transition.public-client",
   "transition.show",
   "transition.unversioned-tag",
   "unreleased",

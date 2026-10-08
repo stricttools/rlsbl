@@ -293,3 +293,62 @@ func headRecord(repo git.Repo) (*lifecycle.Record, error) {
 	}
 	return lifecycle.Parse([]byte(text))
 }
+
+// PublicClient declares that a subject of a confidential repository has, or
+// will have, a public client: its registry names and the repository's names
+// leave the confidential-name index (its codenames and distinctive terms
+// stay). The subject is one the record holds a period, identity, or
+// registry name of; a public repository, where no name is confidential, and
+// a subject declared already are refused.
+func (inv Invocation) PublicClient(dir, subject, reason string) error {
+	m, err := inv.openManaged(dir)
+	if err != nil {
+		return err
+	}
+	on := inv.Now()
+	rec := m.record
+	if !rec.Confidential(on) {
+		return fmt.Errorf("the repository is public on %s, where no name is confidential, so it declares no public client; nothing was written. A releasable is made proprietary by `rlsbl transition classify --subject <releasable> --reason <why>`", day(on))
+	}
+	if !recordSubject(rec, subject) {
+		return fmt.Errorf("%q is not a subject the record holds a lifecycle period, license period, identity, or registry name of; nothing was written", subject)
+	}
+	for _, p := range rec.PublicClients() {
+		if p.Subject == subject {
+			return fmt.Errorf("%q already has a public client (declared %s); nothing was written", subject, day(p.Declared))
+		}
+	}
+	if err := rec.DeclarePublicClient(subject, reason, on); err != nil {
+		return err
+	}
+	return inv.save(m, rec, on, "transition: "+subject+" has a public client", outcome{
+		fmt.Sprintf("%s has a public client from %s; its registry names and the repository's names leave the confidential-name index.", subject, day(on)),
+		fmt.Sprintf("Would record that %s has a public client from %s, taking its registry names and the repository's names out of the confidential-name index.", subject, day(on)),
+	})
+}
+
+// recordSubject reports whether the record holds a lifecycle period, license
+// period, identity, or registry name of subject.
+func recordSubject(rec *lifecycle.Record, subject string) bool {
+	for _, l := range rec.Lifecycle() {
+		if l.Subject == subject {
+			return true
+		}
+	}
+	for _, l := range rec.Licenses() {
+		if l.Subject == subject {
+			return true
+		}
+	}
+	for _, id := range rec.Identities() {
+		if id.Subject == subject {
+			return true
+		}
+	}
+	for _, n := range rec.RegistryNames() {
+		if n.Subject == subject {
+			return true
+		}
+	}
+	return false
+}

@@ -173,7 +173,8 @@ func sameLicenses(a, b map[string]string) bool {
 // changelog's commit ids, the archives' release commits, with an archive
 // whose release commit was folded into a commit of another tree made
 // unrecoverable); the proprietary license periods close and the licenses
-// --license names open; the codenames and distinctive terms are removed;
+// --license names open; the codenames, distinctive terms, and public-client
+// declarations are removed;
 // the repository's confidential-name index entry is removed; a history-
 // rewrite archive records the run; everything is committed; the branch and
 // the moved tags are force-pushed with leases taken before the first
@@ -372,7 +373,7 @@ func (inv Invocation) beginDeclassify(m managed, req DeclassifyRequest) (*declas
 		inv.Say("No commit of the release branch falls in a proprietary period; there is nothing to squash.")
 	}
 	if inv.DryRun {
-		inv.Say(fmt.Sprintf("Then close the proprietary licenses on %s and open %s, remove the codenames and distinctive terms and the index entry, commit, force-push %s and the moved tags, rewrite their GitHub Releases, and make %s public. Nothing was written.", day(on), licenseFlags(req.Licenses), branch, slug))
+		inv.Say(fmt.Sprintf("Then close the proprietary licenses on %s and open %s, remove the codenames, distinctive terms, public-client declarations, and the index entry, commit, force-push %s and the moved tags, rewrite their GitHub Releases, and make %s public. Nothing was written.", day(on), licenseFlags(req.Licenses), branch, slug))
 		return nil, nil
 	}
 	remote, err := m.repo.RemoteRefsPeeled(origin)

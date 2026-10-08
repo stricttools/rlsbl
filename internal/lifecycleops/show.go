@@ -28,17 +28,18 @@ const (
 // Report is what `transition show` prints: the record's entries and every
 // rule's verdict on the command's date.
 type Report struct {
-	RecordFile       string           `json:"record_file"`
-	Present          bool             `json:"present"`
-	Date             string           `json:"date"`
-	Confidential     bool             `json:"confidential"`
-	Lifecycle        []ReportPeriod   `json:"lifecycle"`
-	Licenses         []ReportPeriod   `json:"licenses"`
-	Identities       []ReportIdentity `json:"identities"`
-	RegistryNames    []ReportName     `json:"registry_names"`
-	UnversionedTags  []ReportTag      `json:"unversioned_tags"`
-	Codenames        []string         `json:"codenames"`
-	DistinctiveTerms []string         `json:"distinctive_terms"`
+	RecordFile       string               `json:"record_file"`
+	Present          bool                 `json:"present"`
+	Date             string               `json:"date"`
+	Confidential     bool                 `json:"confidential"`
+	Lifecycle        []ReportPeriod       `json:"lifecycle"`
+	Licenses         []ReportPeriod       `json:"licenses"`
+	Identities       []ReportIdentity     `json:"identities"`
+	RegistryNames    []ReportName         `json:"registry_names"`
+	UnversionedTags  []ReportTag          `json:"unversioned_tags"`
+	PublicClients    []ReportPublicClient `json:"public_clients"`
+	Codenames        []string             `json:"codenames"`
+	DistinctiveTerms []string             `json:"distinctive_terms"`
 	// Problems are why the record is not valid against the declarations on
 	// the date; empty when it is.
 	Problems []string  `json:"problems"`
@@ -82,6 +83,13 @@ type ReportTag struct {
 	Tag      string `json:"tag"`
 	Reason   string `json:"reason"`
 	Recorded string `json:"recorded"`
+}
+
+// ReportPublicClient is one public-client declaration.
+type ReportPublicClient struct {
+	Subject  string `json:"subject"`
+	Reason   string `json:"reason"`
+	Declared string `json:"declared"`
 }
 
 // Verdict is one rule's verdict, for the repository or one subject.
@@ -129,7 +137,7 @@ func (inv Invocation) Show(dir string) (Report, error) {
 	on := inv.Now()
 	r := Report{RecordFile: lifecycle.RecordFile, Present: rec.Present(), Date: day(on), Confidential: rec.Confidential(on),
 		Lifecycle: []ReportPeriod{}, Licenses: []ReportPeriod{}, Identities: []ReportIdentity{}, RegistryNames: []ReportName{},
-		UnversionedTags: []ReportTag{}, Codenames: append([]string{}, rec.Codenames()...),
+		UnversionedTags: []ReportTag{}, PublicClients: []ReportPublicClient{}, Codenames: append([]string{}, rec.Codenames()...),
 		DistinctiveTerms: append([]string{}, rec.DistinctiveTerms()...), Problems: []string{}, Verdicts: []Verdict{}}
 	for _, l := range rec.Lifecycle() {
 		r.Lifecycle = append(r.Lifecycle, ReportPeriod{l.Subject, string(l.Status), day(l.From), dateOrEmpty(l.Until), l.Reason})
@@ -145,6 +153,9 @@ func (inv Invocation) Show(dir string) (Report, error) {
 	}
 	for _, u := range rec.UnversionedTags() {
 		r.UnversionedTags = append(r.UnversionedTags, ReportTag{u.Tag, u.Reason, day(u.Recorded)})
+	}
+	for _, p := range rec.PublicClients() {
+		r.PublicClients = append(r.PublicClients, ReportPublicClient{p.Subject, p.Reason, day(p.Declared)})
 	}
 	var declared, releasables []string
 	if d != nil {

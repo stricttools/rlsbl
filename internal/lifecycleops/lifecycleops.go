@@ -4,8 +4,10 @@
 // by strictspec and read through its lifecycle library), `transition show`,
 // which prints the record and every rule's verdict, `transition classify`,
 // which makes a releasable proprietary, `transition declassify`, which takes
-// a repository public, and `transition init-minimal-record`, for a
-// repository rlsbl does not manage.
+// a repository public, `transition public-client`, which takes a subject's
+// registry names and the repository's names out of the confidential-name
+// index, and `transition init-minimal-record`, for a repository rlsbl does
+// not manage.
 //
 // A command that opens a period closes the subject's period in effect on the
 // command's date first. A command that changes the record validates the
