@@ -1,6 +1,6 @@
 +++
 title = "rlsbl scaffold"
-description = "Generate or update CI/CD workflows, git hooks, changelog, and license files."
+description = "rlsbl scaffold: render a member's CI and publish workflows, version files, gitignore lines, LICENSE, hooks, and test runner, kept current by three-way merge."
 generated = true
 nav_group = "CLI Reference"
 nav_order = 14

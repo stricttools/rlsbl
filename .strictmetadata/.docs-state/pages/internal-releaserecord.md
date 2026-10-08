@@ -1,8 +1,7 @@
 +++
 title = "internal/releaserecord"
-description = "Package releaserecord is the record of what a releasable has released: its release file, its release archives with their fates, the questions asked of them (the nearest release a checkout contains, the latest release, the fate of one version, the next version a release ships), the batch release file, the transition record of repository surgery, the explanation of the tags a repository holds, and the move of recorded release commits through a history rewrite."
+description = "The record of what a releasable released: the release file, archives and their fates, the batch release file, the transition record, and tag accounting."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 25
 +++

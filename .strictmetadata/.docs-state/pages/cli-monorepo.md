@@ -1,6 +1,6 @@
 +++
 title = "rlsbl monorepo"
-description = "Manage monorepo workspaces with multiple independently-versioned projects."
+description = "rlsbl monorepo: declare and change a workspace's members, report on them, generate its routers, batch releases, and extract, absorb, or rename releasables."
 generated = true
 nav_group = "CLI Reference"
 nav_order = 10

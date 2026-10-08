@@ -1,8 +1,7 @@
 +++
 title = "internal/cli"
-description = "Package cli is rlsbl's command line: the strictcli application, every command and group registration (one file per group), their flags and arguments, the payload types and human renderings of --json, and the wiring of the checks registry and the observe allowlist."
+description = "rlsbl's command line: the strictcli application with every command and group, their flags, arguments, and --json payloads, and the checks and observe wiring."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 6
 +++

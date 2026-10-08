@@ -1,8 +1,7 @@
 +++
 title = "internal/saferm"
-description = "Package saferm deletes files through saferm, the deletion tool with an audit trail and undo."
+description = "Deleting files through saferm, the deletion tool with an audit trail and undo, always stopping at the first failure."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 28
 +++

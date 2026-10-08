@@ -1,8 +1,7 @@
 +++
 title = "internal/batchrelease"
-description = "Package batchrelease is `rlsbl monorepo release`: run releases several releasables of a workspace as one batch, init writes the batch release file naming them, and order reports the order a batch releases them in."
+description = "The batch release of several releasables of a workspace: the batch release file, the run on one CI-verified candidate, and the batch's order."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 2
 +++

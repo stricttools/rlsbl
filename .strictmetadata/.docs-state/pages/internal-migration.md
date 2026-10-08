@@ -1,8 +1,7 @@
 +++
 title = "internal/migration"
-description = "Package migration converts a repository's rlsbl records from the layout the Python rlsbl wrote (.rlsbl/, .rlsbl-monorepo/, and each member's .rlsbl/) to the .strictmetadata/ layout the Go rlsbl reads, once per repository."
+description = "The one-time migration of a repository's records from the Python rlsbl's .rlsbl/ and .rlsbl-monorepo/ layout to the .strictmetadata/ layout."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 15
 +++

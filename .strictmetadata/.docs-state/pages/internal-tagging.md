@@ -1,8 +1,7 @@
 +++
 title = "internal/tagging"
-description = "Package tagging marks a project as part of the rlsbl ecosystem: the rlsbl keyword in package.json and pyproject.toml, and the rlsbl topic on the GitHub repository."
+description = "Ecosystem tagging: the rlsbl keyword in package.json and pyproject.toml, the rlsbl topic on the GitHub repository, and finding repositories that carry it."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 32
 +++

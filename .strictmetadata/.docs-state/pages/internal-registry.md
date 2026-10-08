@@ -1,8 +1,7 @@
 +++
 title = "internal/registry"
-description = "Package registry answers rlsbl's questions about the package registries: whether a name is free on npm or PyPI and whether a Go package name is usable, which versions of a package or module are published, a module's deprecation notice, name claims, and whether the npm token on this machine is live and copied into a repository's NPM_TOKEN secret."
+description = "Questions to the package registries: name availability on npm, PyPI, and Go, published versions, deprecation notices, name claims, and the npm token."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 21
 +++

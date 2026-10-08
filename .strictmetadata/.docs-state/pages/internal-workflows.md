@@ -1,8 +1,7 @@
 +++
 title = "internal/workflows"
-description = "Package workflows generates the GitHub Actions workflows rlsbl owns: a workspace's CI router (every member's CI jobs inlined into one ci-router.yml, each run only when the push touched what the member's path filter covers), a workspace's publish router (every publishing member's publish jobs inlined into one publish.yml, each run only for its own releasable's tags), the wait-for-ci job that holds every publish until the releasing project's CI passed on the release commit, and the jobs that package a go binary pipeline's binaries for npm (one platform package per platform and the main package selecting them) and for PyPI (one binary wheel per platform)."
+description = "The GitHub Actions workflows rlsbl generates: a workspace's CI and publish routers, the wait-for-ci job, and the packaging of Go binaries for npm and PyPI."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 35
 +++

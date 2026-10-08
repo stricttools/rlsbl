@@ -1,8 +1,7 @@
 +++
 title = "internal/git"
-description = "Package git is rlsbl's git plumbing."
+description = "rlsbl's git plumbing, every call made through the strictcli effects handle: reads, commits through safegit, refs, tags, pushes, and history queries."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 10
 +++

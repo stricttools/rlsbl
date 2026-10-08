@@ -1,6 +1,6 @@
 +++
 title = "rlsbl targets"
-description = "List all release targets detected in the current project directory, showing which ecosystems (npm, PyPI, Go, etc.) are active based on manifest files found."
+description = "rlsbl targets: every release target rlsbl supports with the files its version lives in, and which ones the current member declares or is detected as."
 generated = true
 nav_group = "CLI Reference"
 nav_order = 17

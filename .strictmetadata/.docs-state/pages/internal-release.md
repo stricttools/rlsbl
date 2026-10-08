@@ -1,8 +1,7 @@
 +++
 title = "internal/release"
-description = "API reference for the internal/release module — auto-generated documentation covering public functions, classes, and type signatures."
+description = "The release of a releasable: validation, the release checkout, the preflight and pre-release pipeline, the release steps, the CI verdict, and resume."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 22
 +++

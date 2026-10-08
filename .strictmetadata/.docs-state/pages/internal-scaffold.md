@@ -1,8 +1,7 @@
 +++
 title = "internal/scaffold"
-description = "Package scaffold is `rlsbl scaffold`: it renders a member's release infrastructure from rlsbl's embedded templates and keeps it current."
+description = "The rlsbl scaffold command: rendering a member's release infrastructure from rlsbl's embedded templates and keeping it current by three-way merge."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 29
 +++

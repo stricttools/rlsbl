@@ -1,6 +1,6 @@
 +++
 title = "rlsbl watch"
-description = "Poll GitHub Actions CI workflow runs for a specific commit SHA and report pass or fail status."
+description = "rlsbl watch: watch the GitHub Actions runs of a commit or of named runs until they conclude, running a failure that is not deterministic again once."
 generated = true
 nav_group = "CLI Reference"
 nav_order = 21

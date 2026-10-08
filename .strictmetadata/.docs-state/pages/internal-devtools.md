@@ -1,8 +1,7 @@
 +++
 title = "internal/devtools"
-description = "Package devtools is rlsbl's developer commands: `rlsbl dev install`, which runs each target's own install command for local development, and `rlsbl dev sync` and `rlsbl dev status`, which overlay editable checkouts of sibling projects onto a member's locked Python environment and report whether the overlays are still in place."
+description = "The rlsbl dev commands: local installs through each target's own install command, and editable overlays of sibling checkouts with their drift status."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 9
 +++

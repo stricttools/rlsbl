@@ -1,8 +1,7 @@
 +++
 title = "internal/secrets"
-description = "Package secrets keeps the Actions secrets CI publishes with in step with the credentials on this machine: `rlsbl secrets sync-npm-token` copies the npm token in ~/.npmrc into the NPM_TOKEN secret of repositories that already carry one."
+description = "The rlsbl secrets commands, which copy the npm token on this machine into the NPM_TOKEN Actions secret of repositories that already carry one."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 30
 +++

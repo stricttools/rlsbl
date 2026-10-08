@@ -1,6 +1,6 @@
 +++
 title = "rlsbl check-name"
-description = "Check whether package names are usable: npm and PyPI availability over the network, and an offline check of the Go package name a candidate implies."
+description = "rlsbl check-name: whether package names are usable, asking npm and PyPI over the network and judging a Go package name offline, with an exit code per verdict."
 generated = true
 nav_group = "CLI Reference"
 nav_order = 3

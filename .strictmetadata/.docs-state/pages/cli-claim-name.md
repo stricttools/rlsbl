@@ -1,6 +1,6 @@
 +++
 title = "rlsbl claim-name"
-description = "Claim a name on a package registry by publishing a minimal placeholder package."
+description = "rlsbl claim-name: claim a name on npm or PyPI by publishing a minimal 0.0.0 placeholder package, only after the check-name check reports it available."
 generated = true
 nav_group = "CLI Reference"
 nav_order = 4

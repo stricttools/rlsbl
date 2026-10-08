@@ -1,8 +1,7 @@
 +++
 title = "internal/dependencies"
-description = "Package dependencies reads what a project declares about its dependencies and what its lockfiles resolved: pyproject.toml and uv.lock, package.json and package-lock.json, go.mod and go.sum."
+description = "What a project declares about its dependencies and what its lockfiles resolved: pyproject.toml and uv.lock, package.json and its lock, go.mod and go.sum."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 8
 +++

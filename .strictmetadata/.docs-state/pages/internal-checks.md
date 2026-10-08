@@ -1,8 +1,7 @@
 +++
 title = "internal/checks"
-description = "Package checks is rlsbl's checks: the checks registry, embedded from checks.toml so the binary carries it wherever it is installed, and the implementation of each check, one file per family, registered on the application through strictcli's check framework by Register."
+description = "rlsbl's checks: the checks registry embedded from checks.toml and the implementation of each check, registered on strictcli's check framework."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 4
 +++

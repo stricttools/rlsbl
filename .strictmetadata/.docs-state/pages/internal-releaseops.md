@@ -1,8 +1,7 @@
 +++
 title = "internal/releaseops"
-description = "Package releaseops is rlsbl's commands on past releases: `release edit` rewrites one version's GitHub Release from the record, `release retry` dispatches a release's workflows again at its tag, `release undo` reverts a release once the evidence shows nothing published it, `release abandon` records an abandoned attempt's version as never released, and `release deprecate` and `release yank` put a notice on a past version, yank also performing each registry's own removal (npm deprecate, a Go retract directive, PyPI's manual yank), and never unpublishing anything."
+description = "The commands on past releases: release edit, retry, undo, abandon, deprecate, and yank, none of which ever unpublishes a package."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 24
 +++

@@ -1,8 +1,7 @@
 +++
 title = "internal/publishrules"
-description = "Package publishrules is rlsbl's side of the lifecycle-and-license rules at release time: the repository's visibility on GitHub, the refusals of what a releasable's release would publish (the proprietary-refuses-public-output and private-repository-publishing rules, which the lifecycle library decides), the deploy command's license precondition, the publish workflow features scaffold may render, the packed-artifact contents check, and the scan of published text for confidential names."
+description = "The lifecycle-and-license rules at release time: repository visibility, refused public outputs, the deploy precondition, packed contents, confidential names."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 20
 +++

@@ -1,8 +1,7 @@
 +++
 title = "internal/declarations"
-description = "Package declarations reads and writes a repository's release declarations, .strictmetadata/releasables/releasables.toml, and the sandboxed test runner's settings, .strictmetadata/test-runner/test-runner.toml."
+description = "Reading and writing the release declarations in releasables.toml and the sandboxed test runner's settings in test-runner.toml."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 7
 +++

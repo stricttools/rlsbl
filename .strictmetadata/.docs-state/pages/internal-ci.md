@@ -1,8 +1,7 @@
 +++
 title = "internal/ci"
-description = "Package ci observes GitHub Actions for a release: whether the releasing project's own CI ran and passed on a commit (the question the release asks before it tags, and the publish workflow's wait-for-ci job asks again before anything is published), the verdict of every CI run on a pushed candidate (green, red, timed out, or no CI configured) with a classified retry of a failed run, the CI router's run_all dispatch, the publish workflows a published Release must start and whether they did, and the watch command's view of a commit."
+description = "What a release asks of GitHub Actions: whether its own CI passed on a commit, the verdict on a pushed candidate, retries of failed runs, and the publish runs."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 5
 +++

@@ -1,8 +1,7 @@
 +++
 title = "internal/rewrite"
-description = "Package rewrite holds the working-tree rewrites of the `rlsbl rewrite` group: renaming a Go module path across a repository, renaming a standalone project's published identity, and turning path- and workspace-sourced Python dependencies into registry floors."
+description = "The rlsbl rewrite commands: renaming a Go module path, renaming a standalone project's published identity, and turning Python path sources into registry floors."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 26
 +++

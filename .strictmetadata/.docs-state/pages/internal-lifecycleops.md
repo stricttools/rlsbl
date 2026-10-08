@@ -1,8 +1,7 @@
 +++
 title = "internal/lifecycleops"
-description = "Package lifecycleops is rlsbl's `transition` command group: the commands that write the lifecycle-and-license record (.strictmetadata/lifecycle-and-license/lifecycle-and-license.toml, owned by strictspec and read through its lifecycle library), `transition show`, which prints the record and every rule's verdict, `transition classify`, which makes a releasable proprietary, `transition declassify`, which takes a repository public, and `transition init-minimal-record`, for a repository rlsbl does not manage."
+description = "The transition command group, which shows and writes the lifecycle-and-license record, classifies and declassifies repositories, and writes a minimal record."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 14
 +++

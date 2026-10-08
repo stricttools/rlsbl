@@ -1,6 +1,6 @@
 +++
 title = "rlsbl transition"
-description = "Record the transition-record facts an operator states."
+description = "rlsbl transition: show and write the lifecycle-and-license record's lifecycle, license, and identity periods and unversioned tags, and classify or declassify."
 generated = true
 nav_group = "CLI Reference"
 nav_order = 18

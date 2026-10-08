@@ -1,6 +1,6 @@
 +++
 title = "rlsbl dev"
-description = "Developer utilities for locally working with rlsbl projects, including editable installs that mirror the project's release target (pypi -> uv tool install -e, npm -> npm link, go -> go install)."
+description = "rlsbl dev: install a project the way its release targets install it, and overlay editable checkouts of sibling projects onto a member's Python environment."
 generated = true
 nav_group = "CLI Reference"
 nav_order = 6

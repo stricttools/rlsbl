@@ -1,8 +1,7 @@
 +++
 title = "internal/targets"
-description = "Package targets is rlsbl's release target protocol for go, npm, and pypi: detecting a target from its manifests, reading and writing its version (VERSION, package.json, pyproject.toml with the package's __version__), reading its package name, license, and description, the companion tags a Go module owes, the test command a target's built-in runner runs, the Python build, the files an upload would carry and the private paths it must never carry (with the standalone program pypi CI runs over a built upload), the exclusions scaffold writes into a project's own runner and build configuration, whether a project is a strictcli program and its entry point, the local-install commands, and the support matrix."
+description = "The release targets go, npm, and pypi: detection, version files, package metadata, built-in tests, builds, upload contents, installs, and the support matrix."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 33
 +++

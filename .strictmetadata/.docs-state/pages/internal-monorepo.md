@@ -1,8 +1,7 @@
 +++
 title = "internal/monorepo"
-description = "Package monorepo is the `rlsbl monorepo` commands on a workspace: init writes a repository's first declarations, add and remove change its members, list, status, outdated, graph, and impact report on them, check-names asks the registries about their names, cleanup removes the old layout's residue, rename-releasable renames a releasable with its state and its identities in the lifecycle-and-license record, extract moves a releasable out into a repository of its own, and absorb brings a repository in as a member."
+description = "The rlsbl monorepo commands on a workspace: init, adding and removing members, reports on them, cleanup, renames, extract, and absorb."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 16
 +++

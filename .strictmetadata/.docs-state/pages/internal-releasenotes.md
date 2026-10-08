@@ -1,8 +1,7 @@
 +++
 title = "internal/releasenotes"
-description = "Package releasenotes decides what one released version's GitHub Release carries and writes it there."
+description = "What one released version's GitHub Release carries, its notices, notes, and rlsbl-ci-sha marker, and writing it there."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 23
 +++

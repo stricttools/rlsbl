@@ -1,8 +1,7 @@
 +++
 title = "internal/changelog"
-description = "Package changelog is rlsbl's structured changelog: one JSONL file of entries per release of each releasable, under .strictmetadata/changelog/<releasable>/ (unreleased.jsonl, and a read-only <version>.jsonl per release), with CHANGELOG.md generated from them."
+description = "The structured JSONL changelog of each releasable: entries and their validation, adding and changing them, coverage of commits, remapping ids, and CHANGELOG.md."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 3
 +++

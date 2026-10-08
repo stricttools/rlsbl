@@ -1,6 +1,6 @@
 +++
 title = "rlsbl discover"
-description = "Search GitHub for repositories tagged with the rlsbl topic and list them."
+description = "rlsbl discover: list the GitHub repositories carrying the rlsbl topic, most recently updated first, or with --mine only the authenticated account's own."
 generated = true
 nav_group = "CLI Reference"
 nav_order = 7

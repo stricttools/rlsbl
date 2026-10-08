@@ -1,6 +1,6 @@
 +++
 title = "rlsbl unreleased"
-description = "List the commits between this checkout's nearest release commit and HEAD, and check whether each has a corresponding changelog entry."
+description = "rlsbl unreleased: a releasable's commits since the nearest release this checkout contains, each marked covered, exempt, or missing a changelog entry."
 generated = true
 nav_group = "CLI Reference"
 nav_order = 19

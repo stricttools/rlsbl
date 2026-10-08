@@ -1,8 +1,7 @@
 +++
 title = "internal/pipelines"
-description = "Package pipelines is what rlsbl's publish pipelines mean: the npm, pypi, and go pipeline types, the artifacts each publishes, the repository secrets a CI publish job reads, whether a pipeline asks the Go module proxy about the repository's module, a local publish from this machine, and the platform table one go binary pipeline's binaries are packaged for (npm platform packages and PyPI binary wheels alike)."
+description = "rlsbl's publish pipelines for go, npm, and pypi: their artifacts and CI secrets, local publishing, and the platform table of Go binaries on npm and PyPI."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 18
 +++

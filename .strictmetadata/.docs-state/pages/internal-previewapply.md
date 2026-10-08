@@ -1,8 +1,7 @@
 +++
 title = "internal/previewapply"
-description = "Package previewapply is the observe, preview, apply skeleton of rlsbl's reconcilers, and the observe allowlist that decides which programs may run while rlsbl is only looking."
+description = "The observe, preview, and apply structure of rlsbl's reconcilers, and the observe allowlist of programs that may run while rlsbl is only looking."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 19
 +++

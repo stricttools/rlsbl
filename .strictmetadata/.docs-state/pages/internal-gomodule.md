@@ -1,8 +1,7 @@
 +++
 title = "internal/gomodule"
-description = "Package gomodule reads Go modules for rlsbl: go.mod parsed with golang.org/x/mod/modfile (the module path, requirements, replacements, the toolchain line, retractions), the containment rule for module paths, whether each module path still names where the repository lives, the packages `go list` enumerates and the main packages among them, go.work's use directives, and whether every -X linker flag names a symbol the linker can set."
+description = "Go modules for rlsbl: go.mod parsing, module path containment and identity, the packages go list enumerates, go.work, and the -X linker flag check."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 12
 +++

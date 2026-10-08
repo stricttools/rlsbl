@@ -1,8 +1,7 @@
 +++
 title = "internal/semver"
-description = "Package semver parses, orders, and bumps release versions."
+description = "Release versions for rlsbl: parsing, ordering, and bumping MAJOR.MINOR.PATCH versions, refusing pre-release and build metadata."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 31
 +++

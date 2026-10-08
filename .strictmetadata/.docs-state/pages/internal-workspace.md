@@ -1,8 +1,7 @@
 +++
 title = "internal/workspace"
-description = "Package workspace is the model of a repository built from its release declarations: its members and releasables, which member owns each file, the scopes attribution answers for, each releasable's tag scheme, the members' dependency graph and release order, the evaluation of a dependency's version constraint, and the old-layout residue `monorepo cleanup` removes."
+description = "The model of a repository built from its declarations: members, releasables, file ownership, tag schemes, the dependency graph, release order, and residue."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 36
 +++

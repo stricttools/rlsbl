@@ -1,6 +1,6 @@
 +++
 title = "rlsbl changelog"
-description = "Structured changelog management using JSONL entries, each typed feature, fix or breaking."
+description = "rlsbl changelog: add, amend, edit, remove, and remap the entries of a releasable's JSONL changelog, and generate CHANGELOG.md from its changelog files."
 generated = true
 nav_group = "CLI Reference"
 nav_order = 1

@@ -1,8 +1,7 @@
 +++
 title = "internal/github"
-description = "Package github is rlsbl's GitHub surface: every call goes through the gh command line, started through the strictcli effects handle, so gh resolves and applies the credential inside its own process and rlsbl never holds a token."
+description = "rlsbl's GitHub surface through the gh command line: repositories, Releases, Actions runs and dispatches, topics, secrets, and the visibility of a repository."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 11
 +++

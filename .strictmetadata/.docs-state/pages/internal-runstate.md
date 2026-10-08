@@ -1,8 +1,7 @@
 +++
 title = "internal/runstate"
-description = "Package runstate is the state of rlsbl operations in progress, kept under .strictmetadata/.release-state/: the advisory lock every mutation of release state takes, a release's in-progress state (which steps finished, which failed), the retry file, the batch plan, and the paths of the reconcile plan and the scrub result."
+description = "The state of operations in progress under .strictmetadata/.release-state/: the advisory lock, a release's in-progress state, the retry file, and the batch plan."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 27
 +++

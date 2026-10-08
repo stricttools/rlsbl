@@ -1,6 +1,6 @@
 +++
 title = "rlsbl status"
-description = "Display the current project version, branch, latest release, unreleased commit count, and changelog coverage."
+description = "rlsbl status: a member's package and version, branch, latest release, changelog coverage since it, workflows, and with --registry the published version."
 generated = true
 nav_group = "CLI Reference"
 nav_order = 16

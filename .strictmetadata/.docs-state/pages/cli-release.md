@@ -1,6 +1,6 @@
 +++
 title = "rlsbl release"
-description = "Release orchestration commands covering the full release lifecycle."
+description = "rlsbl release: write the release file, release on a CI-verified candidate, resume or abandon a stopped release, and act on past releases."
 generated = true
 nav_group = "CLI Reference"
 nav_order = 12

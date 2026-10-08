@@ -1,8 +1,7 @@
 +++
 title = "internal/upstream"
-description = "Package upstream is a fork's relation to its upstream: the declaration, the refs holding the upstream's history, the revisions changelog coverage leaves out in a fork, and `rlsbl upstream adopt-tags`, which moves the tags a fork inherited out of refs/tags."
+description = "A fork's relation to its upstream: the declaration, the refs of the upstream's history, coverage that leaves it out, and upstream adopt-tags."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 34
 +++

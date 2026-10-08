@@ -1,8 +1,7 @@
 +++
 title = "internal/historyrewrite"
-description = "Package historyrewrite is rlsbl's account of history rewrites: `release scrub`, which rewrites the history through safegit and repairs every record the rewrite renamed (the changelog's commit ids, the archives' release commits, the tags, and the GitHub Release documents); `release reconcile`, which makes the tags and Releases on origin agree with what the records say was released, refusing whatever no record explains; and `release backfill`, which brings every version's archive into the fate model from the repository's own history."
+description = "History rewrites and their repair: release scrub through safegit, release reconcile of published tags and Releases, and release backfill of the archives."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 13
 +++
