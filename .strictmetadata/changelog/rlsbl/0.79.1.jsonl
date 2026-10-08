@@ -1,0 +1,5 @@
+{"format_version":2,"id":"18dc8810f21a64930e8487ee71c84485978cfa643b10a688","commits":["ba18f481b3426ca80995b24b97757fef668212c6"],"user_facing":true,"description":"**CI coverage threshold raised to 90%.** Test suite expanded to 4873 tests with 91.78% coverage.","type":"feature"}
+{"format_version":2,"id":"18dc8810f21b2bc5b57bfd5d5261488a9192157685487938","commits":["993b16cd585c419f2229670f2e06ebe63c5c5090","1e85f980077861685ebe1044e12f36b8e821c5a8","6cadde7da6faba731df4e2ceb27760e5561682a5","57ecbc316712660713e7252b7bde702970dce132"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f21bd19fc59539901faf4d5cbf24b137180c2fc7","commits":["d93103a85a0d73755f524565ee32b23dfe00f4a9"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f21c452502191add0b8f460aaad89211b28c1fb6","commits":["42a70fc8efc46d07c1c0adeae7f515734b32dd1a"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f21cbd54567019f075ac4b4a806a88845d604a8b","commits":["7ea0b22e8d93b5fcc40004c7b665f38a3e8f4f0b"],"user_facing":false}

@@ -1,0 +1,14 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required)
+description = "Go workspace dependency validation, circular dependency detection, Dart dead-module detection, and feature matrix selfdoc directive."
+# Optional context explaining why these changes were made
+context = ""
+include = ["npm", "pypi", "docs"]
+exclude = []
+release_commit = "834c096b229db12426a72db009625e6653c40fc4"
+
+[released_trees]
+"." = "9f1230254c5f10587a5a0a13811a0950879d083a"

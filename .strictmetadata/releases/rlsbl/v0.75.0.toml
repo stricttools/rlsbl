@@ -1,0 +1,16 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required)
+description = "Normalization collision detection, ultranorm by default, claim-name command, exit codes"
+# Optional context explaining why these changes were made
+context = "check-name was reporting names as available when registries would reject them due to normalization collisions (e.g., llmloop vs llm-loop on PyPI, toolstream vs tool-stream on npm). This release fixes the false positives, adds the claim-name command for definitive name reservation, and introduces proper exit codes."
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
+release_commit = "8dda2d72f9c18da5ab91a6998cb9e6431207b3e3"
+
+[released_trees]
+"." = "6010cb21b7e411fa093b7f31f5fd7fed49728cb9"

@@ -1,0 +1,2 @@
+{"format_version":2,"id":"18dc8810f015f60100780813e922469f96d2fc433398555b","commits":["096385c"],"user_facing":true,"description":"**Fix: Watch CI hint points to the correct commit.** The release command now captures the pushed SHA before running post-release hooks, so `rlsbl watch` targets the release commit instead of a post-hook auto-commit.","type":"fix"}
+{"format_version":2,"id":"18dc8810f01677bd97417ecbcc7141b2b8a93b818864454f","commits":["7ef4791","bf216c2","aba4ebc"],"user_facing":false}

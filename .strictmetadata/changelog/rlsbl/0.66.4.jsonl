@@ -1,0 +1,4 @@
+{"format_version":2,"id":"18dc8810f197e8aa3a95470540574292938cf2e7e0d47ccb","commits":["0945bf186b7b74d734e75b4556784b83c1555ea4"],"user_facing":true,"description":"**Feature.** New `check-count` selfdoc directive auto-generates the check count from checks.toml, eliminating manual count maintenance in docs.","type":"feature"}
+{"format_version":2,"id":"18dc8810f1985a097c6b93c197ca4bee9bf6fd34c084124a","commits":["4ba8552afbcc2b0a7da61d8839dbbaa72b819bf5","fe66d623737ba1544976f3b40e1eaa4d06661d34","486a85442a6113b9bb4dd462be38df3bfd5d7a31"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f198b52ed3a9b01dfc5a4f5fac313e90cacd8210","commits":["9851c32cc6c879fbd889215568f71e4b3cea538a"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f1990001f78bf0cd3c0f423a8ee4908d961c9c43","commits":["d9993a5bf9212baec7369ca849880bde2ccbda9e"],"user_facing":false}

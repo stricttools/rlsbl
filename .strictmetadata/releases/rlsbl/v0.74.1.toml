@@ -1,0 +1,16 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, or major
+bump = "patch"
+# Short description of this release (required)
+description = "Fix first release on empty remote"
+# Optional context explaining why these changes were made
+context = "When a project had a configured remote but no commits had been pushed yet, the remote-ahead check would abort because origin/{branch} did not exist. The check now detects this and skips gracefully."
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
+release_commit = "f0a6bb576bd708fee160e903d58785261064d737"
+
+[released_trees]
+"." = "b0fa03070885fdc49a88864f0e9e1941d19d6f74"

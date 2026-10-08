@@ -1,0 +1,14 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, or major
+bump = "patch"
+# Short description of this release (required)
+description = "Fix dead-modules false positives and watch test notification leak."
+# Optional context explaining why these changes were made
+context = ""
+include = ["npm", "pypi"]
+exclude = []
+release_commit = "32c18bd34dd6cef052ebccd6eab9584f217ed51c"
+
+[released_trees]
+"." = "3a45c851bd78195d9ac19926521c9345da2eaf4b"

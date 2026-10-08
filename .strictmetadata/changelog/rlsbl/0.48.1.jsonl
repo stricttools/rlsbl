@@ -1,0 +1,4 @@
+{"format_version":2,"id":"18dc8810f0fc498ec921a1350f134412928206bc766955d3","commits":["6395a5f48c61761f9347537dc909a527e546aefe"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0fc8f2dd85bc34fc29f4e74aa8874c950ef016c","commits":["4c750091328f7681ce13f3aa3afeb1a872987aeb"],"user_facing":true,"description":"**Fix.** `rlsbl scaffold` no longer crashes for Go, Zig, and Docker projects (missing `project_root` argument in `template_vars`/`shared_template_mappings`).","type":"fix"}
+{"format_version":2,"id":"18dc8810f0fce1e849e8bf648e904f79ba0c8a1242698482","commits":["4f4bc2ae7573e9d6f60997d202c30b256a76186e","5d36bca4c6d37d3ce4ed371285144364a7a95fdc"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0fd21580536b01af7f2472abdccacb0e1e8c853","commits":["c9220e8eb523ccf162dc506dc09125ce89da8116"],"user_facing":false}

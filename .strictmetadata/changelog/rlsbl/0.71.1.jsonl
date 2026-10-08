@@ -1,0 +1,6 @@
+{"format_version":2,"id":"18dc8810f1d4e87639f48b4c68594a6c93916f0dcabb2cd7","commits":["1060d4a8a438af74f5f1d21263d59628fe688192","593eefbc77c2b5825c0953bb122ff00c7a8998e3","acba696a2fc8638f496afef6c64115a9c9168162"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f1d5396ef3b24374bf4e437f8ffad19bc9c27658","commits":["fe69b8fa9b0213c896ff44df6741ac28cda5a757"],"user_facing":true,"description":"**Fix.** `release undo` error handlers now log tracebacks instead of silently swallowing exceptions.","type":"fix"}
+{"format_version":2,"id":"18dc8810f1d58ef05e85366ce37e47dd8b78d2aedcb13cba","commits":["deccde3a3f0b0ce474c1834d683fa8cacccedeff"],"user_facing":true,"description":"**Fix.** Per-version `.md` files are now regenerated from the archived release `.toml` after finalization, ensuring metadata is sourced from the canonical file.","type":"fix"}
+{"format_version":2,"id":"18dc8810f1d5e3320253385e94be4bbca5bde44d09f2cc0f","commits":["819553b6f056ff55c2f162c601c4dd248c74707a"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f1d61f6c45fb0fb0671b4cd7921e0251de3d21b5","commits":["c2460e8c4ddd37d0df025ef1c8cb318eeb1cd1b2"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f1d65976ac08af2ce58d401290fdacf338a34901","commits":["6c06943c0b66c2eda0c2400a9b1c2033446f01aa"],"user_facing":false}

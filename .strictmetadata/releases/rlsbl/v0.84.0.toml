@@ -1,0 +1,16 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required)
+description = "Go companion tags, workspace root CI fix, uvNoSources lint, BaseTarget fix."
+# Optional context explaining why these changes were made
+context = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
+release_commit = "144601303b97d126e74fe82f7a975554da3651ab"
+
+[released_trees]
+"." = "5d0f16d887c6d19300abc1c1a994447d87d6cd7c"

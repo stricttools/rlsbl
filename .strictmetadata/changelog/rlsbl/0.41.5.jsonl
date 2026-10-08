@@ -1,0 +1,6 @@
+{"format_version":2,"id":"18dc8810f0ba46e469dcbed73a19487a87830cb13874c560","commits":["deef5df8ee0a6e4d4589db4432e7a4ec61b847f8"],"user_facing":true,"description":"**Fix.** Detect npm moniker collisions for separator-free names. Previously, `check-name pgspec --target npm` reported \"available\" even though `pg-spec` exists and npm considers them identical. Now generates insertion variants (inserting `-`, `.`, `_` at every position) and checks each. Also fixed dot separator handling -- dots are now treated identically to dashes and underscores, matching npm's actual normalization.","type":"fix"}
+{"format_version":2,"id":"18dc8810f0babbd30d2e828e109347a7a3cab3ec43d148e6","commits":["dbbc4b55b3d17f66e01a7e021fee692e9e7dbb93"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0baf67c8e119abe5c104938b056f9da7a4c3c5b","commits":["21908688e8ce4c218e2096dfe4be48a39bda3127"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0bb30b80d576895c9b6447c92b4f2bb8c439d98","commits":["3bad2c833d0fce2e8c14087ebe4c95e161d1019d"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0bb67fabb7d2f609611447a8f161debc288be60","commits":["c33017058f0247a0dce48ed13ba3e55c69963b1a"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0bba5e336bf663462a44f99a7eb9be9eb9da982","commits":["0648c9d809d584df1f4e3c6944beb9623decd9f3"],"user_facing":false}

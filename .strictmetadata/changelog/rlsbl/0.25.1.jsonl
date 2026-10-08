@@ -1,0 +1,2 @@
+{"format_version":2,"id":"18dc8810f010238860eccf4349574cf19fb4ba4050e756ad","commits":["67de5bd"],"user_facing":true,"description":"**Fix: built-in lint only runs on library projects.** The pre-release lint check no longer runs on CLI applications, avoiding false positives for `print()` calls and entry points. Lint runs only for monorepo projects with `library = true`.","type":"fix"}
+{"format_version":2,"id":"18dc8810f010dc02ec8db576c11e4902a34ef51123596b48","commits":["65eb1f1"],"user_facing":false}

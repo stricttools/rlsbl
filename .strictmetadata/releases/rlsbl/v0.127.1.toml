@@ -1,0 +1,23 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, major, infra, or prerelease
+#   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
+bump = "patch"
+# Short description of this release (required)
+description = "A target a monorepo releasable declares with a path resolves from the releasable's root for the one member owning it, so orxtra's top-level npm package syncs again; scaffold explains a releasable member missing its releasable-level merge bases."
+# Optional context explaining why these changes were made
+context = ""
+# Pre-release channel: alpha, beta, rc, or stable (ordered;
+# demotion is an error). With patch/minor/major it ENTERS the
+# channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
+# bump = "prerelease" it promotes, and "stable" strips the
+# suffix. See docs/release-workflow.md#the-pre-release-channel.
+# preid = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
+release_commit = "36883322338818644ac521584df22134cb219077"
+
+[released_trees]
+"." = "deb7c8df1c8c233c91adec4b61a109d3e097f2a2"

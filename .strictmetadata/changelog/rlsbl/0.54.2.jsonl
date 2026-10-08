@@ -1,0 +1,4 @@
+{"format_version":2,"id":"18dc8810f12df464dc41e176be234007a7536be94530ed20","commits":["5ca73e0d1496bc5967ae3607c215798baf844f42"],"user_facing":true,"description":"**Fix.** Batch release files now enforce mandatory description per package, matching single-release behavior.","type":"fix"}
+{"format_version":2,"id":"18dc8810f12f7f74e4e9fb8b89644deaa6dcf4df7ee6416a","commits":["a827f71037f498ea69bb55075ebd7ff641595e30","24c3a5ebe568b3ba33727b1b50a1c5a4f81a89f3"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f1341b0b62fa6de4fd3444e9994e971328f07652","commits":["b14a4d00a1d539276cfd093638c37715fed2c90d"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f134d37c4f2defbb408d4ef9ac6c4fc677e25819","commits":["923bd413132f61ef379a4bc02a862b2896953752"],"user_facing":true,"description":"**Fix.** Dep quality checks now share a cached import scan instead of scanning 4x per workspace project.","type":"fix"}

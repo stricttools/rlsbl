@@ -1,0 +1,16 @@
+# Materialized by scripts/backfill_release_anchors.py: this version shipped
+# before rlsbl archived a release file per version, so no archive existed.
+# The description below was recovered from the sources named in the run's
+# plan; bump is derived by version arithmetic against the predecessor, and
+# include reflects the targets detected at backfill time (the historical
+# target set is not recoverable).
+# strictspec document version gate (do not remove)
+format_version = 2
+bump = "minor"
+include = ["npm", "pypi"]
+exclude = []
+description = "Renames the monorepo publish router to publish.yml so PyPI Trusted Publishing claims survive a move between layouts, fixes several sync path bugs, reverts the strict changelog type validation, and auto-commits generated changelog files."
+release_commit = "2d2c5d0dc42f5eb3fcbe5717039d6878b1de4c1f"
+
+[released_trees]
+"." = "17af1ac4c45cbcedc1853ea4163a5234fd2d833b"

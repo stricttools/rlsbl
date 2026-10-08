@@ -1,0 +1,2 @@
+{"format_version":2,"id":"18dc8810f248134100be0a780a184c7188a0e194720595bc","commits":["c492390b31d31ea1b825ea6334229e35eae0e40f"],"user_facing":true,"description":"**Fix CI test failures.** All scaffold tests now mock saferm for CI environments.","type":"fix"}
+{"format_version":2,"id":"18dc8810f248ec9b90955f4645b84d7eb081db7351c87ed9","commits":["4aafa5c8e430fe633ca02fe7ed393788bc521a31","f6d2962e767a76915d699592f822e76b865a11f1","4aafa5c8e430fe633ca02fe7ed393788bc521a31"],"user_facing":false}

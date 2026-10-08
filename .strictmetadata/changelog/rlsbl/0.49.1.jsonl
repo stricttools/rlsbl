@@ -1,0 +1,7 @@
+{"format_version":2,"id":"18dc8810f10161205f6efdee0a76428ebb6f619c9608314c","commits":["e848bbbab0ac17849639b4fd88b20a57d9526ede"],"user_facing":true,"description":"**Fix.** Monorepo release commits now use correct relative paths for version-bumped files.","type":"fix"}
+{"format_version":2,"id":"18dc8810f101b9d871179ef5e863418e901c7007ad28e3e7","commits":["100d3d67b7456915b71ba4c6962a3d062861a30c","83e58771f785bee88d152ec4251981a298aa5494"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f102bf1178410c2948f8471e9c3cc4c3b359459e","commits":["0499ca2e8a77ae609a88e7e8f52d59a7ad8b83d9"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f1038c5d0eebf423ec1b4ec299560e8c92d44080","commits":["d87c4663476ff80d2affa393b4276d1c78c3b0c9"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f10439a7aaf5857102d64298b582ece62ec3aaca","commits":["8ab25538af0acace97ab0bdbe642ca2664b4e2b9"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f104fe6c650fd376a37d4cf3b78f293c7aa32345","commits":["f8276a9e51d45f307a4087f0259dd460aed113b2"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f106e27af0c56a983bef42f48087ed4ac1ff98bd","commits":["2c9a643a74c502a60bb3066d3243da99838fee53"],"user_facing":false}

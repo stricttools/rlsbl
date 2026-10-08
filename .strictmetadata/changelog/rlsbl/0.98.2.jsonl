@@ -1,0 +1,2 @@
+{"format_version":2,"id":"18dc8810f2fc79de2507879d14d14187aeab92206e759c54","commits":["f54a875424a3c696c9a40612b9266acb0975c1fb"],"user_facing":true,"description":"**Fix.** CI test reliability: preid test now mocks tag_exists_locally directly instead of depending on local git tag history.","type":"fix"}
+{"format_version":2,"id":"18dc8810f2fcfc07c2c6e457ceaf4c6388056b7ca824ceae","commits":["f9541f8309db5dcef6f6e5a222205813fe5e2606"],"user_facing":false}

@@ -1,0 +1,5 @@
+{"format_version":2,"id":"18c01fb79655c4fdd9e0bea883d343cc9aaf4341abe13677","commits":["9a6bb9c6a5b8ae09554a14fa042b0abd173ff494"],"user_facing":false}
+{"format_version":2,"id":"18c03bea34e6a899406b8bb689f44c4c8e1c91eb2bcf947c","commits":["0848206cc401883df35718f5864722fc05745448"],"user_facing":true,"description":"**Bug fix.** Monorepo CI router now inlines jobs instead of reusable workflow calls -- GitHub rejects routers with more than 20 `uses:` calls, which silently broke CI for large monorepos.","type":"fix"}
+{"format_version":2,"id":"18c03d7b151d4b9e9a3f443101f24ce184804e0296bf41f6","commits":["3c02a000027135ed54bd9e3314e723f6a2e04f65"],"user_facing":false}
+{"format_version":2,"id":"18c03dee6696e182b9b5899f9c3a4fb2b46012a94cff9d55","commits":["41dc6cb59fa8fc14abf4968077ef5b041b92c90d"],"user_facing":false}
+{"format_version":2,"id":"18c03e079d398df6e4bb8569390944ad87b6462eea67fd64","commits":["b34abd4aedda0a40f569d2a2f966302f0947bc57"],"user_facing":true,"description":"Release blog posts now generate via the selfblog CLI (`selfblog post generate --from-release`); selfdoc gen/check are unchanged","type":"fix"}

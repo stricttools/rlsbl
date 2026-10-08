@@ -1,0 +1,5 @@
+{"format_version":2,"id":"18dc8810f278be1cd9f69868e085485fb353863d527d84b7","commits":["81859ee2a8022135de1797af25cdbe09a57d6362"],"user_facing":true,"description":"**Bug fix.** Release lint now respects lint_allow from workspace.toml, matching the behavior of rlsbl check --tag quality.","type":"fix"}
+{"format_version":2,"id":"18dc8810f2791f483868111f952946b09b286e44960bb74a","commits":["a046b6d5650eed08e3f3bd0ce92f1bcb5e576682"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f2795efe54decacb1da74385b28cfbdb81a88517","commits":["0dc18c2394a57b515658eb692ee98b413d0e95a5","6ad364a0eee6ca9998c17f3d2372a926e40db5ed"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f279a44c84814a64e2064f1db656957c51e673b8","commits":["15468689e79204f2c57fdc10c87ba5ecc3bbcb4c"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f279dcc5cd8f2e1d503d481dbc38f4b72d9ef21c","commits":["9ff1c9bc72d18cc1a87920aeba08f03079389105"],"user_facing":false}

@@ -1,0 +1,14 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, or major
+bump = "patch"
+# Short description of this release (required)
+description = "Fix false-positive deps-undeclared findings in root-project dep scan when sibling project source files are present."
+# Optional context explaining why these changes were made
+context = ""
+include = ["npm", "pypi", "docs"]
+exclude = []
+release_commit = "8e7bdcd29a6f9321f57f96443736d9566feb4644"
+
+[released_trees]
+"." = "a377b52810e8b37dab69c90ee75276229ea9efe3"

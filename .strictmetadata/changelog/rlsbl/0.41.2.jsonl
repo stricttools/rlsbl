@@ -1,0 +1,5 @@
+{"format_version":2,"id":"18dc8810f0b553f36006ce6da7a745a0b37c49123ac15688","commits":["412d752d8ca952b5af43fd78feb114b369beb9ac"],"user_facing":true,"description":"**Go assets use goreleaser for cross-compilation.** When goreleaser is installed, `build_assets()` produces binaries for linux/darwin/windows x amd64/arm64. Falls back to host-only `go build` when goreleaser is unavailable.","type":"feature"}
+{"format_version":2,"id":"18dc8810f0b5b579d72a32f9e99c4c5aa53a3c4b20cd12c1","commits":["72165badda3194d8086183329f099f4e041ca662","ff656b78a20b055bd85a11060513c51668522016","cb184a2ca15a4ffc88a3482f947c7ef12d020bb6","fd100baa1d1bcdb8466411b5e5723419c25b241f"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0b6031443823143f74243bab5c4983631049230","commits":["0ed0360a5a7bada17ea5255dc90baf94ba6f4515"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0b63f808b10e63d38c64354a2b45865e3aa55d6","commits":["1437b3a865f9216beb83c7ac33351ba12a1dd61a"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0b67a66ff83cfb408b549f3a148279d42d6f0d8","commits":["1faa9667a24fe8032dc9fea22abb86e848be3bbe"],"user_facing":false}

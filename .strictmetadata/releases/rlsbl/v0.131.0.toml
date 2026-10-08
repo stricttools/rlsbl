@@ -1,0 +1,23 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, major, infra, or prerelease
+#   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
+bump = "minor"
+# Short description of this release (required)
+description = "Releases build against the release checkout's own committed go.work, and every release gets a private RLSBL_RELEASE_BIN directory for its own builds of tools"
+# Optional context explaining why these changes were made
+context = "The release checkout sits inside the live repository, so Go found the working tree's uncommitted go.work from there and selfdoc's release failed. Releases now pin GOWORK to the checkout, the dep-locks check stops its go.work.sum search at the repository root, and a hook can build an unreleased tool into RLSBL_RELEASE_BIN without installing it for every other session."
+# Pre-release channel: alpha, beta, rc, or stable (ordered;
+# demotion is an error). With patch/minor/major it ENTERS the
+# channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
+# bump = "prerelease" it promotes, and "stable" strips the
+# suffix. See docs/release-workflow.md#the-pre-release-channel.
+# preid = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
+release_commit = "ddc1aa61df0e2f04290ddba1c1c44c82e085e53d"
+
+[released_trees]
+"." = "eafa0698232744c4109238abe6257c4a3fcb2042"

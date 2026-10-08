@@ -1,0 +1,4 @@
+{"format_version":2,"id":"18dc8810f15bc288a51288957da8414a8b5c15da95fddf72","commits":["11375b40da591c91a7a5d99d2060fa90ff798578"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f15c3315365c4091542546778a2da9456d8536ef","commits":["3095e7ecbc9b91f3f17abc96631ec1519fbdc637"],"user_facing":true,"description":"**Fix.** Restored original display order for feature matrix columns (was inadvertently alphabetized).","type":"fix"}
+{"format_version":2,"id":"18dc8810f15c99a8ced36557aedf40848b3b56dab05b4e3e","commits":["4d9e70e48aeb43b9055797f92de33a63a43221dd"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f15cdd337390982063674d72b6760fd4827a527e","commits":["3103ebfab0da680ba9e38e31c0196293fffae701","5b81a07459e3f5b026ef9d449a4a97f62e8cfac9"],"user_facing":false}

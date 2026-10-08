@@ -1,0 +1,25 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, major, infra, or prerelease
+#   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
+bump = "minor"
+# Short description of this release (required)
+description = "Source walks read only what git lists and survive any syntax-tree depth; scaffold fixes for monorepo members, npm, pgdesign, and scratch directories; a Go toolchain-line check; claim-name registry logins; monorepo cleanup --no-auto-commit"
+# Optional context explaining why these changes were made
+context = """
+A generated protobuf file in a gitignored third-party clone crashed `rlsbl rewrite go-module-path` with a RecursionError, which exposed two defects at once: every tree-sitter walker recursed once per syntax-tree level, and the source walk ignored .gitignore despite its docstring. Scaffolding a family of repositories then surfaced the rest: release state written into releasable monorepo members, a fixed npm Node matrix, a crash on an npm target with no package.json, silent tracking under ignore-everything scratch directories, and a pgdesign CI whose Go-version file nothing created. The new refusals (a package.json without engines.node, tracked files in a scratch directory) and the new release-blocking go-toolchain-declared check make this a minor release.
+"""
+# Pre-release channel: alpha, beta, rc, or stable (ordered;
+# demotion is an error). With patch/minor/major it ENTERS the
+# channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
+# bump = "prerelease" it promotes, and "stable" strips the
+# suffix. See docs/release-workflow.md#the-pre-release-channel.
+# preid = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
+release_commit = "0cda5d8e4b3d16ac89dfc607f7f495471fea84d7"
+
+[released_trees]
+"." = "4619c22c6ecf0e75db5f2b222fc4c8647bfb18de"

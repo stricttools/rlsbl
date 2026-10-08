@@ -1,0 +1,4 @@
+{"format_version":2,"id":"18dc8810f194e5f310e4216ee6e74d14897114b0737b8006","commits":["f2a9340289f6978207da858d265b5556aaa18074"],"user_facing":true,"description":"**Feature.** Stale batch_limits exclusions (referencing `version: unreleased`) are automatically removed from config.json during release finalization.","type":"feature"}
+{"format_version":2,"id":"18dc8810f19554a958fcd8b9afc841a1847cbbd8559ac239","commits":["030eabc5691fcea3851dd13435e87abee924f463"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f195a515a6c3272d33434ea5aa10a10c95bd4b86","commits":["01bf37df5e9315df98995ec233a0a0a03b63c239","0a68e2c87177fdcef32bfcacdc571e824de32ead","0693cf992aa60a3c73b7a2375c3474df18a88f05","a96fd60b66fa8f392dcaa0a35e0ea07c9267aef1"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f19609447f70e2f4ee3a481c84baa89a8e0d7e24","commits":["97cd260a928edc7f51c747c71bda03e07ba5226c"],"user_facing":false}

@@ -1,0 +1,11 @@
+format_version = 1
+rlsbl_version = "0.130.0"
+
+[files]
+".github/workflows/ci-pypi.yml" = "125fe8fce0e4bd7ae3ce302559e5cc3f322182d0fa8ff6dd273cfbf409eb8971"
+".github/workflows/publish.yml" = "74f97985c25a3c5bceb2dc3d540fe186b11dd1f80bded8f42d20189b7cbf5d40"
+".gitignore" = "f4c922f7808763bad09a79dd50c776b74b78aeee03fb8ca9f17db0b191c0a2bd"
+".npmignore" = "7c0eea9785c0318aeb39bf8b670ce8384f4a5b812fde69ce23d7d018057325a3"
+"experiments/.gitignore" = "240a3e0d37d2e86b614063f5347eb02d4f99ca6c254de6b82871ff8d95532a7d"
+"screenshots/.gitignore" = "240a3e0d37d2e86b614063f5347eb02d4f99ca6c254de6b82871ff8d95532a7d"
+"scripts/test.sh" = "43d65e7127fe8f6d34269509d541df979a1f19dfd8d3007c82ba749ea91d149c"

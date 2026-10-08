@@ -1,0 +1,16 @@
+# Materialized by scripts/backfill_release_anchors.py: this version shipped
+# before rlsbl archived a release file per version, so no archive existed.
+# The description below was recovered from the sources named in the run's
+# plan; bump is derived by version arithmetic against the predecessor, and
+# include reflects the targets detected at backfill time (the historical
+# target set is not recoverable).
+# strictspec document version gate (do not remove)
+format_version = 2
+bump = "minor"
+include = ["npm", "pypi"]
+exclude = []
+description = "Fixes the release crash introduced by the previous version's changelog preview heading, raises the `max_entries_per_commit` default to match documented practice, warns about stale monorepo changelog entries at finalization, and resolves Action versions from a single table at scaffold time."
+release_commit = "714202db7bc1fb464cbdd57f0cf672411acaff52"
+
+[released_trees]
+"." = "fb9923fe8de868bb6b7845d4685af9dc0901bfdd"

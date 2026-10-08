@@ -1,0 +1,8 @@
+{"format_version":2,"id":"18c03ee4725022839705f22067524cedb872e82fe973671d","commits":["38e8eb366cd5ca890197dca40bf419eb6a8092df","36a963f1c7141da08767e56d29883247e67b12ca"],"user_facing":false}
+{"format_version":2,"id":"18c067f41e900349f4c742ecd8f04140bed393de7bbbf186","commits":["f7295a0d3f8025076693e89232f203e98b75fc28"],"user_facing":true,"description":"**New feature.** Release rollback now detects concurrent commits from other sessions and refuses to proceed, preventing data loss from blanket git reset.","type":"feature"}
+{"format_version":2,"id":"18c067f5f43f5fd2f015b92201394b6cb7bccbfb7d1c86a9","commits":["248931cba7905f936afba60a0de09d94bf1d6d92","d596ec88c1aba09cd3fc8f96d10658cf4984ccbe"],"user_facing":true,"description":"**New feature.** Documentation directives require selfdoc-core, installable via `pip install rlsbl[docs]`.","type":"feature"}
+{"format_version":2,"id":"18c067f737e42a40e8ebf4a6420540468a7f750de02d795c","commits":["ca46d692f81484adf0bd6b52ae6355f999a2fe2a","4c0b03b5649d72dcf7793d141f52968f22668fe6"],"user_facing":false}
+{"format_version":2,"id":"18c067f842aea423a787b4c606ee49d59c69d89b9394f5ec","commits":["13c789247fc5177ced6777a8fed24740e9fafa2b"],"user_facing":false}
+{"format_version":2,"id":"18c067f94f93b634ebb781438ed44442a2576053e1b9513b","commits":["ac2e81fba9058c55bc4c8233289a3b775e6db2dd","1689143ed54e9d008d386e63aaedb0dc51408073"],"user_facing":false}
+{"format_version":2,"id":"18c0680461bad05b2a706435514a47a3b12a71b1478e0c61","commits":["3f259272176e5f33dbe4dadd23458e5caed61e99","7423e5d66f816d3b112bdb544af6147a5dfd19a9"],"user_facing":false}
+{"format_version":2,"id":"18c0683bb8a7bfec55a559639ade4da7a17adf7d2c53de0c","commits":["8cb51ae0da76ee4a9be39a2ce4ff9092eb2ca5b2"],"user_facing":false}

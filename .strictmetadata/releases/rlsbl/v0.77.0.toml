@@ -1,0 +1,16 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required)
+description = "GitError/PostReleaseError exceptions, detached HEAD/shallow clone/push timeout handling, variant delay, dep_validation realpath"
+# Optional context explaining why these changes were made
+context = "Final cleanup round: completed the exception hierarchy (GitError for git infrastructure, PostReleaseError for post-mutation failures), fixed three unhandled edge cases (detached HEAD, shallow clone, push timeout), added rate-limiting delay to variant checks, standardized dep_validation.py on realpath, and triaged the hardening roadmap into focused todos."
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
+release_commit = "e970fd614a8f02ab70f0c6b330dd23fbbcfd77fb"
+
+[released_trees]
+"." = "ef9b209db7caebf3e64230fe493cc5f6dbf78464"

@@ -1,0 +1,16 @@
+# Materialized by scripts/backfill_release_anchors.py: this version shipped
+# before rlsbl archived a release file per version, so no archive existed.
+# The description below was recovered from the sources named in the run's
+# plan; bump is derived by version arithmetic against the predecessor, and
+# include reflects the targets detected at backfill time (the historical
+# target set is not recoverable).
+# strictspec document version gate (do not remove)
+format_version = 2
+bump = "minor"
+include = ["npm", "pypi"]
+exclude = []
+description = "First release under the name rlsbl (renamed from share-it-on): a stdlib-only Python CLI with `release`, `status`, `scaffold` and `check-name`, registry auto-detection from package.json and pyproject.toml, context-aware scaffolding, and dual-publish CI for npm and PyPI."
+release_commit = "f675037ec8e2f13f19b939fd2a3e3dd3a0d5ef6b"
+
+[released_trees]
+"." = "13e4a45fa875f6df7c7f1d8fdd5fe08d64fda699"

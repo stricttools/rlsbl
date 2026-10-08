@@ -1,0 +1,1 @@
+{"format_version":2,"id":"18dc8810f2596129d78f6e91409645189d4c96d4632fb62c","commits":["856b732ca89f3c0ae401fc656d2c56189d9c6c94"],"user_facing":true,"description":"**Fix.** Release finalization now properly commits the deletion of `unreleased.toml` after archiving, preventing a dirty working tree.","type":"fix"}

@@ -1,0 +1,16 @@
+# Materialized by scripts/backfill_release_anchors.py: this version shipped
+# before rlsbl archived a release file per version, so no archive existed.
+# The description below was recovered from the sources named in the run's
+# plan; bump is derived by version arithmetic against the predecessor, and
+# include reflects the targets detected at backfill time (the historical
+# target set is not recoverable).
+# strictspec document version gate (do not remove)
+format_version = 2
+bump = "minor"
+include = ["npm", "pypi"]
+exclude = []
+description = "Adds router watch paths, subtree publishing to mirror repositories, and the swift-apple target, and makes scaffold write the detected target into config so later runs stop relying on auto-detection."
+release_commit = "8bd485a6bbb073fc068820e9f69639edd58902b1"
+
+[released_trees]
+"." = "26b5122f481311f1c16a6dab65a8a2b940acd551"

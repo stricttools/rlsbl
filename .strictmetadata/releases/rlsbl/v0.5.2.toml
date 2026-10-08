@@ -1,0 +1,16 @@
+# Materialized by scripts/backfill_release_anchors.py: this version shipped
+# before rlsbl archived a release file per version, so no archive existed.
+# The description below was recovered from the sources named in the run's
+# plan; bump is derived by version arithmetic against the predecessor, and
+# include reflects the targets detected at backfill time (the historical
+# target set is not recoverable).
+# strictspec document version gate (do not remove)
+format_version = 2
+bump = "patch"
+include = ["npm", "pypi"]
+exclude = []
+description = "A round of fixes to version detection from source checkouts, registry-specific CLAUDE.md publish instructions, gitignore merging, and the Go name check's wording."
+release_commit = "c75a97b29b97e00c656ca3c5c3cf06a5067592b8"
+
+[released_trees]
+"." = "a05f2b09e31234666688e8077c57a545fc5537c6"

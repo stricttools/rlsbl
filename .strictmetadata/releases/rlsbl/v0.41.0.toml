@@ -1,0 +1,10 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+bump = "minor"
+include = ["npm", "pypi", "docs"]
+exclude = []
+release_commit = "55ca2c6c1486cc9459bb066a59654677bf447f92"
+description = "The `private` config key becomes required with no implicit default, asset building and upload become built-in release steps configured per target, and `changelog amend` arrives for editing a released version's JSONL."
+
+[released_trees]
+"." = "2924e94288255312b06d05db1c9e8dfa4e629ba8"

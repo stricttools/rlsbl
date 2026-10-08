@@ -1,0 +1,6 @@
+{"format_version":2,"id":"18dc8810f1f16e1977a523a547d246e29559e005a63ede8d","commits":["5c6932a4d2e6a6cebdcf3eaf0bec9f7de0c3600b"],"user_facing":true,"description":"**Bug fix.** Release no longer aborts on first push to an empty remote. When `origin/{branch}` does not exist after a successful fetch, the remote-ahead check is skipped with an informational message instead of hard-aborting.","type":"fix"}
+{"format_version":2,"id":"18dc8810f1f1f6f3ed42ba1761a14e22af146f8c0e66c966","commits":["b870c963193e735eab6a5b9e2b1120b898834207","f60e038773f818282185d1e5cbf50b87883b2dcc"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f1f250d7bf9f880f9bec4c7cbc211e8a1a0dd47c","commits":["4691a514a2ffe649d06faf06589a8d2d67dd1551"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f1f2ad1547e0ff3d68904236b160e32e308e8ed6","commits":["f0902c1520aee238ad662e3ceda61493551ab086"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f1f2f567c1ded8c7df384fccb15ac8e3618a7542","commits":["a0a7238f21765e20fba1bff9cf8c0070f5607ea1"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f1f33d87f655f81c2fe54b5caf9cbdeb1b7a3cd9","commits":["aa21368fb96c1940ab40b962201420c2a68f7434"],"user_facing":false}

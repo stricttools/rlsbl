@@ -1,0 +1,9 @@
+{"format_version":2,"id":"18dc8810f0bc14c133075c8cae2040a5b788589b8567dd4e","commits":["a19673dcd6ce78feac98ecb87c830547d0a814f6"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0bdb9190d84e6a6d9a34ca39ede76ff91e1d75b","commits":["ee598935a005bf64425308543e0fcba61c750363","efcacc2897bcdc70dff4d7a5eec39b1e3abc92bd"],"user_facing":true,"description":"**New feature.** Run `selfdoc gen --no-commit` before `selfdoc check` during release, ensuring docs are regenerated from source before validation.","type":"feature"}
+{"format_version":2,"id":"18dc8810f0bf2f0745efbb9f5d9e4e748798f5553c86b31f","commits":["f4873180ee9586e124017d5690a5b2f6d610bf6d","6cfc0961867f563c837089b2cdfd10f3bbc39af0","3fd27bd4a13636c9b7140ea882e866f95e592abf"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0c1d65d759f0f2cfb404f679a2303f9bc34b889","commits":["df6c864362c6b04d1d5517b206c4c1e3e56ad7d1","4277061e6675e912b89b720fe3d4a0e5c916d76e","436948ad600eea34ae5ce534a6139b764957963f","4c6d269bebd221c58a4b4b127aca9942a0b101cf"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0c34d78cf9170ecc97c4bb89b8e57d445ac7661","commits":["75da73df82957bbc5ba3edbad9f5e235641fcfea"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0c5ca4ef4b467920488446f95b7c7e6eba400b8","commits":["c4e18b53817504ef72f8a632d50a73cca66da25e"],"user_facing":true,"description":"**Fix.** `selfdoc check` failures now print a clean error message instead of a raw Python traceback.","type":"fix"}
+{"format_version":2,"id":"18dc8810f0c6a51bec35b3346337470ba0427a8c795c4748","commits":["95edb98007088f7e873c58396553580b8aff5f78"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0c724eb41e736cde6ed476e83a091e4aa0a4e60","commits":["ed4667ab4910ae7920afcc2979fc139fbeedda67"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0c79bcfcee17d3cbecb4c93a2ff06ac2b0aa8cc","commits":["cd317813ef70898eae8658d4b27994a22dde1dc5"],"user_facing":false}

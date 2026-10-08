@@ -1,0 +1,2 @@
+{"format_version":2,"id":"18dc8810f17c81f6fa2605ca6e3144ce8b001d79d7a6c27a","commits":["4a9be03f6b90e3525f5ed82b3d2834f90302088e"],"user_facing":true,"description":"**Fix.** Batch size check test updated to account for hint message in failure details.","type":"fix"}
+{"format_version":2,"id":"18dc8810f17cd855e719498d97444db9b07b06c49c1afba0","commits":["abd709b22c3522cef47a8da218f04ebf84c81765"],"user_facing":false}

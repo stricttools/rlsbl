@@ -1,0 +1,10 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+bump = "patch"
+include = ["npm", "pypi", "docs"]
+exclude = []
+release_commit = "897425ddaf1e4cf8522dbf64843334a7a0e4b707"
+description = "npm moniker collision detection covers separator-free names, so `check-name` stops reporting a name as available when npm considers it identical to one that already exists."
+
+[released_trees]
+"." = "7d57528552170080c9fab7639bab971f12944b99"

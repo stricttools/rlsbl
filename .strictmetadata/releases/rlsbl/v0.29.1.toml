@@ -1,0 +1,16 @@
+# Materialized by scripts/backfill_release_anchors.py: this version shipped
+# before rlsbl archived a release file per version, so no archive existed.
+# The description below was recovered from the sources named in the run's
+# plan; bump is derived by version arithmetic against the predecessor, and
+# include reflects the targets detected at backfill time (the historical
+# target set is not recoverable).
+# strictspec document version gate (do not remove)
+format_version = 2
+bump = "patch"
+include = ["npm", "pypi"]
+exclude = []
+description = "The release no longer aborts when validation updates the `.validated` changelog cache."
+release_commit = "4d8d38c8de307c12bea9e389b703353bba4ad709"
+
+[released_trees]
+"." = "5df032e5ef27afa1b3c337281e63036f713cfa66"

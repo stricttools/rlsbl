@@ -1,0 +1,16 @@
+# Materialized by scripts/backfill_release_anchors.py: this version shipped
+# before rlsbl archived a release file per version, so no archive existed.
+# The description below was recovered from the sources named in the run's
+# plan; bump is derived by version arithmetic against the predecessor, and
+# include reflects the targets detected at backfill time (the historical
+# target set is not recoverable).
+# strictspec document version gate (do not remove)
+format_version = 2
+bump = "patch"
+include = ["npm", "pypi"]
+exclude = []
+description = "Test-only release: the deploy tests no longer depend on the CI runner's branch name."
+release_commit = "c4c26b63d0d2719dbf030f5f26d68bd1a9ceb47f"
+
+[released_trees]
+"." = "b444111b3d276c78d43881e075f8c20ad5b238a6"

@@ -1,0 +1,2 @@
+{"format_version":2,"id":"18dc8810ec86e763d23fb9214a174d66bffb1271ed536e87","commits":["2f821a36212e00a364a1a2b0f3f97c1f2cace57d"],"user_facing":true,"description":"**Removed hashes.json from scaffold metadata.** The file was vestigial (never read for any decision). Existing hashes.json files are automatically deleted on next scaffold run.","type":"breaking"}
+{"format_version":2,"id":"18dc8810ec875e5bac43507e626d482faff37245884f9a37","commits":["a7fd9aeda4674400112adc83eb117f33ce6f6b11","0458148e8f5ea4f60f33a1af09f16236a4642cfd"],"user_facing":false}

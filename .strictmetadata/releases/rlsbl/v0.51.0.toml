@@ -1,0 +1,11 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, or major
+bump = "minor"
+include = ["npm", "pypi", "docs"]
+exclude = []
+release_commit = "9149f03eaac1a72c9d5878f5816d807366f3673b"
+description = "`ProjectContext` becomes the single context object: the separate check context is deleted, every target method takes the context, and `monorepo_root` is renamed `workspace_root`."
+
+[released_trees]
+"." = "79d420e62b6f5663b877784f35857f7f39c5c002"

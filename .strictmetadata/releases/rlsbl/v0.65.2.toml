@@ -1,0 +1,14 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, or major
+bump = "patch"
+# Short description of this release (required)
+description = "Watch retry dedup, no-runs exit 0, docs polish"
+# Optional context explaining why these changes were made
+context = ""
+include = ["npm", "pypi"]
+exclude = []
+release_commit = "fa581f8d6c42f2056f5e2feebce9d09937bccccf"
+
+[released_trees]
+"." = "066bb186aec8b64ecf650ce2e5be715d8aae4239"

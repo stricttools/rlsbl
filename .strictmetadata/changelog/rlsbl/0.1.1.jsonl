@@ -1,0 +1,2 @@
+{"format_version":2,"id":"18dc8810ec7fa7abacad1f4240a7486b893493dd22dc3bbf","commits":["20cd720f5be71ac2f6701cb9d8b0074c558c3336"],"user_facing":true,"description":"Fix astral-sh/setup-uv version (v8 tag doesn't exist, use v7)","type":"fix"}
+{"format_version":2,"id":"18dc8810ec8018427427a77c34924fc3bbabba4a4ac2c5b8","commits":["d10c913260840a7e35455f7d7723598db7009709","0f90645377762d700ef17864cc0fd2b8c6d12f3d"],"user_facing":false}

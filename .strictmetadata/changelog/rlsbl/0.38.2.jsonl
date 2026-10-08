@@ -1,0 +1,4 @@
+{"format_version":2,"id":"18dc8810f07d82e4ff4f7818b58c44b6bc24707daad28be5","commits":["2f6aadb53dd1c88c73f6f4a87f0bb74a51646e38","272f4737e8d2f1055dfe9ddf68b709bec0218469"],"user_facing":true,"description":"**Fix.** Publish router no longer fails for plain-target releases. Added a no-op job so GitHub Actions workflows succeed even when all conditional publish jobs are skipped.","type":"fix"}
+{"format_version":2,"id":"18dc8810f07e460e374ee2def5c24594a59eced2c8c25b13","commits":["6ce6b45c591abacf68f69a49c7f5be77c6a76765","8ededd451a310b4c42767a5f07f4b78fff5a8e5e"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f07ec7501f9f945864ff4bbdbe1d779fa6ea4a8a","commits":["cf05373d0d53b76c5be85944f74657c6a1f2729e"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f07f37b5edd85d267cf04057a9f167790b29e1e8","commits":["a1d9dcff7b4ff37b386720673d20d7e08089cfae"],"user_facing":false}

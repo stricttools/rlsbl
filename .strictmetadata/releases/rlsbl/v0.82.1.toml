@@ -1,0 +1,16 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, or major
+bump = "patch"
+# Short description of this release (required)
+description = "TemplateVars auto-namespacing, check-name polish, template fixes."
+# Optional context explaining why these changes were made
+context = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
+release_commit = "bf8ef6cd2ce261e371e331188bbb6d254028f6c9"
+
+[released_trees]
+"." = "c1965dff8772906779ae707e73f23fa88753a789"

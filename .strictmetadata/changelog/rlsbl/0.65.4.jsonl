@@ -1,0 +1,2 @@
+{"format_version":2,"id":"18dc8810f183422efa170be685e14425ab5555fbd54712f1","commits":["85f166ae50d183096a137cc6c25c7eaf9795fdcd"],"user_facing":true,"description":"**Fix.** Updated commit command tests to expect the new `--yes` flag in safegit calls.","type":"fix"}
+{"format_version":2,"id":"18dc8810f1841efa337b659e409041e5bb43ef88ec3c363d","commits":["6eeb2ff251fff8b67dcfde91389e6f09486e40fb"],"user_facing":false}

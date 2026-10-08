@@ -1,0 +1,16 @@
+# Materialized by scripts/backfill_release_anchors.py: this version shipped
+# before rlsbl archived a release file per version, so no archive existed.
+# The description below was recovered from the sources named in the run's
+# plan; bump is derived by version arithmetic against the predecessor, and
+# include reflects the targets detected at backfill time (the historical
+# target set is not recoverable).
+# strictspec document version gate (do not remove)
+format_version = 2
+bump = "patch"
+include = ["npm", "pypi"]
+exclude = []
+description = "Monorepo follow-ups: synced workflows run in the right sub-directory, `monorepo add` reports which manifest files a project is missing, and publish workflows are composed dynamically from each target's own template."
+release_commit = "f6cb61d9176fd6179e8292047d9192defd15a6cc"
+
+[released_trees]
+"." = "35ec05122cda51dc640e9413a798c0f359b0f00c"

@@ -1,0 +1,5 @@
+{"format_version":2,"id":"18dc8810f0b86698ec38d5c1a64b4b4cb64382dd6be04ddd","commits":["c3ddd9a7d6e06c9d61d0689e66af68263506fa40"],"user_facing":true,"description":"**Fix: selfdoc hashes no longer left dirty after release.** Content hashes are refreshed after the version bump so the working tree stays clean post-release.","type":"fix"}
+{"format_version":2,"id":"18dc8810f0b8c040d4c15fc46311462e9f090065e08838fb","commits":["9e55ac31aedff43a9d64d7469f400fcc7204a529","ab152d699b19ed29cdccc01e3005eab1663ffecf"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0b91749a217672e259e4b8a9349336b0e0f6ebf","commits":["677dcac632edaa9c065c86a539a40e5b53765024"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0b9755d5d9da2a5988a4398bf0ad8bd94895c26","commits":["1b5058fa0bc979669773e3f685f42d4ecf1ab30e"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f0b9b15bed19ef25df764c2ea9b944466c2b0087","commits":["1e7337108200f68f200a08f47244b52aca91c498"],"user_facing":false}

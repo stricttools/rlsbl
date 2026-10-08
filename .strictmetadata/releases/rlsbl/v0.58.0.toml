@@ -1,0 +1,14 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, or major
+bump = "minor"
+# Short description of this release (required)
+description = "New dead-workspace-packages check for detecting unused library packages in monorepo workspaces"
+# Optional context explaining why these changes were made
+context = ""
+include = ["npm", "pypi", "docs"]
+exclude = []
+release_commit = "2a9b56182c1e763e89acfdb6ed6abe066100d00b"
+
+[released_trees]
+"." = "4db7797c2361b9fec006c46e5bbfcbb1cc1dcf67"

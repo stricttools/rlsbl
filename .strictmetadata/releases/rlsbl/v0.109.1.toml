@@ -1,0 +1,18 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, major, hotfix, or prerelease
+bump = "patch"
+# Short description of this release (required)
+description = "Scaffold truthful status labels, crates wrapper checksum verification, corrected monorepo positional bindings, and Go dead-modules testdata exclusion"
+# Optional context explaining why these changes were made
+context = "Found via the new CLI wiring coverage (which itself now covers all commands via the deterministic strictcli 0.32.x coverage check) plus fleet verification."
+# Pre-release identifier: alpha, beta, rc, or stable
+# preid = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
+release_commit = "793a0c371335ae366441b1ee5bf6ba8a8f8e83c6"
+
+[released_trees]
+"." = "813984e1bd366676f360fbb15b4c84e6f6541240"

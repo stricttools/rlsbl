@@ -1,0 +1,3 @@
+{"format_version":2,"id":"18dc8810f1b01f7ddc5e6b9660cf4a7f887ede24b02eedbd","commits":["f57af6cf681e29befff5d4c07eff54826afec677"],"user_facing":true,"description":"**Feature.** Deno publish template is now idempotent with JSR version-exists pre-check.","type":"feature"}
+{"format_version":2,"id":"18dc8810f1b0da83a9f10cafe95c4d72bfb690b5f36f1dcc","commits":["6fb82d6e2b7c1ab5c0edcbc8eac24632909335fa"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f1b153e82ca76b7b2f5b4d3d9bb95bde498aea64","commits":["0f67f9c6206532b445ab34533403283199200e5f"],"user_facing":false}

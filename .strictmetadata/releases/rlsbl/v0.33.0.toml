@@ -1,0 +1,16 @@
+# Materialized by scripts/backfill_release_anchors.py: this version shipped
+# before rlsbl archived a release file per version, so no archive existed.
+# The description below was recovered from the sources named in the run's
+# plan; bump is derived by version arithmetic against the predecessor, and
+# include reflects the targets detected at backfill time (the historical
+# target set is not recoverable).
+# strictspec document version gate (do not remove)
+format_version = 2
+bump = "minor"
+include = ["npm", "pypi"]
+exclude = []
+description = "`dev install` grows `--global`/`--venv` and four more targets, an empty `release_branches` list becomes an error instead of a silent fallback, and an aborted release no longer leaves a regenerated CHANGELOG.md in the working tree."
+release_commit = "7186a5284c5929fbc8434924387ba5dc20641c6f"
+
+[released_trees]
+"." = "dafcca66de94089c32c5877e9f9e1ce5f77a7927"

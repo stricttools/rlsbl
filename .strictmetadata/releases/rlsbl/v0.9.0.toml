@@ -1,0 +1,16 @@
+# Materialized by scripts/backfill_release_anchors.py: this version shipped
+# before rlsbl archived a release file per version, so no archive existed.
+# The description below was recovered from the sources named in the run's
+# plan; bump is derived by version arithmetic against the predecessor, and
+# include reflects the targets detected at backfill time (the historical
+# target set is not recoverable).
+# strictspec document version gate (do not remove)
+format_version = 2
+bump = "minor"
+include = ["npm", "pypi"]
+exclude = []
+description = "A large feature and hardening release: the `unreleased` and `prs` commands, a config management system with schema-driven migrations, an advisory lock against concurrent releases, parallel CI watching and registry checks, and a long list of release-safety fixes."
+release_commit = "fd7b9952924b60b40965d64ca543a9f4d40ae5ca"
+
+[released_trees]
+"." = "cd2651ae994d780ec024099f447db65450cbe700"

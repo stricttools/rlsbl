@@ -1,0 +1,16 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, or major
+bump = "patch"
+# Short description of this release (required)
+description = "Fix CI: mock saferm in scaffold orphan tests"
+# Optional context explaining why these changes were made
+context = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
+release_commit = "c6dacb4901a0f2bc8f51185c6d9c35652db37bb0"
+
+[released_trees]
+"." = "5b07ec71d70ead6462fb552ef0bfc380d4a79200"

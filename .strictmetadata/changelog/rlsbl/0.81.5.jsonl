@@ -1,0 +1,2 @@
+{"format_version":2,"id":"18dc8810f24a0b6207ea81981af346978a0be830187ed846","commits":["4d67c06212c3f932e473610cb5c96b2a3f45f107"],"user_facing":true,"description":"**Fix CI test failures.** Autouse saferm mock fixture applied to all scaffold tests.","type":"fix"}
+{"format_version":2,"id":"18dc8810f24ad49dfec10b88ad4746cb9337ff49af5cb56a","commits":["a926ea7c936f196ac106bdaf1390d7c33eb3987a","62620e93ff1bef1a0204eda09717fa2c076c8d88","a926ea7c936f196ac106bdaf1390d7c33eb3987a"],"user_facing":false}

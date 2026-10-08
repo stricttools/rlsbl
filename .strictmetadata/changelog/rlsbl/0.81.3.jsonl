@@ -1,0 +1,2 @@
+{"format_version":2,"id":"18dc8810f244f22b17688c2218844dcb9368485f99b8b64e","commits":["e4397fd1698b5c77e79ded5167398ddbd9b5628d"],"user_facing":true,"description":"**Fix CI test failure.** Scaffold orphan detection tests now mock saferm for CI environments.","type":"fix"}
+{"format_version":2,"id":"18dc8810f246ea610632142b595d4603a05149ac8593b1c0","commits":["0c9bdf6f9b3988cacd499647f8f99d95bd952314","18d613f5d299e354ca74af520eee99fdfe0d99ac"],"user_facing":false}

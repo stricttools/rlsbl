@@ -1,0 +1,33 @@
+format_version = 1
+repository_layout = "standalone"
+release_branches = ["main", "master"]
+environment_file = "~/Projects/.env"
+
+[timeouts]
+push_seconds = 120
+
+[[releasables]]
+name = "rlsbl"
+tag_format = "v{version}"
+publish_mode = "ci"
+
+[[members]]
+path = "."
+name = "root"
+releasable = "rlsbl"
+internal_dep_floors = ["strictcli", "strictspec"]
+targets = [{ name = "npm" }, { name = "pypi" }]
+
+[[members.pipelines]]
+name = "npm"
+type = "npm"
+target = "npm"
+local = false
+artifact = "package"
+
+[[members.pipelines]]
+name = "pypi"
+type = "pypi"
+target = "pypi"
+local = false
+artifact = "package"

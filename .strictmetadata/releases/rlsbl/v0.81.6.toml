@@ -1,0 +1,16 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, or major
+bump = "patch"
+# Short description of this release (required)
+description = "Fix PyPI scanner false positives for prefixed package names"
+# Optional context explaining why these changes were made
+context = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
+release_commit = "9cf27d188af340292accc3b65b0bda70e347aa47"
+
+[released_trees]
+"." = "572402c17d971b53257aeea3b0509f4b33d13777"

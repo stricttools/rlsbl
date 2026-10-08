@@ -1,0 +1,23 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, major, infra, or prerelease
+#   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
+bump = "minor"
+# Short description of this release (required)
+description = "Release-flow fixes (the empty-candidate-window guard now pushes and dispatches run_all itself on stranded resumes; dev-node editable-sibling locks refresh at bump time), the changelog-edit field-wipe fix, and dev install's required --target choice."
+# Optional context explaining why these changes were made
+context = ""
+# Pre-release channel: alpha, beta, rc, or stable (ordered;
+# demotion is an error). With patch/minor/major it ENTERS the
+# channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
+# bump = "prerelease" it promotes, and "stable" strips the
+# suffix. See docs/release-workflow.md#the-pre-release-channel.
+# preid = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
+release_commit = "9924ff3e821c47d80867f23c2165f50f57256eb1"
+
+[released_trees]
+"." = "c7c6aad74659f5f426e906c47dc3af45e2f32109"

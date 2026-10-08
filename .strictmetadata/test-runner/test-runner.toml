@@ -1,0 +1,8 @@
+format_version = 1
+caches = ["uv", "go", "python_user_base"]
+carry_ignored = [".rlsbl-test-tools"]
+ci_workflows = [".github/workflows/ci-pypi.yml"]
+command = "uv sync --offline $SANDBOX_UV_SYNC_ARGS && eval \"$SANDBOX_OVERLAY_INSTALL\" && uv run $SANDBOX_UV_RUN_ARGS --offline pytest"
+default_args = "-q -n auto"
+prewarm = ["scripts/test-prewarm.sh"]
+runner_path = "scripts/test.sh"

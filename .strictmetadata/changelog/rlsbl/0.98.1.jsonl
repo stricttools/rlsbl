@@ -1,0 +1,6 @@
+{"format_version":2,"id":"18dc8810f2f925cbb2ed3434f074443c960b0bc868b75f24","commits":["3f33dadd3e6bc782836bb9efbc4b659f99ee5f59"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f2f990a172e1e1e84ec94f3abf8e41888cbd5257","commits":["bd594823a4eec151b740c058094fa18db5636504"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f2fa5a22c269de17681f4d26aefee8c337336c59","commits":["3921ef4dbf63e74e9354af641ddcfd1f22835b58"],"user_facing":true,"description":"Scaffold hash pruning no longer removes entries for files not actively deleted during the scaffold run.","type":"fix"}
+{"format_version":2,"id":"18dc8810f2fafbf4c9992c1fcaf145128187b6fcba62fd4e","commits":["1c05d9fc1c21eb436a60284e1a838c4101dd6562"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f2fb5986b28f607c83de4c7e843e822a279a1b38","commits":["2beb25b5ba56314528edb26858c7ca06dbfe2632"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f2fbbab20bb5b2dcb1bb4278b613f5c1d0179292","commits":["e7f8793c130ec0f512b6937cfcd6eb8e8f938824"],"user_facing":false}

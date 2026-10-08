@@ -1,0 +1,10 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+bump = "patch"
+include = ["npm", "pypi", "docs"]
+exclude = []
+release_commit = "516307d4a4627bd094da9dca606d347f550833c4"
+description = "`release retry` always dispatches every workflow listed in retry.toml rather than only as a fallback, and npm targets get a scaffolded `.npmignore`."
+
+[released_trees]
+"." = "2d022bf5f468222f2012937f832368a85cac7d45"

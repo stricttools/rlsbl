@@ -1,0 +1,14 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, or major
+bump = "patch"
+# Short description of this release (required)
+description = "Fix CI test failure from --yes flag in safegit commit calls"
+# Optional context explaining why these changes were made
+context = ""
+include = ["npm", "pypi"]
+exclude = []
+release_commit = "a01adbe97c2c801c6ace5a865f92eedc7bbdeb5e"
+
+[released_trees]
+"." = "b808135c1759b509b43b323b58b8faa0302d54db"

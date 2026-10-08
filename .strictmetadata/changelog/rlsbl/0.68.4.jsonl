@@ -1,0 +1,3 @@
+{"format_version":2,"id":"18dc8810f1a86f38ba07296c891e4367afc59d3bd8544149","commits":["3c3bf137d53958787a607295483f6d93f36547fa"],"user_facing":true,"description":"**Fix.** `scaffold --force` no longer destroys user-added .gitignore entries. The additive merge (only add, never remove) now applies regardless of `--force`.","type":"fix"}
+{"format_version":2,"id":"18dc8810f1a8c868c73ed5ba8b9a4a35b7b5688783a8b7b6","commits":["33e5715f2dec82047bca32a72118335df9ede035","7d906c0d10a1b3b4d106f0640238fc067e4e2ecf","8bb8adaf5a59d319b9b548432e701f4d77cff79a"],"user_facing":false}
+{"format_version":2,"id":"18dc8810f1a90ea7afeed3b3360a4b77a708bcae329b6e7f","commits":["b27d411dacca5803a8982ba203cbfe578252e9c9"],"user_facing":false}

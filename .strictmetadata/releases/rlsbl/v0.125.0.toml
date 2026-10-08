@@ -1,0 +1,31 @@
+# strictspec document version gate (do not remove)
+format_version = 2
+# Version bump type: patch, minor, major, infra, or prerelease
+#   prerelease: advance an existing pre-release (0.6.0-beta.0 -> -beta.1)
+bump = "minor"
+# Short description of this release (required)
+description = "check-name --target go becomes an offline Go package-name check against the language and a committed standard-library table, and the github target is removed."
+# Optional context explaining why these changes were made
+context = """
+Neither networked check could inform a naming decision. A Go module path lives
+under its owner, so pkg.go.dev for a bare name almost always said not found;
+a GitHub repository name is owner-scoped, so a GitHub-wide count never meant
+taken. What a Go name can really collide with is the language and the
+standard library, both knowable offline: the go target now reports invalid,
+taken (by a standard-library package), discouraged, or available. rlsbl is
+pre-1.0, so the removal ships without a compatibility shim.
+"""
+# Pre-release channel: alpha, beta, rc, or stable (ordered;
+# demotion is an error). With patch/minor/major it ENTERS the
+# channel (0.5.2 + minor + alpha -> 0.6.0-alpha.0); with
+# bump = "prerelease" it promotes, and "stable" strips the
+# suffix. See docs/release-workflow.md#the-pre-release-channel.
+# preid = ""
+# Set to true to generate a blog post for this release
+# blog = false
+include = ["npm", "pypi"]
+exclude = []
+release_commit = "7ddb377baa0b0273a7b094a383aafaa1917329c4"
+
+[released_trees]
+"." = "8649cc489782bd15d19b29edfbdbdf02fd3083c4"
