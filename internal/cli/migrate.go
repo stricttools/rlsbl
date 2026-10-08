@@ -17,7 +17,11 @@ const migrateRecordsHelp = "Convert the rlsbl records of the repository holding 
 	"once: the release declarations (releasables.toml, from every config.json, workspace.toml, and releasable.toml), the test " +
 	"runner's settings, each releasable's changelog (every line restamped to format_version 2, an id minted where a line has none, " +
 	"a batch exclusion moved onto the entry it exempts as batch_reason), its release file, archives, version file, and undo " +
-	"audits, the batch release files, the transition record's surgery events, the scaffold state and merge bases, customized " +
+	"audits (a pre-release of the dropped pre-release channel, MAJOR.MINOR.PATCH-alpha.N, -beta.N, or -rc.N, is folded: its " +
+	"changelog entries move into the file of the stable version it preceded when that version was released, and into the " +
+	"unreleased file otherwise, an entry naming the commits a kept entry names left out, its archive is not carried, and its " +
+	"tag, when this repository holds it, is recorded as an unversioned tag; a retired subject's pre-releases are refused, " +
+	"naming the hand edit), the batch release files, the transition record's surgery events, the scaffold state and merge bases, customized " +
 	"hook scripts (each moved to .strictmetadata/release-hooks/ and run by a hooks declaration), .strictmetadata/go.mod, the " +
 	"options entries of renamed options and of those that moved to strictcode, and strictcode.toml (the tool declarations, " +
 	"the library lint lists, the dead-modules suppressions, and ruff-lint's coverage as strictcode's lint rule). It writes the " +

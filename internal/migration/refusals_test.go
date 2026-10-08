@@ -479,6 +479,21 @@ func TestEveryRefusalNamingAHandEditClearsOnceTheEditIsMade(t *testing.T) {
 			fix:  func(f *fixture) { f.remove(".rlsbl/changes/next.jsonl") },
 		},
 		{
+			name: "a pre-release of a retired subject", fixture: withClosedHistory,
+			breakIt: func(f *fixture) {
+				f.write(".rlsbl-monorepo/releasables/conformance/changes/0.4.0-rc.1.jsonl", `{"format_version":1,"id":"`+someID+`","commits":["`+otherSHA+`"],"user_facing":true,"description":"Early cases","type":"feature"}`+"\n")
+			},
+			want: "holds pre-releases of the dropped pre-release channel (0.4.0-rc.1)",
+			fix: func(f *fixture) {
+				// The entries folded into the stable version's file by hand;
+				// the repository holds no tag of the pre-release.
+				rc := ".rlsbl-monorepo/releasables/conformance/changes/0.4.0-rc.1.jsonl"
+				stable := ".rlsbl-monorepo/releasables/conformance/changes/0.4.0.jsonl"
+				f.write(stable, f.read(stable)+f.read(rc))
+				f.remove(rc)
+			},
+		},
+		{
 			name: "a batch archive whose name carries no time", fixture: workspaceFixture,
 			breakIt: func(f *fixture) {
 				f.write(".rlsbl-monorepo/releases/batch-latest.toml", "[releasables.widget]\nbump = \"minor\"\ndescription = \"More\"\ninclude = [\"npm\"]\nexclude = []\n")

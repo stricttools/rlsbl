@@ -58,6 +58,10 @@ type builder struct {
 	declaredHookSlots map[string]map[string]bool
 
 	history *history
+	// preReleaseTags are the pre-releases of the dropped pre-release
+	// channel whose tags the lifecycle-and-license record keeps as
+	// unversioned tags.
+	preReleaseTags []preReleaseTag
 }
 
 // Build reads the repository at req.Root and decides everything the

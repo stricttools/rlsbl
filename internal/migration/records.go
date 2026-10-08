@@ -30,7 +30,21 @@ func (b *builder) convertState(name, stateDir string, retired bool) {
 		changelogDest = declarations.RetiredHistoryDir(name) + "/changelog"
 		releasesDest = releaserecord.RetiredArchiveDir(name)
 	}
-	b.convertChangelog(stateDir, changelogDest, name)
+	preReleases := b.preReleasesOf(stateDir)
+	if retired && len(preReleases) > 0 {
+		var labels []string
+		for _, pr := range preReleases {
+			labels = append(labels, pr.label)
+		}
+		b.p.add("%s holds pre-releases of the dropped pre-release channel (%s), and %s's release history is closed, so no declared tag format spells their tags. Hand edit: fold each pre-release's changelog entries into the changelog file of the stable version it preceded (or the unreleased file), record each pre-release's tag that exists with `rlsbl transition record --non-version-tag <tag> --reason <text>` (the Python rlsbl 0.131.0), and remove the pre-release files, then migrate", stateDir, strings.Join(labels, ", "), name)
+		return
+	}
+	destinations := map[string]string{}
+	for _, pr := range preReleases {
+		destinations[pr.label] = b.preReleaseDestination(stateDir, pr)
+		b.preReleaseTags = append(b.preReleaseTags, preReleaseTag{subject: name, pr: pr, destination: destinations[pr.label]})
+	}
+	b.convertChangelog(stateDir, changelogDest, name, preReleases, destinations)
 	b.claimGeneratedChangelog(stateDir)
 	releasesDir := stateDir + "/releases"
 	for _, f := range b.tree.under(releasesDir) {
@@ -54,10 +68,15 @@ func (b *builder) convertState(name, stateDir string, retired bool) {
 			}
 			b.convertRetry(f, name)
 		case strings.HasPrefix(base, "v") && strings.HasSuffix(base, ".toml"):
-			v, err := semver.Parse(strings.TrimSuffix(strings.TrimPrefix(base, "v"), ".toml"))
+			label := strings.TrimSuffix(strings.TrimPrefix(base, "v"), ".toml")
+			v, err := semver.Parse(label)
 			b.tree.claim(f)
+			if pr, ok := parsePreRelease(label); ok {
+				b.note("%s is not carried: the new record holds stable versions only, so the pre-release %s keeps its changelog entries in the %s changelog file and its tag as an unversioned tag", f, pr.label, destinations[pr.label])
+				continue
+			}
 			if err != nil {
-				b.p.add("%s is an archive whose name carries no MAJOR.MINOR.PATCH version (%v), and the new record holds release versions only; rename or remove it by hand", f, err)
+				b.p.add("%s is an archive whose name carries no MAJOR.MINOR.PATCH version and names no pre-release of the dropped pre-release channel (%v), and the new record holds release versions only; rename or remove it by hand", f, err)
 				continue
 			}
 			b.convertArchive(f, releaserecord.ArchivePath(releasesDest, v), v)

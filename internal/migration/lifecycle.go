@@ -233,9 +233,17 @@ func (b *builder) convertLifecycle(d *declarations.Releasables) {
 	// transitions take their registries from them.
 	b.addRegistryNames(rec, d, must)
 	b.addIdentities(rec, d, must)
+	recordedTags := map[string]bool{}
 	for _, t := range b.history.unversioned {
+		recordedTags[t.tag] = true
 		must(rec.AddUnversionedTag(t.tag, t.reason, t.at))
 	}
+	b.addPreReleaseTags(func(tag, reason string) {
+		if !recordedTags[tag] {
+			recordedTags[tag] = true
+			must(rec.AddUnversionedTag(tag, reason, now))
+		}
+	}, d)
 	if len(b.p.list) > 0 {
 		return
 	}

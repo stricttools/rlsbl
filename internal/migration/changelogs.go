@@ -73,11 +73,20 @@ func (b *builder) collectExclusions(releasable string, cfg object) {
 // convertChangelog converts the changes/ directory of an old state
 // directory into dest: every line restamped to format version 2, an id
 // minted where a line has none, and batch_reason set from the exclusions.
-// The Markdown copies and the validation cache are deleted.
-func (b *builder) convertChangelog(stateDir, dest, releasable string) {
+// The Markdown copies and the validation cache are deleted. A pre-release's
+// file is folded into the file destinations names for it (a stable
+// version's, or "unreleased"), which is written when the old layout holds
+// none.
+func (b *builder) convertChangelog(stateDir, dest, releasable string, preReleases []preRelease, destinations map[string]string) {
 	changesDir := stateDir + "/changes"
 	used := map[int]bool{}
 	excl := b.exclusions[releasable]
+	// The files written, by label, each with its sources and own entries.
+	type target struct {
+		sources []string
+		own     []changelog.Entry
+	}
+	targets := map[string]*target{}
 	for _, f := range b.tree.under(changesDir) {
 		name := strings.TrimPrefix(f, changesDir+"/")
 		if strings.Contains(name, "/") {
@@ -90,17 +99,52 @@ func (b *builder) convertChangelog(stateDir, dest, releasable string) {
 			b.tree.claim(f)
 		case name == changelog.UnreleasedName:
 			b.tree.claim(f)
-			b.convertChangelogFile(f, dest+"/"+name, "unreleased", unreleasedMode, excl, used)
+			if entries, ok := b.convertChangelogEntries(f, "unreleased", excl, used); ok {
+				targets["unreleased"] = &target{sources: []string{f}, own: entries}
+			}
 		case strings.HasSuffix(name, ".jsonl"):
 			label := strings.TrimSuffix(name, ".jsonl")
-			if _, err := semver.Parse(label); err != nil {
-				b.p.add("%s is a changelog file whose name is no MAJOR.MINOR.PATCH version (%v), and the new layout holds released versions only; rename or remove it by hand", f, err)
-				b.tree.claim(f)
+			b.tree.claim(f)
+			if _, ok := parsePreRelease(label); ok {
 				continue
 			}
-			b.tree.claim(f)
-			b.convertChangelogFile(f, dest+"/"+name, label, releasedMode, excl, used)
+			if _, err := semver.Parse(label); err != nil {
+				b.p.add("%s is a changelog file whose name is no MAJOR.MINOR.PATCH version and names no pre-release of the dropped pre-release channel (%v), and the new layout holds released versions only; rename or remove it by hand", f, err)
+				continue
+			}
+			if entries, ok := b.convertChangelogEntries(f, label, excl, used); ok {
+				targets[label] = &target{sources: []string{f}, own: entries}
+			}
 		}
+	}
+	folded := map[string][][]changelog.Entry{}
+	for _, pr := range preReleases {
+		src := changesDir + "/" + pr.label + ".jsonl"
+		if !b.tree.has(src) {
+			continue
+		}
+		entries, ok := b.convertChangelogEntries(src, pr.label, excl, used)
+		if !ok {
+			continue
+		}
+		to := destinations[pr.label]
+		if targets[to] == nil {
+			targets[to] = &target{}
+		}
+		targets[to].sources = append(targets[to].sources, src)
+		folded[to] = append(folded[to], entries)
+		b.note("%s's entries move into the %s changelog file: the new layout holds stable versions only, and %s was a pre-release of %s", src, to, pr.label, pr.stable)
+	}
+	for _, label := range sortedKeys(targets) {
+		t := targets[label]
+		name, mode, change := label+".jsonl", releasedMode, "changelog lines restamped to format_version 2"
+		if label == "unreleased" {
+			name, mode = changelog.UnreleasedName, unreleasedMode
+		}
+		if len(folded[label]) > 0 {
+			change += ", with the entries of the pre-releases folded in"
+		}
+		b.writeChangelogFile(t.sources, dest+"/"+name, mode, change, foldEntries(t.own, folded[label]))
 	}
 	for i, x := range excl {
 		if !used[i] {
@@ -112,13 +156,15 @@ func (b *builder) convertChangelog(stateDir, dest, releasable string) {
 // The keys a first-format changelog line may carry.
 var oldEntryKeys = map[string]bool{"format_version": true, "id": true, "commits": true, "user_facing": true, "description": true, "type": true, "packages": true}
 
-func (b *builder) convertChangelogFile(src, dst, label string, mode fs.FileMode, excl []exclusion, used map[int]bool) {
+// convertChangelogEntries reads one first-format changelog file into the
+// entries it converts to, and false when it cannot be read.
+func (b *builder) convertChangelogEntries(src, label string, excl []exclusion, used map[int]bool) ([]changelog.Entry, bool) {
 	data, err := b.tree.read(src)
 	if err != nil {
 		b.p.add("%v", err)
-		return
+		return nil, false
 	}
-	var out []string
+	var out []changelog.Entry
 	entry := 0
 	minted := 0
 	for i, text := range strings.Split(string(data), "\n") {
@@ -141,16 +187,26 @@ func (b *builder) convertChangelogFile(src, dst, label string, mode fs.FileMode,
 			b.p.add("%s converts to a line the new changelog reader refuses (%v); repair the line by hand", where, err)
 			continue
 		}
-		out = append(out, changelog.Serialize(e))
+		out = append(out, e)
 	}
 	if minted > 0 {
 		b.note("%s: %d entries carried no id the new format accepts, so each got a newly minted one", src, minted)
 	}
-	content := ""
-	if len(out) > 0 {
-		content = strings.Join(out, "\n") + "\n"
+	return out, true
+}
+
+// writeChangelogFile plans one changelog file of the new layout holding
+// entries.
+func (b *builder) writeChangelogFile(sources []string, dst string, mode fs.FileMode, change string, entries []changelog.Entry) {
+	var lines []string
+	for _, e := range entries {
+		lines = append(lines, changelog.Serialize(e))
 	}
-	b.addWrite(write{path: dst, sources: []string{src}, change: "changelog lines restamped to format_version 2", data: []byte(content), mode: mode})
+	content := ""
+	if len(lines) > 0 {
+		content = strings.Join(lines, "\n") + "\n"
+	}
+	b.addWrite(write{path: dst, sources: sources, change: change, data: []byte(content), mode: mode})
 }
 
 // convertEntry reads one first-format line.
