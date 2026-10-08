@@ -2,6 +2,6 @@ format_version = 1
 
 [[entry]]
 id = "strictcode:lint"
-current = "error"
+current = "off"
 ideal = "error"
-reason = "ruff-lint checked this member before the check moved into strictcode's lint rule"
+reason = "the Python rlsbl is deleted; the Python left is the selfdoc docs directives, and strictcode.toml declares no python_tools table for them"
