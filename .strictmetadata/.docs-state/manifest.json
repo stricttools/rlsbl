@@ -1031,6 +1031,16 @@
         },
         {
           "level": 2,
+          "text": "transition public-client",
+          "anchor": "transition-public-client"
+        },
+        {
+          "level": 3,
+          "text": "Flags",
+          "anchor": "flags-6"
+        },
+        {
+          "level": 2,
           "text": "transition init-minimal-record",
           "anchor": "transition-init-minimal-record"
         }
@@ -3687,6 +3697,16 @@
         },
         {
           "level": 3,
+          "text": "`MetadataDir`",
+          "anchor": "metadatadir"
+        },
+        {
+          "level": 3,
+          "text": "`OwnershipManifest`",
+          "anchor": "ownershipmanifest"
+        },
+        {
+          "level": 3,
           "text": "`IsAncestor`",
           "anchor": "isancestor"
         },
@@ -4174,6 +4194,11 @@
           "level": 3,
           "text": "`Repo.Ignored`",
           "anchor": "repoignored"
+        },
+        {
+          "level": 3,
+          "text": "`Repo.IgnoreRules`",
+          "anchor": "repoignorerules"
         },
         {
           "level": 3,
@@ -5020,6 +5045,11 @@
         },
         {
           "level": 3,
+          "text": "`ReportPublicClient`",
+          "anchor": "reportpublicclient"
+        },
+        {
+          "level": 3,
           "text": "`Verdict`",
           "anchor": "verdict"
         },
@@ -5077,6 +5107,11 @@
           "level": 3,
           "text": "`Invocation.Classify`",
           "anchor": "invocationclassify"
+        },
+        {
+          "level": 3,
+          "text": "`Invocation.PublicClient`",
+          "anchor": "invocationpublicclient"
         },
         {
           "level": 3,
@@ -8786,6 +8821,16 @@
         },
         {
           "level": 3,
+          "text": "`GitignorePath`",
+          "anchor": "gitignorepath"
+        },
+        {
+          "level": 3,
+          "text": "`GitignoreContent`",
+          "anchor": "gitignorecontent"
+        },
+        {
+          "level": 3,
           "text": "`ScrubResultPath`",
           "anchor": "scrubresultpath"
         },
@@ -11348,7 +11393,7 @@
       ]
     }
   ],
-  "last_gen": "2026-10-08T01:04:36.747791+00:00",
+  "last_gen": "2026-10-08T11:25:53.721442+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
