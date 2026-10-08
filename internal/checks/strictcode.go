@@ -78,11 +78,12 @@ type strictcodeFindings struct {
 
 // runStrictcode runs strictcode with args and reads its machine-mode
 // document. Each run is declared an observed run, which is what lets the
-// read-only check command start it. `strictcode registry rules` writes
-// nothing; strictcode declares `analyze` mutating, because its lint, format,
-// and type-check rules, while on, start their tools with uv run, which can
-// create or update .venv and rewrite uv.lock. The check is declared impure,
-// so a dry run lists it without starting strictcode.
+// read-only check command start it. strictcode writes nothing: `registry
+// rules` only reads, and `analyze` is declared read-only, its lint, format,
+// and type-check rules starting their tools with `uv run --frozen
+// --no-sync` and refusing a missing environment. The check is declared
+// impure (strictcode is not on the observe allowlist), so a dry run lists it
+// without starting strictcode.
 func runStrictcode(c *Context, args ...string) (strictcodeEnvelope, strictcli.Completed, error) {
 	argv := []interface{}{"strictcode"}
 	for _, a := range args {
