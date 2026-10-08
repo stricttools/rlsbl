@@ -1,5 +1,5 @@
 +++
-description = "Where rlsbl keeps a repository's records: the .strictmetadata/ directories it owns and reads, standalone versus workspace layout, run state, the old layout's residue that monorepo cleanup removes, and the one-time record migration."
+description = "Where rlsbl keeps a repository's records under .strictmetadata/, standalone and workspace layouts, the old layout's residue, and the one-time record migration."
 +++
 
 # On-disk layout

@@ -1,5 +1,5 @@
 +++
-description = "The checks rlsbl runs, listed by tag from its checks registry: running a check run and where it is scoped, failing-checks and the hook selections, options that soften or switch off a check, the strictcode check, unpublished-refs, the framework checks, and check metadata and purity."
+description = "The checks rlsbl runs, by tag from its registry: check runs and their scope, options, the strictcode, unpublished-refs, lifecycle, and framework checks."
 +++
 
 # Check system

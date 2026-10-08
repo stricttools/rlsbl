@@ -1,5 +1,5 @@
 +++
-description = "rlsbl workspaces: declaring members and releasables in releasables.toml, the root member, nested members, dev nodes, the dependency graph and impact analysis, the generated CI router and publish router with their derived path filters and run_all, batch releases, and the workspace checks."
+description = "rlsbl workspaces: root, nested, and dev-node members, the dependency graph, the CI and publish routers, batch releases, maintenance, and workspace checks."
 +++
 
 # Workspaces

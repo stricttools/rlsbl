@@ -1,5 +1,5 @@
 +++
-description = "The JSONL changelog: where each releasable's changelog files live, the format version 2 entry schema with ids, packages, and batch reasons, adding, amending, editing, removing, and remapping entries, validation and its exemptions, coverage in a fork, and the generated CHANGELOG.md."
+description = "rlsbl's JSONL changelog: where its files live, the entry schema, adding and changing entries, validation, fork coverage, CHANGELOG.md, and the pre-push hook."
 +++
 
 # JSONL changelog

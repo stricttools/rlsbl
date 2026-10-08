@@ -1,5 +1,5 @@
 +++
-description = "Moving releasables and renaming identities: monorepo extract and absorb with their tag policy, verification, refusals, and next steps; splitting a member out of a shared releasable; monorepo rename-releasable; rewrite project-name and its pending identities; and the transition record of repository surgery."
+description = "Moving releasables with monorepo extract and absorb, splitting a shared releasable, renaming a releasable or a standalone project, and the transition record."
 +++
 
 # Repository conversions

@@ -1,5 +1,5 @@
 +++
-description = "The rlsbl release flow: the release file, validation and its refusals, the release checkout, the pre-release pipeline and preflight, the step table from the version bump to the post-release hooks, the untagged candidate and its CI verdict, resume and abandon, the three version fates, the publish workflow's wait-for-ci job, and the commands that act on past releases."
+description = "The rlsbl release flow: the release file, validation, the release checkout, preflight, the steps, the CI verdict, resume, version fates, and past releases."
 +++
 
 # Release workflow
@@ -172,9 +172,9 @@ The next version comes from the version files and the release record, never from
 - Version files naming a version with neither an archive nor a tag are refused: above the latest release, that is what an abandoned attempt leaves, and the refusal names `rlsbl release abandon`; below it, the version files are behind and must name at least the latest release.
 - A next version the record holds as **never released** is refused: a never-released number is never used again, and the refusal names the version-files value that bumps past it.
 
-## The three version fates
+## The version fates
 
-Every archive records one of three fates, and every question about what the releasable released reads them:
+Every archive records one of the fates in the table below, and every question about what the releasable released reads them:
 
 | Fate | Written as | Meaning |
 | --- | --- | --- |

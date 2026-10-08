@@ -1,5 +1,5 @@
 +++
-description = "The lifecycle-and-license record: each releasable's dated lifecycle, license, and identity periods, held registry names, and unversioned tags; confidential repositories and the confidential-name index; the rules rlsbl enforces from it; and the transition commands that write it, classify, and declassify."
+description = "The lifecycle-and-license record's periods and identities, confidential and public repositories, the rules rlsbl enforces from it, and the transition commands."
 +++
 
 # Lifecycle and license

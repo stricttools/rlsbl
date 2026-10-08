@@ -1,5 +1,5 @@
 +++
-description = "The release declarations in .strictmetadata/releasables/releasables.toml: layout, release branches, timeouts, releasables, members, targets, pipelines, hooks, external checks, test settings, and dependency floors, plus the sandboxed test runner's test-runner.toml and the settings that belong to an option."
+description = "The release declarations in releasables.toml, the sandboxed test runner's settings, the settings that belong to an option, and where the old configuration went."
 +++
 
 # Declarations
