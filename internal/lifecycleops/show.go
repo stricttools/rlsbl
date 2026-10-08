@@ -270,6 +270,14 @@ func (inv Invocation) confidentialNamesVerdict(repo git.Repo, rec *lifecycle.Rec
 		}
 		return v, nil
 	}
+	if len(update.Names) == 0 {
+		if len(held) > 0 {
+			v.Verdict, v.Detail = VerdictRefuses, fmt.Sprintf("the repository is confidential with no name to protect (its public-client declarations take them out), but the index %s still holds names under %s (%s); %s", inv.IndexPath, describeEntries(held), strings.Join(heldNames(held), ", "), fix)
+		} else {
+			v.Verdict, v.Detail = VerdictHolds, "the repository is confidential with no name to protect (its public-client declarations take them out), and the index holds no entry for it"
+		}
+		return v, nil
+	}
 	if len(held) != 1 || strings.Join(held[0].Subjects, ", ") != key || !sameNames(held[0].Names, update.Names) {
 		v.Verdict, v.Detail = VerdictRefuses, fmt.Sprintf("the repository is confidential, and the index %s holds [%s] under %s where the record names [%s] under %s; %s", inv.IndexPath, strings.Join(heldNames(held), ", "), describeEntries(held), strings.Join(update.Names, ", "), key, fix)
 		return v, nil

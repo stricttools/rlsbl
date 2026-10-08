@@ -239,6 +239,8 @@ func (p *Plan) Report(dryRun bool) string {
 	}
 	switch {
 	case p.index == nil:
+	case p.index.Confidential() && len(p.index.Names) == 0:
+		fmt.Fprintf(&b, "%s no confidential names: the repository is confidential with no name to protect, so its entry for %s in the confidential-name index is removed\n", verb, strings.Join(p.index.Subjects, ", "))
 	case p.index.Confidential():
 		fmt.Fprintf(&b, "%s the confidential-name index entry for %s: %s\n", verb, strings.Join(p.index.Subjects, ", "), strings.Join(p.index.Names, ", "))
 	case len(p.index.Subjects) > 0:

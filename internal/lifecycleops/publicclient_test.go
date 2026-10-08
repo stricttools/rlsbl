@@ -105,3 +105,22 @@ func TestPublicClientDryRunWritesNothing(t *testing.T) {
 		t.Fatal("a dry run wrote the record or the index")
 	}
 }
+
+// A public client that leaves a confidential repository no name to protect
+// removes its index entry, and show still judges it confidential.
+func TestShowHoldsForAConfidentialRepositoryWithNoNameLeftToProtect(t *testing.T) {
+	hygiene.Isolate(t)
+	f := newFixture(t, strings.Replace(clientRecord, "codenames = [\"moonbeam\"]\n", "", 1))
+	testsupport.FakeSafegit(t)
+	testsupport.FakeGH(t, ghVisibility("private"))
+	requireExit(t, f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
+		return inv.PublicClient(dir, "portal", "a thin public client is planned")
+	}), 0)
+	if text := f.indexText(t); strings.Contains(text, "portal") {
+		t.Fatalf("the index keeps an entry with no names:\n%s", text)
+	}
+	v := f.confidentialNamesVerdict(t)
+	if v.Verdict != lifecycleops.VerdictHolds || !strings.Contains(v.Detail, "confidential") || strings.Contains(v.Detail, "is public") {
+		t.Fatalf("show for a confidential repository with no names: %+v", v)
+	}
+}
