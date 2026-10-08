@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -184,89 +184,612 @@ jobs:
             jq -r '.[] | "  \(.name): \(.conclusion)"' <<< "$runs"
             exit 0
           done
-  npm:
+  go:
     needs: wait-for-ci
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.tag || github.event.release.tag_name }}
-      - uses: actions/setup-node@v6
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
         with:
-          node-version: 24
-          registry-url: https://registry.npmjs.org
+          go-version-file: go.mod
       - name: Install gitleaks
         run: |
           GITLEAKS_VERSION=8.24.3
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin gitleaks
-      - name: Install dependencies
-        # Full install (devDependencies included): publishing runs the
-        # package's prepack script, which for a TypeScript package compiles
-        # with the dev toolchain. A bare checkout has none of it.
-        run: npm ci
-      - name: Pack the publishable artifact
-        # Packing runs the same prepack build as publishing, so the tarball
-        # scanned below carries what would be published. It is packed
-        # outside the checkout: a scratch directory inside the repository
-        # would be swept into the published tarball by any package without a
-        # `files` field.
-        run: |
-          mkdir -p "$RUNNER_TEMP/artifacts"
-          npm pack --pack-destination "$RUNNER_TEMP/artifacts"
-      - name: Scan artifacts for secrets
-        # Scoped to what ships. A whole-tree scan flags files that never
-        # reach a registry (fixtures, docs, sample configs, public
-        # identifiers) and has blocked a release mid-flight. gitleaks only
-        # auto-loads .gitleaks.toml from the directory it scans, so the
-        # project's allowlist is passed explicitly.
-        run: |
-          CONFIG_ARGS=""
-          if [ -f .gitleaks.toml ]; then
-            CONFIG_ARGS="--config ${PWD}/.gitleaks.toml"
-          fi
-          gitleaks dir "$RUNNER_TEMP/artifacts" ${CONFIG_ARGS}
       - name: Check if already published
-        id: check-npm
-        # Asks for the package's whole version list, never for one version.
+        id: check-go
         run: |
-          PKG_NAME=$(node -p "require('./package.json').name")
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          if npm view "${PKG_NAME}" versions --json 2>/dev/null | node -e 'const v=JSON.parse(require("fs").readFileSync(0,"utf8")||"[]");process.exit([].concat(v).includes(process.argv[1])?0:1)' "${PKG_VERSION}"; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "Already published: ${PKG_NAME}@${PKG_VERSION}"
+          TAG="${RELEASE_TAG}"
+          if git ls-remote --tags origin "${TAG}" | grep -q "${TAG}"; then
+            # Tag already pushed and goreleaser assets likely exist
+            RELEASE_ASSETS=$(gh release view "${TAG}" --json assets -q '.assets | length' 2>/dev/null || echo "0")
+            if [ "${RELEASE_ASSETS}" -gt 0 ]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "Already published: ${TAG} (${RELEASE_ASSETS} assets)"
+            fi
           fi
-      # --access public is written out because scoped packages are not used
-      # here and an unscoped public package requires it.
-      # --provenance records the build in npm's public attestation log; it is
-      # rendered only for a repository that may publish one.
-      - run: npm publish --provenance --access public
-        if: steps.check-npm.outputs.skip != 'true'
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-  pypi:
-    needs: wait-for-ci
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ inputs.tag || github.event.release.tag_name }}
-      - uses: astral-sh/setup-uv@v7
-      - name: Install gitleaks
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # rlsbl owns the release, goreleaser only BUILDS.
+      #
+      # goreleaser's publisher cannot target a prefixed tag ("<name>@v1.2.3"):
+      # its tag validation rejects the prefix, and with --skip=validate its
+      # release lookup still resolves the stripped bare name and would create
+      # or append to a `v1.2.3` Release nothing reads. So the archives are
+      # built here and attached to the Release rlsbl already created.
+      - name: Derive the bare version tag for goreleaser
+        id: bare-tag
+        if: steps.check-go.outputs.skip != 'true'
         run: |
-          GITLEAKS_VERSION=8.24.3
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin gitleaks
-      - run: uv build --out-dir dist
+          # Strip any "<name>@" / "<path>/" prefix: keep the trailing vX.Y.Z.
+          BARE=$(printf '%s' "${RELEASE_TAG}" | sed -E 's/^.*(v[0-9]+\.[0-9]+\.[0-9]+.*)$/\1/')
+          echo "tag=${BARE}" >> "$GITHUB_OUTPUT"
+          # goreleaser reads GORELEASER_CURRENT_TAG's tag contents while getting
+          # git state, BEFORE --skip=validate can excuse anything, so a name no
+          # tag carries aborts the run. A repository whose tags are prefixed
+          # carries no bare tag, so create the bare one locally at the released
+          # commit. It is a lightweight tag (an annotated one needs a tagger
+          # identity no CI checkout sets) and nothing pushes it: goreleaser runs
+          # --skip=publish, and the upload step below attaches the archives to
+          # the prefixed tag. In a repository whose tags are already bare this
+          # does nothing.
+          if ! git rev-parse -q --verify "refs/tags/${BARE}" >/dev/null; then
+            git tag "${BARE}" "$(git rev-parse HEAD)"
+          fi
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      - uses: goreleaser/goreleaser-action@v7.2.3
+        if: steps.check-go.outputs.skip != 'true'
+        with:
+          # Pinned from rlsbl's action-version table. A floating "~> v2"
+          # silently adopts each new goreleaser on the next release: 2.18.1
+          # arrived that way and broke every prefixed-tag repository.
+          version: v2.18.1
+          args: release --clean --skip=publish,announce,validate
+        env:
+          # A prefixed tag is not parseable as a version, and validation would
+          # compare the stripped tag against a git tag that does not exist.
+          GORELEASER_CURRENT_TAG: ${{ steps.bare-tag.outputs.tag }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Scan artifacts for secrets
+        # Scoped to what goreleaser just built and is about to upload. A
+        # whole-tree scan flags files that never ship (fixtures, docs, sample
+        # configs, public identifiers) and has blocked a release mid-flight.
         # gitleaks only auto-loads .gitleaks.toml from the directory it scans,
-        # and dist/ never holds the project's allowlist, so the config is
-        # passed explicitly.
+        # so the project's allowlist is passed explicitly.
+        if: steps.check-go.outputs.skip != 'true'
         run: |
           CONFIG_ARGS=""
           if [ -f .gitleaks.toml ]; then
             CONFIG_ARGS="--config ${PWD}/.gitleaks.toml"
           fi
           gitleaks dir dist/ ${CONFIG_ARGS}
+      - name: Upload release assets to the release tag
+        if: steps.check-go.outputs.skip != 'true'
+        run: |
+          # dist/ holds the archives plus checksums.txt. --clobber keeps a
+          # re-dispatch at the same tag idempotent.
+          shopt -s nullglob
+          ASSETS=(dist/*.tar.gz dist/checksums.txt)
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "::error::goreleaser produced no assets in dist/"
+            exit 1
+          fi
+          gh release upload "${RELEASE_TAG}" "${ASSETS[@]}" --clobber
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  npm-linux-x64:
+    name: Publish the npm package rlsbl-linux-x64
+    needs: [wait-for-ci, go]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Pack and publish rlsbl-linux-x64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          case "$RELEASE_TAG" in
+            'v'*'') ;;
+            *) echo "::error::the tag $RELEASE_TAG is not one of this releasable's tags (v<version>)"; exit 1 ;;
+          esac
+          VERSION="${RELEASE_TAG#'v'}"
+          VERSION="${VERSION%''}"
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::the tag $RELEASE_TAG carries the version '$VERSION', which is not MAJOR.MINOR.PATCH"
+            exit 1
+          fi
+          work="$RUNNER_TEMP/npm-linux-x64"
+          mkdir -p "$work/archive"
+          gh release download "$RELEASE_TAG" --pattern "rlsbl_${VERSION}_linux_amd64.tar.gz" --dir "$work/archive"
+          tar -xzf "$work/archive/rlsbl_${VERSION}_linux_amd64.tar.gz" -C "$work/archive" 'rlsbl'
+          mkdir -p "$work/package"
+          install -m 0755 "$work/archive/rlsbl" "$work/package/rlsbl"
+          sed "s/@VERSION@/$VERSION/" > "$work/package/package.json" <<'MANIFEST'
+          {
+            "cpu": [
+              "x64"
+            ],
+            "description": "The rlsbl binary of rlsbl for linux x64",
+            "files": [
+              "rlsbl"
+            ],
+            "license": "MIT",
+            "name": "rlsbl-linux-x64",
+            "os": [
+              "linux"
+            ],
+            "repository": {
+              "type": "git",
+              "url": "https://github.com/stricttools/rlsbl"
+            },
+            "version": "@VERSION@"
+          }
+          MANIFEST
+          published() {
+            if out="$(npm view "$1" versions --json 2>&1)"; then
+              printf '%s' "$out" | node -e 'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => { const v = JSON.parse(s); process.exit((Array.isArray(v) ? v : [v]).includes(process.argv[1]) ? 0 : 1); });' "$2"
+              return
+            fi
+            case "$out" in
+              *E404*) return 1 ;;
+            esac
+            echo "::error::npm could not list the published versions of $1: $out"
+            exit 1
+          }
+          if published 'rlsbl-linux-x64' "$VERSION"; then
+            echo "rlsbl-linux-x64@$VERSION is published already"
+          else
+            (cd "$work/package" && npm publish --access public --provenance)
+          fi
+  npm-linux-arm64:
+    name: Publish the npm package rlsbl-linux-arm64
+    needs: [wait-for-ci, go]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Pack and publish rlsbl-linux-arm64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          case "$RELEASE_TAG" in
+            'v'*'') ;;
+            *) echo "::error::the tag $RELEASE_TAG is not one of this releasable's tags (v<version>)"; exit 1 ;;
+          esac
+          VERSION="${RELEASE_TAG#'v'}"
+          VERSION="${VERSION%''}"
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::the tag $RELEASE_TAG carries the version '$VERSION', which is not MAJOR.MINOR.PATCH"
+            exit 1
+          fi
+          work="$RUNNER_TEMP/npm-linux-arm64"
+          mkdir -p "$work/archive"
+          gh release download "$RELEASE_TAG" --pattern "rlsbl_${VERSION}_linux_arm64.tar.gz" --dir "$work/archive"
+          tar -xzf "$work/archive/rlsbl_${VERSION}_linux_arm64.tar.gz" -C "$work/archive" 'rlsbl'
+          mkdir -p "$work/package"
+          install -m 0755 "$work/archive/rlsbl" "$work/package/rlsbl"
+          sed "s/@VERSION@/$VERSION/" > "$work/package/package.json" <<'MANIFEST'
+          {
+            "cpu": [
+              "arm64"
+            ],
+            "description": "The rlsbl binary of rlsbl for linux arm64",
+            "files": [
+              "rlsbl"
+            ],
+            "license": "MIT",
+            "name": "rlsbl-linux-arm64",
+            "os": [
+              "linux"
+            ],
+            "repository": {
+              "type": "git",
+              "url": "https://github.com/stricttools/rlsbl"
+            },
+            "version": "@VERSION@"
+          }
+          MANIFEST
+          published() {
+            if out="$(npm view "$1" versions --json 2>&1)"; then
+              printf '%s' "$out" | node -e 'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => { const v = JSON.parse(s); process.exit((Array.isArray(v) ? v : [v]).includes(process.argv[1]) ? 0 : 1); });' "$2"
+              return
+            fi
+            case "$out" in
+              *E404*) return 1 ;;
+            esac
+            echo "::error::npm could not list the published versions of $1: $out"
+            exit 1
+          }
+          if published 'rlsbl-linux-arm64' "$VERSION"; then
+            echo "rlsbl-linux-arm64@$VERSION is published already"
+          else
+            (cd "$work/package" && npm publish --access public --provenance)
+          fi
+  npm-darwin-x64:
+    name: Publish the npm package rlsbl-darwin-x64
+    needs: [wait-for-ci, go]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Pack and publish rlsbl-darwin-x64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          case "$RELEASE_TAG" in
+            'v'*'') ;;
+            *) echo "::error::the tag $RELEASE_TAG is not one of this releasable's tags (v<version>)"; exit 1 ;;
+          esac
+          VERSION="${RELEASE_TAG#'v'}"
+          VERSION="${VERSION%''}"
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::the tag $RELEASE_TAG carries the version '$VERSION', which is not MAJOR.MINOR.PATCH"
+            exit 1
+          fi
+          work="$RUNNER_TEMP/npm-darwin-x64"
+          mkdir -p "$work/archive"
+          gh release download "$RELEASE_TAG" --pattern "rlsbl_${VERSION}_darwin_amd64.tar.gz" --dir "$work/archive"
+          tar -xzf "$work/archive/rlsbl_${VERSION}_darwin_amd64.tar.gz" -C "$work/archive" 'rlsbl'
+          mkdir -p "$work/package"
+          install -m 0755 "$work/archive/rlsbl" "$work/package/rlsbl"
+          sed "s/@VERSION@/$VERSION/" > "$work/package/package.json" <<'MANIFEST'
+          {
+            "cpu": [
+              "x64"
+            ],
+            "description": "The rlsbl binary of rlsbl for darwin x64",
+            "files": [
+              "rlsbl"
+            ],
+            "license": "MIT",
+            "name": "rlsbl-darwin-x64",
+            "os": [
+              "darwin"
+            ],
+            "repository": {
+              "type": "git",
+              "url": "https://github.com/stricttools/rlsbl"
+            },
+            "version": "@VERSION@"
+          }
+          MANIFEST
+          published() {
+            if out="$(npm view "$1" versions --json 2>&1)"; then
+              printf '%s' "$out" | node -e 'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => { const v = JSON.parse(s); process.exit((Array.isArray(v) ? v : [v]).includes(process.argv[1]) ? 0 : 1); });' "$2"
+              return
+            fi
+            case "$out" in
+              *E404*) return 1 ;;
+            esac
+            echo "::error::npm could not list the published versions of $1: $out"
+            exit 1
+          }
+          if published 'rlsbl-darwin-x64' "$VERSION"; then
+            echo "rlsbl-darwin-x64@$VERSION is published already"
+          else
+            (cd "$work/package" && npm publish --access public --provenance)
+          fi
+  npm-darwin-arm64:
+    name: Publish the npm package rlsbl-darwin-arm64
+    needs: [wait-for-ci, go]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Pack and publish rlsbl-darwin-arm64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          case "$RELEASE_TAG" in
+            'v'*'') ;;
+            *) echo "::error::the tag $RELEASE_TAG is not one of this releasable's tags (v<version>)"; exit 1 ;;
+          esac
+          VERSION="${RELEASE_TAG#'v'}"
+          VERSION="${VERSION%''}"
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::the tag $RELEASE_TAG carries the version '$VERSION', which is not MAJOR.MINOR.PATCH"
+            exit 1
+          fi
+          work="$RUNNER_TEMP/npm-darwin-arm64"
+          mkdir -p "$work/archive"
+          gh release download "$RELEASE_TAG" --pattern "rlsbl_${VERSION}_darwin_arm64.tar.gz" --dir "$work/archive"
+          tar -xzf "$work/archive/rlsbl_${VERSION}_darwin_arm64.tar.gz" -C "$work/archive" 'rlsbl'
+          mkdir -p "$work/package"
+          install -m 0755 "$work/archive/rlsbl" "$work/package/rlsbl"
+          sed "s/@VERSION@/$VERSION/" > "$work/package/package.json" <<'MANIFEST'
+          {
+            "cpu": [
+              "arm64"
+            ],
+            "description": "The rlsbl binary of rlsbl for darwin arm64",
+            "files": [
+              "rlsbl"
+            ],
+            "license": "MIT",
+            "name": "rlsbl-darwin-arm64",
+            "os": [
+              "darwin"
+            ],
+            "repository": {
+              "type": "git",
+              "url": "https://github.com/stricttools/rlsbl"
+            },
+            "version": "@VERSION@"
+          }
+          MANIFEST
+          published() {
+            if out="$(npm view "$1" versions --json 2>&1)"; then
+              printf '%s' "$out" | node -e 'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => { const v = JSON.parse(s); process.exit((Array.isArray(v) ? v : [v]).includes(process.argv[1]) ? 0 : 1); });' "$2"
+              return
+            fi
+            case "$out" in
+              *E404*) return 1 ;;
+            esac
+            echo "::error::npm could not list the published versions of $1: $out"
+            exit 1
+          }
+          if published 'rlsbl-darwin-arm64' "$VERSION"; then
+            echo "rlsbl-darwin-arm64@$VERSION is published already"
+          else
+            (cd "$work/package" && npm publish --access public --provenance)
+          fi
+  npm-package:
+    name: Publish the npm package rlsbl
+    needs: [wait-for-ci, npm-linux-x64, npm-linux-arm64, npm-darwin-x64, npm-darwin-arm64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Pin the platform packages and publish rlsbl
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          case "$RELEASE_TAG" in
+            'v'*'') ;;
+            *) echo "::error::the tag $RELEASE_TAG is not one of this releasable's tags (v<version>)"; exit 1 ;;
+          esac
+          VERSION="${RELEASE_TAG#'v'}"
+          VERSION="${VERSION%''}"
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::the tag $RELEASE_TAG carries the version '$VERSION', which is not MAJOR.MINOR.PATCH"
+            exit 1
+          fi
+          cd '.'
+          node -e "$(cat <<'STAMP'
+          const fs = require("fs");
+          const version = process.argv[1];
+          const name = "rlsbl";
+          const platforms = ["rlsbl-darwin-arm64","rlsbl-darwin-x64","rlsbl-linux-arm64","rlsbl-linux-x64"];
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          const fail = (m) => { console.log("::error::" + m); process.exit(1); };
+          if (pkg.name !== name) fail("package.json names the package " + pkg.name + ", not " + name);
+          if (pkg.version !== version) fail("package.json carries the version " + pkg.version + ", not the released " + version);
+          for (const s of ["preinstall", "install", "postinstall"]) { if (pkg.scripts && pkg.scripts[s]) fail("package.json declares a " + s + " script; the package selects its platform package through optionalDependencies and runs nothing at install"); }
+          pkg.optionalDependencies = Object.assign({}, pkg.optionalDependencies);
+          for (const p of platforms) pkg.optionalDependencies[p] = version;
+          fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+          STAMP
+          )" "$VERSION"
+          published() {
+            if out="$(npm view "$1" versions --json 2>&1)"; then
+              printf '%s' "$out" | node -e 'let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => { const v = JSON.parse(s); process.exit((Array.isArray(v) ? v : [v]).includes(process.argv[1]) ? 0 : 1); });' "$2"
+              return
+            fi
+            case "$out" in
+              *E404*) return 1 ;;
+            esac
+            echo "::error::npm could not list the published versions of $1: $out"
+            exit 1
+          }
+          if published 'rlsbl' "$VERSION"; then
+            echo "rlsbl@$VERSION is published already"
+          else
+            npm publish --access public --provenance
+          fi
+  pypi-wheels:
+    name: Publish the PyPI binary wheels
+    needs: [wait-for-ci, go]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+      - name: Assemble one binary wheel per platform
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          case "$RELEASE_TAG" in
+            'v'*'') ;;
+            *) echo "::error::the tag $RELEASE_TAG is not one of this releasable's tags (v<version>)"; exit 1 ;;
+          esac
+          VERSION="${RELEASE_TAG#'v'}"
+          VERSION="${VERSION%''}"
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::the tag $RELEASE_TAG carries the version '$VERSION', which is not MAJOR.MINOR.PATCH"
+            exit 1
+          fi
+          if [ -d dist ] && [ -n "$(ls -A dist)" ]; then
+            echo "::error::dist/ is not empty at the tag; the wheels are published from it, so it must hold nothing else"
+            exit 1
+          fi
+          out="$PWD/dist"
+          meta="$RUNNER_TEMP/wheel-metadata"
+          mkdir -p "$out" "$meta"
+          python3 - './pyproject.toml' "$VERSION" "$meta" <<'METADATA'
+          import os, sys, tomllib
+          path, version, out = sys.argv[1:4]
+          with open(path, "rb") as f:
+              project = tomllib.load(f).get("project")
+          if not isinstance(project, dict):
+              sys.exit(f"::error::{path} has no [project] table")
+          name = project.get("name")
+          if not isinstance(name, str) or not name:
+              sys.exit(f"::error::{path} declares no project name")
+          if project.get("version") != version:
+              sys.exit(f"::error::{path} carries the version {project.get('version')!r}, not the released {version}")
+          lines = ["Metadata-Version: 2.4", f"Name: {name}", f"Version: {version}"]
+          description = project.get("description")
+          if description:
+              lines.append(f"Summary: {description}")
+          license = project.get("license")
+          if isinstance(license, str):
+              lines.append(f"License-Expression: {license}")
+          elif license is not None:
+              sys.exit(f"::error::{path} declares its license as a table; write it as an SPDX expression string")
+          for label, url in (project.get("urls") or {}).items():
+              lines.append(f"Project-URL: {label}, {url}")
+          keywords = project.get("keywords")
+          if keywords:
+              lines.append("Keywords: " + ",".join(keywords))
+          for classifier in project.get("classifiers") or []:
+              lines.append(f"Classifier: {classifier}")
+          body = ""
+          readme = project.get("readme")
+          if readme is not None:
+              types = {".md": "text/markdown", ".rst": "text/x-rst", ".txt": "text/plain"}
+              if isinstance(readme, str):
+                  file, text = readme, None
+                  content_type = types.get(os.path.splitext(readme)[1].lower())
+                  if content_type is None:
+                      sys.exit(f"::error::{path} names the readme {readme}, whose suffix is none of {', '.join(types)}; write readme as a table with its content-type")
+              else:
+                  file, text, content_type = readme.get("file"), readme.get("text"), readme.get("content-type")
+                  if not content_type:
+                      sys.exit(f"::error::{path} declares its readme as a table without a content-type")
+              if text is None:
+                  readme_path = os.path.join(os.path.dirname(path), file)
+                  try:
+                      with open(readme_path, encoding="utf-8") as f:
+                          text = f.read()
+                  except OSError as e:
+                      sys.exit(f"::error::{path} names the readme {file}, which cannot be read: {e}")
+              lines.append(f"Description-Content-Type: {content_type}")
+              body = "\n" + text
+          with open(out + "/METADATA", "w") as f:
+              f.write("\n".join(lines) + "\n" + body)
+          with open(out + "/name", "w") as f:
+              f.write(name)
+          METADATA
+          dist="$(tr 'A-Z' 'a-z' < "$meta/name" | sed -E 's/[-_.]+/_/g')"
+          write_record() {
+            record="$1/$2/RECORD"
+            : > "$record"
+            (cd "$1" && find . -type f ! -path "./$2/RECORD" | sed 's|^\./||' | LC_ALL=C sort) | while IFS= read -r f; do
+              hex="$(sha256sum "$1/$f" | cut -d' ' -f1)"
+              digest="$(printf '%b' "$(printf '%s' "$hex" | sed 's/../\\x&/g')" | base64 -w0 | tr '+/' '-_' | tr -d '=')"
+              size="$(wc -c < "$1/$f" | tr -d ' ')"
+              printf '%s,sha256=%s,%s\n' "$f" "$digest" "$size" >> "$record"
+            done
+            printf '%s/RECORD,,\n' "$2" >> "$record"
+          }
+          # linux-x64
+          work="$RUNNER_TEMP/wheel-linux-x64"
+          mkdir -p "$work/archive"
+          gh release download "$RELEASE_TAG" --pattern "rlsbl_${VERSION}_linux_amd64.tar.gz" --dir "$work/archive"
+          tar -xzf "$work/archive/rlsbl_${VERSION}_linux_amd64.tar.gz" -C "$work/archive" 'rlsbl'
+          tree="$work/tree"
+          mkdir -p "$tree/${dist}-${VERSION}.data/scripts" "$tree/${dist}-${VERSION}.dist-info"
+          install -m 0755 "$work/archive/rlsbl" "$tree/${dist}-${VERSION}.data/scripts/rlsbl"
+          cp "$meta/METADATA" "$tree/${dist}-${VERSION}.dist-info/METADATA"
+          printf '%s\n' 'Wheel-Version: 1.0' 'Generator: rlsbl' 'Root-Is-Purelib: false' 'Tag: py3-none-manylinux_2_17_x86_64' 'Tag: py3-none-manylinux2014_x86_64' 'Tag: py3-none-musllinux_1_1_x86_64' > "$tree/${dist}-${VERSION}.dist-info/WHEEL"
+          write_record "$tree" "${dist}-${VERSION}.dist-info"
+          (cd "$tree" && zip -q -X -D -r "$out/${dist}-${VERSION}-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.musllinux_1_1_x86_64.whl" .)
+          # linux-arm64
+          work="$RUNNER_TEMP/wheel-linux-arm64"
+          mkdir -p "$work/archive"
+          gh release download "$RELEASE_TAG" --pattern "rlsbl_${VERSION}_linux_arm64.tar.gz" --dir "$work/archive"
+          tar -xzf "$work/archive/rlsbl_${VERSION}_linux_arm64.tar.gz" -C "$work/archive" 'rlsbl'
+          tree="$work/tree"
+          mkdir -p "$tree/${dist}-${VERSION}.data/scripts" "$tree/${dist}-${VERSION}.dist-info"
+          install -m 0755 "$work/archive/rlsbl" "$tree/${dist}-${VERSION}.data/scripts/rlsbl"
+          cp "$meta/METADATA" "$tree/${dist}-${VERSION}.dist-info/METADATA"
+          printf '%s\n' 'Wheel-Version: 1.0' 'Generator: rlsbl' 'Root-Is-Purelib: false' 'Tag: py3-none-manylinux_2_17_aarch64' 'Tag: py3-none-manylinux2014_aarch64' 'Tag: py3-none-musllinux_1_1_aarch64' > "$tree/${dist}-${VERSION}.dist-info/WHEEL"
+          write_record "$tree" "${dist}-${VERSION}.dist-info"
+          (cd "$tree" && zip -q -X -D -r "$out/${dist}-${VERSION}-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.musllinux_1_1_aarch64.whl" .)
+          # darwin-x64
+          work="$RUNNER_TEMP/wheel-darwin-x64"
+          mkdir -p "$work/archive"
+          gh release download "$RELEASE_TAG" --pattern "rlsbl_${VERSION}_darwin_amd64.tar.gz" --dir "$work/archive"
+          tar -xzf "$work/archive/rlsbl_${VERSION}_darwin_amd64.tar.gz" -C "$work/archive" 'rlsbl'
+          tree="$work/tree"
+          mkdir -p "$tree/${dist}-${VERSION}.data/scripts" "$tree/${dist}-${VERSION}.dist-info"
+          install -m 0755 "$work/archive/rlsbl" "$tree/${dist}-${VERSION}.data/scripts/rlsbl"
+          cp "$meta/METADATA" "$tree/${dist}-${VERSION}.dist-info/METADATA"
+          printf '%s\n' 'Wheel-Version: 1.0' 'Generator: rlsbl' 'Root-Is-Purelib: false' 'Tag: py3-none-macosx_10_12_x86_64' > "$tree/${dist}-${VERSION}.dist-info/WHEEL"
+          write_record "$tree" "${dist}-${VERSION}.dist-info"
+          (cd "$tree" && zip -q -X -D -r "$out/${dist}-${VERSION}-py3-none-macosx_10_12_x86_64.whl" .)
+          # darwin-arm64
+          work="$RUNNER_TEMP/wheel-darwin-arm64"
+          mkdir -p "$work/archive"
+          gh release download "$RELEASE_TAG" --pattern "rlsbl_${VERSION}_darwin_arm64.tar.gz" --dir "$work/archive"
+          tar -xzf "$work/archive/rlsbl_${VERSION}_darwin_arm64.tar.gz" -C "$work/archive" 'rlsbl'
+          tree="$work/tree"
+          mkdir -p "$tree/${dist}-${VERSION}.data/scripts" "$tree/${dist}-${VERSION}.dist-info"
+          install -m 0755 "$work/archive/rlsbl" "$tree/${dist}-${VERSION}.data/scripts/rlsbl"
+          cp "$meta/METADATA" "$tree/${dist}-${VERSION}.dist-info/METADATA"
+          printf '%s\n' 'Wheel-Version: 1.0' 'Generator: rlsbl' 'Root-Is-Purelib: false' 'Tag: py3-none-macosx_11_0_arm64' > "$tree/${dist}-${VERSION}.dist-info/WHEEL"
+          write_record "$tree" "${dist}-${VERSION}.dist-info"
+          (cd "$tree" && zip -q -X -D -r "$out/${dist}-${VERSION}-py3-none-macosx_11_0_arm64.whl" .)
+          ls -l "$out"
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          skip-existing: true
           packages-dir: dist/
+          skip-existing: true
