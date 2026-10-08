@@ -244,6 +244,11 @@
     [
       "git",
       "hash-object",
+      "--"
+    ],
+    [
+      "git",
+      "hash-object",
       "-w",
       "--stdin"
     ],
@@ -307,6 +312,12 @@
     [
       "npm",
       "view"
+    ],
+    [
+      "npm",
+      "token",
+      "list",
+      "--json"
     ],
     [
       "go",
