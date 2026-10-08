@@ -18,4 +18,4 @@ The result: the user does their post-release work, then has to remember to `rlsb
 
 ## Context
 
-Observed in a private project: PyPI package released via rlsbl, then an npm wrapper package (which delegates to `uvx a private project`) was created and needed publishing. The npm commit happened post-release and was manually pushed, violating the managed-push rule.
+Observed in a private project: PyPI package released via rlsbl, then an npm wrapper package (which delegates to `uvx`) was created and needed publishing. The npm commit happened post-release and was manually pushed, violating the managed-push rule.

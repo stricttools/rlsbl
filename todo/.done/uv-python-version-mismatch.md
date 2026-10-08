@@ -30,7 +30,7 @@ The explicit `uv sync` call actively destroys the venv state that `uv run` would
 
 Not viable. `--all-groups` only affects the **current project's** dependency groups. Workspace members typically have no groups (pytest is in the root's `dev` group). From a member dir, `--all-groups` is a no-op.
 
-Also has side effects on standalone projects: pulls in all groups including heavy optional ones (e.g., PixelWeaver's `gui` group with PyGObject/pycairo).
+Also has side effects on standalone projects: pulls in all groups including heavy optional ones (e.g., a private project's `gui` group with PyGObject/pycairo).
 
 ### B: `uv run --all-groups pytest` (drop uv sync)
 

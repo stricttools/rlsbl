@@ -2,7 +2,7 @@
 
 ## Context
 
-The `post-release-private.sh.tpl` hook is installed at scaffold time based on the `"private"` flag in `config.json`. The a private project v0.1.0-v0.1.7 incident (956MB release assets uploaded) was partly caused by changing `"private": false` in config without running `scaffold --update`, leaving the old private hook in place.
+The `post-release-private.sh.tpl` hook is installed at scaffold time based on the `"private"` flag in `config.json`. A private project's v0.1.0-v0.1.7 incident (956MB release assets uploaded) was partly caused by changing `"private": false` in config without running `scaffold --update`, leaving the old private hook in place.
 
 ## Problem
 
@@ -28,7 +28,7 @@ Two complementary approaches, not mutually exclusive:
 
 - **(c) `rlsbl config set` triggers hook regeneration**: When `private` is changed via a config command, automatically re-run the hook template selection and update the hook file (with three-way merge as `scaffold --update` does). Pros: keeps hooks in sync proactively. Cons: requires a `config set` command (does not exist yet; see `todo/unified-toml-config.md`), and does not help users who edit `config.json` by hand.
 
-Recommendation: **(a)** as the immediate fix -- it is defensive, low-risk, and catches the exact failure mode that caused the a private project incident. **(c)** as a long-term structural fix once the config management story matures.
+Recommendation: **(a)** as the immediate fix -- it is defensive, low-risk, and catches the exact failure mode that caused that incident. **(c)** as a long-term structural fix once the config management story matures.
 
 ## Affected files
 

@@ -2,7 +2,7 @@
 
 ## Context
 
-The `post-release-private.sh.tpl` hook unconditionally uploads everything in `dist/` to GitHub Releases via `gh release upload "v$version" ./dist/* --clobber` with no size checks. This caused a private project v0.1.0 through v0.1.7 to have 956MB release assets containing personal Parquet snapshot data that should never have been uploaded.
+The `post-release-private.sh.tpl` hook unconditionally uploads everything in `dist/` to GitHub Releases via `gh release upload "v$version" ./dist/* --clobber` with no size checks. This caused a private project's v0.1.0 through v0.1.7 to have 956MB release assets containing personal Parquet snapshot data that should never have been uploaded.
 
 ## Problem
 

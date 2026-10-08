@@ -51,7 +51,7 @@ Adding `"docs"` to the project's `.rlsbl/config.json` targets makes selfdoc.json
 
 ## Affected projects
 
-Any project with selfdoc.json that doesn't explicitly list "docs" in rlsbl targets (e.g., wesktop, PixelWeaver).
+Any project with selfdoc.json that doesn't explicitly list "docs" in rlsbl targets (e.g., wesktop and a private project).
 
 ## Effort
 

@@ -6,7 +6,7 @@ Commits that only touch `.rlsbl/changes/unreleased.jsonl` are supposed to be aut
 
 ## Evidence
 
-During the a private project v0.3.2 release, two changelog-only commits were incorrectly flagged as uncovered:
+During a private project's v0.3.2 release, two changelog-only commits were incorrectly flagged as uncovered:
 
 - `68dc405b` -- touched only `.rlsbl/changes/unreleased.jsonl`
 - `1b067cef` -- touched only `.rlsbl/changes/unreleased.jsonl`

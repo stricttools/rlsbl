@@ -625,11 +625,11 @@ in the limits section.
   bodies are boilerplate, so its recovery falls through to commit
   subjects); tinymoon's tagless version gets its commit recorded from its
   bump commit.
-- a private project: FIRST the user-ordered exception — its milestone-tag
+- The private project with milestone tags: FIRST the user-ordered exception — its milestone-tag
   family deleted locally and on origin (attended, plain git, per the
   standing order in the limits section) — then its backfill.
 - Verify: every guarded read (status, unreleased) works across the whole
-  sweep set; second runs plan nothing; the a private project tags verified
+  sweep set; second runs plan nothing; that project's milestone tags verified
   absent both locally and on origin; per-repo falsified-text sweep.
 
 ## Phase 8 — pgdesign (attended, single merged visit)

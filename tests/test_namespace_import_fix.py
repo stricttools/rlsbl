@@ -87,12 +87,12 @@ class TestDetectPythonPackageRoot:
     def test_uv_build_backend(self, tmp_path):
         """uv build-backend module-root returns joined path."""
         (tmp_path / "pyproject.toml").write_text(
-            '[project]\nname = "pixelweaver"\n'
+            '[project]\nname = "spritetool"\n'
             '[tool.uv.build-backend]\n'
             'module-root = "server/src"\n'
         )
         result = detect_python_package_root(str(tmp_path))
-        assert result == os.path.join("server/src", "pixelweaver")
+        assert result == os.path.join("server/src", "spritetool")
 
     def test_ambiguity_guard(self, tmp_path):
         """Raises VersionError when both flat and src dirs exist without config."""
