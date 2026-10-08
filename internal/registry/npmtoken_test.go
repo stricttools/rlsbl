@@ -130,6 +130,20 @@ func TestNpmTokenCreatedAt(t *testing.T) {
 	}
 }
 
+// The npm-token-synced check runs inside read-only commands (rlsbl check,
+// rlsbl failing-checks, a release's --dry-run), so the listing it reads must be
+// an observe the allowlist admits.
+func TestNpmTokenCreatedAtRunsInAReadOnlyCommand(t *testing.T) {
+	hygiene.Isolate(t)
+	fakeNpm(t, `[{"token":"npm_ab...wxyz","created":"2026-03-01T10:00:00Z"}]`, 0)
+	testsupport.RunEffects(t, testsupport.CommandOptions{Effect: strictcli.EffectReadOnly, Allowlist: previewapply.Prefixes(), HTTPClient: testsupport.NewFakeHTTP(t).Client()}, func(e *strictcli.Effects) error {
+		if _, err := NpmTokenCreatedAt(e, "npm_abcdefghijklmnopqrstuvwxyz"); err != nil {
+			t.Errorf("a read-only command could not list the npm tokens: %v", err)
+		}
+		return nil
+	})
+}
+
 func TestCompareNpmTokenSync(t *testing.T) {
 	hygiene.Isolate(t)
 	repo := github.Repository{Owner: "acme", Name: "portal"}

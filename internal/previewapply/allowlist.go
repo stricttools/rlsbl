@@ -156,6 +156,7 @@ var Allowlist = []Entry{
 	{[]string{"gh", "workflow", "list"}, NetworkRead, "lists workflows"},
 	{[]string{"gh", "--version"}, SelfReport, "prints gh's version"},
 	{[]string{"npm", "view"}, NetworkRead, "registry metadata read; its only write is npm's own cache"},
+	{[]string{"npm", "token", "list", "--json"}, NetworkRead, "lists the npm account's tokens, each shown truncated, with its creation time (the npm-token-synced check); pinned to the one argv rlsbl issues because the bare `npm token` prefix also admits create and revoke"},
 	{GoBuildList, NetworkRead, "reads the build list of a Go module or workspace (the release's go work sync check); its only write is the module cache"},
 	{GoPackageListing, LocalRead, "package enumeration; -e keeps it off the network and the format string only shapes stdout"},
 	{[]string{"go", "mod", "tidy", "-diff"}, NetworkRead, "reports what `go mod tidy` would change without changing go.mod or go.sum (the release's untidy-module check); its only write is the module cache"},

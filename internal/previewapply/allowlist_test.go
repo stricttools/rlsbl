@@ -147,6 +147,8 @@ var forbidden = map[string][][]string{
 		{"gh", "pr", "list"},
 		{"npm", "publish"},
 		{"npm", "install"},
+		{"npm", "token", "create"},
+		{"npm", "token", "revoke", "a1b2c3"},
 		{"go", "get", "example.com/m"},
 		{"go", "list", "-mod=mod", "all"},
 		{"go", "list", "-m", "-mod=mod", "all"},
@@ -189,6 +191,7 @@ func TestTheReadsStillMatch(t *testing.T) {
 		{"gh", "auth", "status", "--hostname", "github.com"},
 		{"gh", "run", "view", "1", "--log-failed"},
 		{"npm", "view", "widget", "version"},
+		{"npm", "token", "list", "--json"},
 		{"go", "list", "-m", "-json", "all"},
 		{"go", "list", "-e", "-f", "{{.Name}}\t{{.ImportPath}}\t{{.Dir}}", "./..."},
 	} {
