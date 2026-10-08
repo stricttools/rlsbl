@@ -11139,8 +11139,8 @@
         },
         {
           "level": 2,
-          "text": "The three version fates",
-          "anchor": "the-three-version-fates"
+          "text": "The version fates",
+          "anchor": "the-version-fates"
         },
         {
           "level": 2,
@@ -11348,24 +11348,46 @@
       ]
     }
   ],
-  "last_gen": "2026-10-08T00:09:48.641189+00:00",
+  "last_gen": "2026-10-08T01:04:36.747791+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
       {
-        "word": "mixin",
+        "word": "codename",
+        "aliases": [
+          "codenames"
+        ]
+      },
+      {
+        "word": "esbuild",
         "aliases": []
       },
       {
-        "word": "prs",
+        "word": "gitleaks",
         "aliases": []
       },
       {
-        "word": "rdeps",
+        "word": "ls",
+        "aliases": []
+      },
+      {
+        "word": "norecursedirs",
+        "aliases": []
+      },
+      {
+        "word": "npmignore",
+        "aliases": []
+      },
+      {
+        "word": "predeclared",
         "aliases": []
       },
       {
         "word": "releasables",
+        "aliases": []
+      },
+      {
+        "word": "restamped",
         "aliases": []
       },
       {
@@ -11381,11 +11403,25 @@
         "aliases": []
       },
       {
+        "word": "SPDX",
+        "aliases": []
+      },
+      {
+        "word": "strictcode",
+        "aliases": [
+          "strictcode's"
+        ]
+      },
+      {
         "word": "strictspec",
         "aliases": []
       },
       {
         "word": "testisolation",
+        "aliases": []
+      },
+      {
+        "word": "unpublishes",
         "aliases": []
       }
     ],
