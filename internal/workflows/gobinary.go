@@ -70,24 +70,25 @@ func (g GoBinaryRelease) check() error {
 	if g.Tag.Prefix == "" && g.Tag.Suffix == "" {
 		return errors.New("the tag scheme is empty around its version, so a job cannot tell a release tag from any other ref")
 	}
+	if _, err := g.Tag.Regexp(); err != nil {
+		return err
+	}
 	return nil
 }
 
-// versionScript reads VERSION from RELEASE_TAG through the tag scheme and
-// refuses a tag outside it or a version that is not MAJOR.MINOR.PATCH.
+// versionScript refuses a RELEASE_TAG that is not one of the scheme's tags
+// (its prefix, a MAJOR.MINOR.PATCH version, then its suffix, judged by the
+// tag matcher's regular expression) and reads VERSION from it. check has
+// accepted the scheme.
 func (g GoBinaryRelease) versionScript() string {
-	scheme := shellQuote(g.Tag.Prefix) + "*" + shellQuote(g.Tag.Suffix)
+	re, _ := g.Tag.Regexp()
 	return strings.Join([]string{
-		`case "$RELEASE_TAG" in`,
-		"  " + scheme + ") ;;",
-		`  *) echo "::error::the tag $RELEASE_TAG is not one of this releasable's tags (` + g.Tag.Prefix + `<version>` + g.Tag.Suffix + `)"; exit 1 ;;`,
-		"esac",
-		`VERSION="${RELEASE_TAG#` + shellQuote(g.Tag.Prefix) + `}"`,
-		`VERSION="${VERSION%` + shellQuote(g.Tag.Suffix) + `}"`,
-		`if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then`,
-		`  echo "::error::the tag $RELEASE_TAG carries the version '$VERSION', which is not MAJOR.MINOR.PATCH"`,
+		`if ! printf '%s' "$RELEASE_TAG" | grep -Eq ` + shellQuote(re) + `; then`,
+		`  echo "::error::the tag $RELEASE_TAG is not one of this releasable's tags (` + g.Tag.Prefix + `<MAJOR.MINOR.PATCH>` + g.Tag.Suffix + `)"`,
 		"  exit 1",
 		"fi",
+		`VERSION="${RELEASE_TAG#` + shellQuote(g.Tag.Prefix) + `}"`,
+		`VERSION="${VERSION%` + shellQuote(g.Tag.Suffix) + `}"`,
 	}, "\n") + "\n"
 }
 

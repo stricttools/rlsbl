@@ -1,9 +1,12 @@
 package workspace
 
 import (
+	"regexp"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/stricttools/strictspec/go/lifecycle"
 	"github.com/stricttools/testisolation/go/hygiene"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
@@ -132,5 +135,63 @@ func TestTwoSchemesOwningOneTagAreRefusedNamingBoth(t *testing.T) {
 	}
 	if _, _, err := w.TagOwner("v1.0.0"); err == nil || !strings.Contains(err.Error(), "a, b") {
 		t.Fatalf("TagOwner = %v", err)
+	}
+}
+
+func TestTheSchemesRegexpAcceptsTheTagsItOwnsAndNoOthers(t *testing.T) {
+	hygiene.Isolate(t)
+	tags := []string{
+		"v0.1.0", "v10.20.30", "video-proc@v0.1.0", "v0.1", "v01.1.0", "v0.1.0-rc.1", "vlatest",
+		"video-proc@v0.1.0", "video-proc@v1.2.3", "a.b+c@v1.0.0", "axb+c@v1.0.0", "a.b+c@v1.0.0x",
+		"kernel/v0.2.0", "kernel/vulkan/v0.1.0", "x0.1.0-end", "x0.1.0-endx",
+	}
+	for _, pattern := range []string{"v{version}", "video-proc@v{version}", "a.b+c@v{version}", "kernel/v{version}", "x{version}-end"} {
+		s := scheme(t, pattern)
+		re := regexp.MustCompile(s.Regexp())
+		for _, tag := range tags {
+			if got, want := re.MatchString(tag), s.Owns(tag); got != want {
+				t.Errorf("%s: the regexp %s says %t for %s, Owns says %t", pattern, s.Regexp(), got, tag, want)
+			}
+		}
+	}
+}
+
+func TestAnIdentityOwnsOnlyTheTagsItsGlobsSchemeRenders(t *testing.T) {
+	hygiene.Isolate(t)
+	rec, err := lifecycle.Parse([]byte(`format_version = 1
+
+[[identities]]
+subject = "app"
+facet = "releasable-name"
+value = "app"
+registry = ""
+tag_patterns = ["v*"]
+from = 2025-01-01
+reason = "the releasable"
+
+[[identities]]
+subject = "video-proc"
+facet = "releasable-name"
+value = "video-proc"
+registry = ""
+tag_patterns = ["video-proc@v*"]
+from = 2025-01-01
+until = 2025-06-01
+reason = "an old member"
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	created := time.Date(2025, 3, 1, 12, 0, 0, 0, time.UTC)
+	owner, found, err := IdentityTagOwner(rec, "video-proc@v0.1.0", created)
+	if err != nil || !found || owner.Subject != "video-proc" {
+		t.Errorf("video-proc@v0.1.0 is owned by %+v (%t, %v), not the old member's identity", owner, found, err)
+	}
+	owner, found, err = IdentityTagOwner(rec, "v0.1.0", created)
+	if err != nil || !found || owner.Subject != "app" {
+		t.Errorf("v0.1.0 is owned by %+v (%t, %v), not the releasable's identity", owner, found, err)
+	}
+	if _, found, err := IdentityTagOwner(rec, "vnext", created); err != nil || found {
+		t.Errorf("vnext is owned (%t, %v), though no version renders it", found, err)
 	}
 }

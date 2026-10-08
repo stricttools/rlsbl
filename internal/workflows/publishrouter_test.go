@@ -85,11 +85,14 @@ func TestThePublishRouterInlinesEachPublishingMembersJobs(t *testing.T) {
 		t.Fatalf("concurrency: %v", doc["concurrency"])
 	}
 	resolver := job(t, doc, WaitForCIJobKey)["steps"].([]any)[0].(map[string]any)["run"].(string)
-	if !strings.Contains(resolver, "'core@v'*)") || !strings.Contains(resolver, "pattern='^(core-ci) / '") {
+	if !strings.Contains(resolver, `grep -Eq '^core@v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'`) || !strings.Contains(resolver, "scheme='core@v{version}'") || !strings.Contains(resolver, "pattern='^(core-ci) / '") {
 		t.Fatalf("resolver:\n%s", resolver)
 	}
+	if outputs := job(t, doc, WaitForCIJobKey)["outputs"]; !reflect.DeepEqual(outputs, map[string]any{RouterTagSchemeOutput: "${{ steps.resolve.outputs.tag_scheme }}"}) {
+		t.Fatalf("outputs: %v", outputs)
+	}
 	publish := job(t, doc, "core-publish")
-	if publish["if"] != "startsWith(inputs.tag || github.ref_name, 'core@v')" {
+	if publish["if"] != "needs.wait-for-ci.outputs.tag_scheme == 'core@v{version}'" {
 		t.Fatalf("if: %v", publish["if"])
 	}
 	if !reflect.DeepEqual(publish["needs"], []any{WaitForCIJobKey}) {
@@ -109,12 +112,12 @@ func TestThePublishRouterInlinesEachPublishingMembersJobs(t *testing.T) {
 	if !reflect.DeepEqual(announce["needs"], []any{WaitForCIJobKey, "core-publish"}) {
 		t.Fatalf("needs: %v", announce["needs"])
 	}
-	if announce["if"] != "startsWith(inputs.tag || github.ref_name, 'core@v') && (success())" {
+	if announce["if"] != "needs.wait-for-ci.outputs.tag_scheme == 'core@v{version}' && (success())" {
 		t.Fatalf("if: %v", announce["if"])
 	}
 }
 
-func TestAJobOfAShorterSchemeSkipsTheTagsOfALongerOne(t *testing.T) {
+func TestEachJobRunsOnlyForTheSchemeTheWaitForCIJobJudgedTheTagOf(t *testing.T) {
 	hygiene.Isolate(t)
 	decls := strings.NewReplacer(`name = "core"
 tag_format = "{name}@v{version}"`, `name = "core"
@@ -127,10 +130,10 @@ tag_format = "kernel/vulkan/v{version}"`).Replace(threeMembers)
 		t.Fatal(err)
 	}
 	doc := parseYAML(t, plan.Text)
-	if got := job(t, doc, "core-publish")["if"]; got != "startsWith(inputs.tag || github.ref_name, 'kernel/v') && !(startsWith(inputs.tag || github.ref_name, 'kernel/vulkan/v'))" {
+	if got := job(t, doc, "core-publish")["if"]; got != "needs.wait-for-ci.outputs.tag_scheme == 'kernel/v{version}'" {
 		t.Fatalf("if: %v", got)
 	}
-	if got := job(t, doc, "web-publish")["if"]; got != "startsWith(inputs.tag || github.ref_name, 'kernel/vulkan/v')" {
+	if got := job(t, doc, "web-publish")["if"]; got != "needs.wait-for-ci.outputs.tag_scheme == 'kernel/vulkan/v{version}'" {
 		t.Fatalf("if: %v", got)
 	}
 }

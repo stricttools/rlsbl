@@ -115,6 +115,46 @@ func TestAnOpenIdentityExplainsNothing(t *testing.T) {
 	}
 }
 
+// A releasable tagging v{version} has the identity tag pattern v*, which as
+// a glob also lists an old member's video-proc@v0.1.0; only the old member's
+// closed identity renders that tag, so it explains it, and the releasable's
+// open identity is no second owner.
+func TestAGlobIsNoOwnerOfATagItsSchemeDoesNotRender(t *testing.T) {
+	hygiene.Isolate(t)
+	root := t.TempDir()
+	record, err := lifecycle.Parse([]byte(`format_version = 1
+
+[[identities]]
+subject = "app"
+facet = "releasable-name"
+value = "app"
+registry = ""
+tag_patterns = ["v*"]
+from = 2025-01-01
+reason = "the releasable"
+
+[[identities]]
+subject = "video-proc"
+facet = "releasable-name"
+value = "video-proc"
+registry = ""
+tag_patterns = ["video-proc@v*"]
+from = 2025-01-01
+until = 2025-06-01
+reason = "an old member"
+`))
+	mustNotFail(t, err)
+	dirs, err := releaserecord.ArchiveDirs(root)
+	mustNotFail(t, err)
+	x, err := releaserecord.BuildExplanations(root, map[string]semver.Version{}, dirs, record)
+	mustNotFail(t, err)
+	found, ok, err := x.Explain("video-proc@v0.1.0", day(t, "2025-03-01"))
+	mustNotFail(t, err)
+	if !ok || found.Source != releaserecord.SourceRetiredIdentity || found.Identity.Subject != "video-proc" {
+		t.Fatalf("video-proc@v0.1.0 is explained by %+v (%t)", found, ok)
+	}
+}
+
 func TestTheCurrentSchemeTakesPrecedence(t *testing.T) {
 	hygiene.Isolate(t)
 	root := t.TempDir()

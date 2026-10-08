@@ -291,3 +291,37 @@ classifiers = ["Environment :: Console", "Operating System :: MacOS"]
 		}
 	}
 }
+
+// The binary jobs judge their tag by the tag matcher: a prefix followed by
+// anything is no tag of the scheme.
+func TestTheBinaryJobsReadTheVersionOnlyFromATagOfTheScheme(t *testing.T) {
+	hygiene.Isolate(t)
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Fatalf("the jobs' shell is bash: %v", err)
+	}
+	g := GoBinaryRelease{BinaryJob: "goreleaser", Binary: "portal", Tag: TagParts{Prefix: "v"}}
+	if err := g.check(); err != nil {
+		t.Fatal(err)
+	}
+	script := "set -euo pipefail\n" + g.versionScript() + `printf '%s' "$VERSION"`
+	for tag, want := range map[string]string{
+		"v1.2.3":            "1.2.3",
+		"v0.10.0":           "0.10.0",
+		"video-proc@v0.1.0": "",
+		"v01.2.3":           "",
+		"v1.2":              "",
+		"v1.2.3-rc.1":       "",
+	} {
+		cmd := exec.Command(bash, "-c", script)
+		cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "RELEASE_TAG=" + tag}
+		out, err := cmd.Output()
+		got := string(out)
+		if err != nil {
+			got = ""
+		}
+		if got != want {
+			t.Errorf("%s: read the version %q, want %q (%v)", tag, got, want, err)
+		}
+	}
+}

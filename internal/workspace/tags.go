@@ -3,6 +3,9 @@ package workspace
 import (
 	"fmt"
 	"strings"
+	"time"
+
+	"github.com/stricttools/strictspec/go/lifecycle"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/semver"
@@ -80,6 +83,72 @@ func (s TagScheme) VersionOf(tag string) (semver.Version, bool) {
 func (s TagScheme) Owns(tag string) bool {
 	_, ok := s.VersionOf(tag)
 	return ok
+}
+
+// versionERE is a MAJOR.MINOR.PATCH version as semver.Parse reads it: three
+// decimal components, none with a leading zero.
+const versionERE = `(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)`
+
+// Regexp is a POSIX extended regular expression (and a Go regular
+// expression) matching the tags Owns accepts, anchored at both ends, for
+// the places that judge a tag where this package cannot run (a workflow's
+// shell step). It accepts a component too long for 64 bits, which VersionOf
+// refuses.
+func (s TagScheme) Regexp() string {
+	return "^" + quoteERE(s.prefix) + versionERE + quoteERE(s.suffix) + "$"
+}
+
+// quoteERE escapes every character an extended regular expression gives a
+// meaning.
+func quoteERE(text string) string {
+	var b strings.Builder
+	for _, r := range text {
+		if strings.ContainsRune(`\.+*?()|[]{}^$`, r) {
+			b.WriteByte('\\')
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// IdentityTagOwner evaluates the lifecycle record's identity-owns-its-tags
+// rule through the tag matcher: an identity owns tag when its period covers
+// the date of created and one of its tag patterns, read as the scheme its
+// glob was made from (SchemeFromGlob), owns tag. A glob only lists, so `v*`
+// never owns `video-proc@v0.1.0`. Pending identities own nothing; a tag
+// pattern that names no scheme is refused, and so are identities of two
+// subjects owning one tag. When several identities of one subject own it,
+// the first in record order is returned.
+func IdentityTagOwner(rec *lifecycle.Record, tag string, created time.Time) (lifecycle.Identity, bool, error) {
+	var found []lifecycle.Identity
+	for _, id := range rec.Identities() {
+		if id.Pending() || !id.Contains(created) {
+			continue
+		}
+		for _, p := range id.TagPatterns {
+			scheme, err := SchemeFromGlob(p)
+			if err != nil {
+				return lifecycle.Identity{}, false, fmt.Errorf("the %s identity %q of %q in %s: %w", id.Facet, id.Value, id.Subject, lifecycle.RecordFile, err)
+			}
+			if scheme.Owns(tag) {
+				found = append(found, id)
+				break
+			}
+		}
+	}
+	if len(found) == 0 {
+		return lifecycle.Identity{}, false, nil
+	}
+	for _, id := range found[1:] {
+		if id.Subject != found[0].Subject {
+			return lifecycle.Identity{}, false, &lifecycle.Refusal{
+				Rule:   lifecycle.RuleIdentityOwnsItsTags,
+				Detail: fmt.Sprintf("tag %q created on %s is owned by the tag patterns of %q (%s) and of %q (%s), so its owner is ambiguous", tag, created.Format(time.DateOnly), found[0].Subject, found[0].Facet, id.Subject, id.Facet),
+				Fix:    "Narrow the tag patterns of one of the identities so each tag has one owner.",
+			}
+		}
+	}
+	return found[0], true, nil
 }
 
 // TagStyle is which of the three shapes a version tag has.

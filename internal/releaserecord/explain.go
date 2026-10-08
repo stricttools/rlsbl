@@ -11,6 +11,7 @@ import (
 
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/semver"
+	"github.com/stricttools/rlsbl/internal/workspace"
 )
 
 // A repository's tag namespace is writable by anything, and the backfill and
@@ -146,7 +147,7 @@ func (x *Explanations) Explain(tag string, created time.Time) (Explanation, bool
 	if found, ok := x.byTag[tag]; ok {
 		return found, true, nil
 	}
-	owner, ok, err := x.record.TagOwner(tag, created)
+	owner, ok, err := workspace.IdentityTagOwner(x.record, tag, created)
 	if err != nil || !ok || owner.Open() {
 		return Explanation{}, false, err
 	}

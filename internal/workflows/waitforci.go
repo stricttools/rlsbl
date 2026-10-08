@@ -260,9 +260,14 @@ func waitJob(env []string, resolver string) string {
 	for _, line := range env {
 		b.WriteString(line + "\n")
 	}
+	if resolver != "" {
+		b.WriteString("    outputs:\n")
+		b.WriteString("      " + RouterTagSchemeOutput + ": ${{ steps." + routerResolveStep + ".outputs." + RouterTagSchemeOutput + " }}\n")
+	}
 	b.WriteString("    steps:\n")
 	if resolver != "" {
 		b.WriteString("      - name: Resolve the releasing project's CI check pattern from the tag\n")
+		b.WriteString("        id: " + routerResolveStep + "\n")
 		b.WriteString("        run: |\n")
 		b.WriteString(literalBlock(resolver, "          "))
 	}
@@ -307,13 +312,24 @@ type ReleasingProject struct {
 	CheckPattern string
 }
 
+// RouterTagSchemeOutput is the router's wait-for-ci job output naming the
+// tag scheme (its pattern, the version written {version}) that the tag being
+// published is a tag of; each inlined publish job runs only when it names
+// the job's own releasable's scheme.
+const RouterTagSchemeOutput = "tag_scheme"
+
+// routerResolveStep is the id of the router wait-for-ci job's step that
+// judges the tag.
+const routerResolveStep = "resolve"
+
 // RouterWaitForCIJob is the wait-for-ci job of a workspace's publish router.
 // Its first step picks the releasing project from the tag (the dispatch's
-// tag input, else the ref) and sets CI_CHECK_PATTERN; a tag no project's
-// scheme matches fails the job. Projects sharing a tag scheme (the members
-// of one releasable) share one branch whose pattern accepts every one of
-// theirs, and longer schemes are tried first, so a tag of kernel/vulkan/v...
-// is never read as kernel/v...'s.
+// tag input, else the ref): the project whose scheme's tag matcher
+// (TagParts.Regexp) accepts the tag, so a glob-like prefix never claims
+// another scheme's tag (v... never claims video-proc@v0.1.0). It sets
+// CI_CHECK_PATTERN and the job's RouterTagSchemeOutput; a tag that is no
+// project's fails the job. Projects sharing a tag scheme (the members of one
+// releasable) share one branch whose pattern accepts every one of theirs.
 func RouterWaitForCIJob(projects []ReleasingProject) (string, error) {
 	if len(projects) == 0 {
 		return "", errors.New("a publish router needs at least one releasing project")
@@ -352,31 +368,38 @@ func RouterWaitForCIJob(projects []ReleasingProject) (string, error) {
 		"# gh workflow run publish.yml --ref <tag>. The tag picks the releasing",
 		"# project; a dispatch at a branch matches none and fails here.",
 		`tag_ref="${TAG_INPUT:-$GITHUB_REF_NAME}"`,
-		`case "$tag_ref" in`,
 	)
 	var known []string
-	for _, tag := range order {
+	for i, tag := range order {
+		re, err := tag.Regexp()
+		if err != nil {
+			return "", err
+		}
 		ps := patterns[tag]
 		pattern := ps[0]
 		if len(ps) > 1 {
 			pattern = "(" + strings.Join(ps, "|") + ")"
 		}
-		casePattern := shellQuote(tag.Prefix) + "*"
-		if tag.Suffix != "" {
-			casePattern += shellQuote(tag.Suffix)
+		keyword := "elif"
+		if i == 0 {
+			keyword = "if"
 		}
-		lines = append(lines, "  "+casePattern+")", "    pattern="+shellQuote(pattern), "    ;;")
+		lines = append(lines,
+			keyword+` printf '%s' "$tag_ref" | grep -Eq `+shellQuote(re)+`; then`,
+			"  scheme="+shellQuote(tag.Pattern()),
+			"  pattern="+shellQuote(pattern),
+		)
 		known = append(known, tag.Prefix+"<version>"+tag.Suffix)
 	}
 	lines = append(lines,
-		"  *)",
-		`    echo "::error::wait-for-ci: the tag '$tag_ref' matches no project's tag scheme (`+strings.ReplaceAll(strings.Join(known, ", "), `"`, `\"`)+`)."`,
-		`    echo "To publish a release again, dispatch this workflow at the tag: gh workflow run publish.yml --ref <tag>"`,
-		"    exit 1",
-		"    ;;",
-		"esac",
+		"else",
+		`  echo "::error::wait-for-ci: the tag '$tag_ref' is no tag of any project's tag scheme (`+strings.ReplaceAll(strings.Join(known, ", "), `"`, `\"`)+`, the version MAJOR.MINOR.PATCH)."`,
+		`  echo "To publish a release again, dispatch this workflow at the tag: gh workflow run publish.yml --ref <tag>"`,
+		"  exit 1",
+		"fi",
 		`echo "CI_CHECK_PATTERN=$pattern" >> "$GITHUB_ENV"`,
-		`echo "The releasing project's CI check pattern: $pattern"`,
+		`echo "`+RouterTagSchemeOutput+`=$scheme" >> "$GITHUB_OUTPUT"`,
+		`echo "The releasing project's tag scheme: $scheme; its CI check pattern: $pattern"`,
 	)
 	resolver := strings.Join(lines, "\n") + "\n"
 	return waitJob([]string{"      TAG_INPUT: ${{ inputs.tag }}"}, resolver), nil

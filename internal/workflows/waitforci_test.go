@@ -1,6 +1,9 @@
 package workflows
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -70,13 +73,82 @@ func TestTheRouterJobPicksTheProjectByTagLongestSchemeFirst(t *testing.T) {
 	}
 	steps := j["steps"].([]any)
 	resolver := steps[0].(map[string]any)["run"].(string)
-	vulkan := strings.Index(resolver, "'kernel/vulkan/v'*)")
-	kernel := strings.Index(resolver, "'kernel/v'*)")
-	if vulkan < 0 || kernel < 0 || vulkan > kernel {
-		t.Fatalf("the longer scheme is not tried first:\n%s", resolver)
-	}
 	if !strings.Contains(resolver, "pattern='(^(kernel-ci) / |^(kernel-tools-ci) / )'") {
 		t.Fatalf("one scheme's members do not share a branch:\n%s", resolver)
+	}
+	for _, c := range []struct{ tag, scheme, pattern string }{
+		{"kernel/v0.2.0", "kernel/v{version}", "(^(kernel-ci) / |^(kernel-tools-ci) / )"},
+		{"kernel/vulkan/v0.1.0", "kernel/vulkan/v{version}", "^(vulkan-ci) / "},
+	} {
+		scheme, pattern, ok := runResolver(t, resolver, c.tag)
+		if !ok || scheme != c.scheme || pattern != c.pattern {
+			t.Errorf("%s: scheme %q, pattern %q, judged %t", c.tag, scheme, pattern, ok)
+		}
+	}
+}
+
+// runResolver runs the router's resolver step in bash for tag, and returns
+// the tag scheme it put in the step's outputs, the check pattern it put in
+// the job's environment, and whether it accepted the tag.
+func runResolver(t *testing.T, resolver, tag string) (scheme, pattern string, ok bool) {
+	t.Helper()
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Fatalf("the router's steps run in bash: %v", err)
+	}
+	dir := t.TempDir()
+	env, output := filepath.Join(dir, "env"), filepath.Join(dir, "output")
+	cmd := exec.Command(bash, "-c", resolver)
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "TAG_INPUT=" + tag, "GITHUB_ENV=" + env, "GITHUB_OUTPUT=" + output}
+	if out, err := cmd.CombinedOutput(); err != nil {
+		if !strings.Contains(string(out), "is no tag of any project's tag scheme") {
+			t.Fatalf("the resolver failed for %s other than by refusing the tag: %v\n%s", tag, err, out)
+		}
+		return "", "", false
+	}
+	read := func(path, key string) string {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			if v, found := strings.CutPrefix(line, key+"="); found {
+				return v
+			}
+		}
+		t.Fatalf("%s holds no %s:\n%s", path, key, data)
+		return ""
+	}
+	return read(output, RouterTagSchemeOutput), read(env, "CI_CHECK_PATTERN"), true
+}
+
+// The router judges a tag by each scheme's tag matcher, never by a prefix:
+// v{version} claims no video-proc@v0.1.0, and kernel/v{version} no
+// kernel/vulkan/v0.1.0.
+func TestTheRouterJudgesATagByTheTagMatcher(t *testing.T) {
+	hygiene.Isolate(t)
+	text, err := RouterWaitForCIJob([]ReleasingProject{
+		{Tag: TagParts{Prefix: "v"}, CheckPattern: "^(app) / "},
+		{Tag: TagParts{Prefix: "kernel/v"}, CheckPattern: "^(kernel-ci) / "},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolver := job(t, parseYAML(t, "jobs:\n"+text), WaitForCIJobKey)["steps"].([]any)[0].(map[string]any)["run"].(string)
+	for tag, want := range map[string]string{
+		"v0.1.0":               "v{version}",
+		"v10.2.30":             "v{version}",
+		"kernel/v1.2.3":        "kernel/v{version}",
+		"video-proc@v0.1.0":    "",
+		"vlatest":              "",
+		"v01.2.3":              "",
+		"v1.2.3-rc.1":          "",
+		"kernel/vulkan/v0.1.0": "",
+	} {
+		scheme, _, ok := runResolver(t, resolver, tag)
+		if got := map[bool]string{true: scheme, false: ""}[ok]; got != want {
+			t.Errorf("%s: judged a tag of %q, want %q", tag, got, want)
+		}
 	}
 }
 

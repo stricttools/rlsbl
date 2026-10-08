@@ -6,7 +6,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -170,14 +169,11 @@ func publishers(w *workspace.Workspace, in PublishInputs) ([]publisher, []string
 	return out, suppressed, nil
 }
 
-// tagCondition is the expression true for the tags of a scheme, read from
-// the dispatch's tag input or the ref.
+// tagCondition is the expression true when the router's wait-for-ci job
+// judged the tag being published (the dispatch's tag input or the ref) a
+// tag of the scheme.
 func tagCondition(tag TagParts) string {
-	cond := "startsWith(inputs.tag || github.ref_name, " + expressionQuoted(tag.Prefix) + ")"
-	if tag.Suffix != "" {
-		cond += " && endsWith(inputs.tag || github.ref_name, " + expressionQuoted(tag.Suffix) + ")"
-	}
-	return cond
+	return "needs." + WaitForCIJobKey + ".outputs." + RouterTagSchemeOutput + " == " + expressionQuoted(tag.Pattern())
 }
 
 // checksOut reports whether one of the job's steps checks the repository
@@ -219,10 +215,9 @@ func composeWorkingDirectory(job *yaml.Node, memberPath, where string) error {
 // wait-for-ci dropped, the workflow-level env, defaults.run, and permissions
 // pushed down, file inputs rooted under the member, the working directory
 // too for a job that checks the repository out, each job run only for the
-// member's tags (and not for the tags of a longer scheme its prefix also
-// starts), keys prefixed with the member's name, and every job needing the
+// member's tags (as the router's wait-for-ci job judged the tag), keys prefixed with the member's name, and every job needing the
 // router's wait-for-ci.
-func inlinePublishJobs(p publisher, longer []TagParts, taken map[string]bool) ([]string, map[string]*yaml.Node, error) {
+func inlinePublishJobs(p publisher, taken map[string]bool) ([]string, map[string]*yaml.Node, error) {
 	jobs := mapGet(p.root, "jobs")
 	if mapGet(jobs, RetiredWaitJobKey) != nil {
 		return nil, nil, fmt.Errorf("%s has a job named %q, the waiting job's name before it was renamed %s; run `rlsbl scaffold` in %s to render the current publish workflow, commit it, and run this again", p.source, RetiredWaitJobKey, WaitForCIJobKey, p.member.Path)
@@ -238,9 +233,6 @@ func inlinePublishJobs(p publisher, longer []TagParts, taken map[string]bool) ([
 		keyMap[k] = p.member.Name + "-" + k
 	}
 	cond := tagCondition(p.tag)
-	for _, l := range longer {
-		cond += " && !(" + tagCondition(l) + ")"
-	}
 	out := map[string]*yaml.Node{}
 	var order []string
 	for _, k := range keys {
@@ -333,17 +325,7 @@ func PublishRouter(w *workspace.Workspace, in PublishInputs) (PublishPlan, error
 	all := map[string]*yaml.Node{}
 	var order []string
 	for _, p := range pubs {
-		var longer []TagParts
-		seen := map[TagParts]bool{}
-		for _, other := range pubs {
-			o := other.tag
-			if o != p.tag && !seen[o] && strings.HasPrefix(o.Prefix, p.tag.Prefix) && len(o.Prefix)+len(o.Suffix) > len(p.tag.Prefix)+len(p.tag.Suffix) {
-				seen[o] = true
-				longer = append(longer, o)
-			}
-		}
-		sort.Slice(longer, func(i, j int) bool { return longer[i].Prefix+longer[i].Suffix < longer[j].Prefix+longer[j].Suffix })
-		keys, jobs, err := inlinePublishJobs(p, longer, taken)
+		keys, jobs, err := inlinePublishJobs(p, taken)
 		if err != nil {
 			return PublishPlan{}, err
 		}

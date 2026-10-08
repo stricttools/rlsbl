@@ -76,6 +76,20 @@ type TagParts struct {
 	Suffix string
 }
 
+// Pattern is the scheme's pattern, the version written {version}.
+func (t TagParts) Pattern() string { return t.Prefix + "{version}" + t.Suffix }
+
+// Regexp is the extended regular expression matching the scheme's tags and
+// no others: the tag matcher's (workspace.TagScheme.Regexp), for a shell
+// step to judge a tag with.
+func (t TagParts) Regexp() (string, error) {
+	s, err := workspace.NewTagScheme(t.Pattern())
+	if err != nil {
+		return "", err
+	}
+	return s.Regexp(), nil
+}
+
 // TagPartsOf splits a tag scheme's pattern at its {version}.
 func TagPartsOf(s workspace.TagScheme) TagParts {
 	prefix, suffix, _ := strings.Cut(s.Pattern(), "{version}")

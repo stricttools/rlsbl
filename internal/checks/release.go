@@ -498,7 +498,7 @@ func closedOwner(c *Context, tag, releaseCommit string) (lifecycle.Identity, boo
 	if err != nil {
 		panic(unanswered(err.Error()))
 	}
-	owner, found, err := c.Record().TagOwner(tag, created)
+	owner, found, err := workspace.IdentityTagOwner(c.Record(), tag, created)
 	if err != nil {
 		panic(unanswered(err.Error()))
 	}
