@@ -11,6 +11,7 @@ import (
 	"github.com/stricttools/testisolation/go/hygiene"
 
 	"github.com/stricttools/rlsbl/internal/git"
+	"github.com/stricttools/rlsbl/internal/previewapply"
 	"github.com/stricttools/rlsbl/internal/testsupport"
 )
 
@@ -331,4 +332,13 @@ func TestSummarizeReadsSubjectAuthorAndDate(t *testing.T) {
 		}
 		return nil
 	})
+}
+
+// FilesHolding's git grep runs under --dry-run too, so the observe allowlist
+// admits its argv.
+func TestTheObserveAllowlistAdmitsFilesHoldingsGrep(t *testing.T) {
+	hygiene.Isolate(t)
+	if !previewapply.Allowed(append([]string{"git"}, append(git.GrepArgv, "-e", "x", "HEAD", "--")...)) {
+		t.Fatalf("the observe allowlist does not admit git %s", strings.Join(git.GrepArgv, " "))
+	}
 }

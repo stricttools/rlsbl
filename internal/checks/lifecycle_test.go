@@ -120,6 +120,25 @@ func TestAConfidentialNameInAnUnpushedCommitMessageFails(t *testing.T) {
 	mustStatus(t, runCheck(t, in, "confidential-names"), "pass")
 }
 
+// Binary blobs and text that is not UTF-8 are not scanned, and do not stop
+// the scan of the rest.
+func TestAnUnpushedBinaryOrNonUTF8FileIsNotScanned(t *testing.T) {
+	hygiene.Isolate(t)
+	r := portalRepo(t, "none", nil)
+	pushedToOrigin(r)
+	r.Write("logo.bin", "\x00\xff\xfe gizmo \x01")
+	r.Write("latin1.txt", "caf\xe9 au lait\n")
+	r.Git("add", "-A")
+	r.Git("commit", "-q", "-m", "Add a logo and a note")
+	in := inputs(t, r.Dir)
+	testsupport.WriteFile(t, in.IndexPath, confidentialIndex)
+	mustStatus(t, runCheck(t, in, "confidential-names"), "pass")
+	named := r.CommitFile("notes.md", "ask gizmo\n", "Take notes")
+	got := runCheck(t, in, "confidential-names")
+	mustStatus(t, got, "fail")
+	mustMention(t, got, "commit "+named+", notes.md")
+}
+
 func TestWithNoRemoteTrackingBranchTheWholeHistoryIsScanned(t *testing.T) {
 	hygiene.Isolate(t)
 	r := portalRepo(t, "none", nil)

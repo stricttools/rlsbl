@@ -111,17 +111,15 @@ func (s *Scanner) ScanArtifacts(root string, artifacts []Artifact) error {
 	return s.ScanTexts(texts)
 }
 
-// blobReadBatch bounds how many blobs one git cat-file reads at a time, so
-// a long range is not held in memory whole.
-const blobReadBatch = 256
-
 // ScanRange refuses, naming the commit, the path or the message, the line,
 // the column, and the term, every confidential name in the commits
 // reachable from include and from no exclude revision: each commit's
 // message, and every text blob it adds or changes. A name added and removed
 // again inside the range is refused like one still present, since the push
-// carries every commit. A blob that is not UTF-8 text, or holds a NUL byte,
-// is binary and not scanned. what names the range in the refusal.
+// carries every commit. git tells binary blobs from text ones and lists the
+// blobs holding a name's characters; only those are read, and one that is
+// not UTF-8 text, or holds a NUL byte, is binary and not scanned. what names
+// the range in the refusal.
 func (s *Scanner) ScanRange(repo git.Repo, include, exclude []string, what string) error {
 	if !s.active {
 		return nil
@@ -130,43 +128,45 @@ func (s *Scanner) ScanRange(repo git.Repo, include, exclude []string, what strin
 	if err != nil {
 		return err
 	}
+	terms := s.index.Names()
 	var problems []string
-	report := func(where string, content string) {
-		for _, m := range s.index.Scan(content) {
-			problems = append(problems, fmt.Sprintf("%s, line %d, column %d: %q", where, m.Line, m.Column, m.Term))
-		}
-	}
-	// Each blob is read and scanned once; its matches are reported at every
-	// commit and path that adds it.
-	type site struct{ commit, path string }
-	sites := map[string][]site{}
-	var order []string
+	// Each blob is read and scanned once.
+	matchesOf := map[string][]index.Match{}
 	for i := len(commits) - 1; i >= 0; i-- {
 		c := commits[i]
-		report(fmt.Sprintf("commit %s, its message", c.SHA), c.Message)
-		for _, ch := range c.Changes {
-			if _, seen := sites[ch.Blob]; !seen {
-				order = append(order, ch.Blob)
-			}
-			sites[ch.Blob] = append(sites[ch.Blob], site{c.SHA, ch.Path})
+		for _, m := range s.index.Scan(c.Message) {
+			problems = append(problems, fmt.Sprintf("commit %s, its message, line %d, column %d: %q", c.SHA, m.Line, m.Column, m.Term))
 		}
-	}
-	for start := 0; start < len(order); start += blobReadBatch {
-		batch := order[start:min(start+blobReadBatch, len(order))]
-		contents, err := repo.Blobs(batch)
+		blobAt := map[string]string{}
+		var paths []string
+		for _, ch := range c.Changes {
+			if _, seen := blobAt[ch.Path]; !seen {
+				paths = append(paths, ch.Path)
+			}
+			blobAt[ch.Path] = ch.Blob
+		}
+		holding, err := repo.FilesHolding(c.SHA, paths, terms)
 		if err != nil {
 			return err
 		}
-		for _, blob := range batch {
-			content := contents[blob]
-			if strings.IndexByte(content, 0) >= 0 || !utf8.ValidString(content) {
-				continue
+		for _, path := range holding {
+			blob, ok := blobAt[path]
+			if !ok {
+				return fmt.Errorf("git listed %s of commit %s as holding a confidential name, and the commit changes no such path", path, c.SHA)
 			}
-			matches := s.index.Scan(content)
-			for _, at := range sites[blob] {
-				for _, m := range matches {
-					problems = append(problems, fmt.Sprintf("commit %s, %s, line %d, column %d: %q", at.commit, at.path, m.Line, m.Column, m.Term))
+			matches, read := matchesOf[blob]
+			if !read {
+				content, err := repo.Blob(blob)
+				if err != nil {
+					return fmt.Errorf("reading %s of commit %s, which holds a confidential name's characters, to scan it: %w", path, c.SHA, err)
 				}
+				if strings.IndexByte(content, 0) < 0 && utf8.ValidString(content) {
+					matches = s.index.Scan(content)
+				}
+				matchesOf[blob] = matches
+			}
+			for _, m := range matches {
+				problems = append(problems, fmt.Sprintf("commit %s, %s, line %d, column %d: %q", c.SHA, path, m.Line, m.Column, m.Term))
 			}
 		}
 	}

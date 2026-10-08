@@ -2,7 +2,6 @@ package git
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -94,46 +93,50 @@ func (r Repo) RangeChanges(include, exclude []string) ([]RangeCommit, error) {
 	return commits, nil
 }
 
-// Blobs reads the content of every blob in ids, byte for byte, through one
-// git cat-file --batch. A missing object, or one that is no blob, is an
-// error.
-func (r Repo) Blobs(ids []string) (map[string]string, error) {
-	out := map[string]string{}
-	if len(ids) == 0 {
-		return out, nil
+// GrepArgv is the git grep argv prefix FilesHolding runs: binary files
+// left out (-I), file names only (-l), case ignored (-i), fixed strings (-F),
+// and NUL-terminated names (-z). The observe allowlist admits it pinned
+// whole, since other git grep options open files in a pager.
+var GrepArgv = []string{"grep", "-I", "-l", "-i", "-F", "-z"}
+
+// grepPathsPerCall bounds the pathspecs one git grep takes.
+const grepPathsPerCall = 200
+
+// FilesHolding lists which of paths, in the tree of commit, are text files
+// (as git tells binary from text) holding one of terms anywhere, ignoring
+// case. It is a prefilter: a listed file holds the term's characters, not
+// necessarily the term as a whole token.
+func (r Repo) FilesHolding(commit string, paths, terms []string) ([]string, error) {
+	var found []string
+	if len(paths) == 0 || len(terms) == 0 {
+		return nil, nil
 	}
-	args := []string{"cat-file", "--batch"}
-	res, err := r.read(localTimeout, []byte(strings.Join(ids, "\n")+"\n"), args...)
-	if err != nil {
-		return nil, err
+	for start := 0; start < len(paths); start += grepPathsPerCall {
+		args := append([]string(nil), GrepArgv...)
+		for _, t := range terms {
+			args = append(args, "-e", t)
+		}
+		args = append(args, commit, "--")
+		for _, p := range paths[start:min(start+grepPathsPerCall, len(paths))] {
+			args = append(args, ":(literal)"+p)
+		}
+		res, err := r.read(localTimeout, nil, args...)
+		if err != nil {
+			return nil, err
+		}
+		switch res.code {
+		case 0:
+			for _, f := range nulFields(res.stdout) {
+				path, ok := strings.CutPrefix(f, commit+":")
+				if !ok {
+					return nil, fmt.Errorf("git grep in %s printed %q, which is no file of %s", r.dir, f, commit)
+				}
+				found = append(found, path)
+			}
+		case 1:
+		default:
+			return nil, r.failed(args, res)
+		}
 	}
-	if res.code != 0 {
-		return nil, r.failed(args, res)
-	}
-	rest := res.stdout
-	for _, id := range ids {
-		header, body, ok := strings.Cut(rest, "\n")
-		if !ok && header == "" {
-			return nil, fmt.Errorf("git cat-file --batch in %s stopped before %s", r.dir, id)
-		}
-		fields := strings.Fields(header)
-		if len(fields) == 2 && fields[1] == "missing" {
-			return nil, fmt.Errorf("object %s is missing from %s", id, r.dir)
-		}
-		if len(fields) != 3 {
-			return nil, fmt.Errorf("git cat-file --batch in %s printed an unreadable header %q", r.dir, header)
-		}
-		if fields[1] != "blob" {
-			return nil, fmt.Errorf("object %s is a %s, not a blob", id, fields[1])
-		}
-		size, err := strconv.Atoi(fields[2])
-		if err != nil || size > len(body) {
-			return nil, fmt.Errorf("git cat-file --batch in %s printed a header %q that does not match the content", r.dir, header)
-		}
-		out[id] = body[:size]
-		// Each object's content is followed by a newline; the effects handle
-		// drops the last one from the whole output.
-		rest = strings.TrimPrefix(body[size:], "\n")
-	}
-	return out, nil
+	return found, nil
 }

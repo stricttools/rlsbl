@@ -123,6 +123,7 @@ var Allowlist = []Entry{
 	{[]string{"git", "ls-remote"}, NetworkRead, "lists a remote's refs"},
 	{[]string{"git", "ls-tree"}, LocalRead, "lists a tree's entries"},
 	{[]string{"git", "cat-file"}, LocalRead, "reads an object"},
+	{[]string{"git", "grep", "-I", "-l", "-i", "-F", "-z"}, LocalRead, "lists the text files of a commit holding fixed strings (the confidential-name scan of a push's commits); pinned to the one argv prefix rlsbl issues because other git grep options open the files in a pager"},
 	{[]string{"git", "merge-base"}, LocalRead, "computes a merge base and answers ancestry"},
 	{[]string{"git", "check-ignore"}, LocalRead, "tests paths against ignore rules"},
 	{[]string{"git", "for-each-ref"}, LocalRead, "lists refs"},
