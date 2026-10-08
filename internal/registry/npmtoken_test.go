@@ -109,6 +109,9 @@ func TestNpmTokenCreatedAt(t *testing.T) {
 		{"a wrapped listing", `{"objects":[{"token":"npm_ab...wxyz","created":"2026-03-01T10:00:00Z"}]}`, "2026-03-01T10:00:00Z", 0},
 		{"no match", `[{"token":"npm_zz...zzzz","created":"2020-01-01T00:00:00Z"}]`, "0 unrevoked", 0},
 		{"a revoked match", `[{"token":"npm_ab...wxyz","revoked":true,"created":"2020-01-01T00:00:00Z"}]`, "0 unrevoked", 0},
+		// npm 10 lists revoked as the revocation time, and null for a live token.
+		{"a match revoked at a time", `[{"token":"npm_ab...wxyz","revoked":"2026-02-01T00:00:00.000Z","created":"2020-01-01T00:00:00Z"}]`, "0 unrevoked", 0},
+		{"a live match beside one revoked at a time", `[{"token":"npm_zz...zzzz","revoked":"2026-02-01T00:00:00.000Z","created":"2020-01-01T00:00:00Z"},{"token":"npm_ab...wxyz","revoked":null,"created":"2026-03-01T10:00:00Z"}]`, "2026-03-01T10:00:00Z", 0},
 		{"a failing listing", `{}`, "exited 1", 1},
 		{"an unparsable time", `[{"token":"npm_ab...wxyz","created":"yesterday"}]`, "no creation time", 0},
 	}

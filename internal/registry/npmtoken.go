@@ -122,10 +122,16 @@ func NpmTokenCreatedAt(r Runner, token string) (time.Time, error) {
 	if err := json.Unmarshal([]byte(done.Stdout()), &raw); err != nil {
 		return time.Time{}, fmt.Errorf("`npm token list --json` printed something that is not JSON (%w)", err)
 	}
+	// Revoked is a boolean in older listings and the revocation time (null
+	// for a live token) in npm 10's.
 	type entry struct {
-		Token   string `json:"token"`
-		Revoked bool   `json:"revoked"`
-		Created string `json:"created"`
+		Token   string          `json:"token"`
+		Revoked json.RawMessage `json:"revoked"`
+		Created string          `json:"created"`
+	}
+	revoked := func(e entry) bool {
+		v := strings.TrimSpace(string(e.Revoked))
+		return v != "" && v != "null" && v != "false"
 	}
 	var listed []entry
 	if err := json.Unmarshal(raw, &listed); err != nil {
@@ -139,7 +145,7 @@ func NpmTokenCreatedAt(r Runner, token string) (time.Time, error) {
 	}
 	var matches []entry
 	for _, e := range listed {
-		if !e.Revoked && listingMatches(token, e.Token) {
+		if !revoked(e) && listingMatches(token, e.Token) {
 			matches = append(matches, e)
 		}
 	}
