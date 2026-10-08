@@ -5030,6 +5030,11 @@
         },
         {
           "level": 3,
+          "text": "`RenameInIndex`",
+          "anchor": "renameinindex"
+        },
+        {
+          "level": 3,
           "text": "`Invocation.Declassify`",
           "anchor": "invocationdeclassify"
         },
@@ -11343,7 +11348,7 @@
       ]
     }
   ],
-  "last_gen": "2026-10-07T23:34:45.948386+00:00",
+  "last_gen": "2026-10-08T00:09:48.641189+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
