@@ -697,7 +697,7 @@ Effort: large.
 - orxtra via the ported migration script (tag format written on its
   releasable, watch keys deleted; its alias keys were fixed in 0.2), whose
   backfill half now runs the promoted engine — no separate backfill step.
-- a private project: its untracked files inspected and committed first, then the
+- A private game project: its untracked files inspected and committed first, then the
   dev-node root edit via the script.
 - The private workspace: the dev-node root edit; its two member-path tags get shipped-as
   fields on the versions they shipped (the widened definition covers
