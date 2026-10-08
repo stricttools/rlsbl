@@ -15,13 +15,10 @@ import (
 	"github.com/stricttools/rlsbl/internal/testsupport"
 )
 
-// TestMain hands the process to the fake gh when the test binary was
-// started as gh, and runs the tests otherwise.
+// TestMain runs the tests through testsupport.RunTests, which builds the
+// fake gh they use.
 func TestMain(m *testing.M) {
-	if testsupport.IsFakeGH() {
-		os.Exit(testsupport.FakeGHMain())
-	}
-	os.Exit(m.Run())
+	os.Exit(testsupport.RunTests(m))
 }
 
 // testNow is the migration date of every test.

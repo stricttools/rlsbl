@@ -90,6 +90,9 @@ func layeringViolations(t *testing.T, root string, files []string) []string {
 			}
 			to := internalPackage(path)
 			switch {
+			case from == testOnly && to == testOnly:
+				// The harness's own packages: the fake gh program imports
+				// the package it serves from.
 			case to == testOnly:
 				problems = append(problems, fmt.Sprintf("%s imports %s, which only _test.go files may import", rel, path))
 			case from == testOnly:
@@ -154,6 +157,7 @@ func TestTheLayeringGuardRefusesAnUpwardImport(t *testing.T) {
 		"internal/cli/harness.go":       "package cli\n\nimport _ \"" + m + "/internal/testsupport\"\n",
 		"internal/unplaced/x.go":        "package unplaced\n",
 		"internal/testsupport/x.go":     "package testsupport\n\nimport _ \"" + m + "/internal/semver\"\n",
+		"internal/testsupport/y/z.go":   "package main\n\nimport _ \"" + m + "/internal/testsupport/y\"\n",
 		"cmd/rlsbl/main.go":             "package main\n\nimport (\n\t_ \"" + m + "\"\n\t_ \"" + m + "/internal/cli\"\n)\n",
 		"cmd/rlsbl/bad.go":              "package main\n\nimport _ \"" + m + "/internal/git\"\n",
 		"internal/options/gen/main.go":  "package main\n\nimport _ \"" + m + "/internal/options\"\n",
@@ -179,7 +183,7 @@ func TestTheLayeringGuardRefusesAnUpwardImport(t *testing.T) {
 			t.Errorf("missing violation %q in:\n%s", want, got)
 		}
 	}
-	for _, clean := range []string{"down_test.go", "internal/cli/ok.go", "cmd/rlsbl/main.go", "options/gen/main.go", "options/registry.go"} {
+	for _, clean := range []string{"down_test.go", "internal/cli/ok.go", "cmd/rlsbl/main.go", "options/gen/main.go", "options/registry.go", "testsupport/y/z.go"} {
 		if strings.Contains(got, clean) {
 			t.Errorf("%s was reported:\n%s", clean, got)
 		}

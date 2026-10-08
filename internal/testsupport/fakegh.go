@@ -3,58 +3,98 @@ package testsupport
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
-	"strings"
+	"sync"
 	"testing"
+
+	"github.com/stricttools/rlsbl/internal/testsupport/fakegh"
 )
 
 // GHAnswer is one canned gh answer: the argv after "gh" it answers, and what
 // gh prints and exits with.
-type GHAnswer struct {
-	Args   []string `json:"args"`
-	Stdout string   `json:"stdout"`
-	Stderr string   `json:"stderr"`
-	Exit   int      `json:"exit"`
-}
+type GHAnswer = fakegh.Answer
 
 // GHAnyArg, as an element of GHAnswer.Args, matches any one argument: an
 // answer to a question whose argv carries a commit the test cannot know
 // before the code under test makes it.
-const GHAnyArg = "\x00any-argument"
-
-// argsMatch reports whether args is the answer's argv, GHAnyArg matching
-// any one argument.
-func argsMatch(pattern, args []string) bool {
-	if len(pattern) != len(args) {
-		return false
-	}
-	for i := range pattern {
-		if pattern[i] != GHAnyArg && pattern[i] != args[i] {
-			return false
-		}
-	}
-	return true
-}
+const GHAnyArg = fakegh.AnyArg
 
 // GHCall is one invocation the fake gh received.
-type GHCall struct {
-	Args  []string `json:"args"`
-	Stdin string   `json:"stdin"`
-	Dir   string   `json:"dir"`
+type GHCall = fakegh.Call
+
+// fakeGHPackage is the import path of the fake gh program.
+const fakeGHPackage = ModulePath + "/internal/testsupport/fakegh/gh"
+
+// fakeGHBuild is the fake gh program of this test binary, built on the first
+// FakeGH and removed by RunTests once the tests ran.
+var fakeGHBuild struct {
+	once sync.Once
+	// env is the environment RunTests found, before any test isolated it,
+	// so the build uses the real Go caches; nil until RunTests ran.
+	env []string
+	// goTool is the go command on the PATH RunTests found, and workDir the
+	// working directory it found, inside the module.
+	goTool  string
+	workDir string
+	dir     string
+	path    string
+	err     error
 }
 
-// The files the fake keeps beside its gh entry.
-const (
-	ghAnswersFile = "gh-answers.json"
-	ghCallsFile   = "gh-calls.jsonl"
-)
+// RunTests runs a package's tests and returns the exit status for os.Exit.
+// Every package whose tests call FakeGH runs them through it:
+//
+//	func TestMain(m *testing.M) {
+//		os.Exit(testsupport.RunTests(m))
+//	}
+func RunTests(m *testing.M) int {
+	fakeGHBuild.env = os.Environ()
+	fakeGHBuild.goTool, _ = exec.LookPath("go")
+	fakeGHBuild.workDir, _ = os.Getwd()
+	code := m.Run()
+	if fakeGHBuild.dir != "" {
+		if err := os.RemoveAll(fakeGHBuild.dir); err != nil {
+			fmt.Fprintf(os.Stderr, "testsupport: removing the fake gh build: %v\n", err)
+			return 1
+		}
+	}
+	return code
+}
 
-// ghUnanswered is the fake's exit status for an argv no answer covers.
-const ghUnanswered = 97
+// fakeGHProgram is the fake gh program, built on the first call.
+func fakeGHProgram(t testing.TB) string {
+	t.Helper()
+	if fakeGHBuild.env == nil {
+		t.Fatal("testsupport: FakeGH needs the package's TestMain to run the tests through testsupport.RunTests")
+	}
+	fakeGHBuild.once.Do(func() {
+		if fakeGHBuild.goTool == "" {
+			fakeGHBuild.err = fmt.Errorf("no go command was on PATH when the tests started")
+			return
+		}
+		dir, err := os.MkdirTemp("", "rlsbl-fake-gh-")
+		if err != nil {
+			fakeGHBuild.err = err
+			return
+		}
+		fakeGHBuild.dir = dir
+		path := filepath.Join(dir, "gh")
+		cmd := exec.Command(fakeGHBuild.goTool, "build", "-o", path, fakeGHPackage)
+		cmd.Env = fakeGHBuild.env
+		cmd.Dir = fakeGHBuild.workDir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			fakeGHBuild.err = fmt.Errorf("go build %s: %v\n%s", fakeGHPackage, err, out)
+			return
+		}
+		fakeGHBuild.path = path
+	})
+	if fakeGHBuild.err != nil {
+		t.Fatalf("testsupport: building the fake gh: %v", fakeGHBuild.err)
+	}
+	return fakeGHBuild.path
+}
 
 // GH is a fake gh installed for one test.
 type GH struct {
@@ -63,181 +103,39 @@ type GH struct {
 }
 
 // FakeGH puts a gh first on PATH for the rest of the test: a symlink named gh
-// to the running test binary, with the answers in a file beside it. The
-// package's TestMain must hand the process to FakeGHMain when IsFakeGH
-// reports the binary was started as gh:
-//
-//	func TestMain(m *testing.M) {
-//		if testsupport.IsFakeGH() {
-//			os.Exit(testsupport.FakeGHMain())
-//		}
-//		os.Exit(m.Run())
-//	}
+// to the fake gh program (package fakegh, built once per test binary), with
+// the answers in a file beside it. The package's TestMain runs the tests
+// through RunTests.
 //
 // Answers are matched on the whole argv, an argument GHAnyArg matching any
 // one argument. When several answers match one argv, each call of that argv
-// takes the next, and the last one keeps answering. An argv
-// no answer covers exits 97 and names itself on stderr, and Calls records it
+// takes the next, and the last one keeps answering. An argv no answer covers
+// exits fakegh.Unanswered and names itself on stderr, and Calls records it
 // like every other invocation.
 func FakeGH(t testing.TB, answers ...GHAnswer) *GH {
 	t.Helper()
-	self, err := os.Executable()
-	if err != nil {
-		t.Fatalf("testsupport: locating the test binary: %v", err)
-	}
+	program := fakeGHProgram(t)
 	dir := t.TempDir()
-	if err := os.Symlink(self, filepath.Join(dir, "gh")); err != nil {
+	if err := os.Symlink(program, filepath.Join(dir, "gh")); err != nil {
 		t.Fatal(err)
 	}
 	data, err := json.Marshal(answers)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, ghAnswersFile), data, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, fakegh.AnswersFile), data, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	t.Setenv("GORACE", fakeGHRaceOptions(os.Getenv("GORACE")))
 	return &GH{t: t, dir: dir}
-}
-
-// fakeGHRaceOptions is the GORACE a fake gh starts under: the test's own
-// options with the race detector's pause at exit removed. Under -race the
-// fake is a race-instrumented binary, and the detector sleeps a second at
-// every exit by default, which made each fake gh call cost a second of
-// wall time doing nothing.
-func fakeGHRaceOptions(current string) string {
-	const noExitPause = "atexit_sleep_ms=0"
-	if strings.TrimSpace(current) == "" {
-		return noExitPause
-	}
-	return current + " " + noExitPause
 }
 
 // Calls is every invocation the fake received, in order.
 func (g *GH) Calls() []GHCall {
 	g.t.Helper()
-	calls, err := readGHCalls(g.dir)
+	calls, err := fakegh.ReadCalls(g.dir)
 	if err != nil {
 		g.t.Fatal(err)
 	}
 	return calls
-}
-
-// IsFakeGH reports whether this process is the test binary started as gh.
-func IsFakeGH() bool {
-	return filepath.Base(os.Args[0]) == "gh"
-}
-
-// FakeGHMain answers one gh invocation from the answers file beside the gh
-// entry that started this process, records the invocation, and returns the
-// exit status.
-func FakeGHMain() int {
-	dir, err := fakeGHDir()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "fake gh:", err)
-		return ghUnanswered
-	}
-	args := os.Args[1:]
-	stdin, err := io.ReadAll(os.Stdin)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "fake gh: reading stdin:", err)
-		return ghUnanswered
-	}
-	cwd, err := os.Getwd()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "fake gh:", err)
-		return ghUnanswered
-	}
-	previous, err := readGHCalls(dir)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "fake gh:", err)
-		return ghUnanswered
-	}
-	if err := appendGHCall(dir, GHCall{Args: args, Stdin: string(stdin), Dir: cwd}); err != nil {
-		fmt.Fprintln(os.Stderr, "fake gh:", err)
-		return ghUnanswered
-	}
-	data, err := os.ReadFile(filepath.Join(dir, ghAnswersFile))
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "fake gh:", err)
-		return ghUnanswered
-	}
-	var answers []GHAnswer
-	if err := json.Unmarshal(data, &answers); err != nil {
-		fmt.Fprintln(os.Stderr, "fake gh: reading the answers:", err)
-		return ghUnanswered
-	}
-	var matching []GHAnswer
-	for _, a := range answers {
-		if argsMatch(a.Args, args) {
-			matching = append(matching, a)
-		}
-	}
-	if len(matching) == 0 {
-		fmt.Fprintf(os.Stderr, "fake gh: no answer for argv %q\n", args)
-		return ghUnanswered
-	}
-	seen := 0
-	for _, c := range previous {
-		if slices.Equal(c.Args, args) {
-			seen++
-		}
-	}
-	answer := matching[min(seen, len(matching)-1)]
-	fmt.Fprint(os.Stdout, answer.Stdout)
-	fmt.Fprint(os.Stderr, answer.Stderr)
-	return answer.Exit
-}
-
-// fakeGHDir is the directory of the gh entry that started this process: the
-// one named by argv[0] when that is a path, else the first gh on PATH, which
-// FakeGH put there.
-func fakeGHDir() (string, error) {
-	if strings.ContainsRune(os.Args[0], os.PathSeparator) {
-		return filepath.Dir(os.Args[0]), nil
-	}
-	path, err := exec.LookPath("gh")
-	if err != nil {
-		return "", fmt.Errorf("locating the gh entry on PATH: %w", err)
-	}
-	return filepath.Dir(path), nil
-}
-
-func readGHCalls(dir string) ([]GHCall, error) {
-	data, err := os.ReadFile(filepath.Join(dir, ghCallsFile))
-	if os.IsNotExist(err) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	var calls []GHCall
-	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
-		if line == "" {
-			continue
-		}
-		var c GHCall
-		if err := json.Unmarshal([]byte(line), &c); err != nil {
-			return nil, fmt.Errorf("reading %s: %w", ghCallsFile, err)
-		}
-		calls = append(calls, c)
-	}
-	return calls, nil
-}
-
-func appendGHCall(dir string, c GHCall) error {
-	line, err := json.Marshal(c)
-	if err != nil {
-		return err
-	}
-	f, err := os.OpenFile(filepath.Join(dir, ghCallsFile), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		return err
-	}
-	if _, err := f.Write(append(line, '\n')); err != nil {
-		f.Close()
-		return err
-	}
-	return f.Close()
 }

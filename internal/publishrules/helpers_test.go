@@ -17,10 +17,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	if testsupport.IsFakeGH() {
-		os.Exit(testsupport.FakeGHMain())
-	}
-	os.Exit(m.Run())
+	os.Exit(testsupport.RunTests(m))
 }
 
 // today is the date every rule is asked about.

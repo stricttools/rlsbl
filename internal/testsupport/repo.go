@@ -1,7 +1,8 @@
 // Package testsupport is rlsbl's test harness: throwaway git repositories
 // with file:// bare remotes, a throwaway strictcli command to run code that
-// needs an effects handle, a fake gh that is the test binary itself, a fake
-// HTTP transport, and the walks the module-wide guard tests share.
+// needs an effects handle, a fake gh (the small program of package fakegh,
+// built once per test binary), a fake HTTP transport, and the walks the
+// module-wide guard tests share.
 //
 // It is imported only from _test.go files (the layering test refuses any
 // other importer), so it builds fixtures directly with os/exec and os: a

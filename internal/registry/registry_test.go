@@ -20,10 +20,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	if testsupport.IsFakeGH() {
-		os.Exit(testsupport.FakeGHMain())
-	}
-	os.Exit(m.Run())
+	os.Exit(testsupport.RunTests(m))
 }
 
 // withRegistry runs fn with a client whose requests go to the fake

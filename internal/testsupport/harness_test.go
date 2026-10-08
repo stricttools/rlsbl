@@ -11,13 +11,12 @@ import (
 
 	"github.com/stricttools/strictcli/go/strictcli"
 	"github.com/stricttools/testisolation/go/hygiene"
+
+	"github.com/stricttools/rlsbl/internal/testsupport/fakegh"
 )
 
 func TestMain(m *testing.M) {
-	if IsFakeGH() {
-		os.Exit(FakeGHMain())
-	}
-	os.Exit(m.Run())
+	os.Exit(RunTests(m))
 }
 
 func TestARepositoryWithABareRemoteTakesAFewLines(t *testing.T) {
@@ -150,7 +149,7 @@ func TestFakeGHAnswersRecordsAndRefusesTheUnanswered(t *testing.T) {
 	if _, stderr, code := run("token", "run", "list"); stderr != "boom\n" || code != 2 {
 		t.Fatalf("failing answer: %q, %d", stderr, code)
 	}
-	if _, stderr, code := run("", "release", "create", "v1.0.0"); code != ghUnanswered || !strings.Contains(stderr, "no answer") {
+	if _, stderr, code := run("", "release", "create", "v1.0.0"); code != fakegh.Unanswered || !strings.Contains(stderr, "no answer") {
 		t.Fatalf("unanswered argv: %q, %d", stderr, code)
 	}
 	calls := gh.Calls()
@@ -159,21 +158,6 @@ func TestFakeGHAnswersRecordsAndRefusesTheUnanswered(t *testing.T) {
 	}
 	if calls[3].Stdin != "token" || strings.Join(calls[4].Args, " ") != "release create v1.0.0" {
 		t.Fatalf("calls = %+v", calls)
-	}
-}
-
-// A race-instrumented fake gh pauses a second at every exit unless GORACE
-// says otherwise; the fake starts without the pause, keeping the test's own
-// race options.
-func TestTheFakeGHStartsWithoutTheRaceDetectorsExitPause(t *testing.T) {
-	hygiene.Isolate(t)
-	t.Setenv("GORACE", "halt_on_error=1")
-	FakeGH(t)
-	if got := os.Getenv("GORACE"); got != "halt_on_error=1 atexit_sleep_ms=0" {
-		t.Fatalf("GORACE is %q", got)
-	}
-	if got := fakeGHRaceOptions(""); got != "atexit_sleep_ms=0" {
-		t.Fatalf("without race options of its own the fake starts under %q", got)
 	}
 }
 
@@ -191,5 +175,34 @@ func TestFakeHTTPAnswersAndRecords(t *testing.T) {
 	}
 	if urls := f.URLs(); len(urls) != 1 || urls[0] != "https://registry.npmjs.org/widget" {
 		t.Fatalf("recorded %v", urls)
+	}
+}
+
+// The fake gh is the small program of package fakegh, never the test binary
+// started again: under -race a start of the instrumented test binary cost
+// every gh call tens of milliseconds of package initialization.
+func TestTheFakeGHIsItsOwnProgram(t *testing.T) {
+	hygiene.Isolate(t)
+	FakeGH(t)
+	entry, err := exec.LookPath("gh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	program, err := filepath.EvalSymlinks(entry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if self, err = filepath.EvalSymlinks(self); err != nil {
+		t.Fatal(err)
+	}
+	if program == self {
+		t.Fatalf("the fake gh is the test binary %s", self)
+	}
+	if filepath.Base(program) != "gh" {
+		t.Fatalf("the fake gh is %s", program)
 	}
 }

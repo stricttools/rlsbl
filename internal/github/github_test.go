@@ -15,10 +15,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	if testsupport.IsFakeGH() {
-		os.Exit(testsupport.FakeGHMain())
-	}
-	os.Exit(m.Run())
+	os.Exit(testsupport.RunTests(m))
 }
 
 var portal = Repository{Owner: "acme", Name: "portal"}

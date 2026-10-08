@@ -17,10 +17,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	if testsupport.IsFakeGH() {
-		os.Exit(testsupport.FakeGHMain())
-	}
-	os.Exit(m.Run())
+	os.Exit(testsupport.RunTests(m))
 }
 
 // projectWith is a directory holding one manifest.

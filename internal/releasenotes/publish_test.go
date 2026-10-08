@@ -22,10 +22,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	if testsupport.IsFakeGH() {
-		os.Exit(testsupport.FakeGHMain())
-	}
-	os.Exit(m.Run())
+	os.Exit(testsupport.RunTests(m))
 }
 
 var portal = github.Repository{Owner: "acme", Name: "portal"}
