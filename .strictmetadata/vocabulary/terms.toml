@@ -1,20 +1,41 @@
 format_version = 1
 
 [[accepted]]
-word = "mixin"
-meaning = "A class that adds one capability, such as token authentication, to the pipeline classes that inherit from it."
+word = "codename"
+meaning = "A confidential project's internal name, which the lifecycle-and-license record lists so published text is scanned for it."
+aliases = ["codenames"]
 
 [[accepted]]
-word = "prs"
-meaning = "The 'rlsbl prs' command, which lists the repository's open pull requests (PRs) before a release."
+word = "esbuild"
+meaning = "The JavaScript bundler that ships its Go binary through npm platform packages, the pattern rlsbl's go-binary pipelines follow."
 
 [[accepted]]
-word = "rdeps"
-meaning = "Reverse dependencies: the workspace members that depend on a given member, as the monorepo snapshot reports them."
+word = "gitleaks"
+meaning = "The secret scanner the publish pipelines and the release build run over the artifacts before they are published."
+
+[[accepted]]
+word = "ls"
+meaning = "The list prefix of git's ls-remote and ls-files commands, which rlsbl runs to read refs and tracked files."
+
+[[accepted]]
+word = "norecursedirs"
+meaning = "pytest's setting naming the directories its test collection does not descend into, which scaffold writes for the scratch directories."
+
+[[accepted]]
+word = "npmignore"
+meaning = "The .npmignore file, which names the paths npm leaves out of a published package."
+
+[[accepted]]
+word = "predeclared"
+meaning = "Go's term for an identifier the language declares itself, such as a built-in type or function name."
 
 [[accepted]]
 word = "releasables"
 meaning = "Plural of releasable: a monorepo's unit of versioning, grouping member packages under one version, changelog, and tag scheme."
+
+[[accepted]]
+word = "restamped"
+meaning = "Rewritten with a new format version, as the record migration rewrites every changelog line to format version 2."
 
 [[accepted]]
 word = "rlsbl"
@@ -29,9 +50,22 @@ word = "saferm"
 meaning = "The auditable, undoable file-deletion tool rlsbl uses to remove files."
 
 [[accepted]]
+word = "SPDX"
+meaning = "The Software Package Data Exchange license identifiers, such as MIT or Apache-2.0, that a license period names."
+
+[[accepted]]
+word = "strictcode"
+meaning = "The code analysis tool whose lint, format, and type-check rules the rlsbl:strictcode check runs in every release."
+aliases = ["strictcode's"]
+
+[[accepted]]
 word = "strictspec"
 meaning = "The schema tool whose generated validators define the shape of rlsbl's documents, such as changelog lines and release files."
 
 [[accepted]]
 word = "testisolation"
 meaning = "The sandboxed test-runner tool whose adoption the testisolation-floor check verifies."
+
+[[accepted]]
+word = "unpublishes"
+meaning = "Removes a published package version from its registry, as npm's unpublish does; no rlsbl command does it."
