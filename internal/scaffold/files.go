@@ -616,9 +616,7 @@ func (c *memberContext) sharedRenders() ([]render, error) {
 }
 
 // goStubs are the stub go.mod files (repository-relative) every go target's
-// module needs in its private directories. .strictmetadata/ sits at the
-// repository root and is inside a module only when the module is at the
-// root.
+// module needs in its private directories.
 func (c *memberContext) goStubs() ([]string, error) {
 	var out []string
 	seen := map[string]bool{}
@@ -632,9 +630,6 @@ func (c *memberContext) goStubs() ([]string, error) {
 		}
 		moduleRel := joinDir(c.member.Path, t.dir)
 		for _, d := range dirs {
-			if d == declarations.MetadataDir && moduleRel != "." {
-				continue
-			}
 			p := joinDir(moduleRel, d) + "/go.mod"
 			if !seen[p] {
 				seen[p] = true

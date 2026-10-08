@@ -119,7 +119,19 @@ func TestGoStubsGoInTrackedPrivateDirectories(t *testing.T) {
 		stubs, err = GoStubDirectories(r, repo.Path("widget"))
 		return err
 	})
-	if !slices.Equal(stubs, []string{".strictmetadata", "todo", ".claude"}) {
+	if !slices.Equal(stubs, []string{"todo", ".claude"}) {
 		t.Fatalf("stubs = %q", stubs)
+	}
+	repo.CommitFile("widget/.strictmetadata/.cli-schema/schema.json", "{}\n", "add the schema dump")
+	testsupport.RunEffects(t, testsupport.CommandOptions{Effect: strictcli.EffectReadOnly, Allowlist: previewapply.Prefixes()}, func(e *strictcli.Effects) error {
+		r, err := git.Open(e, repo.Dir)
+		if err != nil {
+			return err
+		}
+		stubs, err = GoStubDirectories(r, repo.Path("widget"))
+		return err
+	})
+	if !slices.Equal(stubs, []string{".strictmetadata", "todo", ".claude"}) {
+		t.Fatalf("a module tracking files in its own .strictmetadata/: stubs = %q", stubs)
 	}
 }

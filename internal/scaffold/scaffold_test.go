@@ -176,6 +176,22 @@ func TestScaffoldingAWorkspaceMemberSyncsTheRouters(t *testing.T) {
 	}
 }
 
+// A module below the root that tracks files in its own .strictmetadata/ (the
+// strictcli schema dump at .strictmetadata/.cli-schema/) gets a stub go.mod
+// there, so the module zip leaves the directory out.
+func TestAModuleBelowTheRootGetsAStubForItsOwnMetadata(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := newProject(t, workspaceWithWidget, map[string]string{
+		"widget/go.mod":  "module github.com/acme/widget\n\ngo 1.26\n",
+		"widget/main.go": "package main\n\nfunc main() {}\n",
+	})
+	repo.CommitFile("widget/.strictmetadata/.cli-schema/schema.json", "{}\n", "add the schema dump")
+	mustScaffold(t, repo.Path("widget"), nil)
+	if !strings.Contains(readFile(t, repo, "widget/.strictmetadata/go.mod"), "module private.invalid/rlsbl-private") {
+		t.Error("widget/.strictmetadata/ holds tracked files and got no stub go.mod")
+	}
+}
+
 // LICENSE is written only from the lifecycle-and-license record: the
 // releasable's license in effect, when rlsbl carries its text. A missing
 // git user.name, which names the copyright holder, is refused until set.

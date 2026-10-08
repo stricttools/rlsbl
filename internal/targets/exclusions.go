@@ -30,8 +30,9 @@ func NpmignoreBlock() string { return strings.Join(ExcludeEntries(), "\n") }
 
 // GoStubDirectories are the private directories at the project root (dir,
 // absolute, inside repo) a Go module needs a stub go.mod in: .strictmetadata
-// always, since scaffold commits files there, and every other private
-// directory holding a tracked file. The proxy zips only committed files, so
+// always for a module at the repository root, since scaffold commits files
+// there, and every private directory holding a tracked file, a module's own
+// .strictmetadata (strictcli's schema dump) included. The proxy zips only committed files, so
 // a directory the project does not track needs no stub (and a stub in an
 // ignored directory could never be committed). The scratch directories carry
 // their own go.mod and are left out.
@@ -57,7 +58,10 @@ func GoStubDirectories(repo git.Repo, dir string) ([]string, error) {
 			holding[top] = true
 		}
 	}
-	out := []string{".strictmetadata"}
+	var out []string
+	if rel == "." || holding[".strictmetadata"] {
+		out = append(out, ".strictmetadata")
+	}
 	for _, name := range append(append([]string(nil), PrivateRootDirs...), PrivateDirs...) {
 		if name == ".strictmetadata" || name == "experiments" || name == "screenshots" {
 			continue
