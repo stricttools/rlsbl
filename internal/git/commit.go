@@ -86,7 +86,47 @@ func (r Repo) planCommit(req CommitRequest) (paths []string, ok bool, err error)
 		}
 		return nil, false, nil
 	}
-	return stageable, true, nil
+	manifests, _, err := r.PartitionStageable(ownershipManifests(req.Paths))
+	if err != nil {
+		return nil, false, err
+	}
+	return append(stageable, manifests...), true, nil
+}
+
+// MetadataDir is the directory at a repository's root that holds every
+// family tool's records, each directory directly under it owned through its
+// OwnershipManifest.
+const MetadataDir = ".strictmetadata"
+
+// OwnershipManifest is the file naming a record directory's owner.
+const OwnershipManifest = "manifest.toml"
+
+// ownershipManifests is the ownership manifest of each record directory a
+// path lies in, other than the paths themselves. A commit carries the
+// changed ones, so a writer that created a directory's manifest along with a
+// record never leaves the manifest out of the record's commit.
+func ownershipManifests(paths []string) []string {
+	named := make(map[string]bool, len(paths))
+	for _, p := range paths {
+		named[p] = true
+	}
+	var manifests []string
+	for _, p := range paths {
+		rest, ok := strings.CutPrefix(p, MetadataDir+"/")
+		if !ok {
+			continue
+		}
+		dir, _, nested := strings.Cut(rest, "/")
+		if !nested {
+			continue
+		}
+		m := MetadataDir + "/" + dir + "/" + OwnershipManifest
+		if !named[m] {
+			named[m] = true
+			manifests = append(manifests, m)
+		}
+	}
+	return manifests
 }
 
 // Commit commits the request's changed paths through safegit, which stages

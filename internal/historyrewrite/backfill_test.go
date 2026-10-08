@@ -331,3 +331,24 @@ func TestATagAClosedIdentityOwnedIsExplained(t *testing.T) {
 	f.repo.Write(".strictmetadata/lifecycle-and-license/lifecycle-and-license.toml", closedIdentityRecord)
 	requireExit(t, backfill(t, f.repo.Dir, "", true), 0)
 }
+
+// A backfill into a repository whose releases directory carries no ownership
+// manifest yet creates the manifest and commits it with the archives, so the
+// working tree is left clean.
+func TestABackfillCommitsTheOwnershipManifestItCreates(t *testing.T) {
+	hygiene.Isolate(t)
+	f := newUnarchived(t, true, "v0.1.0")
+	f.repo.Git("rm", "-q", ".strictmetadata/releases/manifest.toml")
+	f.repo.Git("commit", "-q", "-m", "no releases manifest")
+	newSafegit(t, "0.31.0")
+	noRelease(t)
+
+	r := backfill(t, f.repo.Dir, "", false)
+	requireExit(t, r, 0)
+	if status := f.repo.Git("status", "--porcelain", "--untracked-files=all"); status != "" {
+		t.Fatalf("the backfill left changes uncommitted:\n%s", status)
+	}
+	if files := f.repo.Git("show", "--name-only", "--format=", "HEAD"); !strings.Contains(files, ".strictmetadata/releases/manifest.toml") {
+		t.Fatalf("the backfill's commit does not carry the manifest it created:\n%s", files)
+	}
+}

@@ -32,8 +32,9 @@ import (
 )
 
 // MetadataDir is the directory at a repository's root that holds every
-// family tool's records.
-const MetadataDir = ".strictmetadata"
+// family tool's records; the git package declares it, since its commits
+// carry the ownership manifests of the directories under it.
+const MetadataDir = git.MetadataDir
 
 // The records rlsbl keeps, as repository-relative slash-separated paths.
 const (

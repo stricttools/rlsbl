@@ -6,6 +6,8 @@ import (
 
 	tomledit "github.com/stricttools/go-toml-edit"
 	"github.com/stricttools/strictcli/go/strictcli"
+
+	"github.com/stricttools/rlsbl/internal/git"
 )
 
 // Owner is the tool named in the manifest.toml of every directory rlsbl
@@ -56,7 +58,7 @@ func writeRecord(e *strictcli.Effects, root, dir, rel string, data []byte) error
 // ensureManifest creates dir and its manifest.toml naming rlsbl when the
 // manifest is missing, and refuses one naming another owner.
 func ensureManifest(e *strictcli.Effects, root, dir string) error {
-	rel := dir + "/manifest.toml"
+	rel := dir + "/" + git.OwnershipManifest
 	data, found, err := readRecord(root, rel)
 	if err != nil {
 		return err

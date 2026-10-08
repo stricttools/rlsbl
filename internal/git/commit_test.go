@@ -225,3 +225,31 @@ func TestADryRunRecordsTheCommitInsteadOfCommitting(t *testing.T) {
 		t.Fatal("a dry run committed")
 	}
 }
+
+// A record committed into a .strictmetadata directory whose ownership
+// manifest was created alongside it carries the manifest too, so no writer
+// can leave the manifest it created uncommitted; a manifest git reports no
+// change for is left out.
+func TestCommitCarriesTheOwnershipManifestOfARecordsDirectory(t *testing.T) {
+	hygiene.Isolate(t)
+	testsupport.FakeSafegit(t)
+	repo := testsupport.NewRepo(t)
+	repo.Write(".strictmetadata/changelog/manifest.toml", "owner = \"rlsbl\"\n")
+	repo.Write(".strictmetadata/changelog/a/unreleased.jsonl", "{}\n")
+	repo.Commit("seed", ".strictmetadata/changelog/manifest.toml", ".strictmetadata/changelog/a/unreleased.jsonl")
+	repo.Write(".strictmetadata/changelog/a/unreleased.jsonl", "{}\n{}\n")
+	repo.Write(".strictmetadata/releases/manifest.toml", "owner = \"rlsbl\"\n")
+	repo.Write(".strictmetadata/releases/a/v0.1.0.toml", "x = 1\n")
+	_, err := writing(t, repo.Dir, false, func(r git.Repo) error {
+		_, err := r.Commit(git.CommitRequest{Message: "records", Paths: []string{".strictmetadata/releases/a/v0.1.0.toml", ".strictmetadata/changelog/a/unreleased.jsonl"}, RequireChange: true})
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := committedFiles(repo)
+	slices.Sort(files)
+	if want := []string{".strictmetadata/changelog/a/unreleased.jsonl", ".strictmetadata/releases/a/v0.1.0.toml", ".strictmetadata/releases/manifest.toml"}; !slices.Equal(files, want) {
+		t.Fatalf("committed %q, want %q", files, want)
+	}
+}
