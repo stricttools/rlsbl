@@ -103,3 +103,4 @@ Made by the session leading the campaign, not by the owner.
 - strictspec, which holds the lifecycle-and-license library, joins the release order; saferm is the first project released with npm per-platform packages, before rlsbl.
 - `release undo --version` evidence and the registry probe in `rewrite uv-path-sources` use package-level listings of already-published versions, with tests; no request ever names one of our unpublished versions.
 - A releasable whose lifecycle is on-hold refuses releases.
+- browserbuddy's names leave the confidential-name index through its public-client declaration (`rlsbl transition public-client`), since its published npm and PyPI packages keep their names; this supersedes the line under "Lifecycle and license" by which its names entered the index (decided during the release campaign).
