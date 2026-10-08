@@ -97,7 +97,21 @@ func FakeGH(t testing.TB, answers ...GHAnswer) *GH {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("GORACE", fakeGHRaceOptions(os.Getenv("GORACE")))
 	return &GH{t: t, dir: dir}
+}
+
+// fakeGHRaceOptions is the GORACE a fake gh starts under: the test's own
+// options with the race detector's pause at exit removed. Under -race the
+// fake is a race-instrumented binary, and the detector sleeps a second at
+// every exit by default, which made each fake gh call cost a second of
+// wall time doing nothing.
+func fakeGHRaceOptions(current string) string {
+	const noExitPause = "atexit_sleep_ms=0"
+	if strings.TrimSpace(current) == "" {
+		return noExitPause
+	}
+	return current + " " + noExitPause
 }
 
 // Calls is every invocation the fake received, in order.

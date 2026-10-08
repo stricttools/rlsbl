@@ -162,6 +162,21 @@ func TestFakeGHAnswersRecordsAndRefusesTheUnanswered(t *testing.T) {
 	}
 }
 
+// A race-instrumented fake gh pauses a second at every exit unless GORACE
+// says otherwise; the fake starts without the pause, keeping the test's own
+// race options.
+func TestTheFakeGHStartsWithoutTheRaceDetectorsExitPause(t *testing.T) {
+	hygiene.Isolate(t)
+	t.Setenv("GORACE", "halt_on_error=1")
+	FakeGH(t)
+	if got := os.Getenv("GORACE"); got != "halt_on_error=1 atexit_sleep_ms=0" {
+		t.Fatalf("GORACE is %q", got)
+	}
+	if got := fakeGHRaceOptions(""); got != "atexit_sleep_ms=0" {
+		t.Fatalf("without race options of its own the fake starts under %q", got)
+	}
+}
+
 func TestFakeHTTPAnswersAndRecords(t *testing.T) {
 	hygiene.Isolate(t)
 	f := NewFakeHTTP(t, HTTPAnswer{Method: "GET", URL: "https://registry.npmjs.org/widget", Status: 200, Body: `{"name":"widget"}`})
