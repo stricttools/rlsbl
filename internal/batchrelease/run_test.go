@@ -8,6 +8,7 @@ import (
 
 	"github.com/stricttools/testisolation/go/hygiene"
 
+	"github.com/stricttools/rlsbl/internal/batchrelease"
 	"github.com/stricttools/rlsbl/internal/release"
 	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/testsupport"
@@ -264,5 +265,44 @@ func TestABatchReleaseOfAStandaloneProjectIsRefused(t *testing.T) {
 	_, err := batchCommand(t, repo, true)
 	if err == nil || !strings.Contains(err.Error(), "`rlsbl release run --watch`") {
 		t.Fatalf("a standalone project's batch release was not refused: %v", err)
+	}
+}
+
+// A dev-node root declaring selfdoc.json gets selfdoc gen and then selfdoc
+// check before the batch, and the commit of what they wrote carries the
+// hashes store gen records: check is selfdoc's read-only verdict, writing
+// nothing and declaring no --auto-commit flag, so the batch passes it none.
+func TestABatchCommitsWhatSelfdocGenWroteAtTheRootAndPassesCheckNoCommitFlag(t *testing.T) {
+	hygiene.Isolate(t)
+	testsupport.FakeGH(t, answers(validationAnswers(), releaseCreation("widget@v0.2.0"), releaseCreation("gadget@v0.2.1"))...)
+	logPath := filepath.Join(t.TempDir(), "selfdoc-log")
+	fakeDir := t.TempDir()
+	script := "#!/bin/sh\necho \"selfdoc $*\" >> " + logPath + "\n" + `case "$1" in
+gen) mkdir -p docs && echo generated > docs/index.md && echo recorded > docs/hashes.toml ;;
+check) case " $* " in *" --no-auto-commit "*|*" --auto-commit "*) echo "error: unknown flag" >&2; exit 1 ;; esac ;;
+esac
+`
+	if err := os.WriteFile(filepath.Join(fakeDir, "selfdoc"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", fakeDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	repo := batchRepo(t, map[string]string{"selfdoc.json": "{}\n"})
+	start := repo.Head()
+	out, err := batchCommand(t, repo, false)
+	mustNotFail(t, err, out)
+	if got := strings.TrimSpace(read(t, logPath)); got != "selfdoc gen --no-auto-commit\nselfdoc check" {
+		t.Errorf("selfdoc ran as:\n%s", got)
+	}
+	var selfdocCommit string
+	for _, line := range strings.Split(repo.Git("log", "--format=%H %s", start+"..HEAD"), "\n") {
+		if hash, subject, _ := strings.Cut(line, " "); subject == batchrelease.RootSelfdocCommitMessage {
+			selfdocCommit = hash
+		}
+	}
+	if selfdocCommit == "" {
+		t.Fatalf("no commit carries what selfdoc wrote:\n%s", repo.Git("log", "--format=%s", start+"..HEAD"))
+	}
+	if files := repo.Git("show", "--name-only", "--format=", selfdocCommit); files != "docs/hashes.toml\ndocs/index.md" {
+		t.Errorf("the selfdoc commit carries:\n%s", files)
 	}
 }

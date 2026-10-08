@@ -72,13 +72,16 @@ func fakeNode(t *testing.T, logPath, document string) {
 	fakeProgram(t, "node", fmt.Sprintf("echo \"node $*\" >> %s\nprintf '%%s' '%s'\n", logPath, document))
 }
 
-// fakeSelfdoc writes a page on gen and its hashes store on check.
+// fakeSelfdoc writes a page and its hashes store on gen, and writes nothing
+// on check, which is selfdoc's read-only verdict and declares no
+// --auto-commit flag: given one, it refuses as selfdoc refuses an unknown
+// flag.
 func fakeSelfdoc(t *testing.T, logPath string) {
 	t.Helper()
 	fakeProgram(t, "selfdoc", fmt.Sprintf(`echo "selfdoc $*" >> %s
 case "$1" in
-gen) mkdir -p docs && echo generated > docs/index.md ;;
-check) echo checked > docs/hashes.toml ;;
+gen) mkdir -p docs && echo generated > docs/index.md && echo recorded > docs/hashes.toml ;;
+check) case " $* " in *" --no-auto-commit "*|*" --auto-commit "*) echo "error: unknown flag" >&2; exit 1 ;; esac ;;
 esac
 `, logPath))
 }
@@ -120,13 +123,14 @@ func TestThePrePipelineRunsInOrderAndCommitsWhatSelfdocWrote(t *testing.T) {
 		"pre-checks",
 		"node cli.js help --json",
 		"selfdoc gen --no-auto-commit --version-override 0.5.0",
-		"selfdoc check --no-auto-commit --version-override 0.5.0",
+		"selfdoc check --version-override 0.5.0",
 	}
 	if got := strings.Split(strings.TrimSpace(read(t, logPath)), "\n"); strings.Join(got, "|") != strings.Join(want, "|") {
 		t.Fatalf("the pipeline ran:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
-	// The selfdoc commit carries what selfdoc wrote, with the trailer, and
-	// nothing the hook or the dump wrote.
+	// The selfdoc commit carries what selfdoc wrote, the hashes store gen
+	// records included, with the trailer, and nothing the hook or the dump
+	// wrote.
 	head := repo.Head()
 	if result.SelfdocCommit != head || repo.Git("rev-parse", "HEAD^") != before {
 		t.Fatalf("the selfdoc commit is %q, HEAD is %s", result.SelfdocCommit, head)
