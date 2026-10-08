@@ -885,8 +885,29 @@ func (x *execution) epilogue() error {
 }
 
 // The registry listings' grace after CI concluded: a registry can take a
-// while to list a version its publish accepted.
-var publicationDelays = []time.Duration{0, 5 * time.Second, 15 * time.Second, 30 * time.Second}
+// while to list a version its publish accepted, and npm's CDN serves a
+// package document for up to five minutes (max-age=300), so a copy cached
+// by the publish job's own lookup before it published hides the version
+// that long. The delays add up to more than that.
+var publicationDelays = []time.Duration{0, 5 * time.Second, 15 * time.Second, 30 * time.Second, 60 * time.Second, 90 * time.Second, 120 * time.Second}
+
+// awaitPublication asks missing for the packages the registries do not
+// list yet, again after each of publicationDelays, until none is missing,
+// and returns the packages still missing after the last delay.
+func awaitPublication(wait func(time.Duration), missing func() ([]string, error)) ([]string, error) {
+	var out []string
+	for _, delay := range publicationDelays {
+		if delay > 0 {
+			wait(delay)
+		}
+		var err error
+		out, err = missing()
+		if err != nil || len(out) == 0 {
+			return out, err
+		}
+	}
+	return out, nil
+}
 
 // verifyPublication asks the package listing of every npm and PyPI package
 // the releasable's CI pipelines publish whether it lists the version. A Go
@@ -926,24 +947,20 @@ func (x *execution) verifyPublication() error {
 		}
 	}
 	version := x.version.String()
-	var missing []string
-	for _, delay := range publicationDelays {
-		if delay > 0 {
-			x.req.Sleep(delay)
-		}
-		missing = nil
+	missing, err := awaitPublication(x.req.Sleep, func() ([]string, error) {
+		var missing []string
 		for _, p := range packages {
 			listed := false
 			if p.registry == declarations.TargetNPM {
 				doc, found, err := x.reg.NpmPackage(p.name)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				listed = found && doc.Has(version)
 			} else {
 				doc, found, err := x.reg.PypiProject(p.name)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				listed = found && doc.Has(version)
 			}
@@ -951,12 +968,16 @@ func (x *execution) verifyPublication() error {
 				missing = append(missing, fmt.Sprintf("%s on %s", p.name, p.registry))
 			}
 		}
-		if len(missing) == 0 {
-			if len(packages) > 0 {
-				x.req.Log(fmt.Sprintf("The registries list %s: %d package(s)", version, len(packages)))
-			}
-			return nil
+		return missing, nil
+	})
+	if err != nil {
+		return err
+	}
+	if len(missing) == 0 {
+		if len(packages) > 0 {
+			x.req.Log(fmt.Sprintf("The registries list %s: %d package(s)", version, len(packages)))
 		}
+		return nil
 	}
 	return fmt.Errorf("%s is tagged and released, CI passed, and the registries do not list %s for %s: the publish never reached them. The tag and the Release exist, so nothing is released again: inspect the publish workflow's run for %s, fix the cause, and start it again with `rlsbl release retry --watch`; if %s must not ship at all, `rlsbl release yank %s`", x.state.Tag, version, strings.Join(missing, ", "), x.state.Tag, version, version)
 }
