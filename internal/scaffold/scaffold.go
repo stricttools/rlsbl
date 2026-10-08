@@ -386,7 +386,7 @@ func scaffoldMember(e *strictcli.Effects, repo git.Repo, ws *workspace.Workspace
 	// The run-state directory's .gitignore, written when the run took the
 	// lock, is committed with the scaffold so the directory never shows as
 	// untracked.
-	r.commit = append(r.commit, declarations.ScaffoldStateFile, stateDir+"/manifest.toml", declarations.ScaffoldBasesDir+"/manifest.toml", declarations.ReleaseStateDir+"/.gitignore")
+	r.commit = append(r.commit, declarations.ScaffoldStateFile, stateDir+"/manifest.toml", declarations.ScaffoldBasesDir+"/manifest.toml", runstate.GitignorePath)
 	if err := r.tag(tagged); err != nil {
 		return err
 	}

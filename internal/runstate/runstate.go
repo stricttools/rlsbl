@@ -29,13 +29,13 @@ const (
 	LockPath = declarations.ReleaseStateDir + "/lock"
 	// BatchPlanPath is the plan of a batch release in progress.
 	BatchPlanPath = declarations.ReleaseStateDir + "/batch-plan.toml"
-	// gitignorePath keeps everything in the directory out of git but itself.
-	gitignorePath = declarations.ReleaseStateDir + "/.gitignore"
+	// GitignorePath keeps everything in the directory out of git but itself.
+	GitignorePath = declarations.ReleaseStateDir + "/.gitignore"
 )
 
-// gitignoreContent ignores everything in the run-state directory but the
+// GitignoreContent ignores everything in the run-state directory but the
 // .gitignore itself.
-const gitignoreContent = "*\n!.gitignore\n"
+const GitignoreContent = "*\n!.gitignore\n"
 
 // InProgressPath is a releasable's in-progress release state.
 func InProgressPath(releasable string) string {
@@ -92,15 +92,15 @@ func exists(root, rel string) (bool, error) {
 // they are missing, so run state never shows as an untracked file, even in
 // a repository scaffolded before the directory existed.
 func ensureDirectory(e *strictcli.Effects, root string) error {
-	found, err := exists(root, gitignorePath)
+	found, err := exists(root, GitignorePath)
 	if err != nil || found {
 		return err
 	}
 	if _, err := e.Mkdir(absolute(root, declarations.ReleaseStateDir)); err != nil {
 		return fmt.Errorf("creating %s: %w", declarations.ReleaseStateDir, err)
 	}
-	if _, err := e.Write(absolute(root, gitignorePath), gitignoreContent); err != nil {
-		return fmt.Errorf("writing %s: %w", gitignorePath, err)
+	if _, err := e.Write(absolute(root, GitignorePath), GitignoreContent); err != nil {
+		return fmt.Errorf("writing %s: %w", GitignorePath, err)
 	}
 	return nil
 }

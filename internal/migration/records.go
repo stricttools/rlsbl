@@ -239,12 +239,9 @@ func (b *builder) convertRetry(src, name string) {
 	b.addReleaseStateGitignore()
 }
 
-// releaseStateGitignore keeps the run-state directory's content out of git.
-const releaseStateGitignore = "*\n!.gitignore\n"
-
 // addReleaseStateGitignore plans the run-state directory's .gitignore once.
 func (b *builder) addReleaseStateGitignore() {
-	rel := declarations.ReleaseStateDir + "/.gitignore"
+	rel := runstate.GitignorePath
 	for _, w := range b.plan.writes {
 		if w.path == rel {
 			return
@@ -253,7 +250,7 @@ func (b *builder) addReleaseStateGitignore() {
 	if ok, _ := exists(b.root, rel); ok {
 		return
 	}
-	b.addWrite(write{path: rel, change: "keeps the run state out of git", data: []byte(releaseStateGitignore)})
+	b.addWrite(write{path: rel, change: "keeps the run state out of git", data: []byte(runstate.GitignoreContent)})
 }
 
 // convertUndoAudits converts undo-audit.json, a JSON array, into one JSON

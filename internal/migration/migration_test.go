@@ -790,3 +790,17 @@ func TestARefusedDryRunPrintsThePerFilePlanBesideTheRefusals(t *testing.T) {
 	contains(t, r.Stdout, "Would write .strictmetadata/releases/portal/v0.1.0.toml <- .rlsbl/releases/v0.1.0.toml")
 	contains(t, r.Stdout, "stops at the refusals")
 }
+
+// The migration commits the run-state directory's .gitignore, as the
+// scaffold does, even with no run state to convert: the first command that
+// takes the release lock would otherwise create it untracked.
+func TestTheRunStateGitignoreIsCommittedWithoutRunState(t *testing.T) {
+	hygiene.Isolate(t)
+	f := standalone(t)
+	r := f.migrate()
+	contains(t, r.Stdout, "Committed")
+	if tracked := f.repo.Git("ls-files", ".strictmetadata/.release-state/.gitignore"); tracked != ".strictmetadata/.release-state/.gitignore" {
+		t.Fatalf("the run-state directory's .gitignore is not committed (%q)", tracked)
+	}
+	contains(t, f.read(".strictmetadata/.release-state/.gitignore"), "!.gitignore")
+}

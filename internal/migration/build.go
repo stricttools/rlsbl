@@ -198,6 +198,9 @@ func (b *builder) build() error {
 	b.convertHookScripts()
 	b.convertMemberLeftovers()
 	b.convertScaffoldState()
+	// The scaffold commits the run-state directory's .gitignore; without it
+	// the first command taking the release lock creates it untracked.
+	b.addReleaseStateGitignore()
 	b.convertPrivateModule()
 	b.convertTestRunner()
 	b.convertOptions()
