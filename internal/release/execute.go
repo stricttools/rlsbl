@@ -365,6 +365,9 @@ func (x *execution) pushCandidate() error {
 		x.req.Log(fmt.Sprintf("The push of %s cannot trigger the CI of %s, and its candidate was published once before: it is pushed and the CI router dispatched with %s=true, so every member's jobs run on it", short(x.candidate), x.name(), "run_all"))
 	}
 	if needsPush {
+		if err := pushCarriesNoConfidentialName(x.scanner, x.live, x.candidate, remote, x.branch); err != nil {
+			return err
+		}
 		x.pushAttempted = true
 		if err := x.live.PushFastForward(origin, x.branchRef(), x.candidate, x.timeouts.Push); err != nil {
 			return err
@@ -674,6 +677,9 @@ func (x *execution) push() error {
 		remote = ""
 	}
 	if remote != tip {
+		if err := pushCarriesNoConfidentialName(x.scanner, x.live, tip, remote, x.branch); err != nil {
+			return err
+		}
 		x.pushAttempted = true
 		if err := x.live.PushFastForward(origin, x.branchRef(), tip, x.timeouts.Push); err != nil {
 			return err

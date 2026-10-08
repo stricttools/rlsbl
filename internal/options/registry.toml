@@ -129,7 +129,7 @@ values = "error > warn > off"
 default = "error"
 scope = "none"
 requires = []
-description = "In a public repository, no tracked file and no changelog entry contains a name from the machine-local confidential-name index."
+description = "In a public repository, no tracked file, no changelog entry, and no commit the next push of the branch carries (its message, or a text file it adds or changes) contains a name from the machine-local confidential-name index."
 
 [[option]]
 name = "consequential-grant-agreement"

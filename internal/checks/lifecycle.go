@@ -149,10 +149,43 @@ func checkConfidentialNames(c *Context, r *strictcli.ErrorReporter) strictcli.Ch
 		}
 		texts = append(texts, publishrules.Text{Name: rel, Content: string(data)})
 	}
+	var problems []string
 	if err := scanner.ScanTexts(texts); err != nil {
-		return reportErrors(r, []string{err.Error()}, "tracked files carry confidential names", "")
+		problems = append(problems, err.Error())
 	}
-	return r.Passed(fmt.Sprintf("no tracked text file carries a confidential name (%d scanned)", len(texts)))
+	include, exclude, what := pushRange(c)
+	if err := scanner.ScanRange(c.Repo(), include, exclude, what); err != nil {
+		problems = append(problems, err.Error())
+	}
+	return reportErrors(r, problems, "tracked files or unpushed commits carry confidential names",
+		fmt.Sprintf("no tracked text file (%d scanned) and no commit of %s carries a confidential name", len(texts), what))
+}
+
+// pushRange is the commits the next push of the run's branch carries: those
+// reachable from HEAD and not from origin's remote-tracking branch, nor from
+// the history a fork inherited. With no remote-tracking branch, every commit
+// of HEAD's history is in it. what names the range.
+func pushRange(c *Context) (include, exclude []string, what string) {
+	branch := c.in.Branch
+	if branch == "" {
+		head, attached, err := c.Repo().HeadBranch()
+		if err != nil {
+			panic(unanswered(err.Error()))
+		}
+		if !attached {
+			panic(unanswered("HEAD is detached and the run names no branch, so which commits the next push carries is unknown; check out the release branch"))
+		}
+		branch = head
+	}
+	exclude = append(exclude, c.UpstreamExclude()...)
+	tracking, found, err := c.Repo().RemoteTrackingCommit("origin", branch)
+	if err != nil {
+		panic(unanswered(err.Error()))
+	}
+	if !found {
+		return []string{"HEAD"}, exclude, fmt.Sprintf("the history of HEAD (origin/%s is unknown, so all of it would be pushed)", branch)
+	}
+	return []string{"HEAD"}, append(exclude, tracking), fmt.Sprintf("the range origin/%s..HEAD, which the next push carries", branch)
 }
 
 func checkRepositoryVisibility(c *Context, r *strictcli.ErrorReporter) strictcli.CheckOutcome {

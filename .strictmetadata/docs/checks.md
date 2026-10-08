@@ -128,7 +128,7 @@ Every archived release is checked, from one listing of the local tags, one of or
 | Check | What it holds |
 | --- | --- |
 | `lifecycle-record-valid` | The [lifecycle-and-license record](lifecycle-and-license.md) exists (a missing one names `rlsbl transition license`, which writes it), passes every rule the record is judged by on the run's date against the declared names, and keeps every closed period and held registry name the record at each releasable's nearest release commit holds. |
-| `confidential-names` | In a public repository, no tracked file contains a name from the machine-local confidential-name index. |
+| `confidential-names` | In a public repository, no tracked file contains a name from the machine-local confidential-name index, and neither does any commit the next push of the branch carries: its message, or a text file it adds or changes, so a name added and removed again before the push is refused too. The range runs from origin's remote-tracking branch to HEAD (the whole history of HEAD when origin has no such branch), leaving out the history a fork inherited. |
 | `repository-visibility` | Whether the record makes the repository confidential agrees with GitHub's visibility: confidential with private, public with public. A private repository with no proprietary releasable is refused, naming `transition classify` and making the repository public. |
 | `private-repo-publishing` | A confidential or private repository's releasable and its committed workflows use no publishing feature that records the repository's identity publicly. |
 | `license-consistency` | Every manifest states the same license, and it is the license the record holds for the releasable on the run's date (npm's `UNLICENSED` stands for `proprietary`). |

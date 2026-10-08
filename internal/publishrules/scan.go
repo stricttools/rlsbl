@@ -11,6 +11,8 @@ import (
 
 	"github.com/stricttools/strictspec/go/lifecycle"
 	"github.com/stricttools/strictspec/go/lifecycle/index"
+
+	"github.com/stricttools/rlsbl/internal/git"
 )
 
 // Text is one published text: its name in a refusal (a file, "the GitHub
@@ -107,4 +109,70 @@ func (s *Scanner) ScanArtifacts(root string, artifacts []Artifact) error {
 		}
 	}
 	return s.ScanTexts(texts)
+}
+
+// blobReadBatch bounds how many blobs one git cat-file reads at a time, so
+// a long range is not held in memory whole.
+const blobReadBatch = 256
+
+// ScanRange refuses, naming the commit, the path or the message, the line,
+// the column, and the term, every confidential name in the commits
+// reachable from include and from no exclude revision: each commit's
+// message, and every text blob it adds or changes. A name added and removed
+// again inside the range is refused like one still present, since the push
+// carries every commit. A blob that is not UTF-8 text, or holds a NUL byte,
+// is binary and not scanned. what names the range in the refusal.
+func (s *Scanner) ScanRange(repo git.Repo, include, exclude []string, what string) error {
+	if !s.active {
+		return nil
+	}
+	commits, err := repo.RangeChanges(include, exclude)
+	if err != nil {
+		return err
+	}
+	var problems []string
+	report := func(where string, content string) {
+		for _, m := range s.index.Scan(content) {
+			problems = append(problems, fmt.Sprintf("%s, line %d, column %d: %q", where, m.Line, m.Column, m.Term))
+		}
+	}
+	// Each blob is read and scanned once; its matches are reported at every
+	// commit and path that adds it.
+	type site struct{ commit, path string }
+	sites := map[string][]site{}
+	var order []string
+	for i := len(commits) - 1; i >= 0; i-- {
+		c := commits[i]
+		report(fmt.Sprintf("commit %s, its message", c.SHA), c.Message)
+		for _, ch := range c.Changes {
+			if _, seen := sites[ch.Blob]; !seen {
+				order = append(order, ch.Blob)
+			}
+			sites[ch.Blob] = append(sites[ch.Blob], site{c.SHA, ch.Path})
+		}
+	}
+	for start := 0; start < len(order); start += blobReadBatch {
+		batch := order[start:min(start+blobReadBatch, len(order))]
+		contents, err := repo.Blobs(batch)
+		if err != nil {
+			return err
+		}
+		for _, blob := range batch {
+			content := contents[blob]
+			if strings.IndexByte(content, 0) >= 0 || !utf8.ValidString(content) {
+				continue
+			}
+			matches := s.index.Scan(content)
+			for _, at := range sites[blob] {
+				for _, m := range matches {
+					problems = append(problems, fmt.Sprintf("commit %s, %s, line %d, column %d: %q", at.commit, at.path, m.Line, m.Column, m.Term))
+				}
+			}
+		}
+	}
+	if len(problems) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%s: a public repository publishes no confidential name, and %s carries names from the confidential-name index in these commits; rewrite those commits so that no commit of the range carries a name (a history rewrite, such as `rlsbl release scrub`, before anything is pushed), then run the command again:\n  - %s",
+		lifecycle.RuleConfidentialNames, what, strings.Join(problems, "\n  - "))
 }

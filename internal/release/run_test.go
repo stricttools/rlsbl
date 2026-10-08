@@ -305,6 +305,40 @@ func TestAReleaseRunsToItsGitHubReleaseAndConvertsThePendingIdentity(t *testing.
 	}
 }
 
+func TestAReleaseRefusesToPushACommitCarryingAConfidentialNameUntilTheHistoryIsRewritten(t *testing.T) {
+	hygiene.Isolate(t)
+	testsupport.FakeGH(t, answers(validationAnswers("public"), releaseCreation("v0.5.0"))...)
+	repo := runRepo(t, "", "MIT", nil)
+	prepared := repo.Head()
+	added := repo.CommitFile("notes.md", "ask Gizmo\n", "Take notes")
+	repo.Git("rm", "-q", "notes.md")
+	repo.Git("commit", "-q", "-m", "Drop the notes")
+	indexPath := filepath.Join(t.TempDir(), "confidential-names.toml")
+	testsupport.WriteFile(t, indexPath, "format_version = 1\n\n[[repositories]]\nsubjects = [\"secret\"]\nnames = [\"gizmo\"]\n")
+	withIndex := func(req *release.RunRequest) { req.IndexPath = indexPath }
+	out, err := releaseCommandWith(t, repo, false, false, withIndex)
+	if err == nil {
+		t.Fatalf("a push carrying a confidential name was not refused:\n%s", out)
+	}
+	for _, want := range []string{"commit " + added + ", notes.md, line 1, column 5", `"gizmo"`, "origin/main"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("the refusal does not name %q: %v", want, err)
+		}
+	}
+	if remoteRef(t, repo, "refs/heads/main") != prepared {
+		t.Errorf("origin's main moved though the push was refused")
+	}
+	// The fix the refusal names: rewrite the unpushed commits so that none
+	// carries the name.
+	repo.Git("reset", "-q", "--hard", prepared)
+	if out, err := releaseCommandWith(t, repo, false, false, withIndex); err != nil {
+		t.Fatalf("the release of a clean history failed: %v\n%s", err, out)
+	}
+	if remoteRef(t, repo, "refs/heads/main") != repo.Head() {
+		t.Errorf("origin's main is not the released branch")
+	}
+}
+
 func TestADryRunReleaseWritesNothing(t *testing.T) {
 	hygiene.Isolate(t)
 	testsupport.FakeGH(t, validationAnswers("public")...)

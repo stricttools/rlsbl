@@ -41,6 +41,10 @@ type Inputs struct {
 	// declarations' check_seconds, or ShippedCheckTimeout when they state
 	// none.
 	CheckTimeout time.Duration
+	// Branch is the branch whose next push the run answers for; empty means
+	// the branch HEAD is on. A release names its branch, since its checkout
+	// is detached.
+	Branch string
 	// PushLines are the pre-push hook's ref lines; nil outside a push.
 	PushLines []string
 	// Home is the user's home directory, where ~/.npmrc is read.

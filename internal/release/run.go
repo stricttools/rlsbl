@@ -646,7 +646,7 @@ func (x *execution) preflight() error {
 
 func (x *execution) runPreflight(m declarations.Member, sel PreflightSelection, label string) error {
 	ctx, err := checks.NewContext(x.e, checks.Inputs{
-		Dir: x.ws.MemberDir(m), Releasable: x.releasable.Name, Now: x.now, CheckTimeout: x.timeouts.Check,
+		Dir: x.ws.MemberDir(m), Releasable: x.releasable.Name, Branch: x.branch, Now: x.now, CheckTimeout: x.timeouts.Check,
 		Home: x.req.Home, IndexPath: x.req.IndexPath, Scratch: x.req.Scratch,
 	})
 	if err != nil {
@@ -694,6 +694,24 @@ func (x *execution) publishedSectionClean(pending *changelog.Pending) error {
 		return nil
 	}
 	return x.scanner.ScanTexts([]publishrules.Text{{Name: fmt.Sprintf("the changelog section of %s %s", x.releasable.Name, x.version), Content: sections[0]}})
+}
+
+// pushCarriesNoConfidentialName refuses a push of the branch from remote
+// (origin's commit, empty when origin has no such branch) to tip when a
+// commit the push carries holds a confidential name, in its message or in a
+// text blob it adds or changes. An origin commit this repository does not
+// have is refused: what the push would carry cannot be told.
+func pushCarriesNoConfidentialName(scanner *publishrules.Scanner, repo git.Repo, tip, remote, branch string) error {
+	var exclude []string
+	if remote != "" {
+		if _, found, err := repo.ResolveCommit(remote); err != nil {
+			return err
+		} else if !found {
+			return fmt.Errorf("origin's %s is at %s, which this repository does not have, so which commits the push carries cannot be scanned for confidential names; fetch origin and run the command again", branch, short(remote))
+		}
+		exclude = []string{remote}
+	}
+	return scanner.ScanRange(repo, []string{tip}, exclude, fmt.Sprintf("the push of %s to origin/%s", short(tip), branch))
 }
 
 func sortedKeys[V any](m map[string]V) []string {

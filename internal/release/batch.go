@@ -13,6 +13,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/github"
+	"github.com/stricttools/rlsbl/internal/publishrules"
 	"github.com/stricttools/rlsbl/internal/releaserecord"
 	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/semver"
@@ -214,6 +215,13 @@ func PublishBatchCandidate(e *strictcli.Effects, s *Session, req RunRequest, pen
 		}
 	}
 	if needsPush {
+		scanner, err := publishrules.LoadScanner(s.Root, req.IndexPath, req.Now())
+		if err != nil {
+			return "", err
+		}
+		if err := pushCarriesNoConfidentialName(scanner, live, sha, remote, branch); err != nil {
+			return "", fmt.Errorf("the batch release candidate %s was not pushed: %w", short(sha), err)
+		}
 		if err := live.PushFastForward(origin, ref, sha, timeouts.Push); err != nil {
 			return "", fmt.Errorf("the batch release candidate %s could not be pushed to origin/%s: %w\nNothing was tagged, released, or finalized, and no version is burnt: the release commits of %s stay on %s and their release states are kept. Once pushing works, %s; it continues them", short(sha), branch, err, strings.Join(pending, ", "), branch, RerunBatch)
 		}

@@ -66,9 +66,18 @@ func TestARecordKeepsWhatItHeldAtTheNearestReleaseCommit(t *testing.T) {
 // confidentialIndex holds the names of another, confidential repository.
 const confidentialIndex = "format_version = 1\n\n[[repositories]]\nsubjects = [\"secret\"]\nnames = [\"gizmo\"]\n"
 
+// pushedToOrigin gives r a bare origin holding its main branch as it is now,
+// with the remote-tracking branch a fetch leaves.
+func pushedToOrigin(r *testsupport.Repo) {
+	r.AddBareRemote("origin")
+	r.Git("push", "-q", "origin", "main")
+	r.Git("fetch", "-q", "origin")
+}
+
 func TestAConfidentialNameInATrackedFileFailsUntilItIsRemoved(t *testing.T) {
 	hygiene.Isolate(t)
 	r := portalRepo(t, "none", map[string]string{"README.md": "portal talks to Gizmo.\n"})
+	pushedToOrigin(r)
 	in := inputs(t, r.Dir)
 	testsupport.WriteFile(t, in.IndexPath, confidentialIndex)
 	got := runCheck(t, in, "confidential-names")
@@ -76,6 +85,51 @@ func TestAConfidentialNameInATrackedFileFailsUntilItIsRemoved(t *testing.T) {
 	mustMention(t, got, "README.md", `"gizmo"`)
 	r.Write("README.md", "portal talks to a server.\n")
 	mustStatus(t, runCheck(t, in, "confidential-names"), "pass")
+}
+
+func TestAConfidentialNameAddedAndRemovedInTheUnpushedRangeFailsUntilTheHistoryIsRewritten(t *testing.T) {
+	hygiene.Isolate(t)
+	r := portalRepo(t, "none", nil)
+	pushedToOrigin(r)
+	pushed := r.Head()
+	added := r.CommitFile("notes/plan.md", "talk to Gizmo first\n", "Plan the work")
+	r.CommitFile("notes/plan.md", "talk to the server first\n", "Reword the plan")
+	in := inputs(t, r.Dir)
+	testsupport.WriteFile(t, in.IndexPath, confidentialIndex)
+	got := runCheck(t, in, "confidential-names")
+	mustStatus(t, got, "fail")
+	mustMention(t, got, "commit "+added+", notes/plan.md, line 1, column 9", `"gizmo"`, "origin/main..HEAD")
+	// The fix the refusal names: rewrite the unpushed commits so that none
+	// carries the name.
+	r.Git("reset", "-q", "--hard", pushed)
+	r.CommitFile("notes/plan.md", "talk to the server first\n", "Plan the work")
+	mustStatus(t, runCheck(t, in, "confidential-names"), "pass")
+}
+
+func TestAConfidentialNameInAnUnpushedCommitMessageFails(t *testing.T) {
+	hygiene.Isolate(t)
+	r := portalRepo(t, "none", nil)
+	pushedToOrigin(r)
+	named := r.CommitFile("main.go", "package main\n", "Serve what gizmo asks for")
+	in := inputs(t, r.Dir)
+	testsupport.WriteFile(t, in.IndexPath, confidentialIndex)
+	got := runCheck(t, in, "confidential-names")
+	mustStatus(t, got, "fail")
+	mustMention(t, got, "commit "+named+", its message", `"gizmo"`)
+	r.Git("commit", "-q", "--amend", "-m", "Serve what the server asks for")
+	mustStatus(t, runCheck(t, in, "confidential-names"), "pass")
+}
+
+func TestWithNoRemoteTrackingBranchTheWholeHistoryIsScanned(t *testing.T) {
+	hygiene.Isolate(t)
+	r := portalRepo(t, "none", nil)
+	named := r.CommitFile("notes.md", "gizmo\n", "Take notes")
+	r.CommitFile("notes.md", "nothing\n", "Clear the notes")
+	in := inputs(t, r.Dir)
+	testsupport.WriteFile(t, in.IndexPath, confidentialIndex)
+	got := runCheck(t, in, "confidential-names")
+	mustStatus(t, got, "fail")
+	mustMention(t, got, "commit "+named+", notes.md", "the history of HEAD")
 }
 
 func TestAConfidentialRepositoryCarriesItsOwnNames(t *testing.T) {
