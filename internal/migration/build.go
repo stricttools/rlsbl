@@ -37,8 +37,10 @@ type builder struct {
 	exclusions  map[string][]exclusion
 	lint        libraryLint
 	deadModules []suppression
-	// rootStub reports the root's old private-module stub, .rlsbl/go.mod.
-	rootStub bool
+	// rootStub is the path of the root's old private-module stub
+	// (.rlsbl/go.mod, or .rlsbl-monorepo/go.mod in a workspace), empty when
+	// there is none.
+	rootStub string
 	// ruffLint is the repository's rlsbl:ruff-lint entry, which decides
 	// whether the members ruff-lint covered get strictcode's lint rule.
 	ruffLint *ruffLintEntry

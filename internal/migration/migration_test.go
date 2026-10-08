@@ -537,6 +537,26 @@ func TestThePrivateModuleStubMovesIntoStrictmetadata(t *testing.T) {
 	}
 }
 
+func TestAWorkspacePrivateModuleStubMovesIntoStrictmetadata(t *testing.T) {
+	hygiene.Isolate(t)
+	f := workspaceFixture(t)
+	stub, err := scaffold.PrivateModuleStub()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.write(".rlsbl-monorepo/go.mod", stub)
+	f.commit("the old workspace stub")
+	plan := f.mustPlan()
+	if planned(t, plan, declarations.PrivateModuleFile) != stub {
+		t.Fatal("the workspace stub was not written into .strictmetadata/")
+	}
+	for _, w := range plan.writes {
+		if w.path == declarations.PrivateModuleFile && !slices.Contains(w.sources, ".rlsbl-monorepo/go.mod") {
+			t.Fatalf("the stub's sources are %v, without .rlsbl-monorepo/go.mod", w.sources)
+		}
+	}
+}
+
 func TestBatchReleaseFilesAndUndoAuditsConvert(t *testing.T) {
 	hygiene.Isolate(t)
 	f := workspaceFixture(t)

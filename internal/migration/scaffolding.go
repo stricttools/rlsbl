@@ -348,6 +348,12 @@ func (b *builder) setLintList(m map[string]sourcedList, key, language string, li
 // module stubs; and refuses per-member release state.
 func (b *builder) convertMemberLeftovers() {
 	b.lint = libraryLint{forbidden: map[string]sourcedList{}, allow: map[string]sourcedList{}, stdoutAllow: map[string]sourcedList{}}
+	// A workspace's scaffold kept .rlsbl-monorepo/ out of the root's Go
+	// module with a stub of its own.
+	if f := oldWorkspaceDir + "/go.mod"; b.tree.has(f) {
+		b.tree.claim(f)
+		b.rootStub = f
+	}
 	type leftoverDir struct {
 		dir    string
 		member string
@@ -381,7 +387,7 @@ func (b *builder) convertMemberLeftovers() {
 		if f := ld.dir + "/go.mod"; b.tree.has(f) {
 			b.tree.claim(f)
 			if ld.dir == oldDir {
-				b.rootStub = true
+				b.rootStub = f
 			}
 		}
 		if ld.dir != oldDir && ld.member != "" && b.d.Layout == declarations.LayoutWorkspace {
@@ -511,7 +517,7 @@ func (b *builder) convertPrivateModule() {
 		b.p.add("%v", err)
 		return
 	}
-	if !b.rootStub && !rootModule {
+	if b.rootStub == "" && !rootModule {
 		return
 	}
 	if ok, err := exists(b.root, declarations.PrivateModuleFile); err != nil || ok {
@@ -523,8 +529,8 @@ func (b *builder) convertPrivateModule() {
 		return
 	}
 	var sources []string
-	if b.rootStub {
-		sources = append(sources, oldDir+"/go.mod")
+	if b.rootStub != "" {
+		sources = append(sources, b.rootStub)
 	}
 	b.addWrite(write{path: declarations.PrivateModuleFile, sources: sources, change: "the stub that keeps .strictmetadata/ out of the Go module", data: []byte(stub)})
 }
