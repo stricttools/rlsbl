@@ -1,6 +1,7 @@
 package release
 
 import (
+	"os"
 	"path/filepath"
 	"sort"
 
@@ -127,6 +128,9 @@ type Session struct {
 	// Ignored are the uncommitted changes the release leaves alone.
 	Ignored []git.Change
 	lock    *runstate.Lock
+	// restoreEnvironment puts the process environment back as it was before
+	// the session applied the release's environment; nil when it applied none.
+	restoreEnvironment func()
 }
 
 // Enter takes the repository for a release writing scope (WriteScope or
@@ -184,7 +188,35 @@ func Enter(e *strictcli.Effects, live git.Repo, scope []string, o EnterOptions) 
 	}
 	s.Checkout = co
 	s.Root = co.Path
+	s.restoreEnvironment = applyEnvironment(co.Environment())
 	return s, nil
+}
+
+// applyEnvironment sets env on this process, so every program the release
+// starts inherits it, whether or not its call names the release's
+// environment: a Go command run in the checkout below the working tree must
+// never find the working tree's uncommitted go.work. It returns the function
+// that puts every variable back as it was.
+func applyEnvironment(env map[string]string) func() {
+	type previous struct {
+		value string
+		set   bool
+	}
+	saved := make(map[string]previous, len(env))
+	for k, v := range env {
+		value, set := os.LookupEnv(k)
+		saved[k] = previous{value: value, set: set}
+		os.Setenv(k, v)
+	}
+	return func() {
+		for k, p := range saved {
+			if p.set {
+				os.Setenv(k, p.value)
+			} else {
+				os.Unsetenv(k)
+			}
+		}
+	}
 }
 
 // ToLive is the working tree's counterpart of a path under the session's
@@ -201,8 +233,13 @@ func (s *Session) LivePath(rel string) string {
 	return filepath.Join(s.LiveRoot, filepath.FromSlash(rel))
 }
 
-// Close gives the lock back; a session under --dry-run holds none.
+// Close puts the process environment back and gives the lock back; a
+// session under --dry-run holds neither.
 func (s *Session) Close() error {
+	if s.restoreEnvironment != nil {
+		s.restoreEnvironment()
+		s.restoreEnvironment = nil
+	}
 	if s.lock == nil {
 		return nil
 	}

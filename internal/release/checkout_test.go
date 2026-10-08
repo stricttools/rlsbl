@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -433,4 +434,69 @@ func TestADetachedHeadRefusesTheReleaseUntilTheBranchIsCheckedOut(t *testing.T) 
 	}
 	repo.Git("checkout", "-q", "main")
 	mustNotFail(t, check())
+}
+
+// TestEveryProgramInTheSessionGetsTheReleaseEnvironment covers a program the
+// release starts in its checkout without naming the release's environment:
+// a check running `go list`, the packed-artifact listing. The working tree
+// holds an uncommitted go.work naming its own module, and the checkout lies
+// below the working tree, so such a program finds that go.work unless the
+// session puts the release's environment on every program it starts. Closing
+// the session puts the environment back as it was.
+func TestEveryProgramInTheSessionGetsTheReleaseEnvironment(t *testing.T) {
+	hygiene.Isolate(t, hygiene.Preserve(hygiene.GoCache))
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("no Go toolchain on PATH")
+	}
+	t.Setenv("GOPROXY", "off")
+	// Unset, with t.Setenv putting it back after the test.
+	t.Setenv("GOWORK", "")
+	os.Unsetenv("GOWORK")
+	repo := testsupport.NewRepo(t)
+	repo.Write(declarationsPath, `format_version = 1
+repository_layout = "standalone"
+release_branches = ["main"]
+github_repository = "acme/portal"
+
+[[releasables]]
+name = "portal"
+tag_format = "v{version}"
+publish_mode = "none"
+
+[[members]]
+path = "."
+name = "root"
+releasable = "portal"
+`)
+	repo.Write("go.mod", "module example.com/portal\n\ngo 1.21\n")
+	repo.Write("main.go", "package main\n\nfunc main() {}\n")
+	repo.Write(".gitignore", "/go.work\n")
+	repo.Commit("the project", declarationsPath, "go.mod", "main.go", ".gitignore")
+	repo.Write("go.work", "go 1.21\n\nuse .\n")
+
+	_, err := mutating(t, false, func(e *strictcli.Effects) error {
+		live, err := git.Open(e, repo.Dir)
+		if err != nil {
+			return err
+		}
+		s, err := release.Enter(e, live, nil, release.EnterOptions{What: "The release", Rerun: "run the release again", OnWait: func(string) {}})
+		if err != nil {
+			return err
+		}
+		done, err := e.Run([]interface{}{"go", "list", "-e", "-f", "{{.Name}}", "./..."}, strictcli.Cwd(s.Root), strictcli.Check(false), strictcli.Observe())
+		if err != nil {
+			return errors.Join(err, s.Close())
+		}
+		if got := strings.TrimSpace(done.Stdout()); got != "main" {
+			return errors.Join(fmt.Errorf("go list in the checkout listed %q (%s)", got, strings.TrimSpace(done.Stderr())), s.Close())
+		}
+		if err := s.Close(); err != nil {
+			return err
+		}
+		if value, set := os.LookupEnv("GOWORK"); set {
+			return fmt.Errorf("closing the session left GOWORK=%s", value)
+		}
+		return nil
+	})
+	mustNotFail(t, err)
 }

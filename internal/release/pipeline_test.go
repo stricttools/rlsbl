@@ -1,8 +1,10 @@
 package release_test
 
 import (
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -217,5 +219,88 @@ func TestADumpThatIsNotAHelpDocumentIsRefused(t *testing.T) {
 	_, err = runPipeline(t, repo, false)
 	if err == nil || !strings.Contains(err.Error(), "no top-level \"version\" key") {
 		t.Fatalf("a document without a version was written: %v", err)
+	}
+}
+
+// goPortalDeclarations declare portal as a standalone Go project publishing
+// nothing.
+const goPortalDeclarations = `format_version = 1
+repository_layout = "standalone"
+release_branches = ["main"]
+github_repository = "acme/portal"
+
+[[releasables]]
+name = "portal"
+tag_format = "v{version}"
+publish_mode = "none"
+
+[[members]]
+path = "."
+name = "root"
+releasable = "portal"
+`
+
+// TestTheSchemaDumpInTheCheckoutIgnoresTheWorkingTreesGoWork covers a Go
+// strictcli program whose working tree holds an uncommitted go.work naming
+// the working tree's own module. The release checkout lies below the working
+// tree, so a Go command run there without the release's environment finds
+// that go.work, whose module is not the checkout's, and lists no package:
+// the schema dump's strictcli detection then cannot tell the entry point.
+func TestTheSchemaDumpInTheCheckoutIgnoresTheWorkingTreesGoWork(t *testing.T) {
+	hygiene.Isolate(t, hygiene.Preserve(hygiene.GoCache))
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("no Go toolchain on PATH")
+	}
+	// The strictcli module is required but absent, and nothing is fetched.
+	t.Setenv("GOPROXY", "off")
+	// The session sets GOWORK; t.Setenv puts it back after the test.
+	t.Setenv("GOWORK", "")
+	repo := testsupport.NewRepo(t)
+	repo.Write(declarationsPath, goPortalDeclarations)
+	repo.Write("go.mod", "module example.com/portal\n\ngo 1.21\n\nrequire github.com/stricttools/strictcli/go v0.38.0\n")
+	repo.Write("main.go", "package main\n\nimport \"fmt\"\n\nfunc main() { fmt.Print(`"+helpDocument+"`) }\n")
+	repo.Write(".gitignore", "/go.work\n")
+	repo.Commit("the project", declarationsPath, "go.mod", "main.go", ".gitignore")
+	repo.Write("go.work", "go 1.21\n\nuse .\n")
+
+	var result release.PipelineResult
+	var checkoutPath string
+	_, err := mutating(t, false, func(e *strictcli.Effects) error {
+		live, err := git.Open(e, repo.Dir)
+		if err != nil {
+			return err
+		}
+		s, err := release.Enter(e, live, nil, release.EnterOptions{What: "The release", Rerun: "run the release again", OnWait: func(string) {}})
+		if err != nil {
+			return err
+		}
+		checkoutPath = s.Root
+		ws, err := workspace.Load(s.Root)
+		if err != nil {
+			return errors.Join(err, s.Close())
+		}
+		r, err := git.Open(e, s.Root)
+		if err != nil {
+			return errors.Join(err, s.Close())
+		}
+		v, err := semver.Parse("0.5.0")
+		if err != nil {
+			return errors.Join(err, s.Close())
+		}
+		result, err = release.RunPipeline(e, release.PipelineInputs{
+			Workspace: ws, Repo: r, Releasable: "portal", Representative: "root", Version: v,
+			Hooks: release.HookContext{Version: "0.5.0"}, Environment: s.Checkout.Environment(),
+			ProgramTimeout: time.Minute,
+		})
+		return errors.Join(err, s.Close())
+	})
+	mustNotFail(t, err)
+	if len(result.Dumps) != 1 || result.Dumps[0].Program.EntryPoint != "." {
+		t.Fatalf("the schema dumps: %+v", result.Dumps)
+	}
+	// The dump carries the version being released.
+	want := strings.Replace(helpDocument, `"0.0.0"`, `"0.5.0"`, 1)
+	if got := read(t, filepath.Join(checkoutPath, ".strictmetadata/.cli-schema/schema.json")); got != want {
+		t.Fatalf("the dumped schema: %q", got)
 	}
 }
