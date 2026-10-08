@@ -391,6 +391,42 @@ func TestAScaffoldCommitsWhatItWrote(t *testing.T) {
 	}
 }
 
+// The run after a conflict was resolved commits the resolved file and the
+// merge base the conflicting run wrote, which that run left uncommitted:
+// otherwise both stay uncommitted while the scaffold state records the
+// resolved file's hash.
+func TestTheRunAfterAResolvedConflictCommitsTheFileAndItsBase(t *testing.T) {
+	hygiene.Isolate(t)
+	testsupport.FakeSafegit(t)
+	repo := newProject(t, standalone("none", ""), goModule)
+	repo.Commit("the module", "go.mod", "main.go", declarations.ReleasablesFile)
+	mustScaffold(t, repo.Dir, func(in *Inputs) { in.AutoCommit = true })
+	ci := ".github/workflows/ci.yml"
+	template := readFile(t, repo, ci)
+	if !strings.HasPrefix(template, "name: CI\n") {
+		t.Fatalf("ci.yml does not start with its name line:\n%s", template)
+	}
+	// An older template as the base and a local edit of the same line.
+	repo.Write(BasePath(ci), strings.Replace(template, "name: CI\n", "name: OLD\n", 1))
+	repo.Write(ci, strings.Replace(template, "name: CI\n", "name: MINE\n", 1))
+	repo.Commit("an older scaffold and a local edit", BasePath(ci), ci)
+	if s := runScaffold(t, repo.Dir, func(in *Inputs) { in.AutoCommit = true }); s.result.ExitCode == 0 || s.rowStatus(ci) != statusConflicts {
+		t.Fatalf("the run did not conflict on ci.yml (exit %d, %q):\n%s", s.result.ExitCode, s.rowStatus(ci), s.text())
+	}
+	resolved := strings.Replace(template, "name: CI\n", "name: RESOLVED\n", 1)
+	repo.Write(ci, resolved)
+	s := mustScaffold(t, repo.Dir, func(in *Inputs) { in.AutoCommit = true })
+	if status := repo.Git("status", "--porcelain"); status != "" {
+		t.Fatalf("the run after the resolution left uncommitted changes:\n%s\n%s", status, s.text())
+	}
+	if got := repo.Git("show", "HEAD:"+ci); got+"\n" != resolved {
+		t.Errorf("the committed ci.yml is not the resolution:\n%s", got)
+	}
+	if got := repo.Git("show", "HEAD:"+BasePath(ci)); got+"\n" != template {
+		t.Errorf("the committed merge base is not the template:\n%s", got)
+	}
+}
+
 // A missing merge base is rebuilt from the file's last scaffold commit, so
 // a local edit made since is merged with the template rather than refused
 // or overwritten.

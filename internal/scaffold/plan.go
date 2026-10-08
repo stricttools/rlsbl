@@ -62,6 +62,11 @@ type filePlan struct {
 	// healed names the commit a missing merge base was rebuilt from.
 	healed string
 	shared bool
+	// uncommittedBase: the stored merge base differs from the one HEAD holds,
+	// so an earlier run wrote it and left it uncommitted (the run that wrote
+	// a conflict, or one under --no-auto-commit); this run commits the file
+	// and its base.
+	uncommittedBase bool
 }
 
 // changed reports whether the run writes something for the file.
@@ -138,6 +143,13 @@ func planFile(root string, repo git.Repo, r git.Runner, f render) (filePlan, err
 		default:
 			return filePlan{}, fmt.Errorf("%s: cannot merge template updates: there is no stored merge base (%s) and no `rlsbl scaffold` commit in git history to rebuild one from. Either delete %s and run rlsbl scaffold again (it creates a missing file from the template), or, only when the file is unmodified template output, commit it with a message containing %q so that commit becomes its base; for a file holding your own changes that second way makes the next scaffold replace them with the template", f.path, BasePath(f.path), f.path, commitMessage)
 		}
+	}
+	if found {
+		committed, inHead, err := repo.FileAt("HEAD", BasePath(f.path))
+		if err != nil {
+			return filePlan{}, err
+		}
+		plan.uncommittedBase = !inHead || committed != base
 	}
 	healedStatus := statusUnchanged
 	if plan.healed != "" {

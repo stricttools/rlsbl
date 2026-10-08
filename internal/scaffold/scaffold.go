@@ -347,10 +347,10 @@ func scaffoldMember(e *strictcli.Effects, repo git.Repo, ws *workspace.Workspace
 			conflicted = append(conflicted, DescribeConflicts(p.path, p.conflicts))
 			continue
 		}
-		if p.write || p.chmod {
+		if p.write || p.chmod || p.uncommittedBase {
 			r.commit = append(r.commit, p.path)
 		}
-		if p.writeBase {
+		if p.writeBase || p.uncommittedBase {
 			r.commit = append(r.commit, BasePath(p.path))
 		}
 	}
