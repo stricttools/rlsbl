@@ -173,6 +173,6 @@ func (s *Scanner) ScanRange(repo git.Repo, include, exclude []string, what strin
 	if len(problems) == 0 {
 		return nil
 	}
-	return fmt.Errorf("%s: a public repository publishes no confidential name, and %s carries names from the confidential-name index in these commits; rewrite those commits so that no commit of the range carries a name (a history rewrite, such as `rlsbl release scrub`, before anything is pushed), then run the command again:\n  - %s",
+	return fmt.Errorf("%s: a public repository publishes no confidential name, and these commits of %s carry names from the confidential-name index; rewrite those commits so that no commit of the range carries a name (a history rewrite, such as `rlsbl release scrub`, before anything is pushed), then run the command again:\n  - %s",
 		lifecycle.RuleConfidentialNames, what, strings.Join(problems, "\n  - "))
 }

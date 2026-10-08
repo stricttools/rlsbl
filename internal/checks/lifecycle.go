@@ -183,9 +183,9 @@ func pushRange(c *Context) (include, exclude []string, what string) {
 		panic(unanswered(err.Error()))
 	}
 	if !found {
-		return []string{"HEAD"}, exclude, fmt.Sprintf("the history of HEAD (origin/%s is unknown, so all of it would be pushed)", branch)
+		return []string{"HEAD"}, exclude, fmt.Sprintf("the history of HEAD (origin has no %s, so the next push carries all of it)", branch)
 	}
-	return []string{"HEAD"}, append(exclude, tracking), fmt.Sprintf("the range origin/%s..HEAD, which the next push carries", branch)
+	return []string{"HEAD"}, append(exclude, tracking), fmt.Sprintf("the range origin/%s..HEAD, the next push of %s", branch, branch)
 }
 
 func checkRepositoryVisibility(c *Context, r *strictcli.ErrorReporter) strictcli.CheckOutcome {
