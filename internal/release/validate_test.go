@@ -209,6 +209,37 @@ func TestATargetTheReleaseFileDoesNotNameIsRefusedUntilNamed(t *testing.T) {
 	mustNotFail(t, err)
 }
 
+// exclude keeps nothing from publishing: a pipeline publishes its target on
+// every release. So a release file excluding a target a pipeline publishes
+// is refused until the pipeline is no longer declared.
+func TestExcludingATargetAPipelinePublishesIsRefusedUntilThePipelineIsGone(t *testing.T) {
+	hygiene.Isolate(t)
+	gitHub(t, "public", true)
+	pypiPipeline := `targets = [{ name = "npm" }, { name = "pypi" }]
+
+[[members.pipelines]]
+name = "pypi"
+type = "pypi"
+target = "pypi"
+local = false
+artifact = "package"
+`
+	repo := readyRepo(t, pypiPipeline)
+	repo.CommitFile("pyproject.toml", "[project]\nname = \"portal\"\nversion = \"0.4.0\"\n", "a python package too")
+	repo.CommitFile(".github/workflows/publish.yml", "name: publish\non:\n  release:\n    types: [published]\njobs: {}\n", "the publish workflow")
+	repo.CommitFile(releaseFilePath, releaseFile("minor", `"npm"`, `"pypi"`), "exclude pypi")
+	_, err := validate(t, repo, nil, nil)
+	if err == nil || !strings.Contains(err.Error(), "excludes pypi, which the pipeline \"pypi\" of the member \"root\" publishes") {
+		t.Fatalf("an excluded target a pipeline publishes was accepted: %v", err)
+	}
+	repo.CommitFile(declarationsPath, strings.Replace(read(t, repo.Path(declarationsPath)), pypiPipeline, `targets = [{ name = "npm" }, { name = "pypi" }]
+`, 1), "declare no pypi pipeline")
+	repo.Git("rm", "-q", ".github/workflows/publish.yml")
+	repo.Git("commit", "-q", "-m", "nothing publishes from CI")
+	_, err = validate(t, repo, nil, nil)
+	mustNotFail(t, err)
+}
+
 func TestAReleaseFileNamingATargetTheProjectLacksIsRefusedUntilRemoved(t *testing.T) {
 	hygiene.Isolate(t)
 	gitHub(t, "public", true)
@@ -471,7 +502,7 @@ func TestAGoLibraryOfAProprietaryReleasableIsRefusedUntilItPublishesNoLibrary(t 
 	gitHub(t, "private", true)
 	repo := readyRepo(t, goLibrary)
 	repo.Write("go.mod", "module github.com/acme/portal\n\ngo 1.22\n")
-	repo.Write(releaseFilePath, releaseFile("minor", `"npm"`, `"go"`))
+	repo.Write(releaseFilePath, releaseFile("minor", `"npm", "go"`, ""))
 	repo.Write(recordPath, strings.Replace(lifecycleRecord("active"), `license = "MIT"`, `license = "proprietary"`, 1))
 	repo.Commit("a proprietary go library", "go.mod", releaseFilePath, recordPath)
 	_, err := validate(t, repo, nil, nil)

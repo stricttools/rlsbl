@@ -377,9 +377,10 @@ func releaseTargets(ws *workspace.Workspace, releasable string) (map[string]bool
 }
 
 // validateTargets refuses a release file whose include list is empty, that
-// names a target rlsbl does not support, or whose include and exclude lists
-// do not between them name every target the releasable's members have and
-// nothing else.
+// names a target rlsbl does not support, whose include and exclude lists do
+// not between them name every target the releasable's members have and
+// nothing else, or that excludes a target a pipeline publishes: a pipeline
+// publishes its target on every release, so exclude cannot keep it back.
 func validateTargets(ws *workspace.Workspace, r declarations.Releasable, rf releaserecord.ReleaseFile, source releaseFileSource) error {
 	path := source.described()
 	if len(rf.Include) == 0 {
@@ -416,6 +417,15 @@ func validateTargets(ws *workspace.Workspace, r declarations.Releasable, rf rele
 	}
 	if len(extra) > 0 {
 		return refuse("%s names targets no member of the releasable %q has: %s; remove them from include and exclude", path, r.Name, strings.Join(extra, ", "))
+	}
+	for _, name := range rf.Exclude {
+		for _, m := range ws.MembersOf(r.Name) {
+			for _, p := range m.Pipelines {
+				if p.Target == name {
+					return refuse("%s excludes %s, which the pipeline %q of the member %q publishes on every release, so exclude cannot keep it back; to release without publishing %s, delete that pipeline from %s, or include %s", path, name, p.Name, m.Name, name, declarations.ReleasablesFile, name)
+				}
+			}
+		}
 	}
 	return nil
 }

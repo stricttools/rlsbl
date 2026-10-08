@@ -37,8 +37,10 @@ context = """
 Optional prose on why these changes were made.
 """
 include = ["npm", "pypi"]       # the targets to release
-exclude = []                    # targets to skip; disjoint from include
+exclude = []                    # targets no pipeline publishes; disjoint from include
 ```
+
+Between them `include` and `exclude` name every target the releasable's members have. A pipeline publishes its target on every release, so `exclude` cannot keep a published target back: a release file excluding a target a pipeline publishes is refused, naming the pipeline, and a target is released without publishing by deleting its pipeline from `.strictmetadata/releasables/releasables.toml`.
 
 | Bump | Moves the version | Use for |
 | --- | --- | --- |
