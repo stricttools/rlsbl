@@ -57,3 +57,33 @@ func TestTheFrameworkChecksAreTheOnesStrictcliRegisters(t *testing.T) {
 		t.Fatalf("strictcli registers the framework checks %q, and options.FrameworkChecks declares %q: bring internal/options/render.go in line, then run `go run ./internal/options/gen` from the repository root and commit the result", registered, declared)
 	}
 }
+
+// failing-checks runs the same registry as check: its listing names the
+// checks check lists.
+func TestFailingChecksListsTheChecksCheckLists(t *testing.T) {
+	hygiene.Isolate(t)
+	t.Chdir(t.TempDir())
+	names := func(command string) []string {
+		r := appWith(t, testsupport.NewFakeHTTP(t)).Test([]string{command, "--list", "--json"})
+		if r.ExitCode != 0 {
+			t.Fatalf("%s --list exited %d:\n%s%s", command, r.ExitCode, r.Stdout, r.Stderr)
+		}
+		var listing struct {
+			Payload []struct {
+				Name string `json:"name"`
+			} `json:"payload"`
+		}
+		if err := json.Unmarshal([]byte(r.Stdout), &listing); err != nil {
+			t.Fatalf("not JSON: %v\n%s", err, r.Stdout)
+		}
+		var out []string
+		for _, c := range listing.Payload {
+			out = append(out, c.Name)
+		}
+		slices.Sort(out)
+		return out
+	}
+	if checkNames, failingNames := names("check"), names("failing-checks"); len(checkNames) == 0 || !slices.Equal(checkNames, failingNames) {
+		t.Fatalf("check lists %q, failing-checks lists %q", checkNames, failingNames)
+	}
+}

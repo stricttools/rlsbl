@@ -13,6 +13,7 @@
   "dev.status",
   "dev.sync",
   "discover",
+  "failing-checks",
   "migrate.records",
   "monorepo.absorb",
   "monorepo.add",

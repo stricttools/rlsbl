@@ -14,15 +14,14 @@ import (
 	"github.com/stricttools/rlsbl/internal/testsupport"
 )
 
-// commandPaths are the app's leaf command paths, dot-separated, without the
-// check commands the framework injects: the set strictcli's
-// cli-test-coverage check requires to be covered.
+// commandPaths are the app's leaf command paths, dot-separated, the check
+// commands the framework injects included: strictcli's cli-test-coverage
+// check writes every command a test ran into the manifest, those two among
+// them, though it does not require them to be covered.
 func commandPaths(app *strictcli.App) []string {
 	var paths []string
 	for name := range app.Commands() {
-		if name != "check" && name != "failing-checks" {
-			paths = append(paths, name)
-		}
+		paths = append(paths, name)
 	}
 	var walk func(g *strictcli.Group, prefix string)
 	walk = func(g *strictcli.Group, prefix string) {
