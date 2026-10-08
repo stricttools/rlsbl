@@ -269,7 +269,7 @@ func BuildBumpPlan(in BumpPlanInputs) (BumpPlan, error) {
 				}
 				dir := m.TargetDir(t)
 				built = append(built, dir)
-				if target.Facts().BuildTimeoutSeconds == 0 {
+				if target.Facts().BuildTimeoutSeconds == 0 || shipsGoBinariesOnly(m, t.Name) {
 					continue
 				}
 				buildEntries = append(buildEntries, PlanEntry{Type: EntryBuild, Summary: fmt.Sprintf("build %s in %s", t.Name, dir), Member: m.Name, Target: t.Name, Dir: dir, Version: in.Next})
@@ -641,4 +641,22 @@ func guardUnexpected(repo git.Repo, expected, written []string) error {
 	}
 	sort.Strings(unexpected)
 	return fmt.Errorf("the release checkout has changes the release did not make: %s. Something other than the release (a build writing into the tree, a hook running late) changed it, and the release commit must carry only the release's own files; nothing was committed. Make the build write only paths git ignores, then run the release again", strings.Join(unexpected, ", "))
+}
+
+// shipsGoBinariesOnly reports whether every pipeline of m publishing the
+// named target ships a go binary pipeline's binaries (and at least one
+// does): CI packages those from the release archives, so the target's own
+// build would make an artifact that never ships.
+func shipsGoBinariesOnly(m declarations.Member, target string) bool {
+	found := false
+	for _, p := range m.Pipelines {
+		if p.Target != target {
+			continue
+		}
+		if p.Artifact != declarations.ArtifactGoBinary {
+			return false
+		}
+		found = true
+	}
+	return found
 }

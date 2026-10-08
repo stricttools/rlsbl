@@ -75,6 +75,45 @@ func TestAStandaloneBumpPlansItsVersionWritesTheKeywordAndTheChecks(t *testing.T
 	}
 }
 
+// A pypi target whose only pipeline ships a go binary pipeline's binaries
+// as wheels is not built: CI assembles the wheels from the release
+// archives, and building the pyproject.toml would make a package that never
+// ships. A pypi target publishing its own package is built.
+func TestAPypiTargetShippingGoBinariesIsNotBuilt(t *testing.T) {
+	hygiene.Isolate(t)
+	pyproject := "[project]\nname = \"portal\"\nversion = \"0.4.0\"\n"
+	for artifact, built := range map[string]bool{"go-binary\nbinary_pipeline = \"go\"": false, "package": true} {
+		repo := testsupport.NewRepo(t)
+		repo.Write(declarationsPath, fmt.Sprintf(standaloneDeclarations, "ci")+`description = "A portal"
+targets = [{ name = "go" }, { name = "pypi", path = "py" }]
+
+[[members.pipelines]]
+name = "go"
+type = "go"
+target = "go"
+local = false
+artifact = "binary"
+
+[[members.pipelines]]
+name = "pypi"
+type = "pypi"
+target = "pypi"
+local = false
+artifact = `+fmt.Sprintf("%q", strings.SplitN(artifact, "\n", 2)[0])+"\n"+strings.Join(strings.SplitN(artifact, "\n", 2)[1:], "")+"\n")
+		repo.Write("go.mod", "module example.com/portal\n\ngo 1.25\n")
+		repo.Write("main.go", "package main\n\nfunc main() {}\n")
+		repo.Write("VERSION", "0.4.0\n")
+		repo.Write("py/pyproject.toml", pyproject)
+		repo.Commit("the project", declarationsPath, "go.mod", "main.go", "VERSION", "py/pyproject.toml")
+		in := standaloneInputs(t)
+		in.Primary = "go"
+		plan := bumpPlan(t, repo.Dir, in)
+		if got := strings.Contains(entryTypes(plan), string(release.EntryBuild)); got != built {
+			t.Errorf("artifact %s: built %v, want %v: %s", strings.SplitN(artifact, "\n", 2)[0], got, built, entryTypes(plan))
+		}
+	}
+}
+
 func TestAVersionAlreadyWrittenIsNotWrittenAgain(t *testing.T) {
 	hygiene.Isolate(t)
 	repo := standalone(t, "ci")
