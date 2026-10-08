@@ -272,6 +272,7 @@ func scaffoldMember(e *strictcli.Effects, repo git.Repo, ws *workspace.Workspace
 	if err := refuseMissingBases(root, ws, m, state, stateFound); err != nil {
 		return err
 	}
+	ctx.managed = state.Files
 	if err := ctx.refuseNewVersionDisagreement(); err != nil {
 		return err
 	}

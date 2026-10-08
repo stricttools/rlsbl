@@ -560,11 +560,62 @@ func TestTheBinaryOfAMajorSuffixedModuleIsNamedAfterItsProject(t *testing.T) {
 	if err := os.WriteFile(dir+"/go.mod", []byte("module github.com/acme/portal/v2\n\ngo 1.26\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	name, err := binaryName(dir)
+	name, err := binaryName(dir, ".")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if name != "portal" {
 		t.Errorf("the binary and its archives are named %q", name)
+	}
+}
+
+// goToolMember declares the root member's go target with a binary pipeline
+// installing the main package at ./cmd/tool.
+const goToolMember = `targets = [{ name = "go" }]
+
+[[members.pipelines]]
+name = "go"
+type = "go"
+target = "go"
+local = false
+artifact = "binary"
+install_paths = ["./cmd/tool"]
+`
+
+// A module whose path ends in a directory name such as go builds its binary
+// from the main package goreleaser builds, so the binary and its archives are
+// named after that package (what `go install ./cmd/tool` names it), not after
+// the module path's last element.
+func TestTheBinaryIsNamedAfterItsMainPackage(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := newProject(t, standalone("none", goToolMember), map[string]string{
+		"go.mod":           "module github.com/acme/portal/go\n\ngo 1.26\n",
+		"cmd/tool/main.go": "package main\n\nfunc main() {}\n",
+	})
+	mustScaffold(t, repo.Dir, nil)
+	text := readFile(t, repo, ".goreleaser.yml")
+	for _, want := range []string{"project_name: tool\n", "    binary: tool\n", "  - main: ./cmd/tool\n"} {
+		if !strings.Contains(text, want) {
+			t.Errorf(".goreleaser.yml lacks %q:\n%s", want, text)
+		}
+	}
+}
+
+// The version.go the scaffold writes into the main package declares the
+// Version variable itself, so the next scaffold keeps it instead of removing
+// it as a file no template renders, and the one after does not write it again.
+func TestTheScaffoldedVersionFileStays(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := newProject(t, standalone("none", goToolMember), map[string]string{
+		"go.mod":           "module github.com/acme/portal\n\ngo 1.26\n",
+		"cmd/tool/main.go": "package main\n\nfunc main() {}\n",
+	})
+	mustScaffold(t, repo.Dir, nil)
+	if !exists(t, repo, "cmd/tool/version.go") {
+		t.Fatal("the first scaffold did not write cmd/tool/version.go")
+	}
+	mustScaffold(t, repo.Dir, nil)
+	if !exists(t, repo, "cmd/tool/version.go") {
+		t.Fatal("the second scaffold removed the cmd/tool/version.go the first one wrote")
 	}
 }

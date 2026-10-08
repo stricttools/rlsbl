@@ -76,6 +76,8 @@ type memberContext struct {
 	// repoName is the repository on GitHub, once resolved.
 	repoName     github.Repository
 	repoResolved bool
+	// managed are the files the scaffold state records, by repository path.
+	managed map[string]string
 }
 
 // memberPath is a member-relative path as a repository-relative one.
@@ -200,7 +202,7 @@ func (c *memberContext) goRenders(t memberTarget, out *[]render, add func(path, 
 	if err != nil {
 		return err
 	}
-	name, err := binaryName(t.abs)
+	name, err := binaryName(t.abs, main)
 	if err != nil {
 		return err
 	}
@@ -229,11 +231,16 @@ func (c *memberContext) goRenders(t memberTarget, out *[]render, add func(path, 
 	}); err != nil {
 		return err
 	}
-	declares, err := declaresVersion(filepath.Join(t.abs, filepath.FromSlash(main)))
-	if err != nil || declares {
-		return err
+	versionPath := c.memberPath(joinDir(joinDir(t.dir, strings.TrimPrefix(main, "./")), "version.go"))
+	// A version.go the scaffold manages declares Version itself, so it is
+	// rendered again rather than read as the project's own declaration.
+	if _, ours := c.managed[versionPath]; !ours {
+		declares, err := declaresVersion(filepath.Join(t.abs, filepath.FromSlash(main)))
+		if err != nil || declares {
+			return err
+		}
 	}
-	return add(c.memberPath(joinDir(joinDir(t.dir, strings.TrimPrefix(main, "./")), "version.go")), "go/version.go.tpl", Vars{})
+	return add(versionPath, "go/version.go.tpl", Vars{})
 }
 
 // goVersion is the version a go target's VERSION holds, or 0.0.0, the
@@ -249,16 +256,20 @@ func goVersion(dir string) (string, error) {
 	return strings.TrimSpace(string(data)), nil
 }
 
-// binaryName is the binary a go module builds and its release archives are
-// named after: the name go gives it (gomodule.BinaryName), which skips a
-// major version suffix.
-func binaryName(dir string) (string, error) {
+// binaryName is the binary the main package at main (spelled "." or
+// "./cmd/x") of the go module at dir builds, which its release archives are
+// named after: the name go gives it (gomodule.BinaryName of the package's
+// import path), which skips a major version suffix.
+func binaryName(dir, main string) (string, error) {
 	path, found, err := gomodule.ModulePath(dir)
 	if err != nil {
 		return "", err
 	}
 	if !found {
 		return "", fmt.Errorf("%s holds no go.mod: run `go mod init <module path>` there first", dir)
+	}
+	if main != "." {
+		path += "/" + strings.TrimPrefix(main, "./")
 	}
 	return gomodule.BinaryName(path), nil
 }
@@ -438,7 +449,11 @@ func (c *memberContext) packagedBinary(target string) (string, error) {
 		if !ok {
 			return "", fmt.Errorf("the go binary pipeline %q publishes the target %q, which the member %q does not have", binary.Name, binary.Target, c.member.Name)
 		}
-		return binaryName(goTarget.abs)
+		main, err := gomodule.ResolveMainPackageDir(c.e, goTarget.abs, binary.InstallPaths)
+		if err != nil {
+			return "", err
+		}
+		return binaryName(goTarget.abs, main)
 	}
 	return "", fmt.Errorf("no go-binary pipeline packages the %s target", target)
 }
