@@ -759,6 +759,7 @@ Made by the session leading the campaign, not by the owner.
 - Fixed: a release built a pypi target whose only pipelines are go-binary pipelines with `uv build`, which makes a package that never ships and fails for a `pyproject.toml` declaring no build system; such a target is not built (commit 49086907).
 - Fixed: after the publish runs passed, `release run --watch` reported saferm 0.12.0 as never reaching npm, because the publish job's own lookup before publishing cached the old package document on npm's CDN (max-age 300 seconds) and the release gave the listings 50 seconds. The wait now adds up to more than five minutes (commit 5db50b43). The release itself had completed; nothing was retried (decided during the release campaign).
 - Found on the way, not fixed: a release's dry run lists `pypi/<package root>/__init__.py`, the version-file template, among the files it would commit when the PyPI package has no package root; the commit leaves the nonexistent path out (decided during the release campaign).
+- Fixed: a commit rlsbl makes named a path whose working tree matched HEAD while its index did not, and safegit refused the whole commit. claudestream's scaffold met it after `experiments/.gitignore` was deleted through saferm (which stages the deletion) and written back unchanged by the scaffold: the scaffold wrote its files and failed at the commit. Such a path is now left out of the commit, compared with HEAD by its mode and its content as git stores it (commit 1d62b708) (decided during the release campaign).
 
 ## browserbuddy
 
