@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stricttools/strictcli/go/strictcli"
 	"github.com/stricttools/strictspec/go/lifecycle"
 	"github.com/stricttools/strictspec/go/lifecycle/index"
 	"github.com/stricttools/testisolation/go/hygiene"
@@ -138,6 +139,14 @@ func TestDeclassifySquashesEachProprietaryPeriodAndGoesPublic(t *testing.T) {
 		return inv.Declassify(lifecycleops.DeclassifyRequest{Dir: dir, Licenses: map[string]string{"portal": "MIT"}, Reason: "the server goes open source"})
 	})
 	requireExit(t, r, 0)
+
+	// The report lists the commits of the proprietary periods origin held,
+	// which GitHub keeps serving by their ids, and names who purges them.
+	requireContains(t, r.Stdout, "GitHub still serves these 5 commit(s) of the proprietary periods by their ids after the force-push, and only GitHub support can purge them",
+		"\n  "+b+"\n  "+c+"\n  "+d+"\n  "+f+"\n  "+g)
+	if _, listed, _ := strings.Cut(r.Stdout, "purge them"); strings.Contains(listed, a) || strings.Contains(listed, e) {
+		t.Fatalf("the report lists a public commit:\n%s", r.Stdout)
+	}
 
 	// Two periods squashed into two commits, newest first, with the fixed
 	// message, which names no confidential term.
@@ -273,6 +282,54 @@ func TestADryRunDeclassificationPrintsTheSquashesAndWritesNothing(t *testing.T) 
 	}
 	if _, err := os.Stat(repo.Path(runstate.DeclassifyResultPath)); !os.IsNotExist(err) {
 		t.Fatal("a dry run saved a declassify result")
+	}
+}
+
+// A ref origin holds at a commit this repository lacks could hold commits
+// of a proprietary period, so the declassification refuses before
+// rewriting anything until the commit is fetched.
+func TestDeclassifyRefusesAnOriginRefItCannotReadUntilItIsFetched(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := testsupport.NewRepo(t)
+	commitOn(t, repo, "2026-04-10", map[string]string{declarations.ReleasablesFile: portalDeclarations, lifecycle.RecordFile: proprietaryPortal, lifecycle.ManifestFile: "owner = \"strictspec\"\n"}, "the project")
+	commitOn(t, repo, "2026-05-02", map[string]string{"notes.txt": "one\n"}, "one")
+	bare := repo.AddBareRemote("origin")
+	repo.Git("push", "-q", "origin", "main")
+	// A commit only origin has, on a branch of its own.
+	git := func(args ...string) string {
+		out, stderr, code := testsupport.RunGit(t, bare, args...)
+		if code != 0 {
+			t.Fatalf("git %v: %s", args, stderr)
+		}
+		return strings.TrimSpace(out)
+	}
+	elsewhere := git("commit-tree", git("rev-parse", "main^{tree}"), "-m", "elsewhere")
+	git("update-ref", "refs/heads/elsewhere", elsewhere)
+	head := repo.Head()
+	sg := newFakeSafegit(t)
+	testsupport.FakeGH(t, ghAuth)
+	fx := &fixture{repo: repo, index: filepath.Join(t.TempDir(), "index.toml")}
+	run := func() strictcli.Result {
+		return fx.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
+			return inv.Declassify(lifecycleops.DeclassifyRequest{Dir: dir, Licenses: map[string]string{"portal": "MIT"}, Reason: "open"})
+		})
+	}
+	r := run()
+	requireExit(t, r, 1)
+	requireContains(t, r.Stderr, "origin's refs/heads/elsewhere is at "+elsewhere, "nothing was rewritten", "git fetch origin")
+	if repo.Head() != head || len(sg.Squashes()) != 0 {
+		t.Fatal("the refused declassification rewrote the history")
+	}
+	if _, err := os.Stat(repo.Path(runstate.DeclassifyResultPath)); !os.IsNotExist(err) {
+		t.Fatal("the refused declassification saved a result")
+	}
+
+	// The fix the refusal names: fetch it, and the declassification goes on
+	// to its squash (which this fake safegit is not told how to answer).
+	repo.Git("fetch", "-q", "origin")
+	r = run()
+	if strings.Contains(r.Stderr, "git fetch origin") || len(sg.Squashes()) != 1 {
+		t.Fatalf("the fetch did not clear the refusal: exit %d, %d squash(es):\n%s", r.ExitCode, len(sg.Squashes()), r.Stderr)
 	}
 }
 

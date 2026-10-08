@@ -82,10 +82,14 @@ type declassifyState struct {
 	// Ranges are the planned squashes, oldest first; they are run newest
 	// first, so the commits of an older range keep their ids until its
 	// squash runs.
-	Ranges   []squashRange `json:"ranges"`
-	Squashed int           `json:"squashed"`
-	OldHead  string        `json:"old_head"`
-	NewHead  string        `json:"new_head"`
+	Ranges []squashRange `json:"ranges"`
+	// Served are the commits of the ranges origin held before the first
+	// squash, oldest first: GitHub keeps serving them by their ids after
+	// the force-push, until GitHub support purges them.
+	Served   []string `json:"served"`
+	Squashed int      `json:"squashed"`
+	OldHead  string   `json:"old_head"`
+	NewHead  string   `json:"new_head"`
 	// Rewrites maps every original commit the squashes rewrote to the
 	// commit it ended as.
 	Rewrites         map[string]string           `json:"rewrites"`
@@ -375,6 +379,10 @@ func (inv Invocation) beginDeclassify(m managed, req DeclassifyRequest) (*declas
 	if err != nil {
 		return nil, fmt.Errorf("origin's refs cannot be read (%v): the declassification force-pushes the rewritten history, so origin must answer before the history is rewritten", err)
 	}
+	served, err := servedProprietaryCommits(m.repo, history, ranges, remote)
+	if err != nil {
+		return nil, err
+	}
 	state := &declassifyState{
 		Licenses:   req.Licenses,
 		Reason:     req.Reason,
@@ -383,6 +391,7 @@ func (inv Invocation) beginDeclassify(m managed, req DeclassifyRequest) (*declas
 		Branch:     branch,
 		RemoteRefs: remote,
 		Ranges:     ranges,
+		Served:     served,
 		OldHead:    head,
 		NewHead:    head,
 		Rewrites:   map[string]string{},
@@ -661,7 +670,74 @@ func (inv Invocation) finishDeclassify(m managed, s *declassifyState) error {
 		return err
 	}
 	inv.Say(fmt.Sprintf("Declassified: %d period(s) squashed, %d commit(s) rewritten, %d tag(s) pushed, %d GitHub Release(s) written, and %s made public.", len(s.Ranges), len(s.Rewrites), len(s.Tags), s.ReleasesWritten, slug))
+	inv.Say(servedReport(s.Served, slug))
 	return nil
+}
+
+// servedReport names the commits of the proprietary periods GitHub still
+// serves by their ids after the force-push, which only GitHub support can
+// purge.
+func servedReport(served []string, slug github.Repository) string {
+	if len(served) == 0 {
+		return "origin held no commit of a proprietary period, so GitHub serves none of them by its id."
+	}
+	return fmt.Sprintf("GitHub still serves these %d commit(s) of the proprietary periods by their ids after the force-push, and only GitHub support can purge them: the owner asks GitHub support to remove them from %s now, at the declassification.\n  %s", len(served), slug, strings.Join(served, "\n  "))
+}
+
+// servedProprietaryCommits are the commits of the ranges, oldest first, that
+// origin holds before the declassification rewrites anything: the ones
+// reachable from a ref origin holds. GitHub keeps serving a commit it
+// received by its id after a force-push takes every ref off it. A ref origin
+// holds at a commit this repository lacks is refused, since what it holds
+// could not be told.
+func servedProprietaryCommits(repo git.Repo, history []git.FirstParentCommit, ranges []squashRange, remote map[string]string) ([]string, error) {
+	if len(ranges) == 0 {
+		return nil, nil
+	}
+	var tips []string
+	seen := map[string]bool{}
+	for _, ref := range sortedKeys(remote) {
+		sha := remote[ref]
+		if seen[sha] {
+			continue
+		}
+		seen[sha] = true
+		has, err := repo.HasObject(sha)
+		if err != nil {
+			return nil, err
+		}
+		if !has {
+			return nil, fmt.Errorf("origin's %s is at %s, which this repository does not have, so which commits of the proprietary periods GitHub keeps serving after the force-push cannot be listed; nothing was rewritten. Fetch it (`git fetch origin`) and run this again", ref, sha)
+		}
+		tips = append(tips, sha)
+	}
+	if len(tips) == 0 {
+		return nil, nil
+	}
+	reachable, err := repo.Commits(tips, nil)
+	if err != nil {
+		return nil, err
+	}
+	held := map[string]bool{}
+	for _, c := range reachable {
+		held[c] = true
+	}
+	var served []string
+	for _, r := range ranges {
+		inRange := false
+		for _, c := range history {
+			if c.SHA == r.First {
+				inRange = true
+			}
+			if inRange && held[c.SHA] {
+				served = append(served, c.SHA)
+			}
+			if c.SHA == r.Last {
+				break
+			}
+		}
+	}
+	return served, nil
 }
 
 // repairRecords repairs what the squashes renamed and writes the record of

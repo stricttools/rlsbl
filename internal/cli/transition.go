@@ -67,7 +67,10 @@ var transitionDeclassifyHelp = fmt.Sprintf("Take a confidential repository publi
 	"tree is recorded unrecoverable; the proprietary licenses close today and the --license ones open; the codenames and distinctive "+
 	"terms and the repository's confidential-name index entry are removed; a history-rewrite archive records the run; all of it is "+
 	"committed; the branch and every moved tag are force-pushed with leases taken before the first squash; each moved tag's GitHub "+
-	"Release is rewritten from the record; and the GitHub repository is made public. A run that stops is finished by running the same "+
+	"Release is rewritten from the record; and the GitHub repository is made public. The closing report lists the commits of the "+
+	"proprietary periods origin held before the first squash, which GitHub keeps serving by their ids after the force-push and only "+
+	"GitHub support can purge (the owner asks for it at the declassification); a ref origin holds at a commit this repository lacks is "+
+	"refused before anything is rewritten, naming the fetch. A run that stops is finished by running the same "+
 	"command again, from the step that stopped it (.strictmetadata/.release-state/declassify-result.json). Refused while a release or "+
 	"a scrub is in progress, off a release branch, without an origin remote, and when --reason names a codename or distinctive term. "+
 	"Requires safegit %s or newer. --dry-run prints the squashes and writes nothing.", historyrewrite.SafegitMinimum)
