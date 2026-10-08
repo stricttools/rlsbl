@@ -143,6 +143,7 @@ var Allowlist = []Entry{
 	{[]string{"git", "tag", "--points-at"}, LocalRead, "lists tags at a commit"},
 	{[]string{"git", "stash", "list"}, LocalRead, "lists stash entries"},
 	{[]string{"git", "--version"}, SelfReport, "prints git's version"},
+	{[]string{"git", "hash-object", "--"}, LocalRead, "hashes working-tree files as staging them would store them, writing nothing; pinned with -- so no flag (-w) can follow"},
 	{[]string{"git", "hash-object", "-w", "--stdin"}, ScratchWrite, "stores the three sides of a three-way merge as loose blobs, read from stdin; it writes no ref, takes no index lock, and leaves the worktree alone, and an unreferenced blob is scratch until garbage collection"},
 	{[]string{"git", "merge-file", "--object-id"}, ScratchWrite, "three-way merges blobs and stores the result as one more loose blob, printing its id; --object-id is what makes it read and write objects instead of overwriting the first file operand"},
 	{[]string{"gh", "api", "--method", "GET"}, NetworkRead, "GET-pinned API read; the bare `gh api` prefix would admit POST"},

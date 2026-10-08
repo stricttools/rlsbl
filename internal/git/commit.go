@@ -31,7 +31,9 @@ type CommitRequest struct {
 // PartitionStageable splits paths into those git reports some change for
 // (modified, staged, deleted, or untracked: stageable) and those that are
 // untracked and ignored, keeping the given order. A path git reports nothing
-// for is in neither list.
+// for is in neither list, and so is a path whose working tree matches HEAD
+// while its index does not (a staged deletion of a file written back
+// unchanged): staging it leaves HEAD's tree as it is, which safegit refuses.
 func (r Repo) PartitionStageable(paths []string) (stageable, ignored []string, err error) {
 	for _, p := range paths {
 		out, err := r.output("--no-optional-locks", "status", "--porcelain", "-z", "--ignored=matching", "--untracked-files=normal", "--", p)
@@ -50,11 +52,63 @@ func (r Repo) PartitionStageable(paths []string) (stageable, ignored []string, e
 		}
 		if allIgnored {
 			ignored = append(ignored, p)
-		} else {
+			continue
+		}
+		same, err := r.workingTreeMatchesHead(p)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !same {
 			stageable = append(stageable, p)
 		}
 	}
 	return stageable, ignored, nil
+}
+
+// workingTreeMatchesHead reports whether staging path would leave HEAD's
+// entry for it as it is: both absent, or a regular file whose mode and
+// content, as git would store it, equal HEAD's blob. A directory, a symlink,
+// and a repository without a HEAD commit are reported as differing, which
+// keeps them stageable as git status reported them.
+func (r Repo) workingTreeMatchesHead(path string) (bool, error) {
+	if _, found, err := r.ResolveCommit("HEAD"); err != nil || !found {
+		return false, err
+	}
+	listing, err := r.output("ls-tree", "-z", "--full-tree", "HEAD", "--", path)
+	if err != nil {
+		return false, err
+	}
+	var headMode, headType, headID string
+	if entry, _, _ := strings.Cut(listing, "\x00"); entry != "" {
+		meta, name, ok := strings.Cut(entry, "\t")
+		fields := strings.Fields(meta)
+		if !ok || name != path || len(fields) != 3 {
+			return false, nil
+		}
+		headMode, headType, headID = fields[0], fields[1], fields[2]
+	}
+	info, err := os.Lstat(filepath.Join(r.dir, filepath.FromSlash(path)))
+	if errors.Is(err, os.ErrNotExist) {
+		return headID == "", nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if headType != "blob" || !info.Mode().IsRegular() {
+		return false, nil
+	}
+	mode := "100644"
+	if info.Mode().Perm()&0o111 != 0 {
+		mode = "100755"
+	}
+	if mode != headMode {
+		return false, nil
+	}
+	id, err := r.output("hash-object", "--", path)
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(id) == headID, nil
 }
 
 // planCommit checks the request and narrows its paths to the stageable ones.
