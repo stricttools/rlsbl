@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs rlsbl's Go suite: a gofmt check, then go vet, then every package with
-# bounded parallelism and the race detector.
+# bounded parallelism and the race detector, each package held to its time
+# bound (scripts/go-suite-time-bounds.sh).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -13,4 +14,4 @@ if [[ -n "${unformatted}" ]]; then
 fi
 
 go vet ./...
-go test -p 2 -parallel 2 -race -timeout 40m ./...
+go test -p 2 -parallel 2 -race -timeout 40m ./... 2>&1 | scripts/go-suite-time-bounds.sh
