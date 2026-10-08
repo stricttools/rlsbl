@@ -276,7 +276,10 @@ func TestACandidatePushThatTimesOutStopsNamingALongerTimeout(t *testing.T) {
 	hygiene.Isolate(t)
 	testsupport.FakeGH(t, answers(validationAnswers("public"), releaseCreation("v0.5.0"))...)
 	repo := runRepo(t, "\n[timeouts]\npush_seconds = 1\n", "MIT", nil)
-	writeExecutable(t, filepath.Join(bareOrigin(t, repo), "hooks", "pre-receive"), "#!/bin/sh\nsleep 2\n")
+	// Origin takes longer than the one-second timeout over every branch
+	// push, and no longer than it must: a push cannot end before the hook
+	// does, so the timeout is certain.
+	writeExecutable(t, filepath.Join(bareOrigin(t, repo), "hooks", "pre-receive"), "#!/bin/sh\nwhile read -r old new ref; do\n\tcase \"$ref\" in refs/heads/*) sleep 1.1 ;; esac\ndone\n")
 	out, err := releaseCommand(t, repo, false, false)
 	if err == nil {
 		t.Fatalf("a push slower than its timeout did not stop the release:\n%s", out)
