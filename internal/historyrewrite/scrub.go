@@ -521,7 +521,7 @@ func (r *scrubRun) finish(s *scrubState, resuming bool) error {
 	}
 	summary := fmt.Sprintf("Scrub complete. %d commit(s) rewritten, %d tag(s) pushed, %d GitHub Release(s) written.", len(s.Rewrites), len(s.Tags), s.ReleasesWritten)
 	if n := len(s.RemappedFiles); n > 0 {
-		summary += fmt.Sprintf(" %d changelog file(s) repaired from the rewrite journal.", n)
+		summary += fmt.Sprintf(" %d changelog file(s) repaired through the rewrite's commit map or a rewrite journal.", n)
 	}
 	r.say(summary)
 	return nil
@@ -572,20 +572,74 @@ func (r *scrubRun) requireCleanup(s *scrubState) error {
 	return fmt.Errorf("safegit reported that its cleanup after the rewrite (reflog expiry, repack, prune) did not succeed:%s\n%d object(s) the rewrite replaced still exist (%s, for one). Validating the changelog's commit ids now would pass ids that the next prune breaks. Investigate the errors above, complete the prune (`%s`), and run the same command again; %s is kept", detail, len(present), short(present[0]), pruneCommand, runstate.ScrubResultPath)
 }
 
-// validateHashes requires every commit id of every changelog to name a
-// commit after the rewrite. Ids safegit's in-history remap did not reach (a
-// scrub stopped before this flow, a rewrite run outside it) are repaired
-// from safegit's journal when its commit map renames them.
+// validateHashes requires every changelog commit id that named a commit
+// before the rewrite to name one after it, through the rewrite's commit map:
+// ids the map renames are remapped first (safegit's in-history remap leaves
+// nothing for it in the usual case), and ids safegit's remap did not reach
+// (a scrub stopped before this flow, a rewrite run outside it) are repaired
+// from safegit's journal when its commit map renames them. An id that still
+// names no commit is refused when the rewrite's map holds it, since it named
+// a commit the rewrite replaced; any other id named no commit before the
+// rewrite either (an earlier rewrite left it), and is reported, not refused.
 func (r *scrubRun) validateHashes(s *scrubState) error {
+	report, err := changelog.Remap(r.e, r.root, s.Rewrites)
+	if err != nil {
+		return err
+	}
+	for _, f := range report.Files {
+		r.say(fmt.Sprintf("  remapped %s through the rewrite's commit map: %d commit id(s) in %d entr(ies)", f.Path, f.CommitsRemapped, f.EntriesModified))
+		s.RemappedFiles = mergePaths(s.RemappedFiles, []string{f.Path})
+	}
 	repaired, unresolved, err := r.repairFromJournal()
 	if err != nil {
 		return err
 	}
 	s.RemappedFiles = mergePaths(s.RemappedFiles, repaired)
-	if len(unresolved) > 0 {
-		return fmt.Errorf("after the rewrite, changelog commit ids name no commit, and no rewrite journal renames them:\n%s\nFix the entries (`rlsbl changelog edit` or `rlsbl changelog remove`) and run the scrub again", describeUnresolved(unresolved))
+	replaced, preexisting := splitUnresolved(unresolved, s.Rewrites)
+	if len(replaced) > 0 {
+		return fmt.Errorf("after the rewrite, changelog commit ids that named commits the rewrite replaced name no commit, and neither the rewrite's commit map nor a rewrite journal renames them to one that exists:\n%s\nFix the entries (`rlsbl changelog edit` or `rlsbl changelog remove`) and run the scrub again", describeUnresolved(replaced))
 	}
+	r.reportPreexisting(preexisting)
 	return nil
+}
+
+// splitUnresolved separates the unresolved changelog commit ids the
+// rewrite's commit map holds as an old or a new commit (each named a commit
+// the rewrite replaced, or a prefix of more than one) from the ids it does
+// not hold, which named no commit of the rewritten history before the
+// rewrite either.
+func splitUnresolved(unresolved map[string][]string, rewrites map[string]string) (replaced, preexisting map[string][]string) {
+	// The map's targets count too: an id remapped onto a commit the rewrite
+	// should have written, which names nothing, named a replaced commit.
+	targets := map[string]string{}
+	for _, to := range rewrites {
+		targets[to] = to
+	}
+	replaced, preexisting = map[string][]string{}, map[string][]string{}
+	for file, ids := range unresolved {
+		for _, id := range ids {
+			if changelog.RewriteHolds(id, rewrites) || changelog.RewriteHolds(id, targets) {
+				replaced[file] = append(replaced[file], id)
+			} else {
+				preexisting[file] = append(preexisting[file], id)
+			}
+		}
+	}
+	return replaced, preexisting
+}
+
+// reportPreexisting lists the changelog commit ids that named no commit
+// before the scrub's rewrite and name none after it, which the scrub leaves
+// as they are.
+func (r *scrubRun) reportPreexisting(preexisting map[string][]string) {
+	if len(preexisting) == 0 {
+		return
+	}
+	count := 0
+	for _, ids := range preexisting {
+		count += len(ids)
+	}
+	r.say(fmt.Sprintf("%d changelog commit id(s) name no commit, and the scrub's rewrite replaced none of them, so they named no commit before it either (left by an earlier rewrite); the scrub leaves them as they are:\n%s", count, describeUnresolved(preexisting)))
 }
 
 // repairFromJournal remaps the changelog's unresolved commit ids through
@@ -906,13 +960,9 @@ func (r *scrubRun) repairWithoutRewrite() error {
 		}
 		repaired = mergePaths(repaired, files)
 	}
-	if len(unresolved) > 0 {
-		note := ""
-		if len(repaired) > 0 {
-			note = fmt.Sprintf("\n(%d file(s) were repaired from the rewrite journal and are left uncommitted: %s.)", len(repaired), strings.Join(repaired, ", "))
-		}
-		return fmt.Errorf("the scrub found nothing to rewrite, but changelog commit ids name no commit (left, likely, by an earlier rewrite), and the rewrite journal cannot repair them:\n%s%s\nFix the entries (`rlsbl changelog edit` or `rlsbl changelog remove`) and run the scrub again", describeUnresolved(unresolved), note)
-	}
+	// Nothing was rewritten, so every id still naming no commit named none
+	// before the scrub either.
+	r.reportPreexisting(unresolved)
 	if len(repaired) == 0 {
 		return nil
 	}

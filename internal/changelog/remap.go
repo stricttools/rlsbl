@@ -44,6 +44,14 @@ func mapCommit(h string, rewrites map[string]string) (next string, ambiguous boo
 	return "", true
 }
 
+// RewriteHolds reports whether the commit map rewrites holds the id h: h is
+// one of its keys, or the prefix of one or more of them, so it named a
+// commit the rewrite took in.
+func RewriteHolds(h string, rewrites map[string]string) bool {
+	next, ambiguous := mapCommit(h, rewrites)
+	return next != "" || ambiguous
+}
+
 // CanRemap reports whether a remap with rewrites would rewrite the id h: h
 // matches one key exactly or is a prefix of one key alone. A history
 // rewrite asks it before changing anything, to know whether its journal

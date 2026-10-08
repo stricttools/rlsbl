@@ -95,6 +95,13 @@ type history struct {
 // be empty (a new repository, or an orphan branch with nothing staged).
 func buildHistory(t *testing.T, repo *testsupport.Repo, notes string) history {
 	t.Helper()
+	return buildHistoryWith(t, repo, notes, "")
+}
+
+// buildHistoryWith is buildHistory with extra appended to the released
+// changelog file of 0.1.0.
+func buildHistoryWith(t *testing.T, repo *testsupport.Repo, notes, extra string) history {
+	t.Helper()
 	var h history
 	base := map[string]string{declarationsPath: portalDeclarations, "package.json": packageJSON("0.1.0"), "notes.txt": notes + "\n"}
 	for _, m := range manifests {
@@ -102,7 +109,7 @@ func buildHistory(t *testing.T, repo *testsupport.Repo, notes string) history {
 	}
 	h.A = commitAll(t, repo, base, "the project")
 	h.B = commitAll(t, repo, map[string]string{"notes.txt": notes + "\nmore\n"}, "more notes")
-	h.R = commitAll(t, repo, map[string]string{changelogFilePath: entryLine(1, h.B)}, "v0.1.0")
+	h.R = commitAll(t, repo, map[string]string{changelogFilePath: entryLine(1, h.B) + extra}, "v0.1.0")
 	tree := repo.Git("rev-parse", h.R+"^{tree}")
 	repo.Write(archivePath, archiveText(h.R, tree))
 	document, err := changelog.Document(repo.Dir, "portal", nil)
@@ -127,8 +134,16 @@ type scrubFixture struct {
 
 func newScrubFixture(t *testing.T) *scrubFixture {
 	t.Helper()
+	return newScrubFixtureWith(t, "", func(history) string { return "" })
+}
+
+// newScrubFixtureWith is newScrubFixture with oldExtra appended to the
+// released changelog file of 0.1.0 in the history before the rewrite, and
+// what newExtra gives for that history in the rewritten history.
+func newScrubFixtureWith(t *testing.T, oldExtra string, newExtra func(old history) string) *scrubFixture {
+	t.Helper()
 	repo := testsupport.NewRepo(t)
-	old := buildHistory(t, repo, "token SECRET")
+	old := buildHistoryWith(t, repo, "token SECRET", oldExtra)
 	repo.Git("tag", "v0.1.0", old.R)
 	f := &scrubFixture{repo: repo, old: old}
 	f.bare = repo.AddBareRemote("origin")
@@ -143,7 +158,7 @@ func newScrubFixture(t *testing.T) *scrubFixture {
 	}
 	n.A = commitAll(t, repo, base, "the project")
 	n.B = commitAll(t, repo, map[string]string{"notes.txt": "token REDACTED\nmore\n"}, "more notes")
-	n.R = commitAll(t, repo, map[string]string{changelogFilePath: entryLine(1, n.B)}, "v0.1.0")
+	n.R = commitAll(t, repo, map[string]string{changelogFilePath: entryLine(1, n.B) + newExtra(old)}, "v0.1.0")
 	tree := repo.Git("rev-parse", old.R+"^{tree}")
 	repo.Write(archivePath, archiveText(old.R, tree))
 	document, err := changelog.Document(repo.Dir, "portal", nil)
@@ -336,6 +351,16 @@ func requireStderr(t *testing.T, r strictcli.Result, fragments ...string) {
 	for _, f := range fragments {
 		if !strings.Contains(r.Stderr, f) {
 			t.Fatalf("stderr lacks %q:\n%s", f, r.Stderr)
+		}
+	}
+}
+
+// requireStdout fails the test unless stdout holds every fragment.
+func requireStdout(t *testing.T, r strictcli.Result, fragments ...string) {
+	t.Helper()
+	for _, f := range fragments {
+		if !strings.Contains(r.Stdout, f) {
+			t.Fatalf("stdout lacks %q:\n%s", f, r.Stdout)
 		}
 	}
 }

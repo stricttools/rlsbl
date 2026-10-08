@@ -18,7 +18,9 @@ var releaseScrubHelp = fmt.Sprintf("Scrub content from the repository's git hist
 	"length under --mangle), --file rewrites one repository-relative file (every past version of it replaced by the copy on disk now, or removed "+
 	"from every commit when there is no copy on disk), and --recipe runs a safegit scrub recipe; --from-commit or --entire-history says how much "+
 	"of the history is rewritten. safegit remaps the changelog's commit ids at every rewritten commit; the scrub then requires every changelog "+
-	"commit id to name a commit (repairing ids from safegit's rewrite journal where it can), moves each archive's release commit through the "+
+	"commit id that named a commit the rewrite replaced to name its replacement (remapping it through the rewrite's commit map, or safegit's "+
+	"rewrite journal, where it can), and lists, without refusing, the ids that named no commit before the rewrite either (left by an earlier "+
+	"rewrite); it then moves each archive's release commit through the "+
 	"rewrite (recording the rewritten trees, and a release-commit remap in the transition record), requires every generated changelog to be what "+
 	"generating it gives, deletes any file at the reserved changelog validation cache paths (which no rlsbl command writes), writes the rewrite's archive to .strictmetadata/history-rewrites/<UTC "+
 	"time>.toml (commit ids, tags, the mode, and --reason only, never what was removed), and commits. It then force-pushes the branch and every "+

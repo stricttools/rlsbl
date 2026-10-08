@@ -125,6 +125,61 @@ func TestAScrubRewritesRepairsCommitsAndPublishes(t *testing.T) {
 	}
 }
 
+// A changelog commit id that named no commit before the rewrite (an earlier
+// rewrite left it) is no id the rewrite broke: the scrub reports it and
+// finishes.
+func TestAnIdThatNamedNoCommitBeforeTheRewriteIsReportedNotRefused(t *testing.T) {
+	hygiene.Isolate(t)
+	dangling := strings.Repeat("d", 40)
+	f := newScrubFixtureWith(t, entryLine(2, dangling), func(history) string { return entryLine(2, dangling) })
+	sg := newSafegit(t, "0.31.0")
+	sg.Answer(f.rewriteScript(), safegitDocument(t, f.rewritePayload(true)), 0)
+	releasePublished(t)
+
+	r := scrub(t, f.repo.Dir, mangleSecret, false)
+	requireExit(t, r, 0)
+	requireStdout(t, r, "named no commit before it either", changelogFilePath+": "+dangling, "Scrub complete")
+	if refs := testsupport.Refs(t, f.bare); refs["refs/heads/main"] != f.repo.Head() {
+		t.Fatalf("origin holds %v", refs)
+	}
+}
+
+// An id the rewrite's commit map renames, which safegit's in-history remap
+// missed, is remapped through the map and committed.
+func TestAnIdTheRewriteRenamedIsRemappedThroughItsCommitMap(t *testing.T) {
+	hygiene.Isolate(t)
+	f := newScrubFixtureWith(t, "", func(old history) string { return entryLine(2, old.A) })
+	sg := newSafegit(t, "0.31.0")
+	payload := f.rewritePayload(true)
+	sg.Answer(f.rewriteScript(), safegitDocument(t, payload), 0)
+	releasePublished(t)
+
+	r := scrub(t, f.repo.Dir, mangleSecret, false)
+	requireExit(t, r, 0)
+	requireStdout(t, r, "remapped "+changelogFilePath+" through the rewrite's commit map")
+	released := f.repo.Git("show", "HEAD:"+changelogFilePath)
+	if strings.Contains(released, f.old.A) || !strings.Contains(released, f.new.A) {
+		t.Fatalf("the replaced id was not remapped in the scrub commit:\n%s", released)
+	}
+}
+
+// An id that named a commit the rewrite replaced, and names none after it
+// even through the map, is refused.
+func TestAnIdThatNamedAReplacedCommitAndNamesNoneAfterIsRefused(t *testing.T) {
+	hygiene.Isolate(t)
+	replaced, missing := strings.Repeat("c", 40), strings.Repeat("f", 40)
+	f := newScrubFixtureWith(t, entryLine(2, replaced), func(history) string { return entryLine(2, replaced) })
+	sg := newSafegit(t, "0.31.0")
+	payload := f.rewritePayload(true)
+	payload["rewrites"].(map[string]string)[replaced] = missing
+	sg.Answer(f.rewriteScript(), safegitDocument(t, payload), 0)
+	releasePublished(t)
+
+	r := scrub(t, f.repo.Dir, mangleSecret, false)
+	requireExit(t, r, 1)
+	requireStderr(t, r, "named commits the rewrite replaced name no commit", missing, "hashes-validated")
+}
+
 func TestADryRunRecordsTheRewriteAndWritesNothing(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newScrubFixture(t)
@@ -351,9 +406,15 @@ func TestNothingToRewriteRepairsTheChangelogFromTheJournal(t *testing.T) {
 	sg := newSafegit(t, "0.31.0")
 	sg.Answer("", safegitDocument(t, nil), 0)
 
+	// With no journal naming the move, nothing renames the id, and the scrub,
+	// which rewrote nothing, reports it as naming no commit before it either.
+	head := repo.Head()
 	r := scrub(t, repo.Dir, mangleSecret, false)
-	requireExit(t, r, 1)
-	requireStderr(t, r, "the scrub found nothing to rewrite", gone, "rlsbl changelog")
+	requireExit(t, r, 0)
+	requireStdout(t, r, "No matches found", "named no commit before it either", unreleasedLogPath+": "+gone)
+	if repo.Head() != head {
+		t.Fatal("a scrub that rewrote and repaired nothing committed")
+	}
 
 	// With the journal naming the move, the same scrub repairs and commits.
 	writeJournal(t, repo, "rw1", map[string]string{gone: h.B}, true)
