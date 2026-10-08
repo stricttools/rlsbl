@@ -82,6 +82,32 @@ func (r Repo) Ignored(path string) (bool, error) {
 	return false, r.failed(args, res)
 }
 
+// IgnoreRules maps each of the paths (relative to the repository root) that
+// git's ignore rules match to the rule matching it, as
+// "<source>:<line>:<pattern>". Tracked paths are never matched.
+func (r Repo) IgnoreRules(paths []string) (map[string]string, error) {
+	out := map[string]string{}
+	if len(paths) == 0 {
+		return out, nil
+	}
+	args := []string{"check-ignore", "-v", "-z", "--stdin"}
+	res, err := r.read(localTimeout, []byte(strings.Join(paths, "\x00")+"\x00"), args...)
+	if err != nil {
+		return nil, err
+	}
+	if res.code != 0 && res.code != 1 {
+		return nil, r.failed(args, res)
+	}
+	fields := nulFields(res.stdout)
+	if len(fields)%4 != 0 {
+		return nil, fmt.Errorf("git %s in %s printed %d NUL-separated fields, not a multiple of four", strings.Join(args, " "), r.dir, len(fields))
+	}
+	for i := 0; i < len(fields); i += 4 {
+		out[fields[i+3]] = fields[i] + ":" + fields[i+1] + ":" + fields[i+2]
+	}
+	return out, nil
+}
+
 // mutateWithEnv is mutate with environment variables set for git.
 func (r Repo) mutateWithEnv(timeout time.Duration, env map[string]string, args ...string) error {
 	_, err := r.e.Run(argv(args), strictcli.Cwd(r.dir), strictcli.Timeout(timeout), strictcli.Stream(true), strictcli.EffectEnv(env))

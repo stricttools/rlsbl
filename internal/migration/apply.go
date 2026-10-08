@@ -48,6 +48,33 @@ func (b *builder) checkUncommitted() error {
 	return nil
 }
 
+// checkIgnored refuses a path the plan writes and commits that git's ignore
+// rules match, naming each with its rule: the commit could not carry it, and
+// the old layout would already be removed when the commit refused it.
+func (b *builder) checkIgnored() error {
+	var paths []string
+	for _, w := range b.plan.writes {
+		if !w.ignored {
+			paths = append(paths, w.path)
+		}
+	}
+	paths = append(paths, b.plan.generated...)
+	rules, err := b.repo.IgnoreRules(paths)
+	if err != nil {
+		return err
+	}
+	var named []string
+	for _, p := range paths {
+		if rule, ok := rules[p]; ok {
+			named = append(named, fmt.Sprintf("%s (%s)", p, rule))
+		}
+	}
+	if len(named) > 0 {
+		return &RefusedError{Problems: []string{fmt.Sprintf("these paths, which the migration writes and commits, are ignored by git, so the commit could not carry them: %s. Hand edit: narrow each ignore rule named so it no longer matches them (anchor it with a leading /, for example), commit that, then migrate", strings.Join(named, ", "))}}
+	}
+	return nil
+}
+
 // effectsWriter is the lifecycle library's writer, backed by the effects
 // handle.
 type effectsWriter struct {

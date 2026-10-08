@@ -537,6 +537,26 @@ func TestThePrivateModuleStubMovesIntoStrictmetadata(t *testing.T) {
 	}
 }
 
+// A repository ignore rule written for something else (a built binary named
+// after the project, unanchored) can match the records the migration writes
+// and commits; the refusal comes before anything is written, and anchoring
+// the rule clears it.
+func TestIgnoredRecordPathsAreRefusedBeforeAnythingIsWritten(t *testing.T) {
+	hygiene.Isolate(t)
+	f := standalone(t)
+	f.write(".gitignore", "portal\n")
+	f.commit("ignore the built binary")
+	refusal := f.refused("ignored by git")
+	contains(t, refusal, ".strictmetadata/changelog/portal/0.1.0.jsonl")
+	contains(t, refusal, ".gitignore:1:portal")
+	if !f.exists(".rlsbl/config.json") || f.exists(".strictmetadata/releasables/releasables.toml") {
+		t.Fatal("the refused plan wrote or removed something")
+	}
+	f.write(".gitignore", "/portal\n")
+	f.commit("anchor the ignore rule")
+	f.mustPlan()
+}
+
 func TestAWorkspacePrivateModuleStubMovesIntoStrictmetadata(t *testing.T) {
 	hygiene.Isolate(t)
 	f := workspaceFixture(t)

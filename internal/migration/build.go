@@ -224,6 +224,9 @@ func (b *builder) build() error {
 		err.Plan = b.plan
 		return err
 	}
+	if err := b.checkIgnored(); err != nil {
+		return err
+	}
 	return b.checkUncommitted()
 }
 
