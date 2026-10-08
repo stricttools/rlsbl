@@ -18,11 +18,48 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          # The suite runs git inside a throwaway copy of the tree; a persisted
+          # credential would be a needless secret in the working copy.
+          persist-credentials: false
       # setup-go reads go.mod's `toolchain` line first, then its `go` directive.
       # Declare the development Go in `toolchain` (go mod edit -toolchain=goX.Y.Z)
       # so CI tests with it; `go` stays the minimum consumers need.
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - run: go vet ./...
-      - run: go test ./... -race -short -timeout=10m
+      # The suite's secret-scan tests run gitleaks; /usr/local/bin is inside the
+      # sandbox's read-only /usr bind.
+      - name: Install gitleaks
+        run: |
+          GITLEAKS_VERSION=8.24.3
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar xz -C /usr/local/bin gitleaks
+      # git-filter-repo backs the monorepo extract and absorb flows, whose tests
+      # need the command.
+      - name: Install git-filter-repo
+        run: sudo apt-get update && sudo apt-get install -y git-filter-repo
+      # saferm backs the conversion flows' deletion; installed into
+      # /usr/local/bin so the sandbox's read-only /usr bind sees it.
+      - name: Install saferm
+        run: |
+          go install github.com/stricttools/saferm@v0
+          sudo cp "$(go env GOPATH)/bin/saferm" /usr/local/bin/saferm
+      # The suite runs inside the bwrap sandbox scripts/test.sh sets up. Ubuntu
+      # 24.04's apt bubblewrap (0.9.x) cannot configure loopback under
+      # --unshare-net, so 0.11.0 is built from source, and the AppArmor
+      # restriction on unprivileged user namespaces is relaxed for it.
+      - name: Build bubblewrap 0.11.0 from source
+        run: |
+          set -euo pipefail
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          sudo apt-get update
+          sudo apt-get install -y meson ninja-build libcap-dev
+          git clone --depth 1 --branch v0.11.0 \
+            https://github.com/containers/bubblewrap /tmp/bubblewrap-src
+          meson setup /tmp/bubblewrap-build /tmp/bubblewrap-src \
+            --prefix=/usr/local -Dtests=false -Dman=disabled
+          meson compile -C /tmp/bubblewrap-build
+          sudo meson install -C /tmp/bubblewrap-build
+          bwrap --version
+      - name: Run tests in the bwrap sandbox
+        run: scripts/test.sh
