@@ -2,6 +2,7 @@ package scaffold
 
 import (
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -314,6 +315,38 @@ func TestAPublishWorkflowNoLongerRenderedIsRemovedWhileUnmodified(t *testing.T) 
 	}
 	if _, recorded := state.Files[workflows.PublishPath]; recorded {
 		t.Error("the removed publish workflow is still recorded")
+	}
+}
+
+// A file scaffold no longer renders that the operator deleted, as the
+// refusal of an edited one says, leaves no merge base behind: the next run
+// removes the base with the file's record.
+func TestAnOrphanTheOperatorDeletedHasItsMergeBaseRemoved(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := newProject(t, standalone("ci", npmPipeline), npmPackage, publicAnswer)
+	mustScaffold(t, repo.Dir, nil)
+	if !exists(t, repo, BasePath(workflows.PublishPath)) {
+		t.Fatal("the scaffold stored no merge base of the publish workflow")
+	}
+	deleter := testsupport.FakeSaferm(t)
+	if err := os.Remove(repo.Path(workflows.PublishPath)); err != nil {
+		t.Fatal(err)
+	}
+	s := mustScaffold(t, repo.Dir, func(in *Inputs) { in.PublishMode = "none" })
+	var deleted []string
+	for _, call := range deleter.Calls() {
+		_, path, _ := strings.Cut(call, "-- ")
+		deleted = append(deleted, path)
+	}
+	if !reflect.DeepEqual(deleted, []string{BasePath(workflows.PublishPath)}) {
+		t.Fatalf("deleted %q, want the merge base alone\n%s", deleted, s.text())
+	}
+	state, _, err := ReadState(repo.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, recorded := state.Files[workflows.PublishPath]; recorded {
+		t.Error("the deleted publish workflow is still recorded")
 	}
 }
 

@@ -155,6 +155,9 @@ type orphan struct {
 	reason string
 	// base: a merge base is stored for it.
 	base bool
+	// gone: the file itself was deleted already; only its merge base is
+	// removed.
+	gone bool
 }
 
 // planOrphans are the member's managed files this run renders none of, each
@@ -179,8 +182,17 @@ func planOrphans(root string, ws *workspace.Workspace, m declarations.Member, st
 		if p == joinDir(m.Path, workflows.PublishPath) && publishSkip != "" {
 			reason = publishSkip
 		}
+		base, err := fileExists(filepath.Join(root, filepath.FromSlash(BasePath(p))))
+		if err != nil {
+			return nil, err
+		}
 		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(p)))
 		if errors.Is(err, fs.ErrNotExist) {
+			// Deleted already (as the refusal of an edited orphan says):
+			// only its merge base is left to remove.
+			if base {
+				out = append(out, orphan{path: p, reason: reason, base: true, gone: true})
+			}
 			continue
 		}
 		if err != nil {
@@ -189,10 +201,6 @@ func planOrphans(root string, ws *workspace.Workspace, m declarations.Member, st
 		if FileHash(data) != state.Files[p] {
 			refused = append(refused, fmt.Sprintf("%s (%s)", p, reason))
 			continue
-		}
-		base, err := fileExists(filepath.Join(root, filepath.FromSlash(BasePath(p))))
-		if err != nil {
-			return nil, err
 		}
 		out = append(out, orphan{path: p, reason: reason, base: base})
 	}

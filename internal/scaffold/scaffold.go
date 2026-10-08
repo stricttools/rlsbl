@@ -366,10 +366,12 @@ func scaffoldMember(e *strictcli.Effects, repo git.Repo, ws *workspace.Workspace
 		r.commit = append(r.commit, mg.path)
 	}
 	for _, o := range orphans {
-		if err := saferm.Delete(e, root, saferm.Request{Path: o.path, Description: "rlsbl scaffold no longer renders this file (" + o.reason + ")", SkipMissing: true}); err != nil {
-			return err
+		if !o.gone {
+			if err := saferm.Delete(e, root, saferm.Request{Path: o.path, Description: "rlsbl scaffold no longer renders this file (" + o.reason + ")", SkipMissing: true}); err != nil {
+				return err
+			}
+			r.commit = append(r.commit, o.path)
 		}
-		r.commit = append(r.commit, o.path)
 		if o.base {
 			if err := saferm.Delete(e, root, saferm.Request{Path: BasePath(o.path), Description: "the merge base of a file rlsbl scaffold no longer renders", SkipMissing: true}); err != nil {
 				return err
