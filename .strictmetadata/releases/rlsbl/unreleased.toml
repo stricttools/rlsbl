@@ -1,11 +1,11 @@
 # The next release of rlsbl. Fill in bump and description, then run `rlsbl release run --watch`.
 format_version = 2
 # How the release moves the version: patch, minor, major, or infra (moved as a patch, recorded as infra).
-bump = ""
+bump = "minor"
 # What this release is, in a sentence or two. Required.
-description = ""
+description = "rlsbl rewritten in Go: one binary, published to npm and PyPI as per-platform packages and wheels and installable with go install, with the release record in the .strictmetadata layout. The Python package is gone."
 # Why these changes were made. Optional.
-context = ""
+context = "The stricttools projects are moving to Go; the source checks rlsbl ran moved to strictcode."
 # The targets released, and the ones left out; between them they name every target of the releasable's members.
 include = ["go", "npm", "pypi"]
 exclude = []
