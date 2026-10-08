@@ -83,6 +83,31 @@ func TestAHandlerErrorEndsTheCommandWithExitOne(t *testing.T) {
 	}
 }
 
+// A refusing handler's payload is never printed: a refusal prints no partial
+// report, in human or machine mode.
+func TestAHandlerErrorPrintsNoPayload(t *testing.T) {
+	hygiene.Isolate(t)
+	r := scratchRegistry()
+	r.add(command{
+		path:    []string{"refuse"},
+		help:    "Refuse after building an empty report",
+		effect:  readOnly,
+		payload: map[string]any{"type": "object"},
+		render:  func(any) string { return "Branch: (detached HEAD)" },
+		run: func(*strictcli.Context, map[string]any) (any, error) {
+			return struct{}{}, errors.New("the member has several targets")
+		},
+	})
+	res := r.app.Test([]string{"refuse"})
+	if res.ExitCode != 1 || !strings.Contains(res.Stderr, "the member has several targets") || res.Stdout != "" {
+		t.Fatalf("human: exit %d, stdout %q, stderr %q", res.ExitCode, res.Stdout, res.Stderr)
+	}
+	res = r.app.Test([]string{"refuse", "--json"})
+	if res.ExitCode != 1 || !strings.Contains(res.Stdout, `"payload":null`) || !strings.Contains(res.Stdout, "the member has several targets") {
+		t.Fatalf("machine: exit %d, stdout %q", res.ExitCode, res.Stdout)
+	}
+}
+
 // A command whose exit status is part of its answer ends with the status it
 // states, printing its message only when it has one.
 func TestAnExitStatusEndsTheCommandWithItsOwnCode(t *testing.T) {

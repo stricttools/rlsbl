@@ -52,8 +52,16 @@ func TestStatusThroughTheApplication(t *testing.T) {
 			t.Errorf("%q is not in:\n%s", want, r.Stdout)
 		}
 	}
-	if r := app.Test([]string{"status", "--target", "go"}); r.ExitCode != 1 || !strings.Contains(r.Stderr, "has no go target; its targets are npm") {
+	r = app.Test([]string{"status", "--target", "go"})
+	if r.ExitCode != 1 || !strings.Contains(r.Stderr, "has no go target; its targets are npm") {
 		t.Errorf("a target the member lacks: exit %d: %s", r.ExitCode, r.Stderr)
+	}
+	if r.Stdout != "" {
+		t.Errorf("the refusal printed a partial report:\n%s", r.Stdout)
+	}
+	r = app.Test([]string{"status", "--json", "--target", "go"})
+	if r.ExitCode != 1 || !strings.Contains(r.Stdout, `"payload":null`) || !strings.Contains(r.Stdout, "has no go target; its targets are npm") {
+		t.Errorf("a target the member lacks, in machine mode: exit %d: %s", r.ExitCode, r.Stdout)
 	}
 }
 

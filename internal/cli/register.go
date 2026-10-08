@@ -169,6 +169,13 @@ func (r *commandSet) add(c command) {
 			// Even a command that failed may have written the record.
 			err = errors.Join(err, refreshIndex(ctx))
 		}
+		// A refusal prints no partial report: the payload of a failed run is
+		// printed only when the failure is an exit status, a verdict the
+		// complete report states.
+		var verdict *exitStatus
+		if err != nil && !errors.As(err, &verdict) {
+			payload = nil
+		}
 		if payload != nil {
 			if c.payload == nil {
 				err = errors.Join(err, fmt.Errorf("command %q returned a payload but declares none", key))
