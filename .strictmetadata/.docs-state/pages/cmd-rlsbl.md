@@ -1,8 +1,7 @@
 +++
 title = "cmd/rlsbl"
-description = "Command rlsbl releases software: it bumps versions, validates a structured changelog, tags only the commit CI verified, and publishes to npm, PyPI, and the Go module proxy."
+description = "The rlsbl command: its entry point, which runs the command tree internal/cli builds, and the version goreleaser stamps into the binary."
 generated = true
-seeded = true
 nav_group = "API Reference"
 nav_order = 1
 +++
