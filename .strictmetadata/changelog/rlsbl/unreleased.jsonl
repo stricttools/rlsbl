@@ -87,3 +87,4 @@
 {"format_version":2,"id":"18dce145b48e893942b10404db4143a1a2330149156465a8","commits":["da8fd05ef20c20e545dd36e2bafd64aa14a57e6e"],"user_facing":false}
 {"format_version":2,"id":"18dce17d58c4237cecc58b3f5f1644a3a97e345f8f1a77cd","commits":["dbbb282b15604537fda0616daded0c1adc003829"],"user_facing":false}
 {"format_version":2,"id":"18dce17d6b8c0c5135e2373f33ee4c20bcc78b31a09e1202","commits":["278f751e3880b05e8be3db873cc99a82946dce96"],"user_facing":true,"description":"A release of a repository that commits a `go.work` no longer puts Go commands outside its checkout in that workspace: the tests of a Go project that build throwaway modules failed inside the release, listing no package.","type":"fix"}
+{"format_version":2,"id":"18dce18416db6a0045bc055fb00c4050a0eab453eca72f51","commits":["7a4fa2b8b08ccb172a78aa128c0032bc422c7d56"],"user_facing":false}
