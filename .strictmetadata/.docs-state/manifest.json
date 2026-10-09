@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "name": "rlsbl",
+  "name": "release-checkout",
   "slug": "rlsbl",
   "version": "0.131.0",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, and the Go module proxy",
@@ -11468,7 +11468,7 @@
       ]
     }
   ],
-  "last_gen": "2026-10-09T13:59:23.964548+00:00",
+  "last_gen": "2026-10-09T14:06:16.327035+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
