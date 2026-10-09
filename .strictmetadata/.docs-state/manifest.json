@@ -1111,6 +1111,11 @@
           "level": 2,
           "text": "`cmd/rlsbl`",
           "anchor": "cmdrlsbl"
+        },
+        {
+          "level": 3,
+          "text": "`Version`",
+          "anchor": "version"
         }
       ]
     },
@@ -1805,6 +1810,11 @@
           "level": 3,
           "text": "`IgnoredRecordsFinding`",
           "anchor": "ignoredrecordsfinding"
+        },
+        {
+          "level": 3,
+          "text": "`RewriteHolds`",
+          "anchor": "rewriteholds"
         },
         {
           "level": 3,
@@ -3413,6 +3423,11 @@
         },
         {
           "level": 3,
+          "text": "`PypiDeclaredNames`",
+          "anchor": "pypideclarednames"
+        },
+        {
+          "level": 3,
           "text": "`PypiLocked`",
           "anchor": "pypilocked"
         },
@@ -3747,6 +3762,11 @@
         },
         {
           "level": 3,
+          "text": "`GrepArgv`",
+          "anchor": "grepargv"
+        },
+        {
+          "level": 3,
           "text": "`CommitRequest`",
           "anchor": "commitrequest"
         },
@@ -3779,6 +3799,16 @@
           "level": 3,
           "text": "`PushedRef`",
           "anchor": "pushedref"
+        },
+        {
+          "level": 3,
+          "text": "`RangeCommit`",
+          "anchor": "rangecommit"
+        },
+        {
+          "level": 3,
+          "text": "`BlobChange`",
+          "anchor": "blobchange"
         },
         {
           "level": 3,
@@ -3989,6 +4019,16 @@
           "level": 3,
           "text": "`Repo.ThreeWayMerge`",
           "anchor": "repothreewaymerge"
+        },
+        {
+          "level": 3,
+          "text": "`Repo.RangeChanges`",
+          "anchor": "reporangechanges"
+        },
+        {
+          "level": 3,
+          "text": "`Repo.FilesHolding`",
+          "anchor": "repofilesholding"
         },
         {
           "level": 3,
@@ -4945,6 +4985,11 @@
           "level": 3,
           "text": "`RewriteReleases`",
           "anchor": "rewritereleases"
+        },
+        {
+          "level": 3,
+          "text": "`SafegitRewriteTimeout`",
+          "anchor": "safegitrewritetimeout"
         },
         {
           "level": 3,
@@ -6249,6 +6294,11 @@
           "level": 3,
           "text": "`Scanner.ScanArtifacts`",
           "anchor": "scannerscanartifacts"
+        },
+        {
+          "level": 3,
+          "text": "`Scanner.ScanRange`",
+          "anchor": "scannerscanrange"
         },
         {
           "level": 3,
@@ -10257,6 +10307,11 @@
         },
         {
           "level": 3,
+          "text": "`RouterTagSchemeOutput`",
+          "anchor": "routertagschemeoutput"
+        },
+        {
+          "level": 3,
           "text": "`Dir`",
           "anchor": "dir"
         },
@@ -10484,6 +10539,16 @@
           "level": 3,
           "text": "`Filters.Block`",
           "anchor": "filtersblock"
+        },
+        {
+          "level": 3,
+          "text": "`TagParts.Pattern`",
+          "anchor": "tagpartspattern"
+        },
+        {
+          "level": 3,
+          "text": "`TagParts.Regexp`",
+          "anchor": "tagpartsregexp"
         }
       ]
     },
@@ -10684,6 +10749,11 @@
         },
         {
           "level": 3,
+          "text": "`IdentityTagOwner`",
+          "anchor": "identitytagowner"
+        },
+        {
+          "level": 3,
           "text": "`ParseVersionTag`",
           "anchor": "parseversiontag"
         },
@@ -10846,6 +10916,11 @@
           "level": 3,
           "text": "`TagScheme.Owns`",
           "anchor": "tagschemeowns"
+        },
+        {
+          "level": 3,
+          "text": "`TagScheme.Regexp`",
+          "anchor": "tagschemeregexp"
         },
         {
           "level": 3,
@@ -11393,7 +11468,7 @@
       ]
     }
   ],
-  "last_gen": "2026-10-08T11:25:53.721442+00:00",
+  "last_gen": "2026-10-09T13:59:23.964548+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
