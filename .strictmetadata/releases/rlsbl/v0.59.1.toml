@@ -8,6 +8,6 @@ description = "Fix false-positive deps-undeclared findings in root-project dep s
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "977f5281ac73d953af2cf04aa4f212f302247794"
+release_commit = "265a47d13cfcc4763a919b376a30e93659c60687"
 [released_trees]
-"." = "792f3746d21bb72ca651c4bc43fbf571a10a68f9"
+"." = "23e2a9c6bd9478d2db551369124149aa16b2e32b"

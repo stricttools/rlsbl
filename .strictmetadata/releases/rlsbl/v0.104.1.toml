@@ -18,6 +18,6 @@ Four bug fixes addressing release-flow reliability:
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "424d17bd49d61182266f1b65f7db387da8d6fb50"
+release_commit = "414a89f5feaa6e4f3864d2338fc6b8be94dec1c3"
 [released_trees]
-"." = "d5d67f2fd576de1c245073ad4346f2016bfcf67f"
+"." = "b724e2914f2053da609393ed56c2eba619e002d9"

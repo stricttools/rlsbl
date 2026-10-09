@@ -8,6 +8,6 @@ description = "Release undo traceback logging, per-version .md canonical regener
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "7be2bfbd67fc1b88a6dd0880619d10fc1f33b558"
+release_commit = "b5b1b292da68a4c252b3f1e1fbb963894dbf5354"
 [released_trees]
-"." = "22f97aa3a88f87fa26160759ab0c036aaf6bae4d"
+"." = "fc1710fb8150a8eb1c57e66ca0f3dd60566b38e6"

@@ -10,6 +10,6 @@ context = "ensure_github_topic and watch run_cmd migrated from run() to run_gh()
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "4a358e192fb586362ef9a75cc4dd3170236dc677"
+release_commit = "efa54081297b512e90a330abb8e1562d77d59c86"
 [released_trees]
-"." = "fae2ccf2f28d3a6e705010f56bb21bda75dc8592"
+"." = "fbe3cd68f118f67e6210f67daca6f2f42e7ab7cf"

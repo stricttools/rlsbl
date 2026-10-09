@@ -4,7 +4,7 @@ format_version = 2
 bump = "patch"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "30e1fc676c219f200b52ef9914f2db579e1bd3a8"
+release_commit = "10e25fb77170baca385e72f6e435b86275fb7bf0"
 description = "Monorepo release commits name their version-bumped files by the correct relative paths."
 [released_trees]
-"." = "491b2895836fad7cd0309b6876f61cfb71be1aa4"
+"." = "e131ae002ebf170f26f65804dbba10abe462b1bf"

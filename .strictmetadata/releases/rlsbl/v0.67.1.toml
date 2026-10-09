@@ -8,6 +8,6 @@ description = "V4 shim workspace fix, check-name multi-target, zero SEO warnings
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "2411fe1c751a1e0d3ed503f4ba41817874e9244b"
+release_commit = "d48a979130c4ec1adf8317c22a16853cff19340e"
 [released_trees]
-"." = "e8cd16333118b2635e8ea4361dcd1d6ad4603cfa"
+"." = "bd2d8079d1951bf29cd25ca4e5c4f95c51cba0ca"

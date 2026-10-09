@@ -10,6 +10,6 @@ context = "clean_stale_exclusions now removes commit-level batch exclusions when
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "ef153cf982b5d088d3c4f914295e57013d851154"
+release_commit = "131e90695b623f48635380acb673e3e3a0d75b2d"
 [released_trees]
-"." = "1d05ca7bc8e987d0461f002dd300b34c5f3d1614"
+"." = "be7c7a35593871f545aa76660c3616244adb4c6f"

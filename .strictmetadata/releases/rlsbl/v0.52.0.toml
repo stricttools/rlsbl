@@ -4,7 +4,7 @@ format_version = 2
 bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "01b89c92129cd35cd2ccb5b7db67dd80ae61b53c"
+release_commit = "4cb145637bd30dec61dbbe211680e9093af2c0a1"
 description = "Adds the `internal = true` workspace flag exempting a project from changelog enforcement, teaches `deps-unused` to read JS/TS imports via tree-sitter, and fixes Go cmd-layout projects being misdetected as libraries."
 [released_trees]
-"." = "453163c9837c1ea2c9685bcb58d0d75993ba340b"
+"." = "2c13899e92cadde25c13304fc3363921df75c538"

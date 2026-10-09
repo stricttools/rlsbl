@@ -40,6 +40,6 @@ regression test asks about one repository while standing in another.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "167e29eb85e494c95fc066208f0bdbeb5793465a"
+release_commit = "0464d7cb37022c30ad07cdede806e6a3c0f0a9de"
 [released_trees]
-"." = "df1588f91df43432c9f3a13b0a2ed5e30fdfa01a"
+"." = "55a727bf9081270b96d4048f6130fa8a52170832"

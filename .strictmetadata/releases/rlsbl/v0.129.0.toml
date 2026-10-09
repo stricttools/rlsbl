@@ -32,6 +32,6 @@ establish that honestly, so the refusal names none.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "f3c66c646c57217e15ea72b570cd7f204c3c7da9"
+release_commit = "9ada6875b28806c4209b0fbb8eb93dcfd23a6c8a"
 [released_trees]
-"." = "99d8f20b118e9da625ec697860fcdd1325e09040"
+"." = "173086a20b877f3e82aa27e8ab821373eff9d472"

@@ -36,6 +36,6 @@ module beside its npm and PyPI manifests.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "0a9b19ddf15e43b6f0e21ec7413ae93ea41bdb2e"
+release_commit = "0487f7cd3dcd305d37ccf99b0afd4f9175859522"
 [released_trees]
-"." = "eacb0c98e2969b433110e45a9184177162199f6e"
+"." = "9587a7beae5c8689b7071465bc12bed2a539e27a"

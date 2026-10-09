@@ -10,6 +10,6 @@ context = "When a project had a configured remote but no commits had been pushed
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "1e690ae47892dda0ef1ff7c70286636f2fb49692"
+release_commit = "df39277a2ac2f2fc3a9b8167ed40ea03b37d3622"
 [released_trees]
-"." = "5ec674b87a34b3360a066d927901fb83f532b724"
+"." = "406ed7fb5c756ed40c85b523025c54d8a32ee768"

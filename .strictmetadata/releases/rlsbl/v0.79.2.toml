@@ -10,6 +10,6 @@ context = ""
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "2417d6de36c06e63eb4755aae57e678c190c7dd8"
+release_commit = "ab8f80ae45a0030c31b85c098beb0810da3f4058"
 [released_trees]
-"." = "34d2c25d7126694ed33f175c8bea85e519e87172"
+"." = "9870020dbd6e038258e4d5778b0a966dcb99db0e"

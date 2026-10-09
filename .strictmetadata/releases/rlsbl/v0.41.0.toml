@@ -3,7 +3,7 @@ format_version = 2
 bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "31f2a0c988d17cb26efe7d7148716f2d5dd69e60"
+release_commit = "b39a60523982fe94004e3256d2f4bb3b666af283"
 description = "The `private` config key becomes required with no implicit default, asset building and upload become built-in release steps configured per target, and `changelog amend` arrives for editing a released version's JSONL."
 [released_trees]
-"." = "4e4d4a6baba0b34a628c081c0c4f04c7ce01a8e4"
+"." = "96d5ce95bc4892ae0ef82f3a7e9be9bbb4ec63be"

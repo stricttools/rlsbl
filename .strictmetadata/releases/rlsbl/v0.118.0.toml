@@ -31,6 +31,6 @@ conversion plans, and scripts/migrate_workspace_model.py migrates the rest.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "23e49639904415c99b73e74312dce2e1b0bee762"
+release_commit = "5c6964b9fd6b7b2e9d6cbe3e1d4023a276daae25"
 [released_trees]
-"." = "1755b48100d893e72af4d5999ab657cf11ab1ea5"
+"." = "1f30360451b7d4e07ede6656dbeb4f119e8590d5"

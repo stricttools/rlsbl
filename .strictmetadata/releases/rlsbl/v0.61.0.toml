@@ -8,6 +8,6 @@ description = "Target introspection: capabilities, ecosystem, and auto-generated
 context = "All 18 release targets now declare capabilities (publish, build_assets, read_name, read_metadata, ci_templates, dev_install), ecosystem labels, and auto-detectability. A new table-targets selfdoc directive auto-generates a comprehensive target details table, replacing the stale manual table. MATRIX_COLUMNS is now derived from TARGETS.keys() for DRY consistency."
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "bc6e455b58df1ae9e269f8e209ba55024f994352"
+release_commit = "d7d8bf20205218bf0a5017617eda892046c4cb9c"
 [released_trees]
-"." = "dac5530ea0e6ca17ca1d427012d0dd2ab484a692"
+"." = "b58db79680642920abf041c7a08936558c316cda"

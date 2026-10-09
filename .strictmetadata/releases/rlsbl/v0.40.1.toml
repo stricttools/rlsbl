@@ -3,7 +3,7 @@ format_version = 2
 bump = "patch"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "20e21ec2c559f0153447cd20819683650c7de64f"
+release_commit = "9b4594e80d9d09154fb01cffdb37e1302ff9f5b0"
 description = "Updates the CI workflow for the `check` to `check-name` rename."
 [released_trees]
-"." = "636d16c2a234f8c699064a252f215f428e002610"
+"." = "95897144cf9d42e390b9ff1d4d23d5dfaf9d07da"

@@ -3,7 +3,7 @@ format_version = 2
 bump = "patch"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "f8e952272d849dd7dcc94b69f10a751c93cfac7d"
+release_commit = "1f0ed0f08de3a95f54f7fff6026a78673b76729d"
 description = "`selfdoc gen` runs before `selfdoc check` during a release, so the docs are regenerated from source before they are validated, and a check failure prints a clean error instead of a traceback."
 [released_trees]
-"." = "a26809eead63a45d6944c681ee5157c2c953ce3c"
+"." = "4b431abd3e6351f17d66d096381790390c9ae9f6"

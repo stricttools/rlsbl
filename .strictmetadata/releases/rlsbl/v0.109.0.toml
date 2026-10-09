@@ -19,6 +19,6 @@ rename-releasable crash recovery and batch-archival guards were hardened, and th
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "932a9c86d84e7252c98909222733bb65ea52036b"
+release_commit = "771e8afff185e6581b1c331f58140179a10cb622"
 [released_trees]
-"." = "cdfedb1f155ea0db10faeb1d6d5e878054dffc90"
+"." = "9bf2332d49b802bf4e14e3c89c3bcb4a3ff40e69"

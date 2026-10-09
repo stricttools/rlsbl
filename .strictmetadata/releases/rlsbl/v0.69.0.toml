@@ -8,6 +8,6 @@ description = "Managed-files registry, lint config filtering, publish idempotenc
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "8c22ad982acba22ad8e480b8c5ebacfc96fa750f"
+release_commit = "4afb0f5371c06761c5e129195e6ddf4065d4ad3b"
 [released_trees]
-"." = "b2f10fb612611f3434ea616815fe0b8675183a14"
+"." = "56d3797a6becbd8c46149c363a1815030b180221"

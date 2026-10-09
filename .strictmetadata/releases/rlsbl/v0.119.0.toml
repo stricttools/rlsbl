@@ -27,6 +27,6 @@ member's CI filter).
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "205035e2d3c5f6f7e533fdebc512149e729ac959"
+release_commit = "2080b3f824d19b1e134e360db57e87472020cc11"
 [released_trees]
-"." = "06a3a0671fa93daf3aec90ba8bfdadff146fb2ef"
+"." = "a8fd06beb9de068cb3533a5c05f9a26290a49ef7"

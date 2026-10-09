@@ -3,7 +3,7 @@ format_version = 2
 bump = "patch"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "967a709e1ed4b9f5b41edf71510b80e2b8ba9a9a"
+release_commit = "a002caca57a0b672d4282f5ccf73c66be157eb6a"
 description = "Scaffold fixes: non-workflow files come from every detected target, npm targets resolve their own subdirectory, and the template engine gains an escape for literal braces."
 [released_trees]
-"." = "220235015179d1c04afc82b5971dc2215e82a731"
+"." = "f57ce57058e27410a8ab0789ffb697b547d0e920"

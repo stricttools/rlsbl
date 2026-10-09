@@ -8,6 +8,6 @@ description = "Prepush check system: test-suite check, version-tag skip removal,
 context = "Major overhaul of the pre-push hook system. All pre-push logic migrated into the rlsbl check system under a new 'prepush' tag. The hook now runs 'rlsbl check --tag prepush' with 4 checks (changelog coverage, gitignore guard, manual-push warning, test-suite). Version-tag skip removed -- checks always run. Shared testing.py module extracted from release flow."
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "4ec5ecee3a4eb6238ad6ee20b52c09cecdb0ed63"
+release_commit = "3c0786db0767337d18842175591bb5838a4c4fe0"
 [released_trees]
-"." = "5553fb35c3f09228e85148113bd5d9a68cef8a16"
+"." = "b694fe23bdc9b901cb2e2c642c5bdb23f9a9f56a"

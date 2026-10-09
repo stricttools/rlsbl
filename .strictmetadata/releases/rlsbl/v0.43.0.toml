@@ -3,7 +3,7 @@ format_version = 2
 bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "223b2c9699c4972b96fbd00e5034758b24eeebe5"
+release_commit = "4c0b8f0476c8eb8bcd6b3f11865b6ddd296bfe3a"
 description = "`edit-release`, `undo` and `yank` become subcommands of the `release` group, `release retry` becomes file-driven via retry.toml, and monorepo changelog coverage narrows to the commits touching the package's own files."
 [released_trees]
-"." = "d2aa3319d453f2f35b6d8fe3de8146b6e081854c"
+"." = "923b32b069bea0c39c8801d4894c3d3839ad0978"

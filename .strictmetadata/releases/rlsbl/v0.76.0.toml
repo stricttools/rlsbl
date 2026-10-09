@@ -10,6 +10,6 @@ context = "The 1985-line release.py monolith was split into 6 modules with clean
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "5cac74dc9073d4079bce1f64c4f115b23c03a860"
+release_commit = "04ee090e8fc59fd5f4b8df517126a8cb9e3adee0"
 [released_trees]
-"." = "92fa28300d254181a632b2e90303c490974431d4"
+"." = "af4c0e3f569a19696b48cfb3c24210065141544f"

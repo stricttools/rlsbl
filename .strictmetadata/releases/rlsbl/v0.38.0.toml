@@ -10,6 +10,6 @@ bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
 description = "The monorepo publish router inlines each sub-project's publish steps instead of calling reusable workflows, which fixes PyPI Trusted Publishing, plus a hash cache that skips regeneration when nothing changed."
-release_commit = "f52f1c43436b960da8577480dcdd648068a87f6f"
+release_commit = "3536a38b868c87f0aed0b0d825fc025791ce71a7"
 [released_trees]
-"." = "77b8ffa475ed94733dbbe064d8156fd8edc9359e"
+"." = "f3eda7bb553649c7f5db68f45d0072bab4fe3b29"

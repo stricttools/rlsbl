@@ -8,6 +8,6 @@ description = "CI template UV_NO_SOURCES fix"
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "fe5823c5b4b0cae84a87b2e5b210dd57255f0c59"
+release_commit = "96dfcd7baccc9ea790170ba7e78ae5c96e6fd2a5"
 [released_trees]
-"." = "69891d3db365a26a20964d6cffaab5b1510ac3eb"
+"." = "02d022aff2f1cfc9db8757a9583971e32598ef36"

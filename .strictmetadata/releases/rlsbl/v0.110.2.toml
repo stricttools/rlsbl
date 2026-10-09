@@ -19,6 +19,6 @@ sandbox on CI, and the publish gate certifies it.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "877b27ab5e6ab73fcb0135ec48a52e23ad5dadeb"
+release_commit = "84d0edc94324153588cdd43139d8245b2cda3755"
 [released_trees]
-"." = "2cec62dfc159f09e9b78fd2bd84b2000217b8978"
+"." = "4380661c4466293e5d535157726895598a138bcf"

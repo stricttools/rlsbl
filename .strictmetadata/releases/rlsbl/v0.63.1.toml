@@ -6,6 +6,6 @@ bump = "patch"
 description = "Pass RLSBL_DIST_DIR env var to custom_assets build commands."
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "4269c17304397a19fbb5bbf7e3d4b3e890b1ddb2"
+release_commit = "2a2d71faf5447c18577dc60205dac26383581774"
 [released_trees]
-"." = "731065f80ff8e8b828d26dfaaac7627a9e46157c"
+"." = "edd833fb467ccc2aa9b6655a61a2f451e0625775"

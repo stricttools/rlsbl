@@ -20,9 +20,9 @@ cache), turning CI green so this release cycle ships to the registries.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "ab0343988d9712e376159eb23e70e48ff42b4cbc"
+release_commit = "c2d3e538b123934cd01df934b0c78e6b2943290a"
 release_notices = [
     "> **Deprecated:** tagged but never published to any registry; the publish failed and was fixed forward. Use v0.111.0 instead.",
 ]
 [released_trees]
-"." = "c44ff1f7ecc2cc6dfc797d70cfbe3da1f1c2b345"
+"." = "70f0b1eea858d9fcec523b2f556a45211f4c04b1"

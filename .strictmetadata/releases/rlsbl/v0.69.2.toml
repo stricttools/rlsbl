@@ -8,6 +8,6 @@ description = "Deno publish idempotency, orphan sweep script"
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "c7e96c7b2faa525cd6c7e110c1582e8082316241"
+release_commit = "5c9bee2056c06f78f6461326b5e114ff0f7fea03"
 [released_trees]
-"." = "bef750f30507d257092b58eaba7bf49319542ac3"
+"." = "a1c6b2e2e3295976222bbfdee72d265f25cb4ae8"

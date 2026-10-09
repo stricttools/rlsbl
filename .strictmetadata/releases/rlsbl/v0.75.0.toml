@@ -10,6 +10,6 @@ context = "check-name was reporting names as available when registries would rej
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "b5cfc6842a82d9c35f16ffe67d49816a751c8b1b"
+release_commit = "2c99e39384c4add447cdde54401b80b68d5abede"
 [released_trees]
-"." = "b7a6cb81d37a880672dcc710c698d369b243642a"
+"." = "c4481e144ddd7449e549134f5c62753e33368b2c"

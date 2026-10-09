@@ -16,6 +16,6 @@ The releasable test runner now dispatches the correct test command per member ta
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "f76f80718b67d424c6e16aa51c1bffa735084e2a"
+release_commit = "39143c3d400c5503901acb2c53a3099d91c85fe6"
 [released_trees]
-"." = "e8032bb47bfc6ae0adefd5a21bcbeab6ff2422f0"
+"." = "fe54d8a02f1680a9b45a112dccd3785e78c69b91"

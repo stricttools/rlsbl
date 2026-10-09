@@ -10,6 +10,6 @@ bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
 description = "Restores the path-based changelog-only exemption alongside the trailer check, and syncs uv.lock, package-lock.json and go.sum during the release, including the modified lockfiles in the release commit."
-release_commit = "e4f8e835d02e1c560f2a95a3e9ffd01adf7cad7e"
+release_commit = "36d01061e5028998336a123886a83541c4cde969"
 [released_trees]
-"." = "2eb65d1edee57d905ec94a6f6b0c475ed8d8fe07"
+"." = "cc0b01da4b618af47609e4c2ec0db45df50e70ce"

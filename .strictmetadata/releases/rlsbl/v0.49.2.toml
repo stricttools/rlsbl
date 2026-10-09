@@ -4,7 +4,7 @@ format_version = 2
 bump = "patch"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "da837535b292397d4ab2074e312007bc76c6dd43"
+release_commit = "66d56d8297d77619a246dd4ec14522d6dff06b75"
 description = "Raises the npm name-check timeout to reduce CI flakiness, makes changelog finalization use git-relative paths consistently, and adds release integration tests that run against real git repositories rather than mocked subprocesses."
 [released_trees]
-"." = "f6fceda44f8eeace1438806fc27e2a94d0a7dfc1"
+"." = "d78ab21821ef3d2bf37c219393f0090e193eb1af"

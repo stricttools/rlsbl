@@ -8,6 +8,6 @@ description = "Fix CI test failure from --yes flag in safegit commit calls"
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "636e6a61fc479472402c433ad98c5a3b148b55bd"
+release_commit = "da949e1eb3b53cbba71a562ec75d8e29256a45d1"
 [released_trees]
-"." = "7cce5a7c46050d12c37d9f149b600e3d11e926c2"
+"." = "84b70aeea2ef8ba0558baa158a5664876953b76d"

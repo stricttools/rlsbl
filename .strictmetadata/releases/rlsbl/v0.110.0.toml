@@ -27,9 +27,9 @@ floor and a bare-run refusal guard.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "5471db5408ebfb9d85712460f6293e6045f91492"
+release_commit = "37770efc2e310942b971c27f183d5c73eb066143"
 release_notices = [
     "> **Deprecated:** tagged but never published to any registry; the publish failed and was fixed forward. Use v0.111.0 instead.",
 ]
 [released_trees]
-"." = "61d1b46c177dd1efbb671ff4435b324528f5c692"
+"." = "70e14c8dc6fb0017e7bab3e7b6807a312429d8f3"

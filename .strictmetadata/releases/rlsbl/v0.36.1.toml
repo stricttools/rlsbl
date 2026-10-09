@@ -10,6 +10,6 @@ bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
 description = "Monorepo target detection and PyPI builds resolve paths against the monorepo root and run from the sub-project directory, fixing validation, status and build failures when run from inside a package."
-release_commit = "610ea4d401240906a1ac70501f6a04323781dfcc"
+release_commit = "c63ec0b36d8592acd1a2e7a0d58923051204466d"
 [released_trees]
-"." = "31e47de92b5f58416a5abea46375613ff8961648"
+"." = "b5e8257a9a5ba09cf013f03b17036e6ff831a73c"

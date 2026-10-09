@@ -4,7 +4,7 @@ format_version = 2
 bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "6438beef4b6f4af50b51c5e6d906fd52e2b9af85"
+release_commit = "e0e6861eb0d66540e476fc61378354c9778cb704"
 description = "`ProjectContext` becomes the single context object: the separate check context is deleted, every target method takes the context, and `monorepo_root` is renamed `workspace_root`."
 [released_trees]
-"." = "e67ef3dd341a71f6773249642f9602cd31d61008"
+"." = "478eae20eeb470f5a144db2a7a527b0203f2747d"

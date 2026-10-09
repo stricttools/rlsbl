@@ -41,6 +41,6 @@ key rename to `unrecoverable`.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "ef9428be15e9acd9b0e5dcdc0dae08b2c64a4959"
+release_commit = "ff2dc4d7ffea417074d1edbbfcdbe4f7bbe85ebc"
 [released_trees]
-"." = "19d8cfeadd580dbb2b8551b5988e30a7b5585986"
+"." = "3f4a30201daee5964c6eed8ad4373696c9e5714d"

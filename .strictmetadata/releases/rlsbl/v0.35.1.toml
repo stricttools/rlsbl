@@ -10,6 +10,6 @@ bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
 description = "Release finalization writes the per-version .md file, the release stops false-positiving on files its own hooks and generators wrote, and the old path-pattern changelog exemption is removed."
-release_commit = "a020bc87f6b94ed29169e8518e1307ee443fdc75"
+release_commit = "433f28837504e6b69d7520dcb3a8a62472b614f7"
 [released_trees]
-"." = "3938bf07518f82389fc75f68adfb1b52b3ad5f8a"
+"." = "3562edfb5586966e1982458decfee808b67a5706"

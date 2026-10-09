@@ -10,6 +10,6 @@ Post-0.70.0 cleanup wave driven by loose ends from the previous session plus cro
 """
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "29e3fdd90590032337b13331297ca7395203e518"
+release_commit = "a96769e2e89b73706dcc88315a3a75d92f3d084f"
 [released_trees]
-"." = "3e75e1e3d690f6cfc70c2c7b5883634ab39a523c"
+"." = "fb48a717c9aa10d9758dc56e1247684663e91a18"

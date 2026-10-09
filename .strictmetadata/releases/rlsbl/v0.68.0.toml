@@ -8,6 +8,6 @@ description = "release scrub command, V4 hook removal"
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "6efcccd2af3c465944a6573146ded147fd1815c3"
+release_commit = "8bb3edd5b520b3dbf8f6a1fc89ca5438691a319d"
 [released_trees]
-"." = "2e2b6a260f6cef19a0e71d72601c5f9b161301bf"
+"." = "bef4a82351d85e4c4f1b718c3b7f0f5098d6d208"

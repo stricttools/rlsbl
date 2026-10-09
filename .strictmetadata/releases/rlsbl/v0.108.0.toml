@@ -12,6 +12,6 @@ context = "Adds `artifact: \"launcher\"` pipeline kind that produces npm/PyPI sh
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "46c8c37eb5c24258d23ff86b6ec93b933867453c"
+release_commit = "f523a90de38d0d0f032352e9f091784921d5b865"
 [released_trees]
-"." = "a24e1db9d235bb069593679c91fb9b6409368ff9"
+"." = "7a2f15e458338eda83836c53366ce1ef2cfe3894"

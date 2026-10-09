@@ -41,6 +41,6 @@ on a throwaway clone and touches nothing published or already pulled.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "b714cde1153dc488c515dfd0ea8fd33c9755fc9b"
+release_commit = "f782f5a3987defc02bc3676eb172777df0552f05"
 [released_trees]
-"." = "d2710574e3be6688240691192216d88399734f9d"
+"." = "d3cd12b5048d3621bc26a722399d1f084584abb6"

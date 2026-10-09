@@ -8,6 +8,6 @@ description = "scaffold --force preserves gitignore entries"
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "8be30956daff1b2e6910b648259d7b6476908a87"
+release_commit = "09044e876dc677cede8d9ef9dd7eda7c21ed5f25"
 [released_trees]
-"." = "9bba9a59410ba1f6e58076c0cd02c8de07e152be"
+"." = "a02c6175dbce17abf1e424242237c404bc7c2978"

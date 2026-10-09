@@ -8,6 +8,6 @@ description = "Dev node architecture, release descriptions, quality checks, and 
 context = "The changelog_exempt flag (v0.53) was renamed to dev_node because agents misinterpreted exempt as a desired behavior rather than a graph position. Dev nodes now fully opt out of the changelog system instead of being exempted from enforcement."
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "f2c1f4510f2a9d02baa6357a6811b24138472195"
+release_commit = "bf481035ab7f6538cdb06fb3de89f4c6fa0f287c"
 [released_trees]
-"." = "31c4cd7d6ad373c4a2689d60fe3e8987996feb2b"
+"." = "8b8539cadade3517adf656672f212b25e094a347"

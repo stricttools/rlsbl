@@ -8,6 +8,6 @@ description = "Monorepo mirror command, native-android and native-ios targets."
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "e858501fbcdcaee5bfe126565c16de159b595e00"
+release_commit = "a27b69bca84f8b7f1c27b05c1fb32d3af2c9faa7"
 [released_trees]
-"." = "14c494d6fe3ed9a2e33e9ae38a97e2ed5e8959a9"
+"." = "e56cf105c00aac055bfe5b8767ef19a712b6925d"

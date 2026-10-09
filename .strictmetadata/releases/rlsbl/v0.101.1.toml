@@ -12,6 +12,6 @@ context = "A monorepo's CI router had been broken since June 24 because GitHub A
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "e797b1e069705502764eecb560804bbf7fea3eff"
+release_commit = "ed12fd15b0393d3aa06bf01aa04990f1f825c3e6"
 [released_trees]
-"." = "ed09587c3fad188b4cab08691239c0a27c32e7e0"
+"." = "81dbafd510e2ef63892dced1a8a207d01d2141fe"

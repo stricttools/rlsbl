@@ -19,6 +19,6 @@ bare unscoped names, and Go pipelines must declare an explicit binary/library ar
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "4bf568ce85a8886f451b851d5f6ec94a5c372d5b"
+release_commit = "1e17ac7673bf60f1278392eedcdb70ebe1eeb98a"
 [released_trees]
-"." = "db413da10586246d9e612d8fb888c25e9715cae8"
+"." = "0f753732103b96b99667818b5c28d2141631e6ea"

@@ -3,7 +3,7 @@ format_version = 2
 bump = "patch"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "f7b62d945a8b7f9cab076da1ce8aef9c7744bfc1"
+release_commit = "272a91131b8983dfdd6efe5c525adb77230d7b4c"
 description = "The docs target becomes versioned: it reads and writes its version from selfdoc.json and takes part in the version-consistency check instead of being skipped."
 [released_trees]
-"." = "6851565b50fe35c49af487a855a45347a0df41bd"
+"." = "487476b28db4f50e1d1b545e23f5fc624b46a678"

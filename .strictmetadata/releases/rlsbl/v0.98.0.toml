@@ -23,6 +23,6 @@ stale hashes, and empty directories.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "9f1c3684109e36dd6d4bfdfc55497bccedad1b76"
+release_commit = "6d2432bb34e41d0578210932f2d3f1cd69b12501"
 [released_trees]
-"." = "c7505bf71b0dc2d5642a91ae3cd30216dcf2dffa"
+"." = "7cc79b8bb5e94d28b5892e06a083a4e1ccd8f42b"

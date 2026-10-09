@@ -8,6 +8,6 @@ description = "Go workspace dependency validation, circular dependency detection
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "fb2a20d005f24407ae842f26e026bd6f4915a9b0"
+release_commit = "78fb2b171741981735130d7cda4e93c266596978"
 [released_trees]
-"." = "4389c4a14655b830d4c4a9d0737a5564183878ab"
+"." = "c22fb232ef87a913fca907419854d5590d91f2f4"

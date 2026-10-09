@@ -8,6 +8,6 @@ description = "Changelog edit command, dev_node release prohibition, config hard
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "7a0eb2f0998b6560fb2386565efe464181a57a99"
+release_commit = "53e35c15b837e0c9dad1176da82b03a56e8a752f"
 [released_trees]
-"." = "4f0ea9858323a054afac043ed1699bf2faf2c55b"
+"." = "7ca0dfcf10c2378242021ed331366c3fe6383064"

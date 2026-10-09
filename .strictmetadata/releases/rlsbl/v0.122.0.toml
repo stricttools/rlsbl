@@ -38,6 +38,6 @@ inside a project is still an ordinary source directory.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "c08554ec9cfb09f2d09af904552f139826cd764b"
+release_commit = "f5eaf46d5344b09adf89269e59f9073afe83fe77"
 [released_trees]
-"." = "7a8d67e8bfa9ed6060cf5ff499d26e6a0a8c637c"
+"." = "d2f6f9d599110e129bf76c10b98d347f148f68f9"

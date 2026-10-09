@@ -17,6 +17,6 @@ context = "The pytest plugin, Go module, and npm package formerly named strictte
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "2a9aa54f4ceb698bc99941c1da6b62d43938a744"
+release_commit = "5f3894c63e1580cb5089d3e8a2c52d738716d9bb"
 [released_trees]
-"." = "d30f6821667c678a722e77a218af4f5f5bafc3b8"
+"." = "71a603170ea8d24be6757bbf55bd794916c3fe93"

@@ -30,6 +30,6 @@ name, and where that name is declared.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "f5b0d81015d1f809bc0394a98d6e88c55562a4e9"
+release_commit = "948ea15d5b61e77a71bf478c5454d1cadc1a4155"
 [released_trees]
-"." = "1fb6ec4093c275b9819af37c07581379e55af57b"
+"." = "44de8afb5f3c6938f2f2ea170e13f43f8f9efe13"

@@ -10,6 +10,6 @@ bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
 description = "A broad scaffold and release cycle: centralized GitHub Actions versions, `scaffold --dry-run`, stale pre-push hook regeneration, user-owned custom workflow files, config-driven per-target publishing, the `dev install` command, and a set of monorepo publish fixes."
-release_commit = "b6b026c0ca1d5b329d2043fcaf5578757ae411a2"
+release_commit = "beb31941e3496f80bef204e22f4b51e92352aa37"
 [released_trees]
-"." = "4f60d5f2565734b63246ce6b5ca57ae8de3635ba"
+"." = "4c1fc2baff2ff37c62b9a0e059584e09fa33474d"

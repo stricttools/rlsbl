@@ -34,6 +34,6 @@ printed a run URL and no error lines.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "5b1b5045ab047e4f27c5e146d843ad8c654f6f3b"
+release_commit = "cd49dcfba3255966a2b1e6306c6a5ab1bd3088a1"
 [released_trees]
-"." = "28e9571de23a215b624885e5967347a319fee8dc"
+"." = "f4801e3c9b220ade5491cf129cecdbcd3c1b558a"

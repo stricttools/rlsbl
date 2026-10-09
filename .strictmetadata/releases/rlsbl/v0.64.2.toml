@@ -8,6 +8,6 @@ description = "Fix Docker metadata false positive in scaffold check, add SSH hos
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "2a1cf0ad2406bb9d8c4a6d6939b6bbc8e1cf7f55"
+release_commit = "81978395263ebaaf0a6670632da005ad91ddc84f"
 [released_trees]
-"." = "261b050e5b8b906a8c2b268b2951b13ebd1283c6"
+"." = "5c01ca229d5f6a8479d0c7bb99e3ccbc49d392ce"

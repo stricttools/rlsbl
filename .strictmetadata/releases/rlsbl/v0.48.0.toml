@@ -4,7 +4,7 @@ format_version = 2
 bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "0767cd6c506c4352ed63b499dc779c47ab446fb5"
+release_commit = "1eb52931f69f5109cfc4d90d2979a5b93620c7b8"
 description = "Every internal API takes an explicit `project_root` instead of falling back to the current directory, and an aborted release reverts its version-bumped files instead of leaving the working tree dirty."
 [released_trees]
-"." = "ce0f7589881aef32545957f7fde1ef39f6ab68d3"
+"." = "30ed4b0d37faaa6f362a88ebcc20d68716514967"

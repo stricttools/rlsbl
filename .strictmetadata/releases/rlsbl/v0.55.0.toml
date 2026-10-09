@@ -8,6 +8,6 @@ description = "Monorepo release-init command, Go dead-modules detection, scaffol
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "dbf8e114627730e1c436396dfc2c675e670aa716"
+release_commit = "b7656289a91858119c3c2666c7761519e21500a1"
 [released_trees]
-"." = "bf4e6abb34b1c714b077bd190531ce932c9affbb"
+"." = "3031887dce12008db3583cf30283035872cccfe7"

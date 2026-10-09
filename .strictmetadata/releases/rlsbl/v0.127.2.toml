@@ -21,6 +21,6 @@ The archive's shipped_as field now decides a version's primary ref, rename-relea
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "5a930be1188a38f048935bbd994560d621c6cefc"
+release_commit = "1489c0017e30944328b2b24122eb8a50127d4557"
 [released_trees]
-"." = "a243cb9ef76f28c553650b8e92001ff1ab847430"
+"." = "6c344fc85157672db6056ff61faf1bf539e6b562"

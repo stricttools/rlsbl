@@ -10,6 +10,6 @@ Codebase investigation surfaced 50 curiosities; 13 were elevated to decisions an
 """
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "b9eeb60ef7162ae9b791a568c75f273675df4a25"
+release_commit = "3563f36f7473d7ecd2c8373700c3def00139d3d1"
 [released_trees]
-"." = "7ff2268ffa4a474f6388579c9a8252f9dca419cf"
+"." = "77f81fd41d022b07fb5e98780e35bf1e50623a98"

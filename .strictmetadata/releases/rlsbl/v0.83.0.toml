@@ -12,6 +12,6 @@ Breaking changes: publish.json config file removed (unused by all projects, 4-le
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "3b7f70c4f48b99f10db7643cfc86ac76e3e7b2d0"
+release_commit = "018304b21f0a7f388c7b79ebd838ecb884fe77ef"
 [released_trees]
-"." = "0b5c992d152cd0f55dbf5a42c59643e0db66137b"
+"." = "74852c96f1116d589ecd7759c5243b72e6ef9089"

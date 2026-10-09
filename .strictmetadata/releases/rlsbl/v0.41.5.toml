@@ -3,7 +3,7 @@ format_version = 2
 bump = "patch"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "aa2aa56ed4c436c4ce707d62db764bedd2b5deb3"
+release_commit = "3986df6c94f7d09055507e5ff2f36befb9598de9"
 description = "npm moniker collision detection covers separator-free names, so `check-name` stops reporting a name as available when npm considers it identical to one that already exists."
 [released_trees]
-"." = "76c6dcc0b21e309402a78ead38fb5ec7863b18f2"
+"." = "c4a11fa5e3accccd4cf0136566716081505d0d4c"

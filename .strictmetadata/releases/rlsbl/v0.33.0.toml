@@ -10,6 +10,6 @@ bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
 description = "`dev install` grows `--global`/`--venv` and four more targets, an empty `release_branches` list becomes an error instead of a silent fallback, and an aborted release no longer leaves a regenerated CHANGELOG.md in the working tree."
-release_commit = "10b4ddaf6db2b00fe30e79243adf5ad0f70aaad5"
+release_commit = "e266f3e3557cbae80ff9c8894637748766c3e759"
 [released_trees]
-"." = "bc3ab599eb59fd6b112860f7a8ebb03dac044eb1"
+"." = "64c6b46aa5214bc8ecbf341e94c8d2313391b99c"

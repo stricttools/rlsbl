@@ -32,6 +32,6 @@ option sets, and the validation itself from ever disagreeing.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "ad43c105a2f916ee3a5a2ff0f13c1af01cf84c35"
+release_commit = "16011cafdcc9c89fc5094757df55e1e09ae57772"
 [released_trees]
-"." = "16df8e7aa0c28e36412c1bd6b4d1dc82e5813b89"
+"." = "7d2ce2763cf48d45b04b7c397ae0701dbaf458fa"

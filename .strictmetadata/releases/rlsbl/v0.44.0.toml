@@ -3,7 +3,7 @@ format_version = 2
 bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "712736ce5c36f51363545a4ecb6f88112c1f9f3e"
+release_commit = "ba2bc96cbda2715d202750db9dd7fc787efd6393"
 description = "`release retry` becomes dispatch-only: it no longer deletes and re-creates the GitHub Release or re-uploads assets."
 [released_trees]
-"." = "727a30bac8a96db5ba66c1ce7aeba5bc0e163789"
+"." = "57499af638b62133580926947756ceff19d7682a"

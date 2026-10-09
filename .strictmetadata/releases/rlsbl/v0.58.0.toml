@@ -8,6 +8,6 @@ description = "New dead-workspace-packages check for detecting unused library pa
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "02fc52e2ecb4868e5f7f217ad2ef1b25062401de"
+release_commit = "ff0d84155ecfdaa6455260222063050bbd2db271"
 [released_trees]
-"." = "b45d1b0f0e2720e0a83ba668e20332e11e3477cc"
+"." = "506897152702a5b98adc2510144f1775dcfe0fff"

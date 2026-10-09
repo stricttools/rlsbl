@@ -8,6 +8,6 @@ description = "Fix CI test failure when selfdoc not installed."
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "9e9974a239c0c4d850d9d33d132ecdae9fe057c8"
+release_commit = "cec076d1196a834dbcb8402eaf484b1c90a74ef7"
 [released_trees]
-"." = "07ed2f53d97cdb83b3830729417e709d6ad38aa5"
+"." = "8a662eb50edf93dcbfbb479f46e1cbf1f1dd15d5"

@@ -17,6 +17,6 @@ implicit releasable mode (monorepos must define [[releasables]]).
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "61bb4cee777b457d391d60829a9bf39671cf8d90"
+release_commit = "ef58893886ad9207d663b05f07b502747429a6f6"
 [released_trees]
-"." = "b23bb935c994aa6e8e1d406169f8514031269e54"
+"." = "fea6a29062febec3b4b949bb28d49b563546d982"

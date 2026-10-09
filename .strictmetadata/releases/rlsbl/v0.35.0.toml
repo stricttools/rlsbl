@@ -10,6 +10,6 @@ bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
 description = "Fixes the release crash introduced by the previous version's changelog preview heading, raises the `max_entries_per_commit` default to match documented practice, warns about stale monorepo changelog entries at finalization, and resolves Action versions from a single table at scaffold time."
-release_commit = "994effa29dd2d9835da6530f5d1ee3bfa98c8daa"
+release_commit = "d015392733a426925d33bdf955a25087b55663b7"
 [released_trees]
-"." = "e1d59d5aec1496db03fbac9e4e394c8116f5e1d4"
+"." = "bd701c0d2b03d504bdc61330efdad7623e74a864"

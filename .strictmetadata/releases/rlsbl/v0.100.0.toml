@@ -12,6 +12,6 @@ context = "hashes.json was never read for any scaffold decision -- it was write-
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "d017dddf55e42659d5296e85057d1d66b1fcb112"
+release_commit = "d9c7cd10542d58aec90c3f466365957bf045f7d6"
 [released_trees]
-"." = "5959a3c23a25a0b86174d9dbcdca768b840f278e"
+"." = "6d9fe42dc0ff1ac786b797e8252fa658220b3814"

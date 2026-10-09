@@ -54,6 +54,8 @@
 - A releasable's tags are recognized only as its tag format's prefix, a `MAJOR.MINOR.PATCH` version, then the format's suffix, everywhere: an identity's `tag_patterns` glob (`v*`) no longer claims `video-proc@v0.1.0` or makes that tag's owner ambiguous, and a workspace's publish router judges the published tag by the same rule, its wait-for-ci job naming the matched tag scheme in an output each publish job's condition reads, instead of prefix conditions. Run `rlsbl scaffold` to regenerate the publish workflows.
 - `rlsbl release scrub` no longer refuses changelog commit ids that named no commit before its rewrite either (left by an earlier rewrite): it lists them and goes on, and refuses only an id that named a commit the rewrite replaced and names none after it. Such ids are first remapped through the rewrite's own commit map, then safegit's rewrite journal.
 - `rlsbl release scrub` and `rlsbl transition declassify` give a safegit history rewrite five minutes plus 50ms for each commit of the repository, instead of a fixed ten minutes an entire-history scrub of a long history exceeded, and require safegit 0.31.1, whose rewrites fit that bound.
+- A `rlsbl release scrub` stopped by an out-of-date generated changelog is finished by regenerating it with `rlsbl changelog generate --no-auto-commit` and running the scrub again, which commits it with the scrub's records; the refusal used to say to commit the regenerated changelog, after which the scrub refused to resume.
+- A release is no longer refused for a dev overlay of a package no `pyproject.toml` of the releasable declares; the version-skew check asks PyPI only about overlaid packages the release depends on.
 
 ## 0.131.0
 

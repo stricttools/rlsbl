@@ -8,6 +8,6 @@ description = "Pipeline separation: versioning and publishing are now independen
 context = "Breaking: publish() and build_assets() removed from targets, replaced by pipeline types. DocsTarget removed (use cloudflare-pages pipeline). flutter-ios/flutter-android merged into single flutter target. The publish config key is no longer recognized -- use pipelines. New: 9 built-in pipeline types, custom_assets, hooks override built-ins, 5 new checks, pipeline introspect table. Fix: multi-target array bugs in snapshot/graph/status."
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "c98e21eb29f0d434a2ade01d91e5c5dab6cc9cc6"
+release_commit = "1028bc4715a35dcc47772f0ba4eb66f12ae5b481"
 [released_trees]
-"." = "3a6041033845fdfa3fbfc576aacd156e947dc368"
+"." = "52ad8edcb6c21935756e21868e4f6e5c65f8fd8e"

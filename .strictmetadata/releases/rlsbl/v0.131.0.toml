@@ -17,6 +17,6 @@ context = "The release checkout sits inside the live repository, so Go found the
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "9ce652ae199d1de7a06274952e98df9334d0681e"
+release_commit = "bbd9d9ead4e4136944752809f424a77977176e80"
 [released_trees]
-"." = "119156c1c1836b846c5f22ce75265897167c7b0f"
+"." = "c95fafeed544701a2a6ab4b3d92ad2de88432119"

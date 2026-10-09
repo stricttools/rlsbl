@@ -10,6 +10,6 @@ bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
 description = "The private post-release hook checks `dist/` against `max_asset_size_mb` before uploading assets to a GitHub Release."
-release_commit = "28cc826b1666f8175d5697ad302df4b8253e351b"
+release_commit = "6fe74159be540e293e87019c686667f75e07ff9f"
 [released_trees]
-"." = "49f16c6ce6d7d485a8334271030db0404e5d1cdc"
+"." = "2c3c5adcfaa975fde46f2207ed8e7842726ec957"

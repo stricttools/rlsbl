@@ -8,6 +8,6 @@ description = "deps-undeclared respects try/except ImportError for optional impo
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "811cfdc0b6c085d83b2c8c90208e87579042307e"
+release_commit = "cae30d5a87db86dbe97640d6ae2784f6631d15d6"
 [released_trees]
-"." = "6db88b4d2940a53d89fbd95759e37e41d058c19a"
+"." = "54996b4908d88278c40b63130245a5a183fb461c"

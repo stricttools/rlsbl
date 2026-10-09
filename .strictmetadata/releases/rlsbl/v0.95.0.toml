@@ -24,6 +24,6 @@ gate, so history rewrites keep changelog metadata consistent end to end.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "4e59ce3831b63a842c4d52ab9205151acca48019"
+release_commit = "e00b6b3f46f5e7950d9ca890a46a8c0b4c86b54b"
 [released_trees]
-"." = "ba148abb483c9c2c57b724110931ec221fff7707"
+"." = "21d0a9ab595b06f643846006675d387ae24b4148"
