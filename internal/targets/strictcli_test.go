@@ -2,6 +2,7 @@ package targets
 
 import (
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -99,6 +100,28 @@ func TestTheGoEntryPointIsTheMainPackageImportingStrictcli(t *testing.T) {
 		"cmd/tool/main.go":   "package main\n\nfunc main() {}\n",
 	})
 	if program, found, err := detect(t, dir); err != nil || !found || program != (StrictcliProgram{EntryPoint: "./cmd/portal/", Language: StrictcliGo}) {
+		t.Fatalf("%+v, %v, %v", program, found, err)
+	}
+}
+
+// rlsbl's own release dumps its schema, so its own layout must let the
+// detection tell its entry point among its main packages.
+func TestRlsblsOwnEntryPointIsDetected(t *testing.T) {
+	// The module cache is read where it is, so go list resolves rlsbl's
+	// requirements without downloading them into the isolated home.
+	modcache, err := exec.Command("go", "env", "GOMODCACHE").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	hygiene.Isolate(t)
+	t.Setenv("GOMODCACHE", strings.TrimSpace(string(modcache)))
+	t.Setenv("GOPROXY", "off")
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	program, found, err := detect(t, root)
+	if err != nil || !found || program != (StrictcliProgram{EntryPoint: "./cmd/rlsbl/", Language: StrictcliGo}) {
 		t.Fatalf("%+v, %v, %v", program, found, err)
 	}
 }
