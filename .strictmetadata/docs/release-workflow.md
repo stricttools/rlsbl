@@ -66,7 +66,7 @@ Before it writes anything, the release refuses, each refusal naming its fix:
 - a local pipeline whose credentials are missing, and a pipeline the lifecycle-and-license record or the repository's visibility forbids ([private repositories](pipelines.md#private-repositories-and-proprietary-releasables));
 - a GitHub visibility that disagrees with the record (a proprietary releasable in a public repository, a private repository with no proprietary releasable), and a `deploy_command` on a releasable that is not a proprietary server;
 - a record that drops a closed period or a held registry name present at the releasable's nearest release commit;
-- a dev overlay ahead of PyPI: a `dev-sources.toml.local-only` overlay whose local version is above the package's latest PyPI release means the release was developed against unreleased code, and the dependency is released first;
+- a dev overlay ahead of PyPI: a `dev-sources.toml.local-only` overlay of a package a `pyproject.toml` of the releasable declares, whose local version is above the package's latest PyPI release, means the release was developed against unreleased code, and the dependency is released first; an overlay of a package no `pyproject.toml` declares is not checked;
 - a Go module whose `go mod tidy` would change it, and a Go workspace whose `go work sync` would raise a requirement;
 - a next version that cannot be decided ([the version decision](#the-version-decision)), and a tag of it here or on origin;
 - `gh` unauthenticated, no push access to the repository, a fetch of origin that fails, a branch that is not a declared release branch, a branch behind origin, and a releasable publishing from CI whose GitHub Release would start no publish workflow.

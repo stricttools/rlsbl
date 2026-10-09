@@ -432,12 +432,30 @@ func TestADevOverlayAheadOfPyPIIsRefusedUntilTheDependencyIsReleased(t *testing.
 	checkout := filepath.Join(t.TempDir(), "gadget")
 	testsupport.WriteFile(t, filepath.Join(checkout, "pyproject.toml"), "[project]\nname = \"gadget\"\nversion = \"0.3.0\"\n")
 	overlay(t, repo, checkout)
+	repo.Write("pyproject.toml", "[project]\nname = \"portal\"\nversion = \"0.4.0\"\ndependencies = [\"gadget>=0.2\"]\n")
+	repo.Write(releaseFilePath, releaseFile("minor", `"npm"`, `"pypi"`))
+	repo.Commit("depend on gadget", "pyproject.toml", releaseFilePath)
+	repo.Git("push", "-q", "origin", "main")
 	_, err := validate(t, repo, testsupport.NewFakeHTTP(t, pypiAnswer("0.2.0")), nil)
 	if err == nil || !strings.Contains(err.Error(), "release the dependency first") || !strings.Contains(err.Error(), "gadget 0.3.0") {
 		t.Fatalf("an overlay ahead of PyPI was not refused: %v", err)
 	}
 	// The fix the refusal names: the dependency is released.
 	_, err = validate(t, repo, testsupport.NewFakeHTTP(t, pypiAnswer("0.3.0")), nil)
+	mustNotFail(t, err)
+}
+
+func TestADevOverlayOfAPackageNoManifestDeclaresIsNotRefused(t *testing.T) {
+	hygiene.Isolate(t)
+	gitHub(t, "public", true)
+	repo := readyRepo(t, "")
+	checkout := filepath.Join(t.TempDir(), "gadget")
+	testsupport.WriteFile(t, filepath.Join(checkout, "pyproject.toml"), "[project]\nname = \"gadget\"\nversion = \"0.3.0\"\n")
+	overlay(t, repo, checkout)
+	repo.Git("push", "-q", "origin", "main")
+	// No manifest declares gadget, so the release is not built against it
+	// and PyPI is never asked about it.
+	_, err := validate(t, repo, testsupport.NewFakeHTTP(t), nil)
 	mustNotFail(t, err)
 }
 

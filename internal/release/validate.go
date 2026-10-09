@@ -467,14 +467,21 @@ func validatePipelines(ws *workspace.Workspace, r declarations.Releasable, env m
 // refuseVersionSkew refuses a release developed against a local checkout of
 // a dependency ahead of what PyPI publishes: the dev overlays (in the working
 // tree) install sibling checkouts, and a release built against unreleased
-// dependency code must wait for that dependency's release. Only the
-// project's package document is read from PyPI.
+// dependency code must wait for that dependency's release. An overlay of a
+// package no pyproject.toml of the releasable declares is not something the
+// release depends on, so it is not checked. Only the overlaid package's
+// document is read from PyPI.
 func refuseVersionSkew(ws *workspace.Workspace, r declarations.Releasable, liveRoot string, reg registry.Client) error {
 	dirs := []string{liveRoot}
 	for _, m := range ws.MembersOf(r.Name) {
 		dirs = append(dirs, filepath.Join(liveRoot, filepath.FromSlash(m.Path)))
 	}
-	overlays, err := dependencies.CollectActiveOverlays(uniqueSorted(dirs))
+	dirs = uniqueSorted(dirs)
+	overlays, err := dependencies.CollectActiveOverlays(dirs)
+	if err != nil {
+		return err
+	}
+	declared, err := dependencies.PypiDeclaredNames(dirs)
 	if err != nil {
 		return err
 	}
@@ -483,6 +490,9 @@ func refuseVersionSkew(ws *workspace.Workspace, r declarations.Releasable, liveR
 		return err
 	}
 	for _, o := range overlays {
+		if !declared[dependencies.NormalizePypiName(o.Package)] {
+			continue
+		}
 		local, err := pypi.ReadVersion(o.Path)
 		if err != nil {
 			return refuse("the dev overlay of %s installs the checkout %s, whose version cannot be read (%v), so the release cannot tell whether it was developed against unreleased code of %s", o.Package, o.Path, err, o.Package)

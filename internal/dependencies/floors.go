@@ -86,6 +86,23 @@ func pypiDeclared(dir string) (map[string]declaredPypi, bool, error) {
 	return declared, true, nil
 }
 
+// PypiDeclaredNames are the normalized names of every dependency the
+// pyproject.toml of each of dirs declares, in any section family. A
+// directory without a pyproject.toml declares none.
+func PypiDeclaredNames(dirs []string) (map[string]bool, error) {
+	names := map[string]bool{}
+	for _, dir := range dirs {
+		declared, _, err := pypiDeclared(dir)
+		if err != nil {
+			return nil, err
+		}
+		for name := range declared {
+			names[name] = true
+		}
+	}
+	return names, nil
+}
+
 // PypiLocked are the versions the uv.lock at path resolves, keyed by
 // normalized name; found is false when the file is absent. A lock that
 // does not parse is an error.
