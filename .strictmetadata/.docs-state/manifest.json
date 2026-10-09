@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "name": "release-checkout",
+  "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.131.0",
+  "version": "0.132.0",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, and the Go module proxy",
   "language": "go",
   "base_url": "https://smmh.dev/rlsbl",
@@ -7663,6 +7663,11 @@
         },
         {
           "level": 3,
+          "text": "`ReadArchived`",
+          "anchor": "readarchived"
+        },
+        {
+          "level": 3,
           "text": "`Check`",
           "anchor": "check"
         },
@@ -11468,7 +11473,7 @@
       ]
     }
   ],
-  "last_gen": "2026-10-09T14:06:16.327035+00:00",
+  "last_gen": "2026-10-09T15:27:41.454644+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
