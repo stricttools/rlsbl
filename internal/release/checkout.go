@@ -98,8 +98,10 @@ func (c *Checkout) LiveRepo() git.Repo { return c.live }
 func (c *Checkout) BranchRef() string { return "refs/heads/" + c.Branch }
 
 // Environment is what every process of the release is started with: GOWORK
-// (the checkout's own committed go.work, or off, so a Go command never finds
-// the working tree's uncommitted go.work in a parent directory),
+// (off when the checkout commits no go.work, so a Go command never finds the
+// working tree's uncommitted go.work in a parent directory, and empty when it
+// does, so a Go command in the checkout finds the checkout's own go.work and
+// one in another directory, such as a test's throwaway module, finds none),
 // RLSBL_RELEASE_BIN, and PATH with the release's directory for binaries
 // first, so a tool a hook built there is the one later steps run.
 func (c *Checkout) Environment() map[string]string {
@@ -261,16 +263,16 @@ func prepareReleaseBin(e *strictcli.Effects, live git.Repo) (string, error) {
 	return path, nil
 }
 
-// releaseEnvironment is what every process of a release in the checkout at
-// path gets (see Checkout.Environment).
-func releaseEnvironment(co git.Repo, path, releaseBin string) (map[string]string, error) {
+// releaseEnvironment is what every process of a release in the checkout co
+// gets (see Checkout.Environment).
+func releaseEnvironment(co git.Repo, releaseBin string) (map[string]string, error) {
 	gowork := "off"
 	tracked, err := co.Tracks("go.work")
 	if err != nil {
 		return nil, err
 	}
 	if tracked {
-		gowork = filepath.Join(path, "go.work")
+		gowork = ""
 	}
 	searchPath := releaseBin
 	if p := os.Getenv("PATH"); p != "" {
@@ -296,7 +298,7 @@ func EnterCheckout(e *strictcli.Effects, live git.Repo, branch, sha string) (*Ch
 	if err != nil {
 		return nil, err
 	}
-	env, err := releaseEnvironment(co, path, bin)
+	env, err := releaseEnvironment(co, bin)
 	if err != nil {
 		return nil, err
 	}

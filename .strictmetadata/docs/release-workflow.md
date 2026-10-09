@@ -85,7 +85,7 @@ Every process the release starts in the checkout gets this environment:
 | --- | --- |
 | `RLSBL_RELEASE_BIN` | `<git common dir>/rlsbl/release-bin`, the release's own directory for binaries, empty when each release starts. |
 | `PATH` | `$RLSBL_RELEASE_BIN` first, then the `PATH` rlsbl was started with. |
-| `GOWORK` | The checkout's own `go.work` when the repository tracks one at its root, `off` otherwise, so Go never builds against the working tree's uncommitted `go.work`. |
+| `GOWORK` | Empty when the repository tracks a `go.work` at its root, so a Go command in the checkout finds the checkout's own and one in another directory (a test's throwaway module) finds none; `off` otherwise. Either way Go never builds against the working tree's uncommitted `go.work`. |
 
 A project whose release must run its own unreleased build of a tool (selfdoc releasing itself runs the selfdoc it is about to ship) builds it into `$RLSBL_RELEASE_BIN` from a pre-checks hook; the copy installed for every other session is never touched.
 

@@ -310,12 +310,35 @@ func TestTheEnvironmentKeepsGoOffTheWorkingTreesWorkspace(t *testing.T) {
 		return nil
 	}))
 	repo.Commit("a committed workspace", "go.work")
+	outside := t.TempDir()
 	mustNotFail(t, inCheckout(t, repo, func(co *release.Checkout) error {
-		if got := co.Environment()["GOWORK"]; got != filepath.Join(co.Path, "go.work") {
-			return fmt.Errorf("the committed go.work is not the checkout's own: %s", got)
+		// A Go command in the checkout uses the checkout's own go.work, and
+		// one elsewhere (a test's throwaway module) is in no workspace.
+		if got := goWorkIn(t, co.Path, co.Environment()); got != filepath.Join(co.Path, "go.work") {
+			return fmt.Errorf("the committed go.work is not the checkout's own: %q", got)
+		}
+		if got := goWorkIn(t, outside, co.Environment()); got != "" {
+			return fmt.Errorf("a Go command outside the checkout was put in its workspace: %q", got)
 		}
 		return nil
 	}))
+}
+
+// goWorkIn is the go.work a Go command started in dir with the environment
+// env added uses, or "" for none.
+func goWorkIn(t *testing.T, dir string, env map[string]string) string {
+	t.Helper()
+	cmd := exec.Command("go", "env", "GOWORK")
+	cmd.Dir = dir
+	cmd.Env = os.Environ()
+	for k, v := range env {
+		cmd.Env = append(cmd.Env, k+"="+v)
+	}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("go env GOWORK in %s: %v: %s", dir, err, out)
+	}
+	return strings.TrimSpace(string(out))
 }
 
 func TestTheWriteScopeAndThePartitionOfChanges(t *testing.T) {
