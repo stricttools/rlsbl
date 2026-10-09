@@ -10,8 +10,10 @@ import (
 	"github.com/stricttools/strictcli/go/strictcli"
 	"github.com/stricttools/testisolation/go/hygiene"
 
+	"github.com/stricttools/rlsbl/internal/changelog"
 	"github.com/stricttools/rlsbl/internal/historyrewrite"
 	"github.com/stricttools/rlsbl/internal/testsupport"
+	"github.com/stricttools/rlsbl/internal/workspace"
 )
 
 var scrubTime = time.Date(2026, 3, 4, 5, 6, 7, 0, time.UTC)
@@ -425,5 +427,47 @@ func TestNothingToRewriteRepairsTheChangelogFromTheJournal(t *testing.T) {
 	}
 	if !strings.Contains(repo.Git("log", "-1", "--format=%s"), "repair changelog commit ids") {
 		t.Fatal("the repair was not committed")
+	}
+}
+
+// A generated changelog the rewrite found out of date stops the scrub, and
+// the fix it names clears the stop: the changelog regenerated without a
+// commit, which the scrub then commits with its records, so HEAD is still the
+// rewritten head the saved scrub resumes from.
+func TestAStaleGeneratedChangelogIsRegeneratedAndCommittedWithTheRecords(t *testing.T) {
+	hygiene.Isolate(t)
+	f := newScrubFixture(t)
+	// The rewritten history's CHANGELOG.md is not what generating it gives.
+	f.repo.Git("checkout", "-q", f.new.S)
+	f.new.S = commitAll(t, f.repo, map[string]string{"CHANGELOG.md": "# Changelog\n\nout of date\n"}, "a hand edit")
+	f.repo.Git("checkout", "-q", "main")
+	sg := newSafegit(t, "0.31.1")
+	sg.Answer(f.rewriteScript(), safegitDocument(t, f.rewritePayload(true)), 0)
+
+	r := scrub(t, f.repo.Dir, mangleSecret, false)
+	requireExit(t, r, 1)
+	requireStderr(t, r, "CHANGELOG.md, line 1", "`rlsbl changelog generate --no-auto-commit`")
+
+	// The fix the refusal names: regenerate, and commit nothing.
+	ws, err := workspace.Load(f.repo.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requireExit(t, run(t, false, func(ctx *strictcli.Context) error {
+		_, err := changelog.Regenerate(ctx.Effects(), f.repo.Dir, ws.Declarations, "portal", nil)
+		return err
+	}), 0)
+
+	releasePublished(t)
+	r = scrub(t, f.repo.Dir, mangleSecret, false)
+	requireExit(t, r, 0)
+	if parent := f.repo.Git("rev-parse", "HEAD^"); parent != f.new.S {
+		t.Fatalf("the scrub commit's parent is %s, want the rewritten head %s", parent, f.new.S)
+	}
+	if !strings.Contains(f.repo.Git("show", "--name-only", "--format=", "HEAD"), "CHANGELOG.md") {
+		t.Fatal("the scrub commit does not carry the regenerated CHANGELOG.md")
+	}
+	if status := f.repo.Git("status", "--porcelain", "--", ".", ":!.strictmetadata/.release-state"); status != "" {
+		t.Fatalf("the scrub left changes uncommitted:\n%s", status)
 	}
 }
