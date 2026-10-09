@@ -9,3 +9,6 @@ context = "The stricttools projects are moving to Go; the source checks rlsbl ra
 # The targets released, and the ones left out; between them they name every target of the releasable's members.
 include = ["go", "npm", "pypi"]
 exclude = []
+release_commit = "58a8c82476acd76ec7cf8d97f285e0f0851141fb"
+[released_trees]
+"." = "589a930e4b7c0964c25616f0dbd9a97d00f1c7fd"
