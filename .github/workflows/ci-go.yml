@@ -44,6 +44,12 @@ jobs:
         run: |
           go install github.com/stricttools/saferm@v0
           sudo cp "$(go env GOPATH)/bin/saferm" /usr/local/bin/saferm
+      # rlsbl commits through safegit, and the suite's commit flows run it;
+      # installed into /usr/local/bin as saferm is.
+      - name: Install safegit
+        run: |
+          go install github.com/stricttools/safegit@v0
+          sudo cp "$(go env GOPATH)/bin/safegit" /usr/local/bin/safegit
       # The suite runs inside the bwrap sandbox scripts/test.sh sets up. Ubuntu
       # 24.04's apt bubblewrap (0.9.x) cannot configure loopback under
       # --unshare-net, so 0.11.0 is built from source, and the AppArmor
