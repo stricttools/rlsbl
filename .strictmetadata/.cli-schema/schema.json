@@ -84,7 +84,7 @@
   },
   "project_id": "github.com/stricttools/rlsbl",
   "name": "rlsbl",
-  "version": "0.131.0",
+  "version": "0.132.0",
   "help": "Release orchestration and project scaffolding: bumps versions, validates a structured changelog, tags only the commit CI verified, publishes to npm, PyPI, and the Go module proxy, and scaffolds CI workflows",
   "proc_observe_allowlist": [
     [

@@ -2,7 +2,16 @@
 
 # Changelog
 
-## Unreleased
+## 0.132.0
+
+rlsbl rewritten in Go: one binary, published to npm and PyPI as per-platform packages and wheels and installable with go install, with the release record in the .strictmetadata layout. The Python package is gone.
+
+<details>
+<summary>Context</summary>
+
+The stricttools projects are moving to Go; the source checks rlsbl ran moved to strictcode.
+
+</details>
 
 ### Breaking
 
@@ -56,6 +65,7 @@
 - `rlsbl release scrub` and `rlsbl transition declassify` give a safegit history rewrite five minutes plus 50ms for each commit of the repository, instead of a fixed ten minutes an entire-history scrub of a long history exceeded, and require safegit 0.31.1, whose rewrites fit that bound.
 - A `rlsbl release scrub` stopped by an out-of-date generated changelog is finished by regenerating it with `rlsbl changelog generate --no-auto-commit` and running the scrub again, which commits it with the scrub's records; the refusal used to say to commit the regenerated changelog, after which the scrub refused to resume.
 - A release is no longer refused for a dev overlay of a package no `pyproject.toml` of the releasable declares; the version-skew check asks PyPI only about overlaid packages the release depends on.
+- A release of a repository that commits a `go.work` no longer puts Go commands outside its checkout in that workspace: the tests of a Go project that build throwaway modules failed inside the release, listing no package.
 
 ## 0.131.0
 
