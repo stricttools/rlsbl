@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.132.1
+
+`rlsbl release scrub` finishes in a repository with versions released before it kept changelog files, keeping their GitHub Releases' own notes.
+
+### Fixes
+
+- `rlsbl release scrub` finishes in a repository with versions released before it kept changelog files: their GitHub Releases keep their own notes, with the `rlsbl-ci-sha` marker moved to the rewritten release commit, where the scrub refused to write them and stopped.
+
 ## 0.132.0
 
 rlsbl rewritten in Go: one binary, published to npm and PyPI as per-platform packages and wheels and installable with go install, with the release record in the .strictmetadata layout. The Python package is gone.
