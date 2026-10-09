@@ -10,6 +10,7 @@ import (
 
 	"github.com/stricttools/strictcli/go/strictcli"
 
+	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/semver"
 )
 
@@ -18,8 +19,9 @@ import (
 // that ships with this rlsbl, whose rewrites journal every commit map, remap
 // changelog ids at every rewritten commit (--remap-shas-in), report their
 // cleanup, whose `scrub file` states its mode (--delete or --replace-with)
-// instead of inferring it, and which has `scrub squash`.
-var SafegitMinimum = semver.Version{Major: 0, Minor: 31, Patch: 0}
+// instead of inferring it, which has `scrub squash`, and whose rewrite of a
+// long history finishes within the bound SafegitRewriteTimeout gives it.
+var SafegitMinimum = semver.Version{Major: 0, Minor: 31, Patch: 1}
 
 // SafegitInterfaceVersion is the version of strictcli's machine-mode
 // document that safegit prints under --json at SafegitMinimum. Any other
@@ -30,8 +32,26 @@ const SafegitInterfaceVersion = 3
 // safegitVersionTimeout bounds `safegit --version`.
 const safegitVersionTimeout = 15 * time.Second
 
-// safegitScrubTimeout bounds one safegit rewrite.
-const safegitScrubTimeout = 10 * time.Minute
+// A safegit history rewrite reads and rewrites every commit of the history it
+// walks, so how long it takes grows with the history: a fixed bound is one a
+// large enough repository exceeds however healthy the rewrite is. The bound
+// is a fixed allowance for the work a rewrite does once (its scans of the
+// object store, the repack, the verification) plus an allowance for each
+// commit of the repository.
+const (
+	safegitRewriteBase      = 5 * time.Minute
+	safegitRewritePerCommit = 50 * time.Millisecond
+)
+
+// SafegitRewriteTimeout bounds one safegit history rewrite of repo: a
+// scrub's rewrite, or a declassification's squash.
+func SafegitRewriteTimeout(repo git.Repo) (time.Duration, error) {
+	commits, err := repo.CountCommits([]string{"--all"}, nil)
+	if err != nil {
+		return 0, fmt.Errorf("counting the commits a history rewrite may walk, to bound how long it may take: %w", err)
+	}
+	return safegitRewriteBase + time.Duration(commits)*safegitRewritePerCommit, nil
+}
 
 var releaseVersion = regexp.MustCompile(`(\d+)\.(\d+)\.(\d+)`)
 

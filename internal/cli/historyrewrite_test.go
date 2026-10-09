@@ -56,7 +56,7 @@ func TestReleaseScrubTakesItsModeAndRangeAsMemberFlags(t *testing.T) {
 	if r.ExitCode != 1 || !strings.Contains(r.Stderr, "safegit 0.30.0 is installed") {
 		t.Fatalf("an old safegit: exit %d: %s", r.ExitCode, r.Stderr)
 	}
-	versionedSafegit(t, "0.31.0")
+	versionedSafegit(t, "0.31.1")
 	r = app.Test([]string{"release", "scrub", "--pattern", "SECRET", "--mangle", "--entire-history", "--reason", "a token", "--dry-run", "--approve-consequential"})
 	if r.ExitCode != 0 || !strings.Contains(r.Stdout+r.Stderr, "scrub match --json --dry-run --pattern SECRET --mangle --entire-history") {
 		t.Fatalf("the dry run: exit %d:\n%s%s", r.ExitCode, r.Stdout, r.Stderr)

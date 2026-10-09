@@ -259,7 +259,11 @@ func Scrub(ctx *strictcli.Context, root string, req ScrubRequest, now func() tim
 		if ctx.DryRun() {
 			// The rewrite is recorded, never run, under --dry-run: the would-do
 			// log names the safegit invocation that prints safegit's own counts.
-			if _, err := e.Run(argv("safegit", req.safegitArgs(root, changelog.RemapGlobs(), fileOnDisk, true)), strictcli.Cwd(root), strictcli.Timeout(safegitScrubTimeout)); err != nil {
+			timeout, err := SafegitRewriteTimeout(repo)
+			if err != nil {
+				return err
+			}
+			if _, err := e.Run(argv("safegit", req.safegitArgs(root, changelog.RemapGlobs(), fileOnDisk, true)), strictcli.Cwd(root), strictcli.Timeout(timeout)); err != nil {
 				return err
 			}
 			r.say("The rewrite was recorded, not run: run the safegit command the preview names to see safegit's own match counts.")
@@ -391,8 +395,12 @@ func (r *scrubRun) rewrite(args []string) (*scrubState, error) {
 	if err := release.RemoveCheckout(r.repo, r.say); err != nil {
 		return nil, err
 	}
+	timeout, err := SafegitRewriteTimeout(r.repo)
+	if err != nil {
+		return nil, err
+	}
 	started := r.now()
-	done, err := r.e.Run(argv("safegit", args), strictcli.Cwd(r.root), strictcli.Check(false), strictcli.Timeout(safegitScrubTimeout))
+	done, err := r.e.Run(argv("safegit", args), strictcli.Cwd(r.root), strictcli.Check(false), strictcli.Timeout(timeout))
 	if err != nil {
 		return nil, fmt.Errorf("safegit scrub could not be run: %w", err)
 	}
@@ -445,7 +453,11 @@ func unverifiedError(code int, report string) error {
 // finishing a rewrite safegit failed after. A run that fails again keeps the
 // saved result; one that rewrites further is folded into it.
 func (r *scrubRun) verifySavedRewrite(s *scrubState) error {
-	done, err := r.e.Run(argv("safegit", s.SafegitArgs), strictcli.Cwd(r.root), strictcli.Check(false), strictcli.Timeout(safegitScrubTimeout))
+	timeout, err := SafegitRewriteTimeout(r.repo)
+	if err != nil {
+		return err
+	}
+	done, err := r.e.Run(argv("safegit", s.SafegitArgs), strictcli.Cwd(r.root), strictcli.Check(false), strictcli.Timeout(timeout))
 	if err != nil {
 		return fmt.Errorf("safegit scrub could not be run: %w", err)
 	}

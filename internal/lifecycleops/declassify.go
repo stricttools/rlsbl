@@ -51,9 +51,6 @@ const (
 
 var declassifySteps = []string{stepRecords, stepCommitted, stepBranch, stepTags, stepReleases, stepPublic}
 
-// safegitSquashTimeout bounds one squash.
-const safegitSquashTimeout = 10 * time.Minute
-
 // pruneCommand removes the objects a rewrite left unreachable.
 const pruneCommand = "git reflog expire --expire=now --all && git gc --prune=now"
 
@@ -489,7 +486,11 @@ func parseSquashDocument(stdout string) (*squashPayload, error) {
 func (inv Invocation) squash(m managed, s *declassifyState) error {
 	r := s.Ranges[len(s.Ranges)-1-s.Squashed]
 	args := []interface{}{"safegit", "--approve-consequential", "scrub", "squash", "--json", "--first", r.First, "--last", r.Last, "--message", SquashMessage, "--reason", "declassify: " + s.Reason}
-	done, err := inv.E.Run(args, strictcli.Cwd(m.root), strictcli.Check(false), strictcli.Timeout(safegitSquashTimeout))
+	timeout, err := historyrewrite.SafegitRewriteTimeout(m.repo)
+	if err != nil {
+		return err
+	}
+	done, err := inv.E.Run(args, strictcli.Cwd(m.root), strictcli.Check(false), strictcli.Timeout(timeout))
 	if err != nil {
 		return fmt.Errorf("safegit scrub squash could not be run: %w", err)
 	}

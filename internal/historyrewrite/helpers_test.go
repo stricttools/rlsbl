@@ -181,7 +181,7 @@ func (f *scrubFixture) rewrites() map[string]string {
 func safegitDocument(t *testing.T, payload any) string {
 	t.Helper()
 	data, err := json.Marshal(map[string]any{
-		"interface_version": 3, "app": "safegit", "app_version": "0.31.0", "command": "scrub match", "exit_code": 0,
+		"interface_version": 3, "app": "safegit", "app_version": "0.31.1", "command": "scrub match", "exit_code": 0,
 		"payload": payload, "output": nil, "dry_run": false, "writes": nil, "preview": nil, "preview_error": nil, "diagnostics": []any{},
 	})
 	if err != nil {

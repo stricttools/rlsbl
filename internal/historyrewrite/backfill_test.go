@@ -65,7 +65,7 @@ func readArchive(t *testing.T, repo *testsupport.Repo, v string) releaserecord.A
 func TestAReleasedVersionWithNoArchiveIsMaterializedFromItsTag(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newUnarchived(t, true, "v0.1.0")
-	newSafegit(t, "0.31.0")
+	newSafegit(t, "0.31.1")
 	noRelease(t)
 
 	r := backfill(t, f.repo.Dir, "", true)
@@ -104,7 +104,7 @@ func TestAnArchiveWithBlankFieldsIsCompletedNamingEachSource(t *testing.T) {
 	f.repo.Write(archivePath, "format_version = 2\nbump = \"\"\ninclude = [\"npm\"]\nexclude = []\ndescription = \"\"\nrelease_commit = \""+f.R+"\"\n\n[released_trees]\n\".\" = \""+tree+"\"\n")
 	f.repo.Git("add", "-A")
 	f.repo.Git("commit", "-q", "-m", "an archive nobody filled in")
-	newSafegit(t, "0.31.0")
+	newSafegit(t, "0.31.1")
 	gh(t, testsupport.GHAnswer{Args: ghExists, Stdout: "v0.1.0"},
 		testsupport.GHAnswer{Args: ghBody, Stdout: "## What changed\n\nThe notes are fixed.\n\n**Full Changelog**: https://github.com/acme/portal/commits/v0.1.0"})
 
@@ -133,7 +133,7 @@ func TestANeverReleasedArchiveIsLeftAsItIs(t *testing.T) {
 	f.repo.Write(archivePath, content)
 	f.repo.Git("add", "-A")
 	f.repo.Git("commit", "-q", "-m", "declare the fate")
-	newSafegit(t, "0.31.0")
+	newSafegit(t, "0.31.1")
 	gh(t)
 	r := backfill(t, f.repo.Dir, "", true)
 	requireExit(t, r, 0)
@@ -153,7 +153,7 @@ func TestANeverReleasedArchiveIsLeftAsItIs(t *testing.T) {
 func TestATaglessVersionIsRecordedFromItsVersionBumpCommit(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newUnarchived(t, false, "v0.1.0")
-	newSafegit(t, "0.31.0")
+	newSafegit(t, "0.31.1")
 	gh(t)
 	r := backfill(t, f.repo.Dir, "", true)
 	requireExit(t, r, 0)
@@ -169,7 +169,7 @@ func TestATaglessVersionIsRecordedFromItsVersionBumpCommit(t *testing.T) {
 func TestAVersionWithNoTagAndNoBumpCommitIsUnrecoverable(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newUnarchived(t, false, "the changelog")
-	newSafegit(t, "0.31.0")
+	newSafegit(t, "0.31.1")
 	gh(t)
 	requireExit(t, backfill(t, f.repo.Dir, "", false), 0)
 	if a := readArchive(t, f.repo, "0.1.0"); a.Fate != releaserecord.FateUnrecoverable {
@@ -182,7 +182,7 @@ func TestATagNoRecordNamesIsAdoptedAsReleased(t *testing.T) {
 	f := newUnarchived(t, true, "v0.1.0")
 	later := f.repo.CommitFile("notes.txt", "later\n", "later work")
 	f.repo.Git("tag", "v0.2.0", later)
-	newSafegit(t, "0.31.0")
+	newSafegit(t, "0.31.1")
 	noRelease(t)
 	tag020 := []string{"release", "view", "v0.2.0", "--repo", "acme/portal", "--json", "tagName", "--jq", ".tagName"}
 	gh(t, testsupport.GHAnswer{Args: ghExists, Stderr: "release not found", Exit: 1}, testsupport.GHAnswer{Args: tag020, Stderr: "release not found", Exit: 1})
@@ -199,7 +199,7 @@ func TestAnUnexplainedTagRefusesTheApplyUntilResolved(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newUnarchived(t, true, "v0.1.0")
 	f.repo.Git("tag", "nightly", f.A)
-	newSafegit(t, "0.31.0")
+	newSafegit(t, "0.31.1")
 	noRelease(t)
 
 	// The preview shows the whole plan, the blocker first, and exits 1.
@@ -231,7 +231,7 @@ func TestAnOldSpellingIsExplainedOnceItsArchiveRecordsShippedAs(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newUnarchived(t, false, "the changelog")
 	f.repo.Git("tag", "portal-0.1.0", f.R)
-	newSafegit(t, "0.31.0")
+	newSafegit(t, "0.31.1")
 	gh(t)
 	r := backfill(t, f.repo.Dir, "", true)
 	requireExit(t, r, 1)
@@ -252,7 +252,7 @@ func TestAnOldSpellingIsExplainedOnceItsArchiveRecordsShippedAs(t *testing.T) {
 func TestReviewedDescriptionsComeFirst(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newUnarchived(t, true, "v0.1.0")
-	newSafegit(t, "0.31.0")
+	newSafegit(t, "0.31.1")
 	noRelease(t)
 	overrides := f.repo.Path("experiments/overrides.toml")
 	testsupport.WriteFile(t, overrides, "[versions.\"0.1.0\"]\ndescription = \"The first release, reviewed.\"\ncontext = \"Why it was made.\"\n")
@@ -271,7 +271,7 @@ func TestReviewedDescriptionsComeFirst(t *testing.T) {
 func TestAnOverrideOfAVersionTheRepositoryLacksIsRefused(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newUnarchived(t, true, "v0.1.0")
-	newSafegit(t, "0.31.0")
+	newSafegit(t, "0.31.1")
 	noRelease(t)
 	overrides := f.repo.Path("experiments/overrides.toml")
 	testsupport.WriteFile(t, overrides, "[versions.\"9.9.9\"]\ndescription = \"Nothing\"\n")
@@ -286,7 +286,7 @@ func TestAnOverrideOfAVersionTheRepositoryLacksIsRefused(t *testing.T) {
 func TestAStashRefusesTheApplyUntilDropped(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newUnarchived(t, true, "v0.1.0")
-	newSafegit(t, "0.31.0")
+	newSafegit(t, "0.31.1")
 	noRelease(t)
 	f.repo.Write("notes.txt", "work in progress\n")
 	f.repo.Git("stash", "push", "-q")
@@ -307,7 +307,7 @@ func TestAnArchiveOfTheFirstFormatIsRefusedNamingTheMigration(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newUnarchived(t, true, "v0.1.0")
 	f.repo.Write(archivePath, "format_version = 1\nbump = \"minor\"\ninclude = []\nexclude = []\ndescription = \"old\"\ncandidate_sha = \""+f.R+"\"\n")
-	newSafegit(t, "0.31.0")
+	newSafegit(t, "0.31.1")
 	noRelease(t)
 	r := backfill(t, f.repo.Dir, "", true)
 	requireExit(t, r, 1)
@@ -322,7 +322,7 @@ func TestATagAClosedIdentityOwnedIsExplained(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newUnarchived(t, true, "v0.1.0")
 	f.repo.Git("tag", "portal-old-v0.0.9", f.A)
-	newSafegit(t, "0.31.0")
+	newSafegit(t, "0.31.1")
 	noRelease(t)
 	r := backfill(t, f.repo.Dir, "", false)
 	requireExit(t, r, 1)
@@ -340,7 +340,7 @@ func TestABackfillCommitsTheOwnershipManifestItCreates(t *testing.T) {
 	f := newUnarchived(t, true, "v0.1.0")
 	f.repo.Git("rm", "-q", ".strictmetadata/releases/manifest.toml")
 	f.repo.Git("commit", "-q", "-m", "no releases manifest")
-	newSafegit(t, "0.31.0")
+	newSafegit(t, "0.31.1")
 	noRelease(t)
 
 	r := backfill(t, f.repo.Dir, "", false)

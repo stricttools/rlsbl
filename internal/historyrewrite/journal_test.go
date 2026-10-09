@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
 	"github.com/stricttools/testisolation/go/hygiene"
@@ -67,5 +68,42 @@ func TestACorruptJournalLineIsAnErrorNamingIt(t *testing.T) {
 	_, _, err = readJournal(t, repo.Dir)
 	if err == nil || !strings.Contains(err.Error(), "corrupt at line 3") {
 		t.Fatalf("a corrupt line read as %v", err)
+	}
+}
+
+// TestASafegitRewriteMayTakeLongerInALongerHistory: a history rewrite's time
+// grows with the history it walks, so the bound on it grows with the
+// repository's commit count instead of being one fixed figure a large
+// repository exceeds however healthy the rewrite is.
+func TestASafegitRewriteMayTakeLongerInALongerHistory(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := testsupport.NewRepo(t)
+	repo.CommitFile("a.txt", "a\n", "a")
+	bound := func() time.Duration {
+		t.Helper()
+		var d time.Duration
+		testsupport.RunEffects(t, testsupport.CommandOptions{Effect: strictcli.EffectReadOnly, Allowlist: [][]string{{"git", "rev-parse"}, {"git", "rev-list"}}}, func(e *strictcli.Effects) error {
+			r, err := git.Open(e, repo.Dir)
+			if err != nil {
+				return err
+			}
+			d, err = historyrewrite.SafegitRewriteTimeout(r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return nil
+		})
+		return d
+	}
+	short := bound()
+	for i := 0; i < 20; i++ {
+		repo.CommitFile("a.txt", strings.Repeat("a", i+2)+"\n", "more")
+	}
+	long := bound()
+	if long <= short {
+		t.Fatalf("the bound for 21 commits (%v) is not above the bound for 1 (%v)", long, short)
+	}
+	if per := (long - short) / 20; per*10000 < 5*time.Minute {
+		t.Fatalf("each commit adds %v to the bound: ten thousand commits would get less than five minutes more than one", per)
 	}
 }

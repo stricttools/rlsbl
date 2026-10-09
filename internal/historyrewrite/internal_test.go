@@ -47,7 +47,7 @@ func TestAnythingButTheEnvelopeIsRefusedNamingTheSafegitNeeded(t *testing.T) {
 		"interface not number": `{"interface_version":"3","payload":null}`,
 	} {
 		_, err := parseMachineDocument(stdout)
-		if err == nil || !strings.Contains(err.Error(), "safegit 0.31.0 or newer") {
+		if err == nil || !strings.Contains(err.Error(), "safegit 0.31.1 or newer") {
 			t.Errorf("%s: %v", name, err)
 		}
 	}

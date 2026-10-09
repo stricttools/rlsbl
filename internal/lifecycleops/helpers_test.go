@@ -192,7 +192,7 @@ const fakeSafegitScript = `#!/bin/sh
 here="${0%/*}"
 printf '%s\n' "$*" >> "$here/calls.txt"
 if [ "$1" = --version ]; then
-	echo "safegit 0.31.0"
+	echo "safegit 0.31.1"
 	exit 0
 fi
 if [ "$1" = --approve-consequential ] && [ "$2" = scrub ]; then
