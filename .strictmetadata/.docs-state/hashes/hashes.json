@@ -9,7 +9,7 @@
     "description": "48ad9c8fa2eba353269696121e9a5f6bfebc2a37d19894bb264b79e33a222235"
   },
   "en/checks.md": {
-    "content": "2d5999691cab4bb4d967482e099a502e73b29489f2672d11f62117b7ac4d9d9e",
+    "content": "3742d92d632ed3837155f3e39ff728c7e694415938494511bfd6d421ea2d62dd",
     "description": "21801d076a20157883abd95f8c24a42c5ff5b4f0b9a5b48abe0bccfb6493bd10"
   },
   "en/ci-customization.md": {
@@ -93,7 +93,7 @@
   "en/cli-release.md": {
     "content": "9b3a84dc001548f7d90146352e1b786b353647d2c9eab885639df72e582ad4c2",
     "description": "3f21e797cff20ec76b1803e2b59ac11572ad4b024a6315bcf327951d2785b9be",
-    "schema_hash": "1ed44531ced78626e55d99192bb7b0a59cfa1918550d2b51b860360f6617a046"
+    "schema_hash": "8b360ad8d0ac32d9c1f60aa220f2d9c9f8610f987c62675e68821d823789410d"
   },
   "en/cli-rewrite.md": {
     "content": "9d2c25461ba86f47460e7203ab1115d74a144ca1d195d40e57a956d588a4f411",
@@ -123,9 +123,9 @@
     "schema_hash": "1c4197adb9f4ea6264e8d3504fea11d6f47afe9c5383f15b3d122c17fc77c306"
   },
   "en/cli-transition.md": {
-    "content": "bdff64ea8ad8b255f30e24f50401281d7b038a7c0a320ec6ad96667f872fd1a4",
+    "content": "68a0e4b2ca1bea5cb0678b772d15fd12b6129af59e82e9d4517451050de64cea",
     "description": "b3c480567e84e0bcec346b7cad27e17c0f3522bc0e3fa8fe38e1f6fac1566170",
-    "schema_hash": "da0973587856e89b073b8e2f142327072b58ab197dde835faf796f2c848630d7"
+    "schema_hash": "7f0132372c1d32243333b09c41a47faf6c6fe3190f530e64e47e600367664bfc"
   },
   "en/cli-unreleased.md": {
     "content": "382d5f84514e848c168f7d7c1d489d846a0a8f34ccfbc637f65092bb611bafc3",
@@ -253,7 +253,7 @@
   "en/internal-lifecycleops.md": {
     "content": "156ac08fb5b1ca9897f4b233bdd435de069bfe0377f3c50ff4b3a8720e65f2e4",
     "description": "07990338b60570001185215e2dcf522480362451c89ac43ef395106992b3ee1e",
-    "source_docstring": "ea4f82742d332673be7dbdeb714186c3712e4aaa48992cab047dfbd22b970fce"
+    "source_docstring": "af8ca76073252b008c0fd2c0b691149db0c7df57b3a5766545516dfe37c9e4ef"
   },
   "en/internal-migration.md": {
     "content": "fd91044ab7349a8b5525ead9a63953fdc9d67d245042a1b5a763f9e30844f2fd",
@@ -369,7 +369,7 @@
     "description": "a1f0cfcb22389d01c5dab80b9b6be0783a0b97223ffc56dd9c0d8d3be71646b3"
   },
   "en/lifecycle-and-license.md": {
-    "content": "51ae564f3e5eb887c42f809a943ebf6dc6d25b03016f8615a2f6a368fb1304a1",
+    "content": "6bedeb96516637bc8fe00cbe143513882f413f1861fe50bdf90da7633503543b",
     "description": "7cf467d322fc40b22055330a45e97b4c3d96341706e65bdb255f4726f65f6ea2"
   },
   "en/monorepo.md": {
@@ -385,11 +385,11 @@
     "description": "df521dcf5419b5e7259d3489c0609a642008cdae8fbe15d6e7556d48b14782bb"
   },
   "en/pipelines.md": {
-    "content": "c115640af15eef57a3661a25f5ed659889990af3cbf91c6a4fe119f0b2e385a4",
+    "content": "17947d41cc25e053808f7847c37638d5785efae87c26259c4e01b7dabd9182d1",
     "description": "1e60980500cf8659e13d37c6b3bc9a0a0bdf4bc144800db154380b0d563a001c"
   },
   "en/release-workflow.md": {
-    "content": "cdef93c5f7fd0acd55d0b3af69778a02211392c3097460328e52ec20ffe98131",
+    "content": "089e9f1c5ff42de6cc52deabd61d299f812eeb6e7146ae9553910a0e976531ec",
     "description": "54609d8c503ae0ee3db4abbfb359b07926acfe05809f413acaaced9d561dadf8"
   },
   "en/rlsbl-anchor_remap.md": {
