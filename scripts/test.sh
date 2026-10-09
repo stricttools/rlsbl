@@ -220,6 +220,16 @@ if [ "${1:-}" = "--sweep-only" ]; then
   exit 0
 fi
 
+# --- pre-warm (OUTSIDE the sandbox, network allowed) -------------------------
+# Config-declared commands (test_sandbox.prewarm), run from the project root
+# before the sandbox is entered, so an offline in-sandbox build hits a warm
+# cache. They see REPO_ROOT and the resolved cache paths in their environment.
+# A non-zero exit aborts the run.
+(
+  cd "${REPO_ROOT}"
+go mod download
+)
+
 # --- writable throwaway working copy of the tree ------------------------------
 # The copy is git's view of the tree: tracked files, untracked files that are
 # not ignored, and .git (suites need the repository's git history). Gitignored
