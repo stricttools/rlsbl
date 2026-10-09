@@ -127,6 +127,37 @@ func TestAScrubRewritesRepairsCommitsAndPublishes(t *testing.T) {
 	}
 }
 
+// A version released before its releasable kept a changelog file has no
+// record to compose its Release from: the scrub keeps the Release's own notes
+// and moves its marker to the rewritten release commit.
+func TestAReleaseOfAVersionWithNoChangelogFileKeepsItsNotes(t *testing.T) {
+	hygiene.Isolate(t)
+	release := func(history) map[string]string { return map[string]string{"release.txt": "0.1.0\n"} }
+	f := newScrubFixtureReleasing(t, release, func(_, h history) map[string]string { return release(h) })
+	sg := newSafegit(t, "0.31.1")
+	sg.Answer(f.rewriteScript(), safegitDocument(t, f.rewritePayload(true)), 0)
+	fakeGH := gh(t,
+		testsupport.GHAnswer{Args: ghExists, Stdout: "v0.1.0"},
+		testsupport.GHAnswer{Args: ghBody, Stdout: "Notes written by hand"},
+		testsupport.GHAnswer{Args: ghEdit})
+
+	r := scrub(t, f.repo.Dir, mangleSecret, false)
+	requireExit(t, r, 0)
+
+	var edited bool
+	for _, c := range fakeGH.Calls() {
+		switch strings.Join(c.Args, " ") {
+		case strings.Join(ghEdit, " "):
+			edited = c.Stdin == "Notes written by hand\n\n<!-- rlsbl-ci-sha: "+f.new.R+" -->\n"
+		case strings.Join(ghRewrite, " "):
+			t.Fatal("the Release's notes were replaced")
+		}
+	}
+	if !edited {
+		t.Fatalf("the Release did not keep its notes with the rewritten release commit's marker: %+v", fakeGH.Calls())
+	}
+}
+
 // A changelog commit id that named no commit before the rewrite (an earlier
 // rewrite left it) is no id the rewrite broke: the scrub reports it and
 // finishes.

@@ -102,6 +102,15 @@ func buildHistory(t *testing.T, repo *testsupport.Repo, notes string) history {
 // changelog file of 0.1.0.
 func buildHistoryWith(t *testing.T, repo *testsupport.Repo, notes, extra string) history {
 	t.Helper()
+	return buildHistoryReleasing(t, repo, notes, func(h history) map[string]string {
+		return map[string]string{changelogFilePath: entryLine(1, h.B) + extra}
+	})
+}
+
+// buildHistoryReleasing is buildHistory with the files release gives
+// committed in the release commit R.
+func buildHistoryReleasing(t *testing.T, repo *testsupport.Repo, notes string, release func(history) map[string]string) history {
+	t.Helper()
 	var h history
 	base := map[string]string{declarationsPath: portalDeclarations, "package.json": packageJSON("0.1.0"), "notes.txt": notes + "\n"}
 	for _, m := range manifests {
@@ -109,7 +118,7 @@ func buildHistoryWith(t *testing.T, repo *testsupport.Repo, notes, extra string)
 	}
 	h.A = commitAll(t, repo, base, "the project")
 	h.B = commitAll(t, repo, map[string]string{"notes.txt": notes + "\nmore\n"}, "more notes")
-	h.R = commitAll(t, repo, map[string]string{changelogFilePath: entryLine(1, h.B) + extra}, "v0.1.0")
+	h.R = commitAll(t, repo, release(h), "v0.1.0")
 	tree := repo.Git("rev-parse", h.R+"^{tree}")
 	repo.Write(archivePath, archiveText(h.R, tree))
 	document, err := changelog.Document(repo.Dir, "portal", nil)
@@ -142,8 +151,20 @@ func newScrubFixture(t *testing.T) *scrubFixture {
 // what newExtra gives for that history in the rewritten history.
 func newScrubFixtureWith(t *testing.T, oldExtra string, newExtra func(old history) string) *scrubFixture {
 	t.Helper()
+	return newScrubFixtureReleasing(t, func(h history) map[string]string {
+		return map[string]string{changelogFilePath: entryLine(1, h.B) + oldExtra}
+	}, func(old, h history) map[string]string {
+		return map[string]string{changelogFilePath: entryLine(1, h.B) + newExtra(old)}
+	})
+}
+
+// newScrubFixtureReleasing is newScrubFixture with the files the release
+// commit of 0.1.0 holds given, for the history before the rewrite by
+// oldRelease and for the rewritten one by newRelease.
+func newScrubFixtureReleasing(t *testing.T, oldRelease func(history) map[string]string, newRelease func(old, h history) map[string]string) *scrubFixture {
+	t.Helper()
 	repo := testsupport.NewRepo(t)
-	old := buildHistoryWith(t, repo, "token SECRET", oldExtra)
+	old := buildHistoryReleasing(t, repo, "token SECRET", oldRelease)
 	repo.Git("tag", "v0.1.0", old.R)
 	f := &scrubFixture{repo: repo, old: old}
 	f.bare = repo.AddBareRemote("origin")
@@ -158,7 +179,7 @@ func newScrubFixtureWith(t *testing.T, oldExtra string, newExtra func(old histor
 	}
 	n.A = commitAll(t, repo, base, "the project")
 	n.B = commitAll(t, repo, map[string]string{"notes.txt": "token REDACTED\nmore\n"}, "more notes")
-	n.R = commitAll(t, repo, map[string]string{changelogFilePath: entryLine(1, n.B) + newExtra(old)}, "v0.1.0")
+	n.R = commitAll(t, repo, newRelease(old, n), "v0.1.0")
 	tree := repo.Git("rev-parse", old.R+"^{tree}")
 	repo.Write(archivePath, archiveText(old.R, tree))
 	document, err := changelog.Document(repo.Dir, "portal", nil)

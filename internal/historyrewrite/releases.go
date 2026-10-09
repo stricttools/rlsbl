@@ -2,12 +2,14 @@ package historyrewrite
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/stricttools/strictspec/go/lifecycle"
 
+	"github.com/stricttools/rlsbl/internal/changelog"
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/github"
@@ -209,7 +211,18 @@ func (r ReleaseRepair) rewriteOne(res *releaseResolver, tag string) (bool, error
 		r.Say(fmt.Sprintf("%s: %s %s is recorded never released, so no GitHub Release is owed under it", tag, x.releasable.Name, found.version))
 		return false, nil
 	}
-	doc, err := releasenotes.Read(r.Workspace.Root, x.releasable.Name, x.scheme, found.version)
+	// A version released before its releasable kept a changelog file has no
+	// notes in the record: its Release keeps its own.
+	versions, err := changelog.Versions(r.Workspace.Root, changelog.Dir(x.releasable.Name))
+	if err != nil {
+		return false, err
+	}
+	hasNotes := slices.ContainsFunc(versions, func(v semver.Version) bool { return semver.Compare(v, found.version) == 0 })
+	read := releasenotes.Read
+	if !hasNotes {
+		read = releasenotes.ReadArchived
+	}
+	doc, err := read(r.Workspace.Root, x.releasable.Name, x.scheme, found.version)
 	if err != nil {
 		return false, err
 	}
@@ -235,6 +248,9 @@ func (r ReleaseRepair) rewriteOne(res *releaseResolver, tag string) (bool, error
 			}
 		}
 	}
+	if !hasNotes {
+		return r.keepNotes(tag, x.releasable.Name, doc, exists)
+	}
 	if exists {
 		if err := releasenotes.Rewrite(r.GitHub, r.Repository, r.Scanner, doc); err != nil {
 			return false, err
@@ -253,6 +269,26 @@ func (r ReleaseRepair) rewriteOne(res *releaseResolver, tag string) (bool, error
 	}
 	r.Say(fmt.Sprintf("%s: created its missing GitHub Release", tag))
 	return true, nil
+}
+
+// keepNotes moves the marker of the Release of a version with no changelog
+// file to its rewritten release commit, keeping every other line of the
+// Release's own notes, and reports whether it wrote. With no Release there
+// are no notes to keep and none to compose, which is refused.
+func (r ReleaseRepair) keepNotes(tag, releasable string, doc releasenotes.Document, exists bool) (bool, error) {
+	if !exists {
+		return false, fmt.Errorf("%s %s has no changelog file and %s has no GitHub Release, so there are no notes to create one from", releasable, doc.Version, tag)
+	}
+	if doc.ReleaseCommit == "" {
+		r.Say(fmt.Sprintf("%s: %s %s has no changelog file and no release commit, so its Release keeps its document", tag, releasable, doc.Version))
+		return false, nil
+	}
+	wrote, err := releasenotes.EnsureMarker(r.GitHub, r.Repository, r.Scanner, doc)
+	if err != nil {
+		return false, err
+	}
+	r.Say(fmt.Sprintf("%s: %s %s has no changelog file, so its Release keeps its own notes, with its marker naming the rewritten release commit", tag, releasable, doc.Version))
+	return wrote, nil
 }
 
 // archiveFate is the fate the archive of v in dir states, FateAbsent when

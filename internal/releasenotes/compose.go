@@ -143,6 +143,24 @@ func WithMarker(existing, marker string) (body string, changed bool) {
 // one whose archive states no fate, and one never released are refused,
 // each naming why.
 func Read(root, releasable string, scheme workspace.TagScheme, v semver.Version) (Document, error) {
+	doc, err := ReadArchived(root, releasable, scheme, v)
+	if err != nil {
+		return Document{}, err
+	}
+	section, err := changelog.VersionSection(root, releasable, v, notesDepth)
+	if err != nil {
+		return Document{}, err
+	}
+	_, body, _ := strings.Cut(section, "\n")
+	doc.Notes = strings.TrimSpace(body)
+	return doc, nil
+}
+
+// ReadArchived is Read without the notes: the tag, the release commit, and
+// the notices of released version v from its archive alone, for a version
+// released before its releasable kept a changelog file, whose notes the
+// record does not hold. It refuses what Read refuses about the archive.
+func ReadArchived(root, releasable string, scheme workspace.TagScheme, v semver.Version) (Document, error) {
 	dir := releaserecord.ArchiveDir(releasable)
 	rel := releaserecord.ArchivePath(dir, v)
 	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); errors.Is(err, fs.ErrNotExist) {
@@ -166,11 +184,5 @@ func Read(root, releasable string, scheme workspace.TagScheme, v semver.Version)
 	case releaserecord.FateRecorded:
 		doc.ReleaseCommit = a.ReleaseCommit.Commit
 	}
-	section, err := changelog.VersionSection(root, releasable, v, notesDepth)
-	if err != nil {
-		return Document{}, err
-	}
-	_, body, _ := strings.Cut(section, "\n")
-	doc.Notes = strings.TrimSpace(body)
 	return doc, nil
 }

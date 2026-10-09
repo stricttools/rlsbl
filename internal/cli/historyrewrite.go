@@ -25,7 +25,8 @@ var releaseScrubHelp = fmt.Sprintf("Scrub content from the repository's git hist
 	"generating it gives, deletes any file at the reserved changelog validation cache paths (which no rlsbl command writes), writes the rewrite's archive to .strictmetadata/history-rewrites/<UTC "+
 	"time>.toml (commit ids, tags, the mode, and --reason only, never what was removed), and commits. It then force-pushes the branch and every "+
 	"moved tag, each guarded by the value origin held before the rewrite, and rewrites each moved tag's GitHub Release in place from the record "+
-	"(creating one a tag lacks); a Release is never deleted. A scrub that stops is finished by running the same command again, from the step "+
+	"(creating one a tag lacks; a version released before its releasable kept a changelog file keeps its Release's own notes, with the marker "+
+	"moved to the rewritten release commit); a Release is never deleted. A scrub that stops is finished by running the same command again, from the step "+
 	"that stopped it, with its state kept in .strictmetadata/.release-state/scrub-result.json. Requires safegit %s or newer, whose --json "+
 	"machine-mode document is read at interface_version %d, and a release branch. Refused while a release is stopped mid-flight. --dry-run records the safegit "+
 	"invocation, which prints safegit's own counts, and writes nothing.", historyrewrite.SafegitMinimum, historyrewrite.SafegitInterfaceVersion)
