@@ -25,7 +25,6 @@ unreleased entries survive when members contribute none.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "09fb2ba3f8a669aa012b86ef4229891de55fab6b"
-
+release_commit = "36355b12094a406873c3e6f16a8a6ad095cd17bb"
 [released_trees]
-"." = "232b8fc57e5769d4b2a16e3fd100fee70ad46d81"
+"." = "b3aafe7f457925e4ce571b32e5fb3e44bf58b4d7"

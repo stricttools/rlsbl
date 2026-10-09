@@ -3,8 +3,7 @@ format_version = 2
 bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "de6d0baaf64e166d4dfb1c39e30c94d3baa995d4"
+release_commit = "0da08e9fda782ccf769303f14e1e88d2894974f3"
 description = "The `--update` flag is removed. Bare `rlsbl scaffold` is idempotent: it creates what is missing and three-way merges what already exists, so it is safe to run at any time."
-
 [released_trees]
-"." = "6f7bc9c1773d0cfefa508632b9994560be511ec4"
+"." = "264ad75bd32e450a3abce74f9ffa6beba004ba83"

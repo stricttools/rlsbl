@@ -37,7 +37,6 @@ the other direction.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "1606c00d787c566025f6af654054a98fc6787045"
-
+release_commit = "ce85cc6d68ef1967422a122b2fcdb953b6448e4a"
 [released_trees]
-"." = "100f070008441cfcded97da0ab9dd7179bbf5472"
+"." = "dd7626b801c412e13ffacb4511d7239ff7841db0"

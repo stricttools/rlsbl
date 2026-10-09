@@ -8,7 +8,6 @@ description = "Blog post integration for releases, richer hook environment varia
 context = "Adds blog = true support in release TOML to auto-generate blog posts via selfdoc during releases. Enriches hook env vars with bump type, previous version, and description. Adds conditional selfdoc assembly push to the post-release hook template for unified documentation deployment."
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "ea6c8bfebe72e6abc28d504969be5f3e77feceae"
-
+release_commit = "58c78983a7db0daab5550022e73a512777af6611"
 [released_trees]
-"." = "59eff188d1f5f08ee0792fec90580f22ff960fb3"
+"." = "de8f422acf95a7d5afac31c794393b06b046a64e"

@@ -3,8 +3,7 @@ format_version = 2
 bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "57101b867f062aa46b0e1b92129cf200d21f5c0d"
+release_commit = "fac6afad7748abfc4bd4472d1475fe205036bd91"
 description = "`rlsbl release` becomes a command group (`run`, `init`, `retry`), `run` requires an explicit `--watch`/`--no-watch`, every generated workflow gains a `workflow_dispatch` trigger, and a `pgdesign` target ships for database schema projects."
-
 [released_trees]
-"." = "1914ebf11e8795f238df53524c30a4e0a1a8da2c"
+"." = "94abc1a9bad1f428905a6004d374333506f06f80"

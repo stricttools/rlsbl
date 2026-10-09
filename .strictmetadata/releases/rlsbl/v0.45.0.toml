@@ -3,8 +3,7 @@ format_version = 2
 bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "7e7d738fe9aca2ffb07b25c4fefa6ba676d71aee"
+release_commit = "43e1fc2e22f71bdf6dd23657e91bd5d051c551b6"
 description = "Directory scoping and target-specific tag patterns now apply consistently to monorepo changelog validation during a release, and `push_timeout` must be set explicitly instead of falling back to an implicit 120 seconds."
-
 [released_trees]
-"." = "836c53ebff84b83709570660ffbad0b3c8d3c0bd"
+"." = "2fb4a83e426f7ee0f34b9fc60f795b745ee5b1fb"

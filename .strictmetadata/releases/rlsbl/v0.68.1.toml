@@ -8,7 +8,6 @@ description = "Per-target CI files, YAML indent fix, monorepo sync update"
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "b58dceba1bea82881b4e4aeeec1521db4071eb3c"
-
+release_commit = "b8530ad37356bd0625ee0ee278ada1947022ff1e"
 [released_trees]
-"." = "d1973b1efbc52c993ddc76eb4a5bc0c856fbe57c"
+"." = "cafc4c698fe3ea208073badb6e3dbf50a9c6d57b"

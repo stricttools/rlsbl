@@ -8,7 +8,6 @@ description = "safegit --yes, doc gaps, SEO fixes, retry dedup test"
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "b66b07cc5c70c4f55f5eafb71b20fcdd690f65b3"
-
+release_commit = "7cdd10c2ab4aa8aaff8ce919e6b50a7cec8087f6"
 [released_trees]
-"." = "797f7f6cdfe586d061c02dc950dfebbf060bc6eb"
+"." = "ca595f4a899ab2befc2fb9ea891cdf068a5f1784"

@@ -8,7 +8,6 @@ description = "Make release description mandatory"
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "e8ef6ea6e32f00c580bedfe3d866d91b37c43a29"
-
+release_commit = "869945071b0172fae0c99aa8579fd6c60965498f"
 [released_trees]
-"." = "f5da82f03bf9e6ccefc502719c3ab81e6fc9e4b9"
+"." = "85e5ee2046119a678b147ff9552d5e40f093b56f"

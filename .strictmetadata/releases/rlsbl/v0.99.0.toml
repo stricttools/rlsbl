@@ -12,7 +12,6 @@ context = "migrate-releasable previously orphaned versioned changelog files, lea
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "b9e579d1b5e1e7a90d687b746d44ab116b2a2cce"
-
+release_commit = "12d8dd1365c9e0e9427e13bb9afd1312c286227f"
 [released_trees]
-"." = "5f75ca70fb8d41bb043544bb11d95cba9b5cf57b"
+"." = "0d7807dfe3678d3b18f70cc0723390d24aa10946"

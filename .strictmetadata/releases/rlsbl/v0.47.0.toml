@@ -4,8 +4,7 @@ format_version = 2
 bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "19599be1c5a909eb1cd57971f8105f1e43043e01"
+release_commit = "b4ecdabbee58527eab395e293131e08936c94be0"
 description = "`release init` and `release retry` scaffold empty fields that must be filled in deliberately, `watch` gains `--run-id`, the monorepo CI sync is rewritten around structured YAML with per-job `working-directory`, and `status` and `unreleased` scope their commits to the current project."
-
 [released_trees]
-"." = "e433b4b03868d2112ef012ea974369e3f2f40b20"
+"." = "6f7cded208088bcd9c05ffeab9dbfc29cc80d214"

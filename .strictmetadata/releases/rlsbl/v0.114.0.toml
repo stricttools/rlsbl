@@ -40,7 +40,6 @@ as would-run and checking nothing.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "774cbaeb50afd034fdf5ac39ee107bec1ecf687e"
-
+release_commit = "5d64651b6bba385be787018415c8448975ac5e9c"
 [released_trees]
-"." = "356e88be756747e0c20796c8a73d1afbd5937fd7"
+"." = "254ad810716d9338480b4f9b7dd8fa620f1a9043"

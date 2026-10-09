@@ -17,7 +17,6 @@ default 120s limit.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "549268fb0f42d9b1944bc39883dd17279eb12ed7"
-
+release_commit = "e77500ee5d862d3b2b074b6253a41a22cc3498ab"
 [released_trees]
-"." = "ad4a04abb14063e94c89b96719ece5d3d5080be5"
+"." = "e11754ae1dc2f315adcf1dde5f10201304c9754d"

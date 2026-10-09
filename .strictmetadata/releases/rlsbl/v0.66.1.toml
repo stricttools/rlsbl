@@ -8,7 +8,6 @@ description = "Fix uv sync stripping pytest in workspaces, add workspace-unbuild
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "3c19f319e76bf30a607a46c10eb836c2ee403e1a"
-
+release_commit = "6aa6832593ae8aa31ea96d624f71b0ec7672286a"
 [released_trees]
-"." = "968b2ba22ee270f1269399a51b17a30f084c756a"
+"." = "3387ebe46abb97844ce4ae2cbbcd73f0ec543a45"

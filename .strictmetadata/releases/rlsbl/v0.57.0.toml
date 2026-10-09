@@ -8,7 +8,6 @@ description = "Batch release-init filtering, retry.toml cleanup, and feature sup
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "f644f2b55e8ecedd8c3e1a10b53d01db71f3905e"
-
+release_commit = "c05837a89dd46d96f37f08ce9da08b72c2a15a69"
 [released_trees]
-"." = "191703ca979cdb0d923094bc7f4d2eaac17ee486"
+"." = "6f0551baac78cfbf85e817a3b5946c5f9a60257f"

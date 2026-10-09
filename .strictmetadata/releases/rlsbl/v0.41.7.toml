@@ -3,8 +3,7 @@ format_version = 2
 bump = "patch"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "cf892f16476dea1ce57ce13d7b0db8a31935c4b8"
+release_commit = "c06b614b08d27adfe7e6527c07853177f8a12cbd"
 description = "A release with no user-facing changelog entries is blocked, `changelog add` and `changelog amend` detect duplicate commits, and the docs target keeps selfdoc.json's `versions` array in sync."
-
 [released_trees]
-"." = "48e99d3506a06f71031b494a8c4517e2a8319396"
+"." = "ae244cdc738471daf7ae56d93b04be5b9788403f"

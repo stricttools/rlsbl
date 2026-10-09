@@ -8,7 +8,6 @@ description = "Scrub tag matching, cmd_amend fix, strictcli public API, todo cle
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "0b17202c27c176d0411e6337fc57f1f4ac2b0cc7"
-
+release_commit = "a8b07460d988b4105be11fae0db659c6e700df10"
 [released_trees]
-"." = "b967597f3fe7f9db998457fdea08cc6a22a85f3d"
+"." = "6e9653acbff0d79fd330fd0ee9df1a8e63b76310"

@@ -38,7 +38,6 @@ and its commit are untouched.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "5db47ee6a39eb196734e5deda1e355c44d0090ba"
-
+release_commit = "941fafc00d142b82e2e5c077d7d53ec455be2e05"
 [released_trees]
-"." = "be813392cdeff0b72817828df5008d4e7bb01702"
+"." = "339327e2009a52b59aabc0383d6f5e3cffb2498f"

@@ -43,7 +43,6 @@ tag, version, coverage, and members.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "5698372ae2e3b7c1af0bd22b6fab70f8d1b3d7aa"
-
+release_commit = "37c134392f83c53e0cc0be6a89e779a86474609e"
 [released_trees]
-"." = "822f80217c948c8886f747a9a4a9bef3b003b17e"
+"." = "bb73d26092398145deafc144375d62f97a758571"

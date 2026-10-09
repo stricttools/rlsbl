@@ -8,7 +8,6 @@ description = "New checks (license-file, scaffold-unreplaced-vars, dead-modules-
 context = "LICENSE is no longer scaffold-managed -- projects own their LICENSE file, enforced by the new license-file check. Batch release-init now supports Flutter targets and includes TOML comments. Several fixes for retry.toml cleanup, bare scaffold on plain targets, workspace-unregistered false positives, and shared release config validation."
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "ea4a8d9cd559c63def19e7740cf0aff59c409b8b"
-
+release_commit = "f8b38e0d3ea93c803a637353bf256c8b0782aa48"
 [released_trees]
-"." = "40d6c2450a1a0aea5db1888960a7b08dcef16729"
+"." = "550db8f485145ac2aafde87f72d4ff18c4e77ddb"

@@ -8,7 +8,6 @@ description = "Unified manifest detection, PlainTarget auto-detection, monorepo 
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "b48190e490cacd85186588eb1ce898eedcfdfec5"
-
+release_commit = "e147021a62ed8100d7ef3bf390f26b27615d8f17"
 [released_trees]
-"." = "1593746c83c7ba9112d09359b472f16c7e6f26f7"
+"." = "53756ea00c7fc47d370f7ddf61b31b6658d11eb1"

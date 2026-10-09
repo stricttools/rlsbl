@@ -23,7 +23,6 @@ live on a staging sandbox repo across 6 scenarios.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "d8bd4171ae058fed5789124dde64aa94eb8f233f"
-
+release_commit = "53947e3d1ebfa47ae93212ea8f9f47f48edede6f"
 [released_trees]
-"." = "aa321c7da97edc4ec65b62ebf9cbd792f9d05f63"
+"." = "f43be424f15f28d3afe845e2c0a1aa28b04538c2"

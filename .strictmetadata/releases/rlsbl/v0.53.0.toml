@@ -4,8 +4,7 @@ format_version = 2
 bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "fc4356a312b59a02fd6710a8ccbe61ae09aae8e6"
+release_commit = "58b98024a4f9a23d680072bfa1def9c054d07be6"
 description = "Renames the `internal` workspace flag to `changelog_exempt` so the name describes the behavior it produces, and gives dependency edges a scope (runtime, dev, peer, explicit) that the reverse graph can filter on."
-
 [released_trees]
-"." = "debef2df5431f6e5f8d18eb711b5a178e0492d67"
+"." = "cf1c3d1b738cb2f75ccbf96265ea5c5996a74745"

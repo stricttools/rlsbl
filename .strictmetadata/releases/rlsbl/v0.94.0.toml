@@ -35,7 +35,6 @@ fix, and an unversioned-boundary check.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "f7a07e59f33df934a900be52d117ecfe508599cd"
-
+release_commit = "0960c0c0324a17ecff67a3c9d65d597e8630383d"
 [released_trees]
-"." = "18cb8befc1852662f45236f5a5cda0edad13859d"
+"." = "75e9cca9e69968b4fff31d79522c91be2d5bebee"

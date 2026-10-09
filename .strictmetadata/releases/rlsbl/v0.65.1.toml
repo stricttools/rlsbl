@@ -8,7 +8,6 @@ description = "Fix CI test failure from batch hint message"
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "94d647c7ad34ce7d2dad1d573489887d1dd6b518"
-
+release_commit = "dbde4f6ca3737132c6370ef482a389360c57a4a4"
 [released_trees]
-"." = "07b6e2c60881a81e3dff9e56ce9fd600d737abe6"
+"." = "e0514167133fa031463b0ae1e91ca617d4be3d80"

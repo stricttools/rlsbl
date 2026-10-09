@@ -8,7 +8,6 @@ description = "Auto-cleanup stale exclusions, DRY refactor manual-warning, hook 
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "8aadf8d439f8dd04e7742f929a0f50514351ab15"
-
+release_commit = "9874bfee8ab4cf83552ac416b48e5704e6e43f26"
 [released_trees]
-"." = "fd0e86725f22656c9ed0afbc569340dd530ed584"
+"." = "f68a55cf11e66f728c99addf10afd288c4431bec"

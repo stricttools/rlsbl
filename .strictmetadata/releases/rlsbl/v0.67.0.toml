@@ -8,7 +8,6 @@ description = "Monorepo pre-push support, test-suite-workspace check, release ro
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "059a2a9cb38549b36dce9466ac6dc66d582eddb4"
-
+release_commit = "f352393d2e0bf0df949d5c2d833f7e1a69423ad5"
 [released_trees]
-"." = "71b2498e28d30a65f33c68cad3ba8b7ae5ef517f"
+"." = "58a52f7b450f9d2aa07f369eaf42ec21ee8ee917"

@@ -12,7 +12,6 @@ context = "All bool flags now use --flag/--no-flag syntax with explicit defaults
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "5f794c43be8f4519864224fdbce4cf5fa7972e59"
-
+release_commit = "8fb59e91ca637e984403cad9d087b9de667620b1"
 [released_trees]
-"." = "0ff8eaf74b7f04c3d8914564b599108ae7573937"
+"." = "b6591768028c1cda160cfd84f4e69c2c839006bc"

@@ -8,7 +8,6 @@ description = "Fix feature matrix column order and add directive tests."
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "3c88efa811f7ef243992f1560506af358ab95c13"
-
+release_commit = "d79348a00c8eb277c260d4e8eacb35e0b3343315"
 [released_trees]
-"." = "42966464cff8f6108c845e384fb1eb27ef62f9d4"
+"." = "58bb491ccd4fa45121868c19d581376eabfbd43c"

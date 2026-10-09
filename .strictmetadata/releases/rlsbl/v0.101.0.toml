@@ -25,10 +25,9 @@ Large feature release spanning multiple areas:
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "e67c5ac49168b9508e556f7e239ea5162bf4bdd4"
+release_commit = "c7c9d7515940df90f5e54139baef8a4e72f04ef4"
 release_notices = [
     "> **Deprecated:** never published to PyPI; CI failed on missing gitleaks. Use v0.101.1 instead.",
 ]
-
 [released_trees]
-"." = "e846041518618adba14d681562db4d5f47ca1339"
+"." = "e72decedb8ecb7b33725b26c6e84b2ba1540db92"

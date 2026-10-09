@@ -12,7 +12,6 @@ context = "Found via the new CLI wiring coverage (which itself now covers all co
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "793a0c371335ae366441b1ee5bf6ba8a8f8e83c6"
-
+release_commit = "3d4bd35b2c98635fe9869e59d04d29f57ac9d5d7"
 [released_trees]
-"." = "813984e1bd366676f360fbb15b4c84e6f6541240"
+"." = "a8223201ddbc727701ac2409038bb148e2728d92"

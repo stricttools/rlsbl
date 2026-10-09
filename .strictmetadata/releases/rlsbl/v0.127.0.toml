@@ -19,7 +19,6 @@ A generated protobuf file in a gitignored third-party clone crashed `rlsbl rewri
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "0cda5d8e4b3d16ac89dfc607f7f495471fea84d7"
-
+release_commit = "834e89d367baf1d0c32d1db6ac7f2b0025996c7f"
 [released_trees]
-"." = "4619c22c6ecf0e75db5f2b222fc4c8647bfb18de"
+"." = "65f5db945dcde03a4c6d70438dcb80be379b3305"

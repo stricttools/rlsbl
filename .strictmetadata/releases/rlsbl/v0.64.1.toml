@@ -8,7 +8,6 @@ description = "Fix dead-modules false positives and watch test notification leak
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "32c18bd34dd6cef052ebccd6eab9584f217ed51c"
-
+release_commit = "ee753118a94f47e0e176cf965db421462e361acc"
 [released_trees]
-"." = "3a45c851bd78195d9ac19926521c9345da2eaf4b"
+"." = "1a5106a13093c8e5bb1f6ca013c49198082dbbd4"

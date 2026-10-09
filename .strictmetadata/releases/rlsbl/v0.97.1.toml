@@ -12,7 +12,6 @@ context = "Completes the quality cleanup phase: resolved all three import cycles
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "5b1ecdb2ceef983bdcf78724096655d3f2881405"
-
+release_commit = "d4af4feaa45de0bac6e16ba55de5defeb430398e"
 [released_trees]
-"." = "18111ac0206ce097dd1c26efa3de23b684cb86d0"
+"." = "3d2316c86808511f30d6316f612ce43be7a3259d"

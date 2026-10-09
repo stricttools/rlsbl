@@ -10,7 +10,6 @@ context = """Release flow now delegates test and lint validation to the check sy
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "e1205adc001f109eb2b3232d53a5378bdb7c22dc"
-
+release_commit = "9aab05c54227544c9e034726dbc852150db8f776"
 [released_trees]
-"." = "8f0f697714c7971291e775d865b90e0109692bfd"
+"." = "38222a22062670f31586d2debdebd6395ff8c9d7"

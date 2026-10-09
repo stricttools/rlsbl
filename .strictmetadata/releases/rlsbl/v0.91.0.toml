@@ -12,7 +12,6 @@ context = "This release adds three major capabilities: (1) pre-release channel s
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "b1eca883ba48a2e818b7a3791148b033ab3e8bf8"
-
+release_commit = "dc467cfee4eef615cff53b369d71cc97baac05af"
 [released_trees]
-"." = "ec61dc5089ce224831cab4f4a8dad9c07869b217"
+"." = "69ae29bfca415711e968ee076c092280212c67d9"

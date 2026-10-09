@@ -12,7 +12,6 @@ context = "GitHub Release notes sync (rlsbl release edit) now works for explicit
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "c41c84d7de2ddfee18ba5833dacbab62734041ad"
-
+release_commit = "62dac936232a4a357989939de95225a986c1c533"
 [released_trees]
-"." = "fdd6c9b09ebc2a2167c155b00b230e260a8a0258"
+"." = "05be75f07c67e326bfaf590a3f5515869e29f9a7"

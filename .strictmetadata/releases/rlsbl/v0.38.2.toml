@@ -10,7 +10,6 @@ bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
 description = "The publish router gains a no-op job so a plain-target release succeeds when every conditional publish job is skipped."
-release_commit = "0e86435b93401c14e6bc9371f65478427a445ed0"
-
+release_commit = "99c9c5972e34d90c4c0ed49cfa28f5f0bc87c454"
 [released_trees]
-"." = "273dacab00674ce4c23e122848874b64bc526711"
+"." = "4fc88824bd998fc863e57c20c74c13a9d36b2dc7"

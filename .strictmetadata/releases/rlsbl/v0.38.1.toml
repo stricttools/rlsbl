@@ -10,7 +10,6 @@ bump = "patch"
 include = ["npm", "pypi"]
 exclude = []
 description = "Fixes the doubled output path when a PyPI target lives in a sub-directory, and includes hook-generated files in the release commit instead of leaving them dirty."
-release_commit = "2176636c9e3830bc21d91d0ead6451d5ad60552c"
-
+release_commit = "4d476786eb8ff606b93368cf7ff64a0cdc98ba99"
 [released_trees]
-"." = "55dc552f3dccb41321c0419cb97e606555774e1b"
+"." = "11bcd4343dd9f6523887de0169608a3919404882"

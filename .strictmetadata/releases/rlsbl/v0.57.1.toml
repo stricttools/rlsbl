@@ -8,7 +8,6 @@ description = "Fix Python 3.14 compatibility in monorepo release-init"
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "4bf5a3eef25d0956ba74ec5cc5d5bcc9a40676b6"
-
+release_commit = "da26da37d2dabdec4d20bcf0090804a646e66d40"
 [released_trees]
-"." = "3e9ff3afafe3caf9b2695ab5d140527371167783"
+"." = "4bb8d89855684b69005cd6c0f925d45a14a271b3"

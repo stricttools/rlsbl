@@ -12,7 +12,6 @@ context = "Completes the six-todo scope of the Phase 10 multi-artifact releasabl
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "ff7e497efbedcce7a0041aee443fa4968a129cbc"
-
+release_commit = "b33900a42c3370a04fdd8f46740f8b2a2fe8a45b"
 [released_trees]
-"." = "adcf068ddbbc55437bd99d6576c1251325b4dd80"
+"." = "1e508978461107a27e0dacc07cc482718a201d39"

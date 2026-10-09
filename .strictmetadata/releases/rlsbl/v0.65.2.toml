@@ -8,7 +8,6 @@ description = "Watch retry dedup, no-runs exit 0, docs polish"
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "fa581f8d6c42f2056f5e2feebce9d09937bccccf"
-
+release_commit = "fa8097c267dad0b03fc54d66381e9231bcf3ab14"
 [released_trees]
-"." = "066bb186aec8b64ecf650ce2e5be715d8aae4239"
+"." = "3a9220da227a2e15a1520922159ac682ea3e0f22"

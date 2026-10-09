@@ -21,7 +21,6 @@ releasable = false (not versioned). The --dev-node CLI flag is renamed to
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "d43d801a262a7d95662edc8b992662a3ac34c918"
-
+release_commit = "e1f10b73b9b224e1336d79851eea0f3609416ff2"
 [released_trees]
-"." = "d5f3605d41b0d1a4dbb9268c45090267c87d75d7"
+"." = "a1201acbacc725e2655d95f0de7781b34c0d6bcf"

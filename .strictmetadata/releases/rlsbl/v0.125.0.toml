@@ -25,7 +25,6 @@ pre-1.0, so the removal ships without a compatibility shim.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "7ddb377baa0b0273a7b094a383aafaa1917329c4"
-
+release_commit = "af387bc347084b265302fc00c5882c07801eda58"
 [released_trees]
-"." = "8649cc489782bd15d19b29edfbdbdf02fd3083c4"
+"." = "7429f5b5b85298fdc055b240d82b2bf0951d1695"

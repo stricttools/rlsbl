@@ -16,7 +16,6 @@ New features: idempotent publish with registry probes; recovery dispatch across 
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "386860de8b0ac73f19b473f740aff9d53a206a9d"
-
+release_commit = "493f8e125b686097b69b8e34eed132fa2fd2960a"
 [released_trees]
-"." = "949f03ba71863fc114d3b648b93fba02fb87ed4e"
+"." = "39f28698282aa3da330eda7e88eea728e7ce5f94"

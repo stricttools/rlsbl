@@ -14,7 +14,6 @@ Hook scripts are deprecated in favor of config entries. Existing customized scri
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "9506455962fb96f75cb750c45fd8f74cc33324bd"
-
+release_commit = "c5f5fcb5ba9cefee25b57017d8aaff6be0f77a15"
 [released_trees]
-"." = "43f1caa73a681dd6852875c8043458ab4ee3c9d6"
+"." = "047d40875ebf3875f81d8dd5dad96613d8fa0f22"

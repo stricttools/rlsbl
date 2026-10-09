@@ -45,7 +45,6 @@ outranks pyproject.toml, or a deno.jsonc, whose comments a rewrite would lose
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "84ec70ebbaf3e55116d5a27d6a2e5be87c59cf53"
-
+release_commit = "6ded131ffd493623f9ddca18c7e408e63c8790bd"
 [released_trees]
-"." = "1dc36f7546d5f64719db640c5bcd25c2906217a3"
+"." = "494ba4ba4e58ece89351712f18ab185dd1d08ad3"

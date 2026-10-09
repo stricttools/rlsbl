@@ -20,7 +20,6 @@ Also includes fixes for `get_push_timeout` crashing with `config=None`, `uv.lock
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "81567897933431331baddde5ad53a667a3b980ba"
-
+release_commit = "a010ebb4774ffd86cb26565c0b3172fe9a50d5d6"
 [released_trees]
-"." = "e72399db05d2e2d43f248ba9e3cd6df96c5f5f5c"
+"." = "4e87d14915bb5124b307ea8385631f18d9b89025"

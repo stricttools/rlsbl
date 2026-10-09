@@ -8,7 +8,6 @@ description = "Feature matrix n/a support for toolchain-native checks"
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "a4aae215f8c850ce20f4ba2565d9d4d430a0c301"
-
+release_commit = "8230b0de928321d4cbb837336e25f8570eedafed"
 [released_trees]
-"." = "8ee461db2ae66fd4fad343021cb87e5124a3a3dc"
+"." = "0780c38c5797374f5b49ec93b927c8f7d8761509"

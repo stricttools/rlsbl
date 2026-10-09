@@ -4,8 +4,7 @@ format_version = 2
 bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "e78ff8ca74f956ed9d4a994c1423cb796d25729f"
+release_commit = "6d4b6169b873571d9fe4aa01654fcdc60b05c632"
 description = "Commands receive a `ProjectContext` carrying config read once at startup, instead of a bare project root re-read from disk at every call."
-
 [released_trees]
-"." = "1f6768f02a7009a2b6d45461a2dfdb1081939824"
+"." = "4afd392e9514d08de4fde7bd29f7c1096ec955fd"

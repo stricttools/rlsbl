@@ -10,7 +10,6 @@ bump = "minor"
 include = ["npm", "pypi"]
 exclude = []
 description = "Adds configurable changelog batch limits, so no entry may reference more commits than `max_commits_per_entry` and no commit may appear in more entries than `max_entries_per_commit`."
-release_commit = "91562c5b2983010ff340bec801653bfe9fc702a1"
-
+release_commit = "aeb2dc5a84d57a5ff56f8db6b308bd6637f679dd"
 [released_trees]
-"." = "c74fe0c36a7736bb7cdaf32436d6f63aeb5ef464"
+"." = "1b427b0fe3c2b06980c677ccecd956fba5263dc7"

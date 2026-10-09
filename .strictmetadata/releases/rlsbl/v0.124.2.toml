@@ -35,7 +35,6 @@ anywhere.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "f567384dd997d54d54b2f4a9d70f55633f50b5ea"
-
+release_commit = "b7f5dd340561901a92d42f55ea96cf7e8fc630ad"
 [released_trees]
-"." = "9274ef55880cbad4940b81f6ced496877fd322d7"
+"." = "a64dde911e70213d95402901362078bd926bdaa1"

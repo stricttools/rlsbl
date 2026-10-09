@@ -8,7 +8,6 @@ description = "Dynamic check-count directive, quality count fix, exclusion clean
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "cf7af9ec8335e99c3856b9c5fe1b514533f11c0a"
-
+release_commit = "34320d4384b76d09c0f0b0d364f6bae8de0c6506"
 [released_trees]
-"." = "b81db88e044f72d63ad21807cdfa1ed86335b519"
+"." = "268bb46e3b4f1b4576ea9214b875f8ba3c7a5b8d"

@@ -12,7 +12,6 @@ context = "The monorepo CI router generates job keys from CI workflow filenames 
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "bf356a817affc82b5576766d8273d0fb72dec5a8"
-
+release_commit = "05d04ff293d836391951584ebc272dbc468658c2"
 [released_trees]
-"." = "4f692ea64434fe39df4629fcf1f4b6302a84c721"
+"." = "82aa61ab9f285d07c4528b1f02f6afec3d677c4f"

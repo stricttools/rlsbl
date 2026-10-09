@@ -29,7 +29,6 @@ and strictspec 0.5.0.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "94014a5db5217afdf2cbb3701964cef2ec52e279"
-
+release_commit = "b37185d7ea4de487369f579f6457ee74a5916a49"
 [released_trees]
-"." = "120fa1ae0073d464441cc517ca2df856e9cf4c8f"
+"." = "2091488eac94e8ba28934baa45ce8a740851885f"

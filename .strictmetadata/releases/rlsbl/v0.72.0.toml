@@ -8,7 +8,6 @@ description = "Silent exception audit, release robustness fixes, dev-node batch 
 context = "Systematic audit replaced silent exception swallowing with explicit warnings or hard errors across all commands. Release undo and create now handle GitHub API failures gracefully. Dev-node projects in batch releases now hard-error instead of silently skipping."
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "c5de6a71765c4d9767efb7b4040028eb6fb9529c"
-
+release_commit = "119d8a38ac7f81e99d4a036b2835f5670650fb99"
 [released_trees]
-"." = "3204879cf434e1c8086c5ca105b50096913cee21"
+"." = "a5e611d5a3fba97d2e7c4e3e27998a7c550691e4"

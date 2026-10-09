@@ -3,8 +3,7 @@ format_version = 2
 bump = "patch"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "195840be4ff0a72f2327ca4e7c8206ee78b898b9"
+release_commit = "84b57ae50e8acb4d11b13db255af6865eacd0d53"
 description = "Go asset builds use goreleaser for cross-compilation when it is installed, falling back to a host-only `go build` when it is not."
-
 [released_trees]
-"." = "64422470e742ecd26dddeb5d93fa79527ae9ef46"
+"." = "58ec75897f3bab749413a7ed434e5a6faf9ee628"

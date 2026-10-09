@@ -16,7 +16,6 @@ Removed silent error swallowing in member version sync and dead-code convention 
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "64271f7a039bca2d2923b754bb5e0d3202d356e7"
-
+release_commit = "08fabfdc95b66f73ceb6bcb21e4dccb9ef9fb40e"
 [released_trees]
-"." = "9dfc25ffea6b34eb7a3b84e6f0ed806aa6052252"
+"." = "4b4027a894c11287bdc7f44fd983bc899e12268f"

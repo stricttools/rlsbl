@@ -8,7 +8,6 @@ description = "CI uses --no-sources for portable uv sync"
 context = ""
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "c225d799182a2d16e79dff83e26f2086132d8874"
-
+release_commit = "16708e3d6280385bcb1f60a1582c104ba2c7efda"
 [released_trees]
-"." = "74c36a9d82c1a10c0e368089d4f3dd1c55933cd0"
+"." = "de44d3c440ee4cfa87b5173fee7229fecbfe6595"

@@ -71,7 +71,6 @@ strictcli that ships `dry_run_supported`.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "6df4c199ed37175480d5024dfba6d7d9255ecb0a"
-
+release_commit = "e6691516f80bb6fb278c1ffcd185b8a8c3849042"
 [released_trees]
-"." = "c2570d6865acbd79951054ab29c7167c7cd7d6ea"
+"." = "e9c5e2a0166cc5a8c101507f5ebfe17f9c2bc982"

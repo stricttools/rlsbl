@@ -4,8 +4,7 @@ format_version = 2
 bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "979dee000b7b2f37d485d0c00c1cfdee76082006"
+release_commit = "7707bf73b61738def80e1ac0d16e4627a1e870d7"
 description = "Config helpers and every target's `publish()` take the already-loaded config and context instead of a project root, removing redundant disk reads during publish."
-
 [released_trees]
-"." = "3d391c3ec94bdb3859c3cc5e4dc3c7ffa46d4bd1"
+"." = "410ce2ef23de3ebe7e394c5c1c6796d2264ac0a7"

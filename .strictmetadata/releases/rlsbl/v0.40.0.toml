@@ -3,8 +3,7 @@ format_version = 2
 bump = "minor"
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "b9dfda96303878bd9de1c5a3c7c14e96dba6d2ec"
+release_commit = "1dfd2bee3dbadbc30722e4c2cdcdf9399c4d73f0"
 description = "Tests, lint and the remote check always run -- the `--skip-*` flags are gone -- and README.md and CLAUDE.md become selfdoc-generated from templates under `docs/`."
-
 [released_trees]
-"." = "b9800dc75ff3162b52cdb688a7745a47bb24c9cc"
+"." = "80f1069477fee59222f2545ca378cdfb88fb94b3"

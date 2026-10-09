@@ -8,7 +8,6 @@ description = "Documentation overhaul and notification UX fix"
 context = "Comprehensive docs rewrite (13 new guide pages, 2600+ lines), notification click-to-open fix, pipeline env var validation ordering fix, and new --allow-batch flag for changelog add."
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "814fbfd00fc9608e21a730a8319141abb7eec1a5"
-
+release_commit = "f01f8dea568bee1fb80c6ee95471b596dd0c658e"
 [released_trees]
-"." = "1ce4890d62a5e41dfa2070e1558b28247c79d73e"
+"." = "fd503e1d26948a9b782df916148f4628de9becc9"

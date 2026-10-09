@@ -10,7 +10,6 @@ context = "ensure_github_topic migrated from run() to run_gh() but the test mock
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "9df4fce18d23e52fca1dae789b345cc533042e88"
-
+release_commit = "508b6f7e8ed7a4b1e767c1091b689d4eade6e0a8"
 [released_trees]
-"." = "a6ae0768dcb9849b9ce932ae3b63026c3cd484c7"
+"." = "0069ee000cb5d5ff005ba3a0c2a2527294c39b12"

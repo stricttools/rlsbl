@@ -14,7 +14,6 @@ Breaking: projects with .rlsbl/config.json that lack an explicit "targets" key w
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "e927a992298a91b25d8d080b3d29dfc2437f1c37"
-
+release_commit = "5b6b1492e80822438bd05f373230d4f1fad55b96"
 [released_trees]
-"." = "cb6f7f16fc32f60be07fc8fb819b5efda44ac587"
+"." = "e34a39e39b4c33a7b9885e2469a7162de301ffc3"

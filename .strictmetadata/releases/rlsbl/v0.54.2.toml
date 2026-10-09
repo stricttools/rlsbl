@@ -8,7 +8,6 @@ description = "Batch release description enforcement, scan cache optimization, l
 context = ""
 include = ["npm", "pypi", "docs"]
 exclude = []
-release_commit = "06f9b2ab204533e65853637846b9e1be38ee14a0"
-
+release_commit = "88744cc24bc40a9ae5c3f4219927d7c12fcf3086"
 [released_trees]
-"." = "9985be82e8b5f6a793aa87c88498f2abb3cf87bc"
+"." = "e8ab684c8916dbaceba545f38f1d3b35020aae85"

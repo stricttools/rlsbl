@@ -10,7 +10,6 @@ context = "The workspace test runner was running uv sync per sub-project instead
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "521cf14389ba96d50b516aac83b5f080d00f411e"
-
+release_commit = "79867076baf5e54d415849d78d54cf1dbfd49002"
 [released_trees]
-"." = "b94a88f38b17fe1c59363f811c9ed9534d75726b"
+"." = "5d18a876332274e439cbeb6550d0f8ff58c42156"

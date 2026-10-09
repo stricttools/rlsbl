@@ -10,7 +10,6 @@ context = "Final cleanup round: completed the exception hierarchy (GitError for 
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "e970fd614a8f02ab70f0c6b330dd23fbbcfd77fb"
-
+release_commit = "6adafce5eff1e3075f90eb43a4959551755ff2cf"
 [released_trees]
-"." = "ef9b209db7caebf3e64230fe493cc5f6dbf78464"
+"." = "ef350102e178f33ee74a246b4c72486ca7fc86bf"

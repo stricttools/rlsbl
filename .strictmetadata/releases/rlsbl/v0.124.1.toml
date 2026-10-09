@@ -28,7 +28,6 @@ committed stamps and the resolved strictspec disagree.
 # blog = false
 include = ["npm", "pypi"]
 exclude = []
-release_commit = "f8835b235fafdba9891e94b565243e877c97c749"
-
+release_commit = "6f2565bb5aa832bcd85c36e0d4ceb338fee67cba"
 [released_trees]
-"." = "48ebb8e2b9fe3b095e704918d0dd7c98a88f9da8"
+"." = "1f24d5c5ff933bd1cdb1690a1ad0804a51091ad0"
