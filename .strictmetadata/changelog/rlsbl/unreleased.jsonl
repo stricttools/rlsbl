@@ -84,3 +84,4 @@
 {"format_version":2,"id":"18dcdfad41c2d81bd0aa85f6fc844198a028cc77ab144da1","commits":["af3cd2b09bfa65e572b062560a0801cd09a36a90"],"user_facing":true,"description":"A release is no longer refused for a dev overlay of a package no `pyproject.toml` of the releasable declares; the version-skew check asks PyPI only about overlaid packages the release depends on.","type":"fix"}
 {"format_version":2,"id":"18dce1138b62ad4c1e05642d262541b99677a03a0ef4654d","commits":["5cd74dc9708da3bc0a8ccec7d4a1cdb69ddfe149"],"user_facing":false}
 {"format_version":2,"id":"18dce1268750b84199ab1e0cd09241099c4036a32d23c664","commits":["72406c4a28853283251eb21f68d6639ac740f37d"],"user_facing":false}
+{"format_version":2,"id":"18dce145b48e893942b10404db4143a1a2330149156465a8","commits":["da8fd05ef20c20e545dd36e2bafd64aa14a57e6e"],"user_facing":false}
