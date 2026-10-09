@@ -109,12 +109,7 @@ func TestTheGoEntryPointIsTheMainPackageImportingStrictcli(t *testing.T) {
 func TestRlsblsOwnEntryPointIsDetected(t *testing.T) {
 	// The module cache is read where it is, so go list resolves rlsbl's
 	// requirements without downloading them into the isolated home.
-	modcache, err := exec.Command("go", "env", "GOMODCACHE").Output()
-	if err != nil {
-		t.Fatal(err)
-	}
-	hygiene.Isolate(t)
-	t.Setenv("GOMODCACHE", strings.TrimSpace(string(modcache)))
+	hygiene.Isolate(t, hygiene.Preserve(hygiene.GoModCache))
 	t.Setenv("GOPROXY", "off")
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
