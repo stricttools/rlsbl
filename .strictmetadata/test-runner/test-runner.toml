@@ -2,4 +2,6 @@ format_version = 1
 caches = ["go"]
 ci_workflows = [".github/workflows/ci-go.yml"]
 command = "scripts/go-suite.sh"
+# CI starts with an empty module cache, and the sandbox has no network.
+prewarm = ["go mod download"]
 runner_path = "scripts/test.sh"
