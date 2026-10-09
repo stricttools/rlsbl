@@ -1,3 +1,0 @@
-{"format_version":2,"id":"18dce3ce44108a91a903196e9786404e850b8bab4029a06a","commits":["db7ee725130930dc5a40cc20f05b7b57cb3f3269"],"user_facing":false}
-{"format_version":2,"id":"18dce601ce828a61c9ac7eb9cfef43b3801bc097fcc54e00","commits":["2395105dae00b7db2d6dbafd92e2f9c182c2f713"],"user_facing":true,"description":"`rlsbl release scrub` finishes in a repository with versions released before it kept changelog files: their GitHub Releases keep their own notes, with the `rlsbl-ci-sha` marker moved to the rewritten release commit, where the scrub refused to write them and stopped.","type":"fix"}
-{"format_version":2,"id":"18dce6bcbe83ca5cba080efcd67d4e1ea3cbbbf3a054e5c8","commits":["f505349d9d7f2c25f04bc01982e1a31d2ddb5917"],"user_facing":false}
