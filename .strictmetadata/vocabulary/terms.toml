@@ -1,11 +1,6 @@
 format_version = 1
 
 [[accepted]]
-word = "codename"
-meaning = "A confidential project's internal name, which the lifecycle-and-license record lists so published text is scanned for it."
-aliases = ["codenames"]
-
-[[accepted]]
 word = "esbuild"
 meaning = "The JavaScript bundler that ships its Go binary through npm platform packages, the pattern rlsbl's go-binary pipelines follow."
 
