@@ -41,14 +41,14 @@ Lists the commits of the releasable the working directory selects since the near
 
 Lists every target rlsbl supports with the files its version lives in, and whether the member whose directory holds the working directory has it: the targets it declares in `releasables.toml`, or, when it declares none, the ones its manifests are detected as ([release targets](targets.md)).
 
-## `rlsbl discover`
+## `rlsbl discover --mine` and `--no-mine`
 
 ```bash
-rlsbl discover
+rlsbl discover --no-mine
 rlsbl discover --mine
 ```
 
-Lists the GitHub repositories carrying the `rlsbl` topic, most recently updated first, through the authenticated `gh`; `--mine` keeps the repositories the authenticated account owns. GitHub's search returns at most 1000 repositories, and a topic carried by more is refused rather than listed in part. Projects gain the topic from `rlsbl scaffold` while `rlsbl:ecosystem-tagging` is on.
+Lists the GitHub repositories carrying the `rlsbl` topic, most recently updated first, through the authenticated `gh`; `--mine` or `--no-mine` is required, and `--mine` keeps the repositories the authenticated account owns. GitHub's search returns at most 1000 repositories, and a topic carried by more is refused rather than listed in part. Projects gain the topic from `rlsbl scaffold` while `rlsbl:ecosystem-tagging` is on.
 
 ## `rlsbl check-name` and `rlsbl claim-name`
 
@@ -61,14 +61,14 @@ rlsbl claim-name widget --target npm --approve-consequential
 
 `claim-name` publishes a minimal placeholder (version 0.0.0) under a name `check-name` reports available, and refuses any other verdict. npm authenticates with `NPM_TOKEN` when it is set, otherwise with `~/.npmrc`; PyPI with `UV_PUBLISH_TOKEN` or `PYPI_TOKEN`, otherwise with `~/.pypirc`. No token is ever printed or passed as an argument. A claimed name is held for good: neither registry gives it back. Checking or claiming a name contacts the registry with it, so only names the owner approved are checked.
 
-## `rlsbl secrets sync-npm-token`
+## `rlsbl secrets sync-npm-token --no-all` and `--all`
 
 ```bash
-rlsbl secrets sync-npm-token --approve-consequential
+rlsbl secrets sync-npm-token --no-all --approve-consequential
 rlsbl secrets sync-npm-token --all --approve-consequential
 ```
 
-Copies the npm token in `~/.npmrc` into the `NPM_TOKEN` Actions secret of repositories that already have one. It refuses when `~/.npmrc` holds no token, and when npm does not accept it (asked with `GET https://registry.npmjs.org/-/whoami`); otherwise it prints the npm user the token authenticates. Without `--all` the target is the repository the working directory's `origin` names, and one without an `NPM_TOKEN` secret is refused: the secret is never created. With `--all` the targets are every repository the authenticated `gh` account can see that has the secret; archived ones are named and skipped. Every target is read before any is written, each is set with `gh secret set NPM_TOKEN --repo <owner/repo>` with the token on stdin, and the run exits 1 when any target could not be read or set. The `npm-token-synced` check names this command when a secret is older than the token.
+Copies the npm token in `~/.npmrc` into the `NPM_TOKEN` Actions secret of repositories that already have one. It refuses when `~/.npmrc` holds no token, and when npm does not accept it (asked with `GET https://registry.npmjs.org/-/whoami`); otherwise it prints the npm user the token authenticates. With `--no-all` the target is the repository the working directory's `origin` names, and one without an `NPM_TOKEN` secret is refused: the secret is never created. With `--all` the targets are every repository the authenticated `gh` account can see that has the secret; archived ones are named and skipped. Every target is read before any is written, each is set with `gh secret set NPM_TOKEN --repo <owner/repo>` with the token on stdin, and the run exits 1 when any target could not be read or set. The `npm-token-synced` check names this command when a secret is older than the token.
 
 ## `rlsbl rewrite`
 

@@ -22,7 +22,7 @@ const NpmrcTokenKey = "//registry.npmjs.org/:_authToken"
 const NpmTokenSecret = "NPM_TOKEN"
 
 // SyncCommand brings repositories' NPM_TOKEN secrets up to the local token.
-const SyncCommand = "rlsbl secrets sync-npm-token"
+const SyncCommand = "rlsbl secrets sync-npm-token --no-all"
 
 // tokenListTimeout bounds `npm token list --json`.
 const tokenListTimeout = time.Minute

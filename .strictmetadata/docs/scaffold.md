@@ -26,7 +26,7 @@ Everything is planned and every refusal made before anything is written. What th
 | `pyproject.toml` settings | pytest's `norecursedirs` with the scratch directories, an `--ignore=<path>` per nested member in pytest's `addopts`, and hatchling's sdist exclusions; every other byte is kept. |
 | `.git/hooks/pre-push`, `.git/hooks/post-rewrite` | Every scaffold: the [git hooks](#git-hooks). |
 
-While `rlsbl:ecosystem-tagging` is on (its default), the npm and PyPI manifests gain the `rlsbl` keyword and the GitHub repository the `rlsbl` topic, so `rlsbl discover` finds the project.
+While `rlsbl:ecosystem-tagging` is on (its default), the npm and PyPI manifests gain the `rlsbl` keyword and the GitHub repository the `rlsbl` topic, so `rlsbl discover --no-mine` finds the project.
 
 `CHANGELOG.md` and `unreleased.jsonl` are not scaffolded: the first `rlsbl changelog add` creates the changelog directory and file, and `rlsbl changelog generate` writes `CHANGELOG.md`.
 

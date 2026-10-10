@@ -75,7 +75,7 @@ type otherOption struct {
 
 var otherOptions = []otherOption{
 	{TestSandbox, "on > off", "off", "tests", "Whether the repository distributes the sandboxed test runner .strictmetadata/test-runner/test-runner.toml describes: scaffold renders the runner, and testisolation-floor requires every CI workflow the file names to invoke it."},
-	{EcosystemTagging, "on > off", "on", "project", "Whether rlsbl tags the project as part of the rlsbl ecosystem: the rlsbl keyword in package.json and pyproject.toml, and the rlsbl topic on its GitHub repository, which `rlsbl discover` searches."},
+	{EcosystemTagging, "on > off", "on", "project", "Whether rlsbl tags the project as part of the rlsbl ecosystem: the rlsbl keyword in package.json and pyproject.toml, and the rlsbl topic on its GitHub repository, which `rlsbl discover --no-mine` searches."},
 }
 
 // checksDocument is the checks registry as the generator reads it.

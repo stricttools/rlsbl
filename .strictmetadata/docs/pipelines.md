@@ -30,7 +30,7 @@ artifact = "package"    # what it publishes (below)
 
 :-: table-pipelines
 
-The `ci-publish-secrets` check asks GitHub whether each secret a CI pipeline authenticates with exists on the repository, and `npm-token-synced` whether the `NPM_TOKEN` secret holds the token npm accepts on this machine; `rlsbl secrets sync-npm-token` copies it there.
+The `ci-publish-secrets` check asks GitHub whether each secret a CI pipeline authenticates with exists on the repository, and `npm-token-synced` whether the `NPM_TOKEN` secret holds the token npm accepts on this machine; `rlsbl secrets sync-npm-token --no-all` copies it there.
 
 ## Publishing from CI
 

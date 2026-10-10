@@ -27,7 +27,7 @@ func registerDiscover(r *commandSet) {
 		help:   discoverHelp,
 		effect: readOnly,
 		flags: []strictcli.Flag{
-			strictcli.BoolFlag("mine", "List only the repositories the authenticated GitHub account owns", strictcli.Default(false)),
+			strictcli.BoolFlag("mine", "List only the repositories the authenticated GitHub account owns (--mine), or every repository tagged as part of the rlsbl ecosystem (--no-mine)", strictcli.Required()),
 		},
 		payload: discoverPayloadSchema(),
 		render:  renderDiscover,

@@ -44,12 +44,12 @@ func TestSyncNpmTokenSetsTheRepositoryTheOriginNames(t *testing.T) {
 	fake := testsupport.NewFakeHTTP(t, httpGet("https://registry.npmjs.org/-/whoami", 200, `{"username": "someone"}`))
 	app := appWith(t, fake)
 
-	r := app.Test([]string{"secrets", "sync-npm-token", "--approve-consequential"})
+	r := app.Test([]string{"secrets", "sync-npm-token", "--no-all", "--approve-consequential"})
 	if r.ExitCode != 1 || !strings.Contains(r.Stderr, "has no origin remote") || !strings.Contains(r.Stderr, "--all") {
 		t.Fatalf("exit %d:\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
 	}
 	repo.Git("remote", "add", "origin", "git@github.com:owner/repo.git")
-	r = app.Test([]string{"secrets", "sync-npm-token", "--approve-consequential"})
+	r = app.Test([]string{"secrets", "sync-npm-token", "--no-all", "--approve-consequential"})
 	if r.ExitCode != 0 || !strings.Contains(r.Stdout, "owner/repo: NPM_TOKEN set") {
 		t.Fatalf("adding the origin did not clear the refusal: exit %d:\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
 	}

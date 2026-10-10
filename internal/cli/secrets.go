@@ -18,7 +18,7 @@ const secretsGroupHelp = "Keep the Actions secrets CI publishes with in step wit
 
 const syncNpmTokenHelp = "Copy the npm token in ~/.npmrc (the //registry.npmjs.org/:_authToken= line) into the NPM_TOKEN Actions secret of " +
 	"repositories that already have one. Refuses when ~/.npmrc holds no token, and when npm does not accept it (asked with GET " +
-	"https://registry.npmjs.org/-/whoami); otherwise prints the npm user it authenticates. Without --all the target is the repository the " +
+	"https://registry.npmjs.org/-/whoami); otherwise prints the npm user it authenticates. With --no-all the target is the repository the " +
 	"working directory's origin remote names, and a repository without an NPM_TOKEN secret is refused: the secret is never created. With --all " +
 	"the targets are every repository the authenticated gh account can see (its own and those of every organization it belongs to) that has an " +
 	"NPM_TOKEN secret; archived repositories are named and skipped, since GitHub refuses writes to them. Every target's secret is read before " +
@@ -41,8 +41,8 @@ func registerSecrets(r *commandSet) {
 			"replaces the NPM_TOKEN Actions secret a repository's CI publishes to npm with",
 			strictcli.ProcMutate)},
 		flags: []strictcli.Flag{
-			strictcli.BoolFlag("all", "Target every repository the authenticated gh account can see that has an NPM_TOKEN secret, instead of the "+
-				"repository the origin remote names (the current repository when not passed)", strictcli.Optional()),
+			strictcli.BoolFlag("all", "Target every repository the authenticated gh account can see that has an NPM_TOKEN secret (--all), or "+
+				"only the repository the origin remote names (--no-all)", strictcli.Required()),
 		},
 		run: runSyncNpmToken,
 	})
@@ -74,7 +74,7 @@ func originRepository(ctx *strictcli.Context) (github.Repository, error) {
 }
 
 func runSyncNpmToken(ctx *strictcli.Context, kw map[string]any) (any, error) {
-	all, _ := strictcli.GetOpt[bool](kw, "all")
+	all := strictcli.Get[bool](kw, "all")
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("the home directory, where ~/.npmrc lives, cannot be found: %w", err)

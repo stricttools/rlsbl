@@ -219,7 +219,7 @@ values = "on > off"
 default = "on"
 scope = "none"
 requires = []
-description = "Whether rlsbl tags the project as part of the rlsbl ecosystem: the rlsbl keyword in package.json and pyproject.toml, and the rlsbl topic on its GitHub repository, which `rlsbl discover` searches."
+description = "Whether rlsbl tags the project as part of the rlsbl ecosystem: the rlsbl keyword in package.json and pyproject.toml, and the rlsbl topic on its GitHub repository, which `rlsbl discover --no-mine` searches."
 
 [[option]]
 name = "effects-bypass"

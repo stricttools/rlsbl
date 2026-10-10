@@ -122,7 +122,7 @@ Each repository keeps a record of every releasable's dated lifecycle (active, on
 
 ## Ecosystem tagging
 
-While the `rlsbl:ecosystem-tagging` option is on (its default), scaffold and the release add an `rlsbl` keyword to npm and PyPI manifests and the `rlsbl` topic to the GitHub repository, so `rlsbl discover` finds the project. A repository opts out with an options entry:
+While the `rlsbl:ecosystem-tagging` option is on (its default), scaffold and the release add an `rlsbl` keyword to npm and PyPI manifests and the `rlsbl` topic to the GitHub repository, so `rlsbl discover --no-mine` finds the project. A repository opts out with an options entry:
 
 ```
 rlsbl options set rlsbl:ecosystem-tagging --current off --ideal off --reason "..."
@@ -144,7 +144,7 @@ rlsbl options set rlsbl:ecosystem-tagging --current off --ideal off --reason "..
 
 | Registry | Setup | Then |
 | --- | --- | --- |
-| npm | Add the `NPM_TOKEN` Actions secret (`rlsbl secrets sync-npm-token` keeps it current). | The publish workflow publishes on the GitHub Release. |
+| npm | Add the `NPM_TOKEN` Actions secret (`rlsbl secrets sync-npm-token --no-all` keeps it current). | The publish workflow publishes on the GitHub Release. |
 | PyPI | Register the repository as a [trusted publisher](https://docs.pypi.org/trusted-publishers/); no token. | The publish workflow publishes through OIDC. |
 | Go | Nothing: a Go module is published by its tag. | The publish workflow asks the module proxy for a library; goreleaser attaches a binary's archives to the Release. |
 

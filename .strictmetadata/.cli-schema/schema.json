@@ -787,12 +787,11 @@
       "flags": [
         {
           "name": "mine",
-          "help": "List only the repositories the authenticated GitHub account owns",
+          "help": "List only the repositories the authenticated GitHub account owns (--mine), or every repository tagged as part of the rlsbl ecosystem (--no-mine)",
           "value_schema": {
             "type": "boolean"
           },
-          "presence": "default",
-          "default": false,
+          "presence": "required",
           "negatable": true
         }
       ]
@@ -2902,11 +2901,11 @@
             },
             {
               "name": "uninstall",
-              "help": "Reverse a previous install where the target has a reverse (installs when not passed)",
+              "help": "Reverse a previous install where the target has a reverse (--uninstall), or install (--no-uninstall)",
               "value_schema": {
                 "type": "boolean"
               },
-              "presence": "optional",
+              "presence": "required",
               "negatable": true
             }
           ]
@@ -2941,17 +2940,17 @@
       "commands": {
         "sync-npm-token": {
           "name": "sync-npm-token",
-          "help": "Copy the npm token in ~/.npmrc (the //registry.npmjs.org/:_authToken= line) into the NPM_TOKEN Actions secret of repositories that already have one. Refuses when ~/.npmrc holds no token, and when npm does not accept it (asked with GET https://registry.npmjs.org/-/whoami); otherwise prints the npm user it authenticates. Without --all the target is the repository the working directory's origin remote names, and a repository without an NPM_TOKEN secret is refused: the secret is never created. With --all the targets are every repository the authenticated gh account can see (its own and those of every organization it belongs to) that has an NPM_TOKEN secret; archived repositories are named and skipped, since GitHub refuses writes to them. Every target's secret is read before any is written. Each target is set with `gh secret set NPM_TOKEN --repo <owner/repo>`, the token piped on stdin, and printed with its outcome. Exits 1 when any target could not be read or set, once every other target was tried. The token is never printed.",
+          "help": "Copy the npm token in ~/.npmrc (the //registry.npmjs.org/:_authToken= line) into the NPM_TOKEN Actions secret of repositories that already have one. Refuses when ~/.npmrc holds no token, and when npm does not accept it (asked with GET https://registry.npmjs.org/-/whoami); otherwise prints the npm user it authenticates. With --no-all the target is the repository the working directory's origin remote names, and a repository without an NPM_TOKEN secret is refused: the secret is never created. With --all the targets are every repository the authenticated gh account can see (its own and those of every organization it belongs to) that has an NPM_TOKEN secret; archived repositories are named and skipped, since GitHub refuses writes to them. Every target's secret is read before any is written. Each target is set with `gh secret set NPM_TOKEN --repo <owner/repo>`, the token piped on stdin, and printed with its outcome. Exits 1 when any target could not be read or set, once every other target was tried. The token is never printed.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
             {
               "name": "all",
-              "help": "Target every repository the authenticated gh account can see that has an NPM_TOKEN secret, instead of the repository the origin remote names (the current repository when not passed)",
+              "help": "Target every repository the authenticated gh account can see that has an NPM_TOKEN secret (--all), or only the repository the origin remote names (--no-all)",
               "value_schema": {
                 "type": "boolean"
               },
-              "presence": "optional",
+              "presence": "required",
               "negatable": true
             }
           ],
@@ -3271,16 +3270,16 @@
         },
         "edit": {
           "name": "edit",
-          "help": "Rewrite one released version's GitHub Release in place from the record: the notes its changelog holds, the deprecate and yank notices its release archive records on top, the rlsbl-ci-sha marker naming the commit it shipped from, and the pre-release flag, set when a notice is recorded and cleared otherwise. The version defaults to the latest release the archives record. A version the record holds no release of, and one without a GitHub Release, are refused before anything is written. Run from the directory of a member versioned under the releasable.",
+          "help": "Rewrite one released version's GitHub Release in place from the record: the notes its changelog holds, the deprecate and yank notices its release archive records on top, the rlsbl-ci-sha marker naming the commit it shipped from, and the pre-release flag, set when a notice is recorded and cleared otherwise. A version the record holds no release of, and one without a GitHub Release, are refused before anything is written. Run from the directory of a member versioned under the releasable.",
           "effect": "mutating",
           "args": [
             {
               "name": "version",
-              "help": "The released version whose Release is rewritten, bare (0.4.0); the latest release when omitted",
+              "help": "The released version whose Release is rewritten, bare (0.4.0)",
               "value_schema": {
                 "type": "string"
               },
-              "presence": "optional"
+              "presence": "required"
             }
           ]
         },
@@ -3752,11 +3751,11 @@
             },
             {
               "name": "user-facing",
-              "help": "Whether CHANGELOG.md and the release notes show the entry (user-facing when neither form is passed)",
+              "help": "Whether CHANGELOG.md and the release notes show the entry (--user-facing) or leave it out (--no-user-facing)",
               "value_schema": {
                 "type": "boolean"
               },
-              "presence": "optional",
+              "presence": "required",
               "negatable": true
             },
             {
