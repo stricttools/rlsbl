@@ -123,13 +123,13 @@ requires = []
 description = "Every registered command path appears in the committed test-coverage manifest."
 
 [[option]]
-name = "confidential-names"
+name = "confidential-terms"
 subject = "project"
 values = "error > warn > off"
 default = "error"
 scope = "none"
 requires = []
-description = "In a public repository, no tracked file, no changelog entry, and no commit the next push of the branch carries (its message, or a text file it adds or changes) contains a name from the machine-local confidential-name index."
+description = "In a public repository, every hit of the confidential-term list (the age-encrypted list under the user's home directory; a missing list has no terms) in the commits the next push of the branch carries (their messages and trailers, the paths they add, and the lines they add or change in text files) is resolved in .strictmetadata/confidential-hits/resolutions.toml: judged a false positive at 70% certainty or more, or approved by the owner. Every unresolved hit is reported at once, with its id, location, and the text around it."
 
 [[option]]
 name = "consequential-grant-agreement"

@@ -27,7 +27,7 @@ const SCHEMA_FORMAT_VERSION = 2
 // embeddedSchema carries the compiled schema (and its imported type-definition
 // files and scalar manifest) so the validator is self-contained and does no IO.
 var embeddedSchema = map[string]string{
-	"release-file.schema.toml": "# strictspec schema for a releasable's release file and its archives:\n# .strictmetadata/releases/<releasable>/unreleased.toml while it is editable,\n# and .strictmetadata/releases/<releasable>/v<version>.toml once archived. The\n# version an archive records is its file name and is not repeated inside.\n#\n# The generated Go validator (internal/releaserecord/releasefilespec) is what\n# the release record runs first. internal/releaserecord then decodes the\n# document strictly and applies what this schema cannot see: a description of\n# only whitespace, a flow-owned field in the editable file, and an archive in\n# none of the three fates.\n#\n# THE THREE FATES. An archive is in one of three states, and every reader\n# dispatches on which:\n#\n#   recorded         release_commit + [released_trees] -- it shipped, from a known commit\n#   unrecoverable    unrecoverable = true              -- it shipped, from a commit nothing can name\n#   never released   never_released = true             -- the version number exists, no release does\n#\n# The schema refuses a document carrying two of them; an archive carrying none\n# is refused by the reader, because the same schema validates the editable\n# unreleased.toml, which carries none by design. Exclusion is judged on\n# presence, not on the value: rlsbl writes a marker only when it is true, so\n# `unrecoverable = false` beside a release commit is a hand-made document and\n# is refused all the same.\n#\n# The pre-release channel and blog-on-release are gone: `preid` and `blog` are\n# unknown keys and `prerelease` is not a bump.\n\nname = \"rlsbl-release-file\"\nmeta_version = 1\nformat_version = 2\ndocument_syntax = \"toml\"\nrole = \"schema\"\nroot = \"ReleaseFile\"\ndescription = \"A releasable's release file: the bump, the target selection, and the release prose, plus the fate an archive records.\"\n\n[types.ReleaseFile]\ntype = \"record\"\n\n[types.ReleaseFile.fields.format_version]\ntype = \"literal\"\nvalue = 2\nrequired = true\ndescription = \"The document's format version.\"\n\n[types.ReleaseFile.fields.bump]\ntype = \"enum\"\nrequired = true\nvalues = [\"patch\", \"minor\", \"major\", \"infra\"]\ndescription = \"How the release moves the version. An infra release moves it as a patch release does and is recorded as infra.\"\n\n[types.ReleaseFile.fields.include]\ntype = \"array\"\nrequired = true\ndescription = \"The target names to release. May be empty; disjoint from exclude.\"\n[types.ReleaseFile.fields.include.item]\ntype = \"string\"\nnon_empty = true\n\n[types.ReleaseFile.fields.exclude]\ntype = \"array\"\nrequired = true\ndescription = \"The target names to skip. Disjoint from include.\"\n[types.ReleaseFile.fields.exclude.item]\ntype = \"string\"\nnon_empty = true\n\n[types.ReleaseFile.fields.description]\ntype = \"string\"\nrequired = true\nnon_empty = true\ndescription = \"A short summary of the release. A description of only whitespace is refused by the reader.\"\n\n[types.ReleaseFile.fields.context]\ntype = \"string\"\nrequired = false\ndescription = \"Optional prose explaining why the changes were made.\"\n\n[types.ReleaseFile.fields.release_commit]\ntype = \"GitObjectHash\"\nrequired = false\ndescription = \"The commit this version shipped from: the release candidate whose CI concluded green, which the version tag points at. Written by the release flow at its archive step and by the history rewrites that move it; never authored by hand, and refused in the editable unreleased.toml. The rlsbl-ci-sha marker in the GitHub Release body restates it for CI and never outranks it.\"\n\n[types.ReleaseFile.fields.released_trees]\ntype = \"map\"\nrequired = false\nkey_pattern = \"^(\\\\.|[A-Za-z0-9._][A-Za-z0-9._/-]*)$\"\ndescription = \"The released content: one git tree object per released path, keyed by the repository-relative path (\\\".\\\" for a whole standalone repository, one entry per member directory for a workspace releasable). Written with release_commit, at the same step and under the same rule.\"\n[types.ReleaseFile.fields.released_trees.value]\ntype = \"GitObjectHash\"\n\n[types.ReleaseFile.fields.unrecoverable]\ntype = \"boolean\"\nrequired = false\ndescription = \"Written only as true, by the backfill: this version shipped, but the commit it shipped from cannot be recovered from any source. The version has consumers and its refs exist; only the record of where it came from is lost.\"\n\n[types.ReleaseFile.fields.never_released]\ntype = \"boolean\"\nrequired = false\ndescription = \"Written only as true: the version number exists, but no release was ever published under it (a version claimed and abandoned, or a stray tag's version). Every question about what the releasable released passes over it.\"\n\n[types.ReleaseFile.fields.shipped_as]\ntype = \"string\"\nrequired = false\nnon_empty = true\ndescription = \"The tag this version shipped under, when it differs from the tag the releasable's format gives it today. Legal on a recorded and on an unrecoverable archive; refused on a never-released one, which shipped under nothing.\"\n\n[types.ReleaseFile.fields.release_notices]\ntype = \"array\"\nrequired = false\ndescription = \"The notices `rlsbl release deprecate` and `rlsbl release yank` put at the top of this version's GitHub Release, each the markdown block as it appears there, top to bottom. Every Release body rlsbl composes for the version carries them.\"\n[types.ReleaseFile.fields.release_notices.item]\ntype = \"string\"\nnon_empty = true\n\n[[types.ReleaseFile.constraints]]\nform = \"collections-disjoint\"\nleft = \"include\"\nright = \"exclude\"\nnormalization = \"none\"\ndescription = \"No target appears in both include and exclude.\"\n\n[[types.ReleaseFile.constraints]]\nform = \"mutual-exclusion\"\nfields = [\"release_commit\", \"unrecoverable\", \"never_released\"]\ndescription = \"A version has one fate: recorded, unrecoverable, or never released.\"\n\n[[types.ReleaseFile.constraints]]\nform = \"forbidden-when\"\nfield = \"released_trees\"\nwhen = { field = \"unrecoverable\", predicate = \"present\" }\ndescription = \"An unrecoverable version has no released trees to record.\"\n\n[[types.ReleaseFile.constraints]]\nform = \"forbidden-when\"\nfield = \"released_trees\"\nwhen = { field = \"never_released\", predicate = \"present\" }\ndescription = \"A version that was never released released no trees.\"\n\n[[types.ReleaseFile.constraints]]\nform = \"forbidden-when\"\nfield = \"shipped_as\"\nwhen = { field = \"never_released\", predicate = \"present\" }\ndescription = \"A never-released version shipped under no tag.\"\n\n[types.GitObjectHash]\ntype = \"string\"\nregex = \"^[0-9a-f]{7,64}$\"\ndescription = \"A git object id, commit or tree: full (40 hexadecimal digits, or 64 in a SHA-256 repository) or abbreviated to at least 7. The release flow records the full form; whether the object exists is checked by rlsbl, not here.\"\n",
+	"release-file.schema.toml": "# strictspec schema for a releasable's release file and its archives:\n# .strictmetadata/releases/<releasable>/unreleased.toml while it is editable,\n# and .strictmetadata/releases/<releasable>/v<version>.toml once archived. The\n# version an archive records is its file name and is not repeated inside.\n#\n# The generated Go validator (internal/releaserecord/releasefilespec) is what\n# the release record runs first. internal/releaserecord then decodes the\n# document strictly and applies what this schema cannot see: a description of\n# only whitespace, a flow-owned field in the editable file, and an archive in\n# none of the three fates.\n#\n# THE THREE FATES. An archive is in one of three states, and every reader\n# dispatches on which:\n#\n#   recorded         release_commit + [released_trees] -- it shipped, from a known commit\n#   unrecoverable    unrecoverable = true              -- it shipped, from a commit nothing can name\n#   never released   never_released = true             -- the version number exists, no release does\n#\n# The schema refuses a document carrying two of them; an archive carrying none\n# is refused by the reader, because the same schema validates the editable\n# unreleased.toml, which carries none by design. Exclusion is judged on\n# presence, not on the value: rlsbl writes a marker only when it is true, so\n# `unrecoverable = false` beside a release commit is a hand-made document and\n# is refused all the same.\n#\n# The pre-release channel and blog-on-release are gone: `preid` and `blog` are\n# unknown keys and `prerelease` is not a bump.\n\nname = \"rlsbl-release-file\"\nmeta_version = 1\nformat_version = 2\ndocument_syntax = \"toml\"\nrole = \"schema\"\nroot = \"ReleaseFile\"\ndescription = \"A releasable's release file: the bump, the target selection, and the release prose, plus the fate an archive records.\"\n\n[types.ReleaseFile]\ntype = \"record\"\n\n[types.ReleaseFile.fields.format_version]\ntype = \"literal\"\nvalue = 2\nrequired = true\ndescription = \"The document's format version.\"\n\n[types.ReleaseFile.fields.bump]\ntype = \"enum\"\nrequired = true\nvalues = [\"patch\", \"minor\", \"major\", \"infra\"]\ndescription = \"How the release moves the version. An infra release moves it as a patch release does and is recorded as infra.\"\n\n[types.ReleaseFile.fields.include]\ntype = \"array\"\nrequired = true\ndescription = \"The target names to release. May be empty; disjoint from exclude.\"\n[types.ReleaseFile.fields.include.item]\ntype = \"string\"\nnon_empty = true\n\n[types.ReleaseFile.fields.exclude]\ntype = \"array\"\nrequired = true\ndescription = \"The target names to skip. Disjoint from include.\"\n[types.ReleaseFile.fields.exclude.item]\ntype = \"string\"\nnon_empty = true\n\n[types.ReleaseFile.fields.description]\ntype = \"string\"\nrequired = true\nnon_empty = true\ndescription = \"A short summary of the release. A description of only whitespace is refused by the reader.\"\n\n[types.ReleaseFile.fields.context]\ntype = \"string\"\nrequired = false\ndescription = \"Optional prose explaining why the changes were made.\"\n\n[types.ReleaseFile.fields.release_commit]\ntype = \"GitObjectHash\"\nrequired = false\ndescription = \"The commit this version shipped from: the release candidate whose CI concluded green, which the version tag points at. Written by the release flow at its archive step and by the history rewrites that move it; never authored by hand, and refused in the editable unreleased.toml. The rlsbl-ci-sha marker in the GitHub Release body restates it for CI and never outranks it.\"\n\n[types.ReleaseFile.fields.released_trees]\ntype = \"map\"\nrequired = false\nkey_pattern = \"^(\\\\.|[A-Za-z0-9._][A-Za-z0-9._/-]*)$\"\ndescription = \"The released content: one git tree object per released path, keyed by the repository-relative path (\\\".\\\" for a whole standalone repository, one entry per member directory for a workspace releasable). Written with release_commit, at the same step and under the same rule.\"\n[types.ReleaseFile.fields.released_trees.value]\ntype = \"GitObjectHash\"\n\n[types.ReleaseFile.fields.unrecoverable]\ntype = \"boolean\"\nrequired = false\ndescription = \"Written only as true, by the backfill: this version shipped, but the commit it shipped from cannot be recovered from any source. The version has consumers and its refs exist; only the record of where it came from is lost.\"\n\n[types.ReleaseFile.fields.never_released]\ntype = \"boolean\"\nrequired = false\ndescription = \"Written only as true: the version number exists, but no release was ever published under it (a version claimed and abandoned, or a stray tag's version). Every question about what the releasable released passes over it.\"\n\n[types.ReleaseFile.fields.shipped_as]\ntype = \"string\"\nrequired = false\nnon_empty = true\ndescription = \"The tag this version shipped under, when it differs from the tag the releasable's format gives it today. Legal on a recorded and on an unrecoverable archive; refused on a never-released one, which shipped under nothing.\"\n\n[types.ReleaseFile.fields.release_notices]\ntype = \"array\"\nrequired = false\ndescription = \"The notices `rlsbl release deprecate` and `rlsbl release yank` put at the top of this version's GitHub Release, each the markdown block as it appears there, top to bottom. Every Release body rlsbl composes for the version carries them.\"\n[types.ReleaseFile.fields.release_notices.item]\ntype = \"string\"\nnon_empty = true\n\n[types.ReleaseFile.fields.confidential_hits]\ntype = \"array\"\nrequired = false\ndescription = \"The resolutions of the confidential-term hits this release published, copied from .strictmetadata/confidential-hits/resolutions.toml by the release flow at its archive step: each hit the agent judged a false positive (with its certainty and reason) and each the owner approved publishing (with the owner's reason). Never authored by hand, and refused in the editable unreleased.toml.\"\n[types.ReleaseFile.fields.confidential_hits.item]\ntype = \"ConfidentialHit\"\n\n[[types.ReleaseFile.constraints]]\nform = \"collections-disjoint\"\nleft = \"include\"\nright = \"exclude\"\nnormalization = \"none\"\ndescription = \"No target appears in both include and exclude.\"\n\n[[types.ReleaseFile.constraints]]\nform = \"mutual-exclusion\"\nfields = [\"release_commit\", \"unrecoverable\", \"never_released\"]\ndescription = \"A version has one fate: recorded, unrecoverable, or never released.\"\n\n[[types.ReleaseFile.constraints]]\nform = \"forbidden-when\"\nfield = \"released_trees\"\nwhen = { field = \"unrecoverable\", predicate = \"present\" }\ndescription = \"An unrecoverable version has no released trees to record.\"\n\n[[types.ReleaseFile.constraints]]\nform = \"forbidden-when\"\nfield = \"released_trees\"\nwhen = { field = \"never_released\", predicate = \"present\" }\ndescription = \"A version that was never released released no trees.\"\n\n[[types.ReleaseFile.constraints]]\nform = \"forbidden-when\"\nfield = \"shipped_as\"\nwhen = { field = \"never_released\", predicate = \"present\" }\ndescription = \"A never-released version shipped under no tag.\"\n\n[types.ConfidentialHit]\ntype = \"record\"\n\n[types.ConfidentialHit.fields.hit]\ntype = \"string\"\nrequired = true\nregex = \"^[0-9a-f]{16}$\"\ndescription = \"The hit's id: derived from the list entry that matched, the matched text, and the words after it, so it names no confidential text.\"\n\n[types.ConfidentialHit.fields.location]\ntype = \"string\"\nrequired = true\nnon_empty = true\ndescription = \"Where the hit was when it was resolved, with every confidential match redacted.\"\n\n[types.ConfidentialHit.fields.resolution]\ntype = \"enum\"\nrequired = true\nvalues = [\"false-positive\", \"approved\"]\ndescription = \"false-positive: the agent judged the hit not confidential; approved: the owner approved publishing it.\"\n\n[types.ConfidentialHit.fields.certainty]\ntype = \"integer\"\nrequired = false\nmin = 70\nmax = 100\ndescription = \"The agent's certainty, in percent, that the hit is a false positive. Carried by a false positive only.\"\n\n[types.ConfidentialHit.fields.reason]\ntype = \"string\"\nrequired = true\nnon_empty = true\ndescription = \"One line: the agent's reason for a false positive, the owner's for an approval.\"\n\n[types.ConfidentialHit.fields.recorded]\ntype = \"date\"\nrequired = true\ndescription = \"The day the resolution was recorded.\"\n\n[types.GitObjectHash]\ntype = \"string\"\nregex = \"^[0-9a-f]{7,64}$\"\ndescription = \"A git object id, commit or tree: full (40 hexadecimal digits, or 64 in a SHA-256 repository) or abbreviated to at least 7. The release flow records the full form; whether the object exists is checked by rlsbl, not here.\"\n",
 }
 
 const embeddedMainFile = "release-file.schema.toml"
@@ -86,18 +86,19 @@ func ValidateBytesWithEvidence(input []byte, syntax string, evidence map[string]
 // ReleaseFile is the frozen typed binding of the "ReleaseFile" record. Fields are immutable by
 // convention (shallow-plus-generated-immutability); use With* for copy-on-write.
 type ReleaseFile struct {
-	FormatVersion  int64
-	Bump           string
-	Include        []string
-	Exclude        []string
-	Description    string
-	Context        string
-	ReleaseCommit  string
-	ReleasedTrees  strictspec.Value
-	Unrecoverable  bool
-	NeverReleased  bool
-	ShippedAs      string
-	ReleaseNotices []string
+	FormatVersion    int64
+	Bump             string
+	Include          []string
+	Exclude          []string
+	Description      string
+	Context          string
+	ReleaseCommit    string
+	ReleasedTrees    strictspec.Value
+	Unrecoverable    bool
+	NeverReleased    bool
+	ShippedAs        string
+	ReleaseNotices   []string
+	ConfidentialHits []*ConfidentialHit
 }
 
 func bindReleaseFile(v strictspec.Value) *ReleaseFile {
@@ -140,6 +141,9 @@ func bindReleaseFile(v strictspec.Value) *ReleaseFile {
 	}
 	if fv, ok := v.Field("release_notices"); ok {
 		out.ReleaseNotices = bindSlice(fv, func(e strictspec.Value) string { return func() string { r, _ := e.AsString(); return r }() })
+	}
+	if fv, ok := v.Field("confidential_hits"); ok {
+		out.ConfidentialHits = bindSlice(fv, func(e strictspec.Value) *ConfidentialHit { return bindConfidentialHit(e) })
 	}
 	return out
 }
@@ -225,6 +229,92 @@ func (x *ReleaseFile) WithShippedAs(v string) *ReleaseFile {
 func (x *ReleaseFile) WithReleaseNotices(v []string) *ReleaseFile {
 	c := *x
 	c.ReleaseNotices = v
+	return &c
+}
+
+// WithConfidentialHits returns a copy of ReleaseFile with ConfidentialHits set to the given value.
+func (x *ReleaseFile) WithConfidentialHits(v []*ConfidentialHit) *ReleaseFile {
+	c := *x
+	c.ConfidentialHits = v
+	return &c
+}
+
+// ConfidentialHit is the frozen typed binding of the "ConfidentialHit" record. Fields are immutable by
+// convention (shallow-plus-generated-immutability); use With* for copy-on-write.
+type ConfidentialHit struct {
+	Hit        string
+	Location   string
+	Resolution string
+	Certainty  int64
+	Reason     string
+	Recorded   string
+}
+
+func bindConfidentialHit(v strictspec.Value) *ConfidentialHit {
+	if v.Kind() != strictspec.KindRecord {
+		return nil
+	}
+	out := &ConfidentialHit{}
+	if fv, ok := v.Field("hit"); ok {
+		out.Hit = func() string { r, _ := fv.AsString(); return r }()
+	}
+	if fv, ok := v.Field("location"); ok {
+		out.Location = func() string { r, _ := fv.AsString(); return r }()
+	}
+	if fv, ok := v.Field("resolution"); ok {
+		out.Resolution = func() string { r, _ := fv.AsString(); return r }()
+	}
+	if fv, ok := v.Field("certainty"); ok {
+		out.Certainty = func() int64 { r, _ := fv.Int(); return r }()
+	}
+	if fv, ok := v.Field("reason"); ok {
+		out.Reason = func() string { r, _ := fv.AsString(); return r }()
+	}
+	if fv, ok := v.Field("recorded"); ok {
+		out.Recorded = func() string { r, _ := fv.Datetime(); return r }()
+	}
+	return out
+}
+
+// WithHit returns a copy of ConfidentialHit with Hit set to the given value.
+func (x *ConfidentialHit) WithHit(v string) *ConfidentialHit {
+	c := *x
+	c.Hit = v
+	return &c
+}
+
+// WithLocation returns a copy of ConfidentialHit with Location set to the given value.
+func (x *ConfidentialHit) WithLocation(v string) *ConfidentialHit {
+	c := *x
+	c.Location = v
+	return &c
+}
+
+// WithResolution returns a copy of ConfidentialHit with Resolution set to the given value.
+func (x *ConfidentialHit) WithResolution(v string) *ConfidentialHit {
+	c := *x
+	c.Resolution = v
+	return &c
+}
+
+// WithCertainty returns a copy of ConfidentialHit with Certainty set to the given value.
+func (x *ConfidentialHit) WithCertainty(v int64) *ConfidentialHit {
+	c := *x
+	c.Certainty = v
+	return &c
+}
+
+// WithReason returns a copy of ConfidentialHit with Reason set to the given value.
+func (x *ConfidentialHit) WithReason(v string) *ConfidentialHit {
+	c := *x
+	c.Reason = v
+	return &c
+}
+
+// WithRecorded returns a copy of ConfidentialHit with Recorded set to the given value.
+func (x *ConfidentialHit) WithRecorded(v string) *ConfidentialHit {
+	c := *x
+	c.Recorded = v
 	return &c
 }
 
