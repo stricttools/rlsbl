@@ -2,6 +2,25 @@
 
 # Changelog
 
+## 0.133.0
+
+Releases scan what they push and publish against the age-encrypted confidential-term list, report every hit at once, and refuse a hit until it is judged a false positive or approved by the owner with the new confidential commands; the archive records each resolution used. The machine-local confidential-name index and transition public-client are gone.
+
+<details>
+<summary>Context</summary>
+
+Confidential terms now live in one encrypted list outside every repository instead of being derived from lifecycle-and-license records into a machine-local index. Commits are never refused for a term; only what is published is checked, so a false positive never interrupts work and every hit of a release is judged together.
+
+</details>
+
+### Breaking
+
+- **Releases scan for the confidential-term list, and every hit is judged.** The `confidential-names` check is now `confidential-terms`: a release scans what it pushes and publishes against the age-encrypted confidential-term list (a missing list has no terms), reports every hit at once with an id, its location, and the text around it, and refuses while a hit has no resolution. `rlsbl confidential judge-false-positive` records a false positive judged at 70% certainty or more, `rlsbl confidential approve-hit` (consequential) records the owner's approval, and the release archive records the resolutions it used under `confidential_hits`. The machine-local confidential-name index is gone: no command reads or writes it, `transition public-client` is removed, and the record refuses `codenames`, `distinctive_terms`, and `public_clients`.
+
+### Features
+
+- **A confidential repository's packed artifacts are scanned for confidential terms.** A registry is public whatever the repository is, so a release from a confidential repository scans the artifacts it publishes, and records the resolutions it used.
+
 ## 0.132.1
 
 `rlsbl release scrub` finishes in a repository with versions released before it kept changelog files, keeping their GitHub Releases' own notes.
