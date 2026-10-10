@@ -42,7 +42,7 @@ func TestAmendRewritesTheReleaseAndAFailedRewriteNamesReleaseEdit(t *testing.T) 
 	more := repo.CommitFile("b.txt", "b\n", "more")
 	testsupport.FakeGH(t, ghReleaseEdit(1)...)
 	app := appWith(t, testsupport.NewFakeHTTP(t))
-	r := app.Test([]string{"changelog", "amend", "--version", "0.4.0", "--commits", more, "--description", "Also this", "--type", "fix"})
+	r := app.Test([]string{"changelog", "amend", "--version", "0.4.0", "--commits", more, "--description", "Also this", "--type", "fix", "--user-facing"})
 	if r.ExitCode != 1 || !strings.Contains(r.Stderr, "its GitHub Release was not rewritten") || !strings.Contains(r.Stderr, "`rlsbl release edit 0.4.0`") {
 		t.Fatalf("exit %d:\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
 	}

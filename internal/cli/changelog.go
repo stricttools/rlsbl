@@ -124,7 +124,7 @@ func registerChangelog(r *commandSet) {
 			strictcli.StringFlag("commits", "Comma-separated commit ids the entry describes", strictcli.Required()),
 			strictcli.StringFlag("description", "The change in one line of markdown (required for a user-facing entry)", strictcli.Optional()),
 			strictcli.StringFlag("type", "What the change is (required for a user-facing entry)", strictcli.Optional(), entryTypeChoices),
-			strictcli.BoolFlag("user-facing", "Whether CHANGELOG.md and the release notes show the entry (user-facing when neither form is passed)", strictcli.Optional()),
+			strictcli.BoolFlag("user-facing", "Whether CHANGELOG.md and the release notes show the entry (--user-facing) or leave it out (--no-user-facing)", strictcli.Required()),
 			strictcli.BoolFlag("validate-hashes", "Resolve every commit and check it against the releasable's scope (validated when neither form is passed)", strictcli.Optional()),
 		},
 		run: runChangelogAmend,
