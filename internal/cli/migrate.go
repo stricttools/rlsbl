@@ -24,7 +24,8 @@ const migrateRecordsHelp = "Convert the rlsbl records of the repository holding 
 	"hook scripts (each moved to .strictmetadata/release-hooks/ and run by a hooks declaration), .strictmetadata/go.mod, the " +
 	"options entries of renamed options and of those that moved to strictcode, and strictcode.toml (the tool declarations, " +
 	"the library lint lists, the dead-modules suppressions, and ruff-lint's coverage as strictcode's lint rule). It writes the " +
-	"lifecycle-and-license record: one active lifecycle period and one license period per releasable from today, a retired " +
+	"lifecycle-and-license record: one license period per releasable from today (no lifecycle period: a releasable's status is derived, " +
+	"active when its archives record a release and unreleased when they do not), a retired " +
 	"period per closed release history (whose release state moves to .strictmetadata/retired-release-histories/), the " +
 	"releasable-name identities with their renames, the identity transitions (pending until their version is released), the " +
 	"registry names of every releasable and retired subject that published from CI (a retired subject's read at its release " +

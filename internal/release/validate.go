@@ -319,20 +319,41 @@ func RefuseHeldLifecycle(record *lifecycle.Record, ws *workspace.Workspace, r de
 
 // refuseHeldLifecycle evaluates lifecycle-allows-release for the releasable
 // and every member versioned under it: a subject on hold or retired is not
-// released.
+// released, and neither is an unreleased releasable (no lifecycle period in
+// effect and no release in its archives). A member's release history is its
+// releasable's, so a member without a period of its own follows it.
 func refuseHeldLifecycle(record *lifecycle.Record, ws *workspace.Workspace, r declarations.Releasable, now time.Time) error {
-	subjects := []string{r.Name}
-	for _, m := range ws.MembersOf(r.Name) {
-		if m.Name != r.Name {
-			subjects = append(subjects, m.Name)
-		}
+	released, err := releaserecord.HasRelease(ws.Root, r.Name)
+	if err != nil {
+		return err
 	}
-	for _, s := range subjects {
-		if err := record.ReleaseAllowed(s, now); err != nil {
+	if err := record.ReleaseAllowed(r.Name, now, released); err != nil {
+		msg := err.Error()
+		if record.StatusOn(r.Name, now, released) == lifecycle.StatusUnreleased {
+			msg += fmt.Sprintf(" Recording one is the owner's decision to release it: `rlsbl transition lifecycle --subject %s --status active --reason <why> --approve-consequential`.", r.Name)
+		}
+		return &ValidationError{Message: msg}
+	}
+	for _, m := range ws.MembersOf(r.Name) {
+		if m.Name == r.Name {
+			continue
+		}
+		if err := record.ReleaseAllowed(m.Name, now, true); err != nil {
 			return &ValidationError{Message: err.Error()}
 		}
 	}
 	return nil
+}
+
+// LifecycleStatus is the releasable's lifecycle status on the date of now:
+// the status of its lifecycle period in effect, and otherwise active when its
+// archives record a release and unreleased when they do not.
+func LifecycleStatus(record *lifecycle.Record, root, releasable string, now time.Time) (lifecycle.Status, error) {
+	released, err := releaserecord.HasRelease(root, releasable)
+	if err != nil {
+		return "", err
+	}
+	return record.StatusOn(releasable, now, released), nil
 }
 
 // releaseEnvironmentFile is base with the declarations' environment file's

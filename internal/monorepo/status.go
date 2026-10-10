@@ -5,6 +5,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
+
+	"github.com/stricttools/strictspec/go/lifecycle"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
@@ -32,6 +35,9 @@ type ReleasableStatus struct {
 	// contains, in the releasable's scope, against its changelog.
 	Coverage release.Coverage `json:"coverage"`
 	Members  []string         `json:"members"`
+	// Lifecycle is the releasable's lifecycle status on the report's date
+	// (see release.LifecycleStatus).
+	Lifecycle string `json:"lifecycle"`
 }
 
 // MemberStatus is one member's row.
@@ -61,8 +67,13 @@ const (
 )
 
 // ReadStatus reports on every releasable and member of the workspace.
-func ReadStatus(repo git.Repo, ws *workspace.Workspace, fork release.Fork) (Status, error) {
+// The lifecycle statuses are read on the date of now.
+func ReadStatus(repo git.Repo, ws *workspace.Workspace, fork release.Fork, now time.Time) (Status, error) {
 	st := Status{Releasables: []ReleasableStatus{}, Members: []MemberStatus{}}
+	record, err := lifecycle.Load(ws.Root)
+	if err != nil {
+		return Status{}, err
+	}
 	for _, r := range ws.Releasables() {
 		row := ReleasableStatus{Name: r.Name, Members: []string{}}
 		for _, m := range ws.MembersOf(r.Name) {
@@ -80,6 +91,11 @@ func ReadStatus(repo git.Repo, ws *workspace.Workspace, fork release.Fork) (Stat
 			return Status{}, err
 		}
 		row.Latest, row.Coverage = p.Latest.Label(), p.Coverage
+		status, err := release.LifecycleStatus(record, ws.Root, r.Name, now)
+		if err != nil {
+			return Status{}, err
+		}
+		row.Lifecycle = string(status)
 		st.Releasables = append(st.Releasables, row)
 	}
 	graph := workspace.NewGraph(ws)

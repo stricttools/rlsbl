@@ -47,8 +47,9 @@ const monorepoAbsorbHelp = "Bring the repository at <source_repo> into this work
 	"it a releasable named after the member is created with the stated --tag-format and --license (an SPDX identifier, or proprietary, which " +
 	"requires GitHub to report this repository private), and with --publish-mode when the source declares none (the source's own otherwise); " +
 	"--license is refused with --releasable. The created releasable keeps the arriving lifecycle period and license period when the source's " +
-	"record holds them (a different --license is refused), and is given otherwise an active lifecycle period and a license period under " +
-	"--license from today, and its releasable-name identity under its own name. The source may be a standalone project in the new layout or declare nothing; one in the old layout or a " +
+	"record holds them (a different --license is refused), and is given otherwise a license period under --license from today and no " +
+	"lifecycle period (its status is derived: active when the arriving archives record a release, unreleased when they do not), and its " +
+	"releasable-name identity under its own name. The source may be a standalone project in the new layout or declare nothing; one in the old layout or a " +
 	"workspace is refused. Refused before anything is written: a dirty source or workspace, a destination path taken, a name taken, a tag " +
 	"or version this workspace holds already, a version the source cannot state, and records the result would leave invalid. The source " +
 	"repository is never changed, and nothing is pushed. Use --dry-run to print the plan."

@@ -7,8 +7,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/lifecycle"
 
 	"github.com/stricttools/rlsbl/internal/changelog"
 	"github.com/stricttools/rlsbl/internal/declarations"
@@ -43,6 +45,8 @@ type StatusRequest struct {
 	// version.
 	Registry bool
 	Fork     Fork
+	// Now is the date the lifecycle status is read on.
+	Now time.Time
 }
 
 // Status is `rlsbl status`'s report on the member the working directory
@@ -66,6 +70,9 @@ type Status struct {
 	// Branch is null when HEAD is detached.
 	Branch *string `json:"branch"`
 	Clean  bool    `json:"clean"`
+	// Lifecycle is the releasable's lifecycle status on the request's date
+	// (see LifecycleStatus), and null without a releasable.
+	Lifecycle *string `json:"lifecycle"`
 	LatestFields
 	// ChangelogHasVersion is whether the releasable's changelog holds the
 	// released file of its current version.
@@ -147,6 +154,19 @@ func ReadStatus(e *strictcli.Effects, req StatusRequest) (Status, error) {
 		if err := releaseStatus(s, version, &st); err != nil {
 			return Status{}, err
 		}
+		if req.Now.IsZero() {
+			return Status{}, fmt.Errorf("the status request names no date to read the lifecycle status on")
+		}
+		record, err := lifecycle.Load(s.ws.Root)
+		if err != nil {
+			return Status{}, err
+		}
+		status, err := LifecycleStatus(record, s.ws.Root, s.releasable.Name, req.Now)
+		if err != nil {
+			return Status{}, err
+		}
+		text := string(status)
+		st.Lifecycle = &text
 	} else {
 		st.LatestFields = LatestFields{NeverReleasedVersions: []string{}, LatestReleaseLabel: "(versioned under no releasable)"}
 	}

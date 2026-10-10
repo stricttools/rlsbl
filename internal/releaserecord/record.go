@@ -508,3 +508,11 @@ func LatestReleasedVersion(root, dir string) (semver.Version, bool, error) {
 	}
 	return semver.Version{}, false, nil
 }
+
+// HasRelease reports whether the releasable's release archives record a
+// release (recorded or unrecoverable). A releasable without one is unreleased
+// unless a lifecycle period in effect says otherwise.
+func HasRelease(root, releasable string) (bool, error) {
+	_, released, err := LatestReleasedVersion(root, ArchiveDir(releasable))
+	return released, err
+}

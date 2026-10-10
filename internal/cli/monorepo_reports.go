@@ -15,7 +15,8 @@ import (
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
 
-const monorepoStatusHelp = "Report on every releasable and member of the workspace. Each releasable's row holds its version file's version " +
+const monorepoStatusHelp = "Report on every releasable and member of the workspace. Each releasable's row holds its lifecycle status today (its lifecycle period's " +
+	"in effect, and otherwise active when its archives record a release and unreleased when they do not), its version file's version " +
 	"(empty before its first release), its latest release (annotated when this checkout does not contain it), its changelog coverage (the " +
 	"commits since the nearest release this checkout contains that touch its members or its records, covered/needing an entry, with the exempt " +
 	"ones counted apart, as `rlsbl status` counts them; a fork leaves out its upstream's history), and its members. Each member's row holds its " +
@@ -146,18 +147,19 @@ func runMonorepoStatus(ctx *strictcli.Context, kw map[string]any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return monorepo.ReadStatus(repo, ws, fork)
+	return monorepo.ReadStatus(repo, ws, fork, time.Now())
 }
 
 func monorepoStatusPayloadSchema() map[string]any {
 	coverage := objectSchema(map[string]any{"covered": integerSchema(), "total": integerSchema(), "exempted": integerSchema()})
 	return objectSchema(map[string]any{
 		"releasables": arraySchema(objectSchema(map[string]any{
-			"name":     stringSchema(),
-			"version":  nullableStringSchema(),
-			"latest":   stringSchema(),
-			"coverage": coverage,
-			"members":  stringArraySchema(),
+			"name":      stringSchema(),
+			"version":   nullableStringSchema(),
+			"latest":    stringSchema(),
+			"lifecycle": stringSchema(),
+			"coverage":  coverage,
+			"members":   stringArraySchema(),
 		})),
 		"members": arraySchema(objectSchema(map[string]any{
 			"name":           stringSchema(),
@@ -192,11 +194,11 @@ func renderMonorepoStatus(payload any) string {
 		if r.Coverage.Exempted > 0 {
 			coverage += fmt.Sprintf(" (%d exempted)", r.Coverage.Exempted)
 		}
-		rows = append(rows, []string{r.Name, orNone(r.Version), r.Latest, coverage, strings.Join(r.Members, ", ")})
+		rows = append(rows, []string{r.Name, r.Lifecycle, orNone(r.Version), r.Latest, coverage, strings.Join(r.Members, ", ")})
 	}
 	out := "No releasable is declared."
 	if len(rows) > 0 {
-		out = renderTable([]string{"Releasable", "Version", "Released", "Coverage", "Members"}, rows)
+		out = renderTable([]string{"Releasable", "Lifecycle", "Version", "Released", "Coverage", "Members"}, rows)
 	}
 	rows = nil
 	for _, m := range p.Members {

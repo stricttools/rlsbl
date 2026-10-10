@@ -14,6 +14,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/github"
 	"github.com/stricttools/rlsbl/internal/publishrules"
+	"github.com/stricttools/rlsbl/internal/releaserecord"
 )
 
 // The verdicts a rule gets in `transition show`.
@@ -27,11 +28,15 @@ const (
 // Report is what `transition show` prints: the record's entries and every
 // rule's verdict on the command's date.
 type Report struct {
-	RecordFile      string           `json:"record_file"`
-	Present         bool             `json:"present"`
-	Date            string           `json:"date"`
-	Confidential    bool             `json:"confidential"`
-	Lifecycle       []ReportPeriod   `json:"lifecycle"`
+	RecordFile   string         `json:"record_file"`
+	Present      bool           `json:"present"`
+	Date         string         `json:"date"`
+	Confidential bool           `json:"confidential"`
+	Lifecycle    []ReportPeriod `json:"lifecycle"`
+	// Statuses are each declared releasable's lifecycle status on the date:
+	// its period's in effect, and otherwise active when its archives record
+	// a release and unreleased when they do not (never recorded).
+	Statuses        []ReportStatus   `json:"statuses"`
 	Licenses        []ReportPeriod   `json:"licenses"`
 	Identities      []ReportIdentity `json:"identities"`
 	RegistryNames   []ReportName     `json:"registry_names"`
@@ -50,6 +55,15 @@ type ReportPeriod struct {
 	From    string `json:"from"`
 	Until   string `json:"until"`
 	Reason  string `json:"reason"`
+}
+
+// ReportStatus is one releasable's lifecycle status on the report's date.
+type ReportStatus struct {
+	Subject string `json:"subject"`
+	Status  string `json:"status"`
+	// Derived is true when no lifecycle period is in effect, so the status
+	// comes from whether the archives record a release.
+	Derived bool `json:"derived"`
 }
 
 // ReportIdentity is one identity; a pending one carries EffectiveVersion
@@ -125,7 +139,7 @@ func (inv Invocation) Show(dir string) (Report, error) {
 	}
 	on := inv.Now()
 	r := Report{RecordFile: lifecycle.RecordFile, Present: rec.Present(), Date: day(on), Confidential: rec.Confidential(on),
-		Lifecycle: []ReportPeriod{}, Licenses: []ReportPeriod{}, Identities: []ReportIdentity{}, RegistryNames: []ReportName{},
+		Lifecycle: []ReportPeriod{}, Statuses: []ReportStatus{}, Licenses: []ReportPeriod{}, Identities: []ReportIdentity{}, RegistryNames: []ReportName{},
 		UnversionedTags: []ReportTag{}, Problems: []string{}, Verdicts: []Verdict{}}
 	for _, l := range rec.Lifecycle() {
 		r.Lifecycle = append(r.Lifecycle, ReportPeriod{l.Subject, string(l.Status), day(l.From), dateOrEmpty(l.Until), l.Reason})
@@ -149,6 +163,16 @@ func (inv Invocation) Show(dir string) (Report, error) {
 			releasables = append(releasables, rel.Name)
 		}
 	}
+	released := map[string]bool{}
+	for _, name := range releasables {
+		has, err := releaserecord.HasRelease(root, name)
+		if err != nil {
+			return Report{}, err
+		}
+		released[name] = has
+		_, inEffect := rec.LifecycleOn(name, on)
+		r.Statuses = append(r.Statuses, ReportStatus{Subject: name, Status: string(rec.StatusOn(name, on, has)), Derived: !inEffect})
+	}
 	if err := rec.Validate(on, declared); err != nil {
 		var ve *lifecycle.ValidationError
 		if !errors.As(err, &ve) {
@@ -162,7 +186,7 @@ func (inv Invocation) Show(dir string) (Report, error) {
 		return Report{}, err
 	}
 	for _, rule := range lifecycle.Rules() {
-		verdicts, err := judge(rule, rec, previous, releasables, source, on)
+		verdicts, err := judge(rule, rec, previous, releasables, released, source, on)
 		if err != nil {
 			return Report{}, err
 		}
@@ -218,8 +242,9 @@ func verdictOf(rule lifecycle.Rule, subject string, err error, holds string) Ver
 
 // judge is one rule's verdicts on the date of on. previous is the record
 // HEAD commits, which the permanent rules hold the working tree's record
-// to; nil when HEAD holds none.
-func judge(rule lifecycle.Rule, rec, previous *lifecycle.Record, releasables []string, source publishrules.VisibilitySource, on time.Time) ([]Verdict, error) {
+// to; nil when HEAD holds none. released says which releasables' archives
+// record a release.
+func judge(rule lifecycle.Rule, rec, previous *lifecycle.Record, releasables []string, released map[string]bool, source publishrules.VisibilitySource, on time.Time) ([]Verdict, error) {
 	class := string(rule.Class())
 	switch rule {
 	case lifecycle.RuleProprietaryRequiresPrivate:
@@ -263,7 +288,7 @@ func judge(rule lifecycle.Rule, rec, previous *lifecycle.Record, releasables []s
 	case lifecycle.RuleLifecycleAllowsRelease:
 		var out []Verdict
 		for _, subject := range releasables {
-			out = append(out, verdictOf(rule, subject, rec.ReleaseAllowed(subject, on), "released while its lifecycle is active or unstated"))
+			out = append(out, verdictOf(rule, subject, rec.ReleaseAllowed(subject, on, released[subject]), "released while its lifecycle is active, recorded or derived from its released archives"))
 		}
 		return out, nil
 	case lifecycle.RuleProprietaryHistoryIsSquashed:

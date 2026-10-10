@@ -23,8 +23,9 @@ const monorepoInitHelp = "Write .strictmetadata/releasables/releasables.toml for
 	"the releasable --releasable names, created with the --tag-format and --publish-mode stated (neither has a default), and a root releasable " +
 	"publishing from CI states --publish-ci-check-pattern, the pattern of the check-run names the root's own CI reports, which publishing waits for. " +
 	"The root releasable also states --license, an SPDX identifier or proprietary (which requires GitHub to report the repository private, as " +
-	"`rlsbl transition classify` does), and the lifecycle-and-license record gains its active lifecycle period, its license period, and its " +
-	"releasable-name identity owning its tag namespace, from today. " +
+	"`rlsbl transition classify` does), and the lifecycle-and-license record gains its license period and its " +
+	"releasable-name identity owning its tag namespace, from today, and no lifecycle period: the new releasable is unreleased, and its releases " +
+	"are refused until `rlsbl transition lifecycle --status active` records the owner's decision to release it. " +
 	"--release-branch names each branch a release may run from. A repository whose declarations exist is refused. The declarations and the record " +
 	"are committed unless --no-auto-commit is passed; when the commit fails, the files the init created are removed again through saferm and a " +
 	"record it changed is put back as it was, so running it again starts afresh."
@@ -35,9 +36,10 @@ const monorepoAddHelp = "Declare the directory at <path> (relative to the reposi
 	"the scaffold declares when it is not detected. --releasable names the releasable it is versioned under, or is false for none; naming a " +
 	"releasable the workspace does not declare creates it, and then --tag-format and --publish-mode are required, because a tag scheme and a publish " +
 	"mode are stated, never derived, and so is --license, an SPDX identifier or proprietary (which requires GitHub to report the repository " +
-	"private, as `rlsbl transition classify` does); all three are refused when no releasable is created. A created releasable gets its active " +
-	"lifecycle period, its license period, and its releasable-name identity owning its tag namespace in the lifecycle-and-license record, from " +
-	"today, written before the scaffold, which renders the member's LICENSE from it. --depends-on names a member it depends on (repeatable), " +
+	"private, as `rlsbl transition classify` does); all three are refused when no releasable is created. A created releasable gets its license " +
+	"period and its releasable-name identity owning its tag namespace in the lifecycle-and-license record, from today, and no lifecycle period " +
+	"(it is unreleased, and its releases are refused until `rlsbl transition lifecycle --status active` records the owner's decision to release " +
+	"it), written before the scaffold, which renders the member's LICENSE from it. --depends-on names a member it depends on (repeatable), " +
 	"--library and --dev-only mark it, and --registry-name is its name on the registries. Every refusal is made before anything is written. When " +
 	"the scaffold, the routers, or the commit fails, every path the add changed is put back as it was and nothing is committed. A path that had " +
 	"uncommitted changes before the add and is written by it is left uncommitted and named. --no-auto-commit leaves everything uncommitted. Under " +

@@ -82,8 +82,9 @@ func TestAStandaloneProjectMigratesAndCommitsOnce(t *testing.T) {
 	if l, ok := rec.LicenseOn("portal", testNow); !ok || l.License != "MIT" {
 		t.Fatalf("the license period: %+v %v", l, ok)
 	}
-	if p, ok := rec.LifecycleOn("portal", testNow); !ok || p.Status != lifecycle.StatusActive {
-		t.Fatalf("the lifecycle period: %+v %v", p, ok)
+	// No lifecycle period: portal's status is derived from its archives.
+	if p, ok := rec.LifecycleOn("portal", testNow); ok {
+		t.Fatalf("the migration recorded a lifecycle period: %+v", p)
 	}
 	names := rec.RegistryNames()
 	if len(names) != 1 || names[0].Registry != "npm" || names[0].Name != "portal" {

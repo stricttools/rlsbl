@@ -210,9 +210,10 @@ func (b *builder) convertLifecycle(d *declarations.Releasables) {
 			b.p.add("composing %s: %v", lifecycle.RecordFile, err)
 		}
 	}
-	reasonActive := "active when rlsbl's records moved to the .strictmetadata layout"
+	// No lifecycle period is opened for a declared releasable: its status is
+	// derived from its release archives (active once released, unreleased
+	// before), and only a deliberate transition records one.
 	for _, r := range d.Releasables {
-		must(rec.OpenPeriod(lifecycle.TableLifecycle, r.Name, string(lifecycle.StatusActive), now, reasonActive))
 		reason := "read from the package manifests when rlsbl's records moved to the .strictmetadata layout"
 		if _, ok := b.req.Licenses[r.Name]; ok {
 			reason = "declared by the owner when rlsbl's records moved to the .strictmetadata layout"

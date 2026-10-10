@@ -60,7 +60,13 @@ func TestMonorepoReleaseInitNeedsTheReleasablesOrAllStated(t *testing.T) {
 	if _, err := os.Stat(repo.Path(".strictmetadata/batch-releases/unreleased.toml")); !os.IsNotExist(err) {
 		t.Fatalf("a refused init wrote the batch release file: %v", err)
 	}
-	// The fix the refusal names: --all states every releasable.
+	// The fix the refusal names: --all states every releasable. Neither was
+	// ever released, so both are unreleased until the owner records them
+	// active.
+	if r := app.Test([]string{"monorepo", "release", "init", "--all"}); r.ExitCode == 0 || !strings.Contains(r.Stderr, "unreleased") || !strings.Contains(r.Stderr, "rlsbl transition lifecycle --subject") {
+		t.Fatalf("--all of unreleased releasables: exit %d\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
+	}
+	repo.CommitFile(".strictmetadata/lifecycle-and-license/lifecycle-and-license.toml", "format_version = 1\n\n[[lifecycle]]\nsubject = \"widget\"\nstatus = \"active\"\nfrom = 2026-01-01\nreason = \"to be released\"\n\n[[lifecycle]]\nsubject = \"gadget\"\nstatus = \"active\"\nfrom = 2026-01-01\nreason = \"to be released\"\n", "activate widget and gadget")
 	if r := app.Test([]string{"monorepo", "release", "init", "--all"}); r.ExitCode != 0 {
 		t.Fatalf("--all: exit %d\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
 	}

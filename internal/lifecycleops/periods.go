@@ -10,6 +10,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/github"
 	"github.com/stricttools/rlsbl/internal/publishrules"
+	"github.com/stricttools/rlsbl/internal/releaserecord"
 )
 
 // PeriodRequest is a `transition lifecycle` or `transition license`: the
@@ -34,6 +35,8 @@ func (inv Invocation) Lifecycle(req PeriodRequest) error {
 	status := lifecycle.Status(req.Value)
 	switch status {
 	case lifecycle.StatusActive, lifecycle.StatusOnHold, lifecycle.StatusRetired:
+	case lifecycle.StatusUnreleased:
+		return fmt.Errorf("unreleased is never recorded: a releasable whose archives record no release and that has no lifecycle period in effect is unreleased; the statuses a period records are %s, %s, and %s", lifecycle.StatusActive, lifecycle.StatusOnHold, lifecycle.StatusRetired)
 	default:
 		return fmt.Errorf("%q is not a lifecycle status; the statuses are %s, %s, and %s", req.Value, lifecycle.StatusActive, lifecycle.StatusOnHold, lifecycle.StatusRetired)
 	}
@@ -51,7 +54,24 @@ func (inv Invocation) Lifecycle(req PeriodRequest) error {
 	if err := rec.OpenPeriod(lifecycle.TableLifecycle, req.Subject, string(status), on, req.Reason); err != nil {
 		return err
 	}
-	return inv.save(m, rec, on, fmt.Sprintf("transition: %s is %s", req.Subject, status), outcome{fmt.Sprintf("%s is %s from %s.", req.Subject, status, day(on)), fmt.Sprintf("Would record %s as %s from %s.", req.Subject, status, day(on))})
+	done := fmt.Sprintf("%s is %s from %s.", req.Subject, status, day(on))
+	if status == lifecycle.StatusActive && isReleasable(m, req.Subject) {
+		released, err := releaserecord.HasRelease(m.ws.Root, req.Subject)
+		if err != nil {
+			return err
+		}
+		if !released {
+			done += " Its archives record no release, so its first release is allowed from now on."
+		}
+	}
+	return inv.save(m, rec, on, fmt.Sprintf("transition: %s is %s", req.Subject, status), outcome{done, fmt.Sprintf("Would record %s as %s from %s.", req.Subject, status, day(on))})
+}
+
+// isReleasable reports whether the declarations declare subject as a
+// releasable.
+func isReleasable(m managed, subject string) bool {
+	_, ok := m.ws.Declarations.Releasable(subject)
+	return ok
 }
 
 // knownSubject reports whether subject is declared or held by the record's

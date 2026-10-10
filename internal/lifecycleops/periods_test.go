@@ -76,6 +76,31 @@ func TestLifecycleClosesThePeriodAndOpensTheNewOne(t *testing.T) {
 	requireContains(t, r.Stderr, `"nobody" is neither`)
 }
 
+func TestAnActivePeriodForAnUnreleasedReleasableAllowsItsFirstRelease(t *testing.T) {
+	hygiene.Isolate(t)
+	// portal has a license and no lifecycle period, and its archives record
+	// no release: it is unreleased, which nothing records.
+	f := newFixture(t, "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"MIT\"\nfrom = 2026-01-01\nreason = \"open\"\n"+portalName)
+	testsupport.FakeSafegit(t)
+	r := f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
+		return inv.Lifecycle(lifecycleops.PeriodRequest{Dir: dir, Subject: "portal", Value: "unreleased", Reason: "never released"})
+	})
+	requireExit(t, r, 1)
+	requireContains(t, r.Stderr, "unreleased is never recorded")
+	r = f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
+		return inv.Lifecycle(lifecycleops.PeriodRequest{Dir: dir, Subject: "portal", Value: "active", Reason: "ready for its first release"})
+	})
+	requireExit(t, r, 0)
+	requireContains(t, r.Stdout, "portal is active from 2026-06-01", "its first release is allowed")
+	rec, err := lifecycle.Parse([]byte(f.record(t)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if periods := rec.Lifecycle(); len(periods) != 1 || periods[0].Status != lifecycle.StatusActive || !periods[0].Open() {
+		t.Fatalf("periods %+v", periods)
+	}
+}
+
 func TestADryRunWritesNoRecordAndNoIndex(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newFixture(t, mitSince)
@@ -330,6 +355,29 @@ func TestShowJudgesEveryRule(t *testing.T) {
 	} {
 		if verdicts[key] != want {
 			t.Errorf("%s: %q, want %q (all: %v)", key, verdicts[key], want, verdicts)
+		}
+	}
+}
+
+func TestShowPrintsTheDerivedStatusOfAReleasableWithoutAPeriod(t *testing.T) {
+	hygiene.Isolate(t)
+	// portal has no lifecycle period and its archives record no release.
+	f := newFixture(t, "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"MIT\"\nfrom = 2026-01-01\nreason = \"open\"\n"+portalName)
+	f.repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
+	testsupport.FakeGH(t, ghVisibility("public"))
+	var report lifecycleops.Report
+	r := f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
+		var err error
+		report, err = inv.Show(dir)
+		return err
+	})
+	requireExit(t, r, 0)
+	if len(report.Statuses) != 1 || report.Statuses[0] != (lifecycleops.ReportStatus{Subject: "portal", Status: "unreleased", Derived: true}) {
+		t.Fatalf("statuses %+v", report.Statuses)
+	}
+	for _, v := range report.Verdicts {
+		if v.Rule == "lifecycle-allows-release" && (v.Verdict != lifecycleops.VerdictRefuses || !strings.Contains(v.Detail, "unreleased")) {
+			t.Errorf("the unreleased releasable's verdict: %+v", v)
 		}
 	}
 }

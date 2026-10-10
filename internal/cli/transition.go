@@ -16,7 +16,7 @@ import (
 )
 
 const transitionGroupHelp = "The lifecycle-and-license record, .strictmetadata/lifecycle-and-license/lifecycle-and-license.toml: each " +
-	"releasable's dated lifecycle (active, on-hold, retired), license, and identity periods, the registry names it holds, the tags " +
+	"releasable's dated lifecycle (active, on-hold, retired; without a period in effect, active once released and unreleased before), license, and identity periods, the registry names it holds, the tags " +
 	"that release no version: license and lifecycle facts only (confidential terms live in the confidential-term list, which a " +
 	"release scans for). A repository is confidential while a releasable's license is proprietary. A command that opens a " +
 	"period closes the subject's period in effect on today's date first. A command that changes the record validates the whole " +
@@ -32,8 +32,10 @@ const transitionShowHelp = "Print the lifecycle-and-license record and every rul
 	"declarations or without a record."
 
 const transitionLifecycleHelp = "Close a releasable's or member's lifecycle period on today's date and open one with --status: active, " +
-	"on-hold (its releases are refused), or retired (its release history is a record). The subject is declared, or one the record already " +
-	"holds a lifecycle period of. A status the subject already has is refused."
+	"on-hold (its releases are refused), or retired (its release history is a record). A releasable without a lifecycle period in effect has " +
+	"a derived status, never recorded: active when its release archives record a release, and unreleased when they do not, which refuses its " +
+	"releases. Recording active for an unreleased releasable is the owner's decision that allows its first release. The subject is declared, " +
+	"or one the record already holds a lifecycle period of. A status its lifecycle period in effect already holds is refused."
 
 const transitionLicenseHelp = "Close a releasable's license period on today's date and open one under --license, an SPDX identifier. " +
 	"proprietary is refused (`transition classify` makes a releasable proprietary), and so is a change that would leave no releasable " +
@@ -109,7 +111,7 @@ func registerTransition(r *commandSet) {
 		flags: []strictcli.Flag{
 			strictcli.StringFlag("subject", "The releasable or member whose lifecycle changes", strictcli.Required()),
 			strictcli.StringFlag("status", "The status from today", strictcli.Required(), strictcli.Choices(
-				strictcli.Ch(string(lifecycle.StatusActive), "released as usual"),
+				strictcli.Ch(string(lifecycle.StatusActive), "released as usual; for an unreleased releasable, its first release is allowed"),
 				strictcli.Ch(string(lifecycle.StatusOnHold), "its releases are refused until it is active again"),
 				strictcli.Ch(string(lifecycle.StatusRetired), "its release history is closed, a record nothing releases from"),
 			)),
@@ -368,6 +370,7 @@ func transitionShowPayloadSchema() map[string]any {
 		"date":         str,
 		"confidential": map[string]any{"type": "boolean"},
 		"lifecycle":    list(period),
+		"statuses":     list(object(map[string]any{"subject": str, "status": str, "derived": map[string]any{"type": "boolean"}})),
 		"licenses":     list(period),
 		"identities": list(object(map[string]any{"subject": str, "facet": str, "value": str, "registry": str, "tag_patterns": strs,
 			"from": str, "until": str, "effective_version": str, "reason": str})),
@@ -406,6 +409,17 @@ func renderTransitionShow(payload any) string {
 			table[i] = []string{r.Subject, r.Value, r.From, until, r.Reason}
 		}
 		b.WriteString("\n" + title + "\n" + renderTable([]string{"subject", value, "from", "until", "reason"}, table))
+	}
+	if len(p.Statuses) > 0 {
+		table := make([][]string, len(p.Statuses))
+		for i, st := range p.Statuses {
+			source := "recorded"
+			if st.Derived {
+				source = "derived (no period in effect)"
+			}
+			table[i] = []string{st.Subject, st.Status, source}
+		}
+		b.WriteString("\nLifecycle status on " + p.Date + "\n" + renderTable([]string{"releasable", "status", "source"}, table))
 	}
 	periods("Lifecycle", "status", p.Lifecycle)
 	periods("Licenses", "license", p.Licenses)

@@ -13,16 +13,18 @@ import (
 )
 
 // requireCreatedRecord fails unless the record of repo gives the releasable
-// name an open active lifecycle period, an open license period under
-// license, and its open releasable-name identity owning glob.
+// name no lifecycle period (its status is derived: unreleased until its
+// first release, which an active period recorded by `rlsbl transition
+// lifecycle` allows), an open license period under license, and its open
+// releasable-name identity owning glob.
 func requireCreatedRecord(t *testing.T, repo *testsupport.Repo, name, license, glob string) *lifecycle.Record {
 	t.Helper()
 	rec, err := lifecycle.Load(repo.Dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if l, ok := rec.LifecycleOn(name, today); !ok || l.Status != lifecycle.StatusActive || !l.Open() {
-		t.Errorf("%s has no open active lifecycle period: %+v", name, rec.Lifecycle())
+	if l, ok := rec.LifecycleOn(name, today); ok {
+		t.Errorf("%s was given a lifecycle period, where its status is derived: %+v", name, l)
 	}
 	if l, ok := rec.LicenseOn(name, today); !ok || l.License != license || !l.Open() {
 		t.Errorf("%s is not licensed %s: %+v", name, license, rec.Licenses())

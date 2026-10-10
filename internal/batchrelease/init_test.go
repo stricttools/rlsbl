@@ -139,6 +139,8 @@ func TestInitOfAReleasableWithNoTargetIsRefusedUntilItIsLeftOut(t *testing.T) {
 	testsupport.FakeSafegit(t)
 	repo := workspaceRepo(t, map[string]string{"portal/README.md": "portal\n"})
 	repo.CommitFile(declarationsPath, batchDeclarations+"\n[[releasables]]\nname = \"portal\"\ntag_format = \"{name}@v{version}\"\npublish_mode = \"none\"\n\n[[members]]\npath = \"portal\"\nname = \"portal\"\nreleasable = \"portal\"\n", "declare portal")
+	// portal was never released: the owner's active period allows it.
+	repo.CommitFile(".strictmetadata/lifecycle-and-license/lifecycle-and-license.toml", "format_version = 1\n\n[[lifecycle]]\nsubject = \"portal\"\nstatus = \"active\"\nfrom = 2026-01-01\nreason = \"to be released\"\n", "activate portal")
 	withWidgetFeature(t, repo)
 	_, err := initBatch(t, repo, nil)
 	if err == nil || !strings.Contains(err.Error(), "no target (go, npm, or pypi) is declared or detected in any member of portal") || !strings.Contains(err.Error(), "--releasables") {

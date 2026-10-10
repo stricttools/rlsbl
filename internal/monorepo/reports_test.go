@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
 	"github.com/stricttools/testisolation/go/hygiene"
@@ -37,7 +38,7 @@ func TestStatusReportsEachReleasableAndMember(t *testing.T) {
 	var st Status
 	mustRun(t, strictcli.EffectReadOnly, false, func(e *strictcli.Effects, _ func(string)) error {
 		var err error
-		st, err = ReadStatus(openRepo(t, e, repo.Dir), load(t, repo), release.Fork{})
+		st, err = ReadStatus(openRepo(t, e, repo.Dir), load(t, repo), release.Fork{}, time.Date(2026, 10, 7, 12, 0, 0, 0, time.UTC))
 		return err
 	})
 	if len(st.Releasables) != 2 || len(st.Members) != 3 {
@@ -49,6 +50,11 @@ func TestStatusReportsEachReleasableAndMember(t *testing.T) {
 	}
 	if gadget.Version == nil || *gadget.Version != "0.2.0" || gadget.Coverage.Total != 1 || gadget.Latest == "" {
 		t.Errorf("gadget %+v", gadget)
+	}
+	// Neither releasable's archives record a release, and the record holds
+	// no lifecycle period: both are unreleased, derived.
+	if widget.Lifecycle != "unreleased" || gadget.Lifecycle != "unreleased" {
+		t.Errorf("lifecycle: widget %q, gadget %q", widget.Lifecycle, gadget.Lifecycle)
 	}
 	root, wm, gm := st.Members[0], st.Members[1], st.Members[2]
 	if root.Version != nil || root.VersionSource != VersionFromNoTarget || len(root.Targets) != 0 || root.Releasable != nil || !root.DevOnly {

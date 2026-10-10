@@ -72,24 +72,17 @@ func requirePrivateForProprietary(license string, gh github.Client, repo git.Rep
 }
 
 // recordCreatedReleasable gives the releasable r a command creates its
-// entries in rec from the date of on: an active lifecycle period, a
-// license period under license, and its releasable-name identity owning
-// its tag namespace. An open entry rec holds already (an absorb's arriving
-// entries, or an earlier run of the same command) is kept when it agrees: a
-// lifecycle period of any status, and a license period of the same
-// license; one of another license is refused. An open releasable-name
-// identity of another name is closed on that date and the releasable's own
-// opened.
+// entries in rec from the date of on: a license period under license, and
+// its releasable-name identity owning its tag namespace. No lifecycle period
+// is opened: the releasable's status is derived from its release archives
+// (unreleased until it is released; an active period recorded by `rlsbl
+// transition lifecycle` allows its first release), and a lifecycle period
+// rec holds already (an absorb's arriving one) is kept. An open license
+// period rec holds already (an absorb's arriving entries, or an earlier run
+// of the same command) is kept when it is of the same license; one of
+// another license is refused. An open releasable-name identity of another
+// name is closed on that date and the releasable's own opened.
 func recordCreatedReleasable(rec *lifecycle.Record, r declarations.Releasable, license string, on time.Time, reason string) error {
-	lifecycleOpen := false
-	for _, l := range rec.Lifecycle() {
-		lifecycleOpen = lifecycleOpen || (l.Subject == r.Name && l.Open())
-	}
-	if !lifecycleOpen {
-		if err := rec.OpenPeriod(lifecycle.TableLifecycle, r.Name, string(lifecycle.StatusActive), on, reason); err != nil {
-			return err
-		}
-	}
 	licenseOpen := false
 	for _, l := range rec.Licenses() {
 		if l.Subject != r.Name || !l.Open() {

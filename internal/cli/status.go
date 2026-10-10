@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
 
@@ -11,7 +12,9 @@ import (
 )
 
 const statusHelp = "Report on the member whose directory holds the working directory and one of its targets: the package name and version the " +
-	"target's manifest declares, the branch and whether the working tree is clean, the latest release in the releasable's release archives (annotated " +
+	"target's manifest declares, the branch and whether the working tree is clean, the releasable's lifecycle status today (the status of its lifecycle period in " +
+	"effect, and otherwise active when its archives record a release and unreleased when they do not; an unreleased releasable's releases are " +
+	"refused until an active period is recorded), the latest release in the releasable's release archives (annotated " +
 	"when this checkout does not contain it, when its commit is unrecoverable, and with the versions archived above it that were never released), " +
 	"whether the changelog holds the released file of the current version, changelog coverage of the commits since the nearest release this checkout " +
 	"contains (covered of those needing an entry, and how many are exempt), the member's own CI workflows and publish workflow, and a warning when " +
@@ -59,6 +62,7 @@ func runStatus(ctx *strictcli.Context, kw map[string]any) (any, error) {
 		Target:   target,
 		Registry: strictcli.Get[bool](kw, "registry"),
 		Fork:     fork,
+		Now:      time.Now(),
 	})
 }
 
@@ -119,6 +123,7 @@ func statusPayloadSchema() map[string]any {
 		"releasable_version":    schemaNullString,
 		"branch":                schemaNullString,
 		"clean":                 map[string]any{"type": "boolean"},
+		"lifecycle":             map[string]any{"type": []any{"string", "null"}, "enum": []any{"active", "on-hold", "retired", "unreleased", nil}},
 		"changelog_has_version": schemaNullBool,
 		"coverage":              closedObject(true, schemaCoverageShape),
 		"commits_ahead":         schemaNullInteger,
@@ -175,6 +180,13 @@ func renderStatus(payload any) string {
 		add("Branch", *st.Branch)
 	} else {
 		add("Branch", "(detached HEAD)")
+	}
+	if st.Lifecycle != nil {
+		lifecycle := *st.Lifecycle
+		if lifecycle == "unreleased" {
+			lifecycle += " (releases are refused until an active lifecycle period is recorded)"
+		}
+		add("Lifecycle", lifecycle)
 	}
 	add("Released", st.LatestReleaseLabel)
 	add("Clean", map[bool]string{true: "yes", false: "no"}[st.Clean])

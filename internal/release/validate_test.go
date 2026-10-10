@@ -177,6 +177,53 @@ func TestAReleasableOnHoldIsRefusedUntilActiveAgain(t *testing.T) {
 	mustNotFail(t, err)
 }
 
+// unreleasedRepo is readyRepo without its release: the record holds no
+// release of portal, so its first release ships 0.4.0.
+func unreleasedRepo(t *testing.T) *testsupport.Repo {
+	t.Helper()
+	repo := testsupport.NewRepo(t)
+	repo.Write(declarationsPath, fmt.Sprintf(releaseDeclarations, ""))
+	repo.Write("package.json", packageJSON("portal", "0.4.0"))
+	repo.Commit("the project", declarationsPath, "package.json")
+	feature := repo.CommitFile("feature.txt", "a feature\n", "add a feature")
+	unreleased := changelog.Dir("portal") + "/" + changelog.UnreleasedName
+	repo.Write(unreleased, changelog.Serialize(changelog.Entry{ID: strings.Repeat("ab", 24), Commits: []string{feature}, UserFacing: true, Type: "feature", Description: "A feature."})+"\n")
+	repo.Write(releaseFilePath, releaseFile("minor", `"npm"`, ""))
+	repo.Commit("prepare the release", unreleased, releaseFilePath)
+	repo.AddBareRemote("origin")
+	repo.Git("push", "-q", "origin", "main")
+	return repo
+}
+
+func TestAnUnreleasedReleasableIsRefusedUntilAnActivePeriodIsRecorded(t *testing.T) {
+	hygiene.Isolate(t)
+	gitHub(t, "public", true)
+	repo := unreleasedRepo(t)
+	// No release and no lifecycle period: unreleased, derived, nothing recorded.
+	_, err := validate(t, repo, nil, nil)
+	if err == nil || !strings.Contains(err.Error(), "unreleased") || !strings.Contains(err.Error(), "rlsbl transition lifecycle --subject portal --status active") {
+		t.Fatalf("an unreleased releasable was not refused naming the transition: %v", err)
+	}
+	// The fix the refusal names: the deliberate active period.
+	repo.CommitFile(recordPath, lifecycleRecord("active"), "activate portal")
+	v, err := validate(t, repo, nil, nil)
+	mustNotFail(t, err)
+	if !v.Decision.FirstRelease || v.Decision.Version.String() != "0.4.0" {
+		t.Errorf("the first release: %+v", v.Decision)
+	}
+}
+
+func TestAReleasedReleasableWithoutALifecyclePeriodIsActive(t *testing.T) {
+	hygiene.Isolate(t)
+	gitHub(t, "public", true)
+	repo := readyRepo(t, "")
+	if _, err := os.Stat(repo.Path(recordPath)); !os.IsNotExist(err) {
+		t.Fatalf("the fixture holds a record: %v", err)
+	}
+	_, err := validate(t, repo, nil, nil)
+	mustNotFail(t, err)
+}
+
 func TestAProprietaryReleasableInAPublicRepositoryIsRefusedUntilItIsPrivate(t *testing.T) {
 	hygiene.Isolate(t)
 	gitHub(t, "public", true)
