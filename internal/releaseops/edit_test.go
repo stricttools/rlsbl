@@ -14,7 +14,7 @@ import (
 func edit(t *testing.T, p *project, dryRun bool, version string) strictcli.Result {
 	t.Helper()
 	return run(t, nil, dryRun, func(ctx *strictcli.Context) error {
-		return releaseops.Edit(ctx, releaseops.EditRequest{Dir: p.Dir, Version: version, IndexPath: p.indexPath})
+		return releaseops.Edit(ctx, releaseops.EditRequest{Dir: p.Dir, Version: version, TermList: p.termList})
 	})
 }
 

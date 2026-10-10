@@ -21,7 +21,7 @@ func contains(list []string, item string) bool {
 }
 
 // shippedPreflight is every check the shipped registry tags preflight.
-var shippedPreflight = []string{"confidential-names", "lifecycle-record-valid", "strictcode", "test-suite", "upload-private-paths", "go-module-identity"}
+var shippedPreflight = []string{"confidential-terms", "lifecycle-record-valid", "strictcode", "test-suite", "upload-private-paths", "go-module-identity"}
 
 var preflightMember = declarations.Member{
 	Path: ".", Name: "root", Releasable: "portal",
@@ -222,7 +222,7 @@ func TestARepositoryScopedPreflightCheckRunsOncePerRelease(t *testing.T) {
 	if len(sels) != 2 {
 		t.Fatalf("%d selections for 2 members", len(sels))
 	}
-	for _, repositoryWide := range []string{"strictcode", "lifecycle-record-valid", "confidential-names", "scaffold-conflicts"} {
+	for _, repositoryWide := range []string{"strictcode", "lifecycle-record-valid", "confidential-terms", "scaffold-conflicts"} {
 		if !contains(sels[0].Checks, repositoryWide) || contains(sels[1].Checks, repositoryWide) {
 			t.Errorf("%s does not run once: first member %v, second %v", repositoryWide, sels[0].Checks, sels[1].Checks)
 		}

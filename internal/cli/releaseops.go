@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
+	"github.com/stricttools/strictspec/go/confidential"
 
 	"github.com/stricttools/rlsbl/internal/releaseops"
 )
@@ -92,11 +92,11 @@ func registerReleaseOps(r *commandSet) {
 			if err != nil {
 				return nil, err
 			}
-			indexPath, err := index.DefaultPath()
+			termList, err := confidential.DefaultLocation()
 			if err != nil {
 				return nil, err
 			}
-			return nil, releaseops.Edit(ctx, releaseops.EditRequest{Dir: dir, Version: version, IndexPath: indexPath})
+			return nil, releaseops.Edit(ctx, releaseops.EditRequest{Dir: dir, Version: version, TermList: termList})
 		},
 	})
 	r.add(command{
@@ -191,7 +191,7 @@ func registerReleaseOps(r *commandSet) {
 				if req.Dir, _, err = workingRepository(); err != nil {
 					return nil, err
 				}
-				if req.IndexPath, err = index.DefaultPath(); err != nil {
+				if req.TermList, err = confidential.DefaultLocation(); err != nil {
 					return nil, err
 				}
 				return nil, op.run(ctx, req)

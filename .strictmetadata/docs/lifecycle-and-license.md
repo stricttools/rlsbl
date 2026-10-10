@@ -4,14 +4,12 @@ description = "The lifecycle-and-license record's periods and identities, confid
 
 # Lifecycle and license
 
-Each repository keeps one record of what its releasables are over time: `.strictmetadata/lifecycle-and-license/lifecycle-and-license.toml`. The directory belongs to strictspec, which owns the record's schema and the library that evaluates it; rlsbl, selfdoc, and safegit link that library at the points where they enforce its rules. rlsbl writes the record through the `transition` commands, through the commands creating a releasable (`monorepo init`, `monorepo add`, `monorepo absorb`), and through the operations that change an identity (`monorepo rename-releasable`, `rewrite project-name`, `monorepo extract`, `monorepo absorb`).
+Each repository keeps one record of what its releasables are over time: `.strictmetadata/lifecycle-and-license/lifecycle-and-license.toml`. The directory belongs to strictspec, which owns the record's schema and the library that evaluates it; rlsbl and selfdoc link that library at the points where they enforce its rules. rlsbl writes the record through the `transition` commands, through the commands creating a releasable (`monorepo init`, `monorepo add`, `monorepo absorb`), and through the operations that change an identity (`monorepo rename-releasable`, `rewrite project-name`, `monorepo extract`, `monorepo absorb`).
 
 ## The record
 
 ```toml
 format_version = 1
-codenames = []                        # confidential repositories: extra names to protect
-distinctive_terms = []                # confidential repositories: prose terms to protect
 
 [[lifecycle]]
 subject = "portal"                    # a releasable or member name
@@ -54,11 +52,6 @@ recorded_since = 2026-10-07
 tag = "nightly"
 reason = "..."
 recorded = 2026-10-07
-
-[[public_clients]]                    # confidential repositories: a subject with a public client
-subject = "portal"
-reason = "..."
-declared = 2026-10-07
 ```
 
 Every table holds dated periods: `from` is a date, `until` closes the period, and a period without `until` is the one in effect. Periods of one subject in one table never overlap, and at most one is open; identities are kept per subject and facet, and a `package-name` identity, which is a name in one registry, per registry as well, so it always names its registry. A subject has at most one pending identity per facet (and registry). A closed period is never changed or removed, and a registry name, once recorded, stays: the record is append-only, and the `lifecycle-record-valid` check holds it to the record at the releasable's nearest release commit.
@@ -69,11 +62,9 @@ A subject is a releasable or member the declarations hold, the subject of a clos
 
 ## Confidential and public
 
-No field declares a repository's disclosure. A repository is **confidential** while one of its releasables has a `proprietary` license period in effect, and **public** otherwise; a repository without a record is public. Every tool derives this from the license periods, offline. `codenames`, `distinctive_terms`, and `public_clients` are refused while the repository is public.
+No field declares a repository's disclosure. A repository is **confidential** while one of its releasables has a `proprietary` license period in effect, and **public** otherwise; a repository without a record is public. Every tool derives this from the license periods, offline.
 
-While a repository is confidential, its names (the registry names recorded for its proprietary releasables, the repository's own names when no releasable carries a non-proprietary license, the codenames, and the distinctive terms) are kept in a machine-local **confidential-name index**, `<user config directory>/strictspec/confidential-names.toml`, outside every repository. The repository's own names are its directory's name and, when it has an `origin` remote, the last path segment of the origin. Releasable and member names and other identity values are not kept: they are often common words, which would be refused everywhere. A subject declared to have a **public client** (`[[public_clients]]`, written by `transition public-client`), a published package or a thin client of a proprietary server, takes its registry names out of the index, and any such declaration takes the repository's own names out; the codenames and distinctive terms stay. An entry is keyed by the record itself, never by a remote: by the values of its open `releasable-name` identities, so finding it asks no network. An entry keyed by a name the repository no longer holds open keeps that name and its names, for the repository that holds it now (after an extract); `monorepo rename-releasable` moves its old name to the new one. Every rlsbl command that changes anything brings the repository's entry in step after it runs, in a git repository declaring releasables and outside `--dry-run`, even when the command fails (the names while the repository is confidential, no entry while it is public; a repository without a record keys no entry); the `transition` commands do it right after writing the record, and so does the record migration; selfdoc's mutating commands and every safegit commit do the same. Read-only commands only read the index. A confidential repository therefore needs an open `releasable-name` identity, and a confidential record without one is refused before anything is written, naming `rlsbl transition identity --facet releasable-name`.
-
-The index is what keeps those names out of public places. safegit refuses a commit, in a public repository, whose message, added lines, or new paths contain one; selfdoc refuses to deploy or post a page that contains one; and rlsbl refuses, in a public repository, a release whose published text or packed artifacts contain one, or whose push of the branch carries a commit whose message, or a text file it adds or changes, contains one (the `confidential-names` check reports the tracked files, and the commits the next push of the branch carries, that do). Matching is case-insensitive on whole tokens, and a name lying inside a URL (`https://...`) or a dotted hostname ending in a common top-level domain (`docs.example.com`) is not matched.
+The record holds license and lifecycle facts only. Confidential terms (private project names, details about the owner, machine paths) are never written into a repository: they live in the confidential-term list outside every repository, which a release scans what it would push or publish against, as [confidential terms](confidential-terms.md) describes. A confidential repository's own text is not scanned: what it carries is its own, and its public outputs are refused by the rules below.
 
 ## The rules
 
@@ -85,7 +76,6 @@ The rules are fixed in the library's code; nothing in the record names one. `rls
 | proprietary refuses public output | A proprietary releasable publishes to no registry and makes no registry write (no npm deprecate, no Go retract), gets no build attestation, no public docs, and no blog post. | Release validation of its pipelines; `release yank`. |
 | private repository publishing | In a confidential or private repository: no npm build attestations (`--provenance`), no PyPI attestations, no Go module proxy request, no Go `library` pipeline, no Homebrew tap, and no published manifest field naming the repository (`package.json` `repository`, `homepage`, `bugs`; `pyproject.toml` `[project.urls]`). | Release validation; the `private-repo-publishing` check; the publish workflows `rlsbl scaffold` renders. |
 | lifecycle allows release | A subject whose lifecycle is `on-hold` or `retired` is not released. | Release validation and batch release planning; `releasable-residue` leaves a retired subject's history alone. |
-| confidential names | While the repository is confidential, its names go into the index. | Every mutating command brings the entry in step; `transition show` compares the entry with the record's names; the `confidential-names` check and release validation read the index. |
 | proprietary history is squashed | Before the repository goes public, the commits of each proprietary period are squashed into one commit per period whose message names no confidential term. | `transition declassify`. |
 | identity owns its tags | A tag one of an identity's `tag_patterns` owns, created while that identity's period ran, belongs to it; once the period closes, those tags are accounted for, never demanded, scrubbed, or refused. A tag pattern is the glob of a tag scheme (one `*` standing for the version), and it owns a tag only when the tag is the text before the `*`, a `MAJOR.MINOR.PATCH` version, then the text after it, as a releasable's tag format owns its tags: `v*` owns `v1.2.0` and never `video-proc@v0.1.0` or `vnext`. A pattern that is no scheme's glob is refused. | `release backfill`, `release reconcile`, `unpublished-refs`, `go-companion-tags`. |
 | registry names are held | A recorded registry name stays in the record, and no rlsbl command unpublishes a package. | `lifecycle-record-valid`. |
@@ -95,7 +85,7 @@ A **server** releasable, one declaring `deploy_command` in its declarations, mus
 
 ## The transition commands
 
-A command that opens a period closes the subject's period in effect on the command's date first. A command that changes the record validates the whole record against the declarations, writes it, brings the confidential-name index in step, and commits it with the `Autogenerated: true` trailer, together with whatever else the command changes (`transition declassify` commits the files it repairs with it, as its help says). All but `show` and `init-minimal-record` are consequential.
+A command that opens a period closes the subject's period in effect on the command's date first. A command that changes the record validates the whole record against the declarations, writes it, and commits it with the `Autogenerated: true` trailer, together with whatever else the command changes (`transition declassify` commits the files it repairs with it, as its help says). All but `show` and `init-minimal-record` are consequential.
 
 | Command | What it records |
 | --- | --- |
@@ -106,8 +96,7 @@ A command that opens a period closes the subject's period in effect on the comma
 | `rlsbl transition unversioned-tag --tag <tag> --reason <text>` | A tag that releases no version (a nightly marker, an imported vendor tag), so the backfill, the reconcile, and the tag checks account for it. |
 | `rlsbl transition classify --subject <releasable> --reason <text>` | A `proprietary` license period, which makes the repository confidential. GitHub must already report the repository private; making it private is the owner's step outside rlsbl. Deprecate and yank anything the releasable published first: afterwards no registry write is made for it. |
 | `rlsbl transition declassify --license <releasable>=<SPDX>... --reason <text>` | Takes a confidential repository public (below). |
-| `rlsbl transition public-client --subject <name> --reason <text>` | A public-client declaration for a subject the record holds: its registry names and the repository's own names leave the confidential-name index. Refused in a public repository and for a subject declared already; a declassification removes the declarations. |
-| `rlsbl transition init-minimal-record` | Writes a record holding only `format_version = 1`, with its manifest, in a repository rlsbl does not manage, so safegit and selfdoc have a record to read. A repository holding release declarations or an old-layout directory is refused, and so is one that already holds a record. |
+| `rlsbl transition init-minimal-record` | Writes a record holding only `format_version = 1`, with its manifest, in a repository rlsbl does not manage, so selfdoc has a record to read. A repository holding release declarations or an old-layout directory is refused, and so is one that already holds a record. |
 
 ### Declassifying
 
@@ -116,12 +105,11 @@ A command that opens a period closes the subject's period in effect on the comma
 1. squashes each proprietary period's commits on the release branch's first-parent history (dated by committer) into one commit with a fixed message that names no confidential term, through `safegit scrub squash`, keeping the public history before and after; a period whose commits are not contiguous, or that holds a merge commit, is refused before anything is rewritten, naming the commit;
 2. repairs the changelog's commit ids and the archives' release commits through the rewrite, recording a release unrecoverable when its commit was folded into a commit carrying another tree;
 3. closes the proprietary license periods and opens the `--license` ones;
-4. removes the codenames, the distinctive terms, the public-client declarations, and the repository's index entry;
-5. writes a history-rewrite archive, which records the squash commits, and commits everything;
-6. force-pushes the branch and every moved tag with leases taken before the first squash, rewrites each moved tag's GitHub Release from the record, and makes the GitHub repository public.
+4. writes a history-rewrite archive, which records the squash commits, and commits everything;
+5. force-pushes the branch and every moved tag with leases taken before the first squash, rewrites each moved tag's GitHub Release from the record, and makes the GitHub repository public.
 
 The closing report lists the commits of the proprietary periods that origin held before the first squash. GitHub keeps serving a commit it received by its id after a force-push takes every ref off it, and only GitHub support can purge it: the owner asks GitHub support to remove the listed commits at the declassification. rlsbl does nothing else about them. A ref origin holds at a commit this repository lacks is refused before anything is rewritten, since what it holds cannot be told; fetch it (`git fetch origin`) and run the command again.
 
 Every changelog entry of a squashed period then names its period's one squash commit, so the changelog batch checks (`changelog-batch-commits` and `changelog-batch-entries`) leave out every commit a committed history-rewrite archive records as a declassification's squash commit, followed through any later rewrite.
 
-A run that stops is finished by running the same command again. It is refused while a release or a scrub is in progress, off a release branch, without an `origin` remote, and when `--reason` names a confidential term. It requires the safegit version `rlsbl transition declassify --help` names, or a newer one. `--dry-run` prints the squashes and writes nothing.
+A run that stops is finished by running the same command again. It is refused while a release or a scrub is in progress, off a release branch, without an `origin` remote, and when `--reason` carries a term of the confidential-term list. It requires the safegit version `rlsbl transition declassify --help` names, or a newer one. `--dry-run` prints the squashes and writes nothing.

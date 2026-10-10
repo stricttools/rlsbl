@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/confidential"
 	"github.com/stricttools/strictspec/go/lifecycle"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
 
 	"github.com/stricttools/rlsbl/internal/changelog"
 	"github.com/stricttools/rlsbl/internal/declarations"
@@ -170,10 +170,7 @@ func sameLicenses(a, b map[string]string) bool {
 // changelog's commit ids, the archives' release commits, with an archive
 // whose release commit was folded into a commit of another tree made
 // unrecoverable); the proprietary license periods close and the licenses
-// --license names open; the codenames, distinctive terms, and public-client
-// declarations are removed;
-// the repository's confidential-name index entry is removed; a history-
-// rewrite archive records the run; everything is committed; the branch and
+// --license names open; a history-rewrite archive records the run; everything is committed; the branch and
 // the moved tags are force-pushed with leases taken before the first
 // squash; each moved tag's GitHub Release is rewritten from the record; and
 // the GitHub repository is made public. A declassification that stops is
@@ -326,7 +323,7 @@ func (inv Invocation) beginDeclassify(m managed, req DeclassifyRequest) (*declas
 	if err != nil {
 		return nil, err
 	}
-	repoNames, err := index.RepositoryNames(m.root, url)
+	repoNames, err := confidential.RepositoryNames(m.root, url)
 	if err != nil {
 		return nil, err
 	}
@@ -337,16 +334,19 @@ func (inv Invocation) beginDeclassify(m managed, req DeclassifyRequest) (*declas
 	if err := client.CheckAuth(); err != nil {
 		return nil, err
 	}
-	terms, err := rec.ConfidentialNames(on, repoNames...)
+	if inv.TermList.List == "" || inv.TermList.Identity == "" {
+		return nil, errors.New("no confidential-term list location was given to the command")
+	}
+	list, err := confidential.Load(inv.TermList)
 	if err != nil {
 		return nil, err
 	}
-	if matches := index.ScanTerms(SquashMessage, terms); len(matches) > 0 {
-		return nil, fmt.Errorf("the squash commits' fixed message names the confidential term %q (line %d), which the history would publish; nothing was rewritten. Remove %q from the record's codenames or distinctive terms, if it is one, or report this", matches[0].Term, matches[0].Line, matches[0].Term)
+	terms := list.For(repoNames)
+	if hits := terms.Scan("the squash commits' message", SquashMessage); len(hits) > 0 {
+		return nil, fmt.Errorf("the squash commits' fixed message carries a confidential term (%s, line %d), which the history would publish; nothing was rewritten. Report this", hits[0].Entry.Describe(), hits[0].Line)
 	}
-	removed := append(rec.Codenames(), rec.DistinctiveTerms()...)
-	if matches := index.ScanTerms(req.Reason, removed); len(matches) > 0 {
-		return nil, fmt.Errorf("--reason names %q, a codename or distinctive term the declassification removes from the record so it is never published, and the reason is published (the record, the rewrite's archive, and the commit carry it); nothing was rewritten. Word the reason without it", matches[0].Term)
+	if hits := terms.Scan("--reason", req.Reason); len(hits) > 0 {
+		return nil, fmt.Errorf("--reason carries a confidential term (%s: %s), and the reason is published (the record, the rewrite's archive, and the commit carry it); nothing was rewritten. Word the reason without it", hits[0].Entry.Describe(), hits[0].Context)
 	}
 	history, err := m.repo.FirstParentHistory("HEAD")
 	if err != nil {
@@ -370,7 +370,7 @@ func (inv Invocation) beginDeclassify(m managed, req DeclassifyRequest) (*declas
 		inv.Say("No commit of the release branch falls in a proprietary period; there is nothing to squash.")
 	}
 	if inv.DryRun {
-		inv.Say(fmt.Sprintf("Then close the proprietary licenses on %s and open %s, remove the codenames, distinctive terms, public-client declarations, and the index entry, commit, force-push %s and the moved tags, rewrite their GitHub Releases, and make %s public. Nothing was written.", day(on), licenseFlags(req.Licenses), branch, slug))
+		inv.Say(fmt.Sprintf("Then close the proprietary licenses on %s and open %s, commit, force-push %s and the moved tags, rewrite their GitHub Releases, and make %s public. Nothing was written.", day(on), licenseFlags(req.Licenses), branch, slug))
 		return nil, nil
 	}
 	remote, err := m.repo.RemoteRefsPeeled(origin)
@@ -640,7 +640,7 @@ func (inv Invocation) finishDeclassify(m managed, s *declassifyState) error {
 			if err != nil {
 				return err
 			}
-			scanner, err := publishrules.LoadScanner(m.root, inv.IndexPath, inv.Now())
+			scanner, err := publishrules.LoadScanner(m.repo, inv.TermList, inv.Now())
 			if err != nil {
 				return err
 			}
@@ -794,9 +794,6 @@ func (inv Invocation) repairRecords(m managed, s *declassifyState) error {
 			return err
 		}
 	}
-	if err := rec.ClearConfidentialTerms(); err != nil {
-		return err
-	}
 	if rec.Confidential(on) {
 		return fmt.Errorf("the record is still confidential on %s after the proprietary licenses closed; nothing was committed. Check %s", day(on), lifecycle.RecordFile)
 	}
@@ -824,14 +821,7 @@ func (inv Invocation) repairRecords(m managed, s *declassifyState) error {
 		}
 		s.ArchivePath = rel
 	}
-	update, err := inv.planIndex(m.repo, rec, on)
-	if err != nil {
-		return err
-	}
 	if err := rec.Write(recordWriter{inv.E}, m.root); err != nil {
-		return err
-	}
-	if err := update.apply(inv.E); err != nil {
 		return err
 	}
 	s.Paths = mergePaths(mergePaths(mergePaths(s.Paths, paths), recordPaths), append([]string{s.ArchivePath}, recordManifests...))

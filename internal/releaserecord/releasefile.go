@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tomledit "github.com/stricttools/go-toml-edit"
+	"github.com/stricttools/strictspec/go/confidential"
 	"github.com/stricttools/strictspec/go/strictspec"
 
 	"github.com/stricttools/rlsbl/internal/releaserecord/releasefilespec"
@@ -68,6 +69,9 @@ type Archive struct {
 	// ReleaseNotices are the deprecate and yank notices of the version's
 	// GitHub Release, top to bottom.
 	ReleaseNotices []string
+	// ConfidentialHits are the resolutions of the confidential-term hits
+	// the release published, in hit-id order.
+	ConfidentialHits []confidential.Resolution
 }
 
 // The flow-owned fields: written only by rlsbl's own commands (the release
@@ -75,15 +79,16 @@ type Archive struct {
 // the editable release file, and stripped when an archive is restored as
 // one.
 const (
-	fieldReleaseCommit  = "release_commit"
-	fieldReleasedTrees  = "released_trees"
-	fieldUnrecoverable  = "unrecoverable"
-	fieldNeverReleased  = "never_released"
-	fieldShippedAs      = "shipped_as"
-	fieldReleaseNotices = "release_notices"
+	fieldReleaseCommit    = "release_commit"
+	fieldReleasedTrees    = "released_trees"
+	fieldUnrecoverable    = "unrecoverable"
+	fieldNeverReleased    = "never_released"
+	fieldShippedAs        = "shipped_as"
+	fieldReleaseNotices   = "release_notices"
+	fieldConfidentialHits = "confidential_hits"
 )
 
-var flowOwnedFields = []string{fieldReleaseCommit, fieldReleasedTrees, fieldUnrecoverable, fieldNeverReleased, fieldShippedAs, fieldReleaseNotices}
+var flowOwnedFields = []string{fieldReleaseCommit, fieldReleasedTrees, fieldUnrecoverable, fieldNeverReleased, fieldShippedAs, fieldReleaseNotices, fieldConfidentialHits}
 
 // RawReleaseFields are the fields of one release, in the release file and in
 // each table of the batch release file, as decoded. The type is exported
@@ -101,6 +106,18 @@ type RawReleaseFields struct {
 	NeverReleased  *bool              `toml:"never_released"`
 	ShippedAs      *string            `toml:"shipped_as"`
 	ReleaseNotices *[]string          `toml:"release_notices"`
+	// ConfidentialHits is exported for the decoder, as the fields are.
+	ConfidentialHits *[]RawConfidentialHit `toml:"confidential_hits"`
+}
+
+// RawConfidentialHit is one [[confidential_hits]] entry as decoded.
+type RawConfidentialHit struct {
+	Hit        string             `toml:"hit,required"`
+	Location   string             `toml:"location,required"`
+	Resolution string             `toml:"resolution,required"`
+	Certainty  *int64             `toml:"certainty"`
+	Reason     string             `toml:"reason,required"`
+	Recorded   tomledit.LocalDate `toml:"recorded,required"`
 }
 
 type rawReleaseDocument struct {
@@ -117,6 +134,7 @@ type document struct {
 	neverReleased *bool
 	shippedAs     *string
 	notices       *[]string
+	hits          *[]confidential.Resolution
 }
 
 // flowOwnedPresent names the flow-owned fields the document carries.
@@ -132,6 +150,7 @@ func (d document) flowOwnedPresent() []string {
 		{fieldNeverReleased, d.neverReleased != nil},
 		{fieldShippedAs, d.shippedAs != nil},
 		{fieldReleaseNotices, d.notices != nil},
+		{fieldConfidentialHits, d.hits != nil},
 	} {
 		if f.set {
 			present = append(present, f.name)
@@ -240,6 +259,24 @@ func (r RawReleaseFields) convert(where string) (document, []string) {
 	if overlap := intersection(r.Include, r.Exclude); len(overlap) > 0 {
 		problems = append(problems, fmt.Sprintf("%stargets appear in both include and exclude: %s", where, strings.Join(overlap, ", ")))
 	}
+	var hits *[]confidential.Resolution
+	if r.ConfidentialHits != nil {
+		converted := make([]confidential.Resolution, 0, len(*r.ConfidentialHits))
+		for i, h := range *r.ConfidentialHits {
+			res := confidential.Resolution{
+				Hit: h.Hit, Location: h.Location, Decision: confidential.Decision(h.Resolution), Reason: h.Reason,
+				Recorded: fmt.Sprintf("%04d-%02d-%02d", h.Recorded.Year, h.Recorded.Month, h.Recorded.Day),
+			}
+			if h.Certainty != nil {
+				res.Certainty = int(*h.Certainty)
+			}
+			if (res.Decision == confidential.FalsePositive) != (h.Certainty != nil) {
+				problems = append(problems, fmt.Sprintf("%sconfidential_hits entry %d: a false positive carries a certainty, and an approval none", where, i+1))
+			}
+			converted = append(converted, res)
+		}
+		hits = &converted
+	}
 	return document{
 		file: ReleaseFile{
 			Bump:        bump,
@@ -254,6 +291,7 @@ func (r RawReleaseFields) convert(where string) (document, []string) {
 		neverReleased: r.NeverReleased,
 		shippedAs:     r.ShippedAs,
 		notices:       r.ReleaseNotices,
+		hits:          hits,
 	}, problems
 }
 
@@ -349,6 +387,9 @@ func parseArchive(rel string, v semver.Version, data []byte) (Archive, error) {
 	}
 	if d.notices != nil {
 		a.ReleaseNotices = append([]string{}, *d.notices...)
+	}
+	if d.hits != nil {
+		a.ConfidentialHits = append([]confidential.Resolution{}, *d.hits...)
 	}
 	return a, nil
 }

@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/confidential"
 	"github.com/stricttools/strictspec/go/lifecycle"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
 	"github.com/stricttools/testisolation/go/hygiene"
 
 	"github.com/stricttools/rlsbl/internal/changelog"
@@ -23,10 +23,8 @@ import (
 )
 
 // twoPeriods licenses portal proprietary twice, the second time to this
-// day, with a codename and a distinctive term.
+// day.
 const twoPeriods = `format_version = 1
-codenames = ["moonbeam"]
-distinctive_terms = ["quasarflux"]
 
 [[licenses]]
 subject = "portal"
@@ -99,10 +97,8 @@ func TestDeclassifySquashesEachProprietaryPeriodAndGoesPublic(t *testing.T) {
 	bare := repo.AddBareRemote("origin")
 	repo.Git("push", "-q", "origin", "main", "v0.1.0")
 
-	fx := &fixture{repo: repo, index: filepath.Join(t.TempDir(), "confidential-names.toml")}
-	if err := os.WriteFile(fx.index, []byte("format_version = 1\n\n[[repositories]]\nsubjects = [\"portal\"]\nnames = [\"moonbeam\", \"portal\"]\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	fx := &fixture{repo: repo, termList: testsupport.TermList(t)}
+	testsupport.WriteTermList(t, fx.termList, testsupport.TermListOf("moonbeam"))
 
 	// What safegit's two squashes write, newest period first.
 	s2 := commitTree(t, repo, treeOf(repo, g), []string{e}, g, lifecycleops.SquashMessage)
@@ -154,8 +150,10 @@ func TestDeclassifySquashesEachProprietaryPeriodAndGoesPublic(t *testing.T) {
 	if len(squashes) != 2 || !strings.Contains(squashes[0], "--first "+f+" --last "+g) || !strings.Contains(squashes[1], "--first "+b+" --last "+d) {
 		t.Fatalf("squashes %q", squashes)
 	}
-	if found := index.ScanTerms(lifecycleops.SquashMessage, []string{"moonbeam", "quasarflux", "portal", "origin"}); len(found) != 0 {
-		t.Fatalf("the squash message names %+v", found)
+	for _, term := range []string{"moonbeam", "quasarflux", "portal", "origin"} {
+		if strings.Contains(strings.ToLower(lifecycleops.SquashMessage), term) {
+			t.Fatalf("the squash message names %q", term)
+		}
 	}
 	// The public history before and after each period is kept: A, the
 	// first squash, E rewritten onto it, the second squash, and the
@@ -186,19 +184,16 @@ func TestDeclassifySquashesEachProprietaryPeriodAndGoesPublic(t *testing.T) {
 		t.Errorf("the unreleased changelog reads %q", got)
 	}
 	// The record is public: the proprietary license closed today, MIT
-	// open, no codenames or terms; the index entry is gone.
+	// open.
 	rec, err := lifecycle.Parse([]byte(readFile(t, repo, lifecycle.RecordFile)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rec.Confidential(today) || len(rec.Codenames()) != 0 || len(rec.DistinctiveTerms()) != 0 {
+	if rec.Confidential(today) {
 		t.Fatalf("the record:\n%s", readFile(t, repo, lifecycle.RecordFile))
 	}
 	if l, ok := rec.LicenseOn("portal", today); !ok || l.License != "MIT" || !l.Open() {
 		t.Fatalf("portal's license is %+v", l)
-	}
-	if strings.Contains(fx.indexText(t), "[[repositories]]") {
-		t.Fatalf("the index keeps the repository:\n%s", fx.indexText(t))
 	}
 	// The run is archived and committed, and nothing is left in progress.
 	if got := readFile(t, repo, ".strictmetadata/history-rewrites/20260601T120000Z.toml"); !strings.Contains(got, `operation = "declassify"`) || !strings.Contains(got, `mode = "squash"`) {
@@ -271,7 +266,7 @@ func TestADryRunDeclassificationPrintsTheSquashesAndWritesNothing(t *testing.T) 
 	head := repo.Head()
 	sg := newFakeSafegit(t)
 	testsupport.FakeGH(t, ghAuth)
-	fx := &fixture{repo: repo, index: filepath.Join(t.TempDir(), "index.toml")}
+	fx := &fixture{repo: repo, termList: testsupport.TermList(t)}
 	r := fx.run(t, true, func(inv lifecycleops.Invocation, dir string) error {
 		return inv.Declassify(lifecycleops.DeclassifyRequest{Dir: dir, Licenses: map[string]string{"portal": "MIT"}, Reason: "open"})
 	})
@@ -308,7 +303,7 @@ func TestDeclassifyRefusesAnOriginRefItCannotReadUntilItIsFetched(t *testing.T) 
 	head := repo.Head()
 	sg := newFakeSafegit(t)
 	testsupport.FakeGH(t, ghAuth)
-	fx := &fixture{repo: repo, index: filepath.Join(t.TempDir(), "index.toml")}
+	fx := &fixture{repo: repo, termList: testsupport.TermList(t)}
 	run := func() strictcli.Result {
 		return fx.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
 			return inv.Declassify(lifecycleops.DeclassifyRequest{Dir: dir, Licenses: map[string]string{"portal": "MIT"}, Reason: "open"})
@@ -345,12 +340,12 @@ func readFile(t *testing.T, repo *testsupport.Repo, rel string) string {
 func TestDeclassifyRefusalsClearOnceFixed(t *testing.T) {
 	hygiene.Isolate(t)
 	repo := testsupport.NewRepo(t)
-	record := "format_version = 1\ncodenames = [\"moonbeam\"]\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-05-01\nreason = \"server\"\n" + portalName
+	record := "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-05-01\nreason = \"server\"\n" + portalName
 	commitOn(t, repo, "2026-05-02", map[string]string{declarations.ReleasablesFile: portalDeclarations, lifecycle.RecordFile: record, lifecycle.ManifestFile: "owner = \"strictspec\"\n"}, "the project")
 	repo.AddBareRemote("origin")
 	newFakeSafegit(t)
 	testsupport.FakeGH(t, ghAuth)
-	fx := &fixture{repo: repo, index: filepath.Join(t.TempDir(), "index.toml")}
+	fx := &fixture{repo: repo, termList: testsupport.TermList(t)}
 	preview := func(reason string) (int, string) {
 		r := fx.run(t, true, func(inv lifecycleops.Invocation, dir string) error {
 			return inv.Declassify(lifecycleops.DeclassifyRequest{Dir: dir, Licenses: map[string]string{"portal": "MIT"}, Reason: reason})
@@ -358,9 +353,10 @@ func TestDeclassifyRefusalsClearOnceFixed(t *testing.T) {
 		return r.ExitCode, r.Stderr
 	}
 
+	testsupport.WriteTermList(t, fx.termList, testsupport.TermListOf("moonbeam"))
 	code, stderr := preview("moonbeam goes open source")
-	if code != 1 || !strings.Contains(stderr, `--reason names "moonbeam"`) || !strings.Contains(stderr, "Word the reason without it") {
-		t.Fatalf("a reason naming a codename: exit %d: %s", code, stderr)
+	if code != 1 || !strings.Contains(stderr, "--reason carries a confidential term") || !strings.Contains(stderr, "Word the reason without it") {
+		t.Fatalf("a reason carrying a term of the list: exit %d: %s", code, stderr)
 	}
 	if code, stderr := preview("the server goes open source"); code != 0 {
 		t.Fatalf("the reworded reason: exit %d: %s", code, stderr)
@@ -380,20 +376,20 @@ func TestDeclassifyRefusalsClearOnceFixed(t *testing.T) {
 // declassifyPreview is a repository with a proprietary portal on main, an
 // origin, a safegit new enough, and gh logged in, whose declassification
 // dry run passes; preview runs it.
-func declassifyPreview(t *testing.T, record string) (*testsupport.Repo, func() (int, string)) {
+func declassifyPreview(t *testing.T, record string) (*testsupport.Repo, func() (int, string), confidential.Location) {
 	t.Helper()
 	repo := testsupport.NewRepo(t)
 	commitOn(t, repo, "2026-05-02", map[string]string{declarations.ReleasablesFile: portalDeclarations, lifecycle.RecordFile: record, lifecycle.ManifestFile: "owner = \"strictspec\"\n"}, "the project")
 	repo.AddBareRemote("origin")
 	newFakeSafegit(t)
 	testsupport.FakeGH(t, ghAuth)
-	fx := &fixture{repo: repo, index: filepath.Join(t.TempDir(), "index.toml")}
+	fx := &fixture{repo: repo, termList: testsupport.TermList(t)}
 	return repo, func() (int, string) {
 		r := fx.run(t, true, func(inv lifecycleops.Invocation, dir string) error {
 			return inv.Declassify(lifecycleops.DeclassifyRequest{Dir: dir, Licenses: map[string]string{"portal": "MIT"}, Reason: "the server goes open source"})
 		})
 		return r.ExitCode, r.Stderr
-	}
+	}, fx.termList
 }
 
 const proprietaryPortal = "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-05-01\nreason = \"server\"\n" + portalName
@@ -454,7 +450,7 @@ func TestDeclassifyRefusalsNamingAFixClearOnceItIsMade(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			hygiene.Isolate(t)
-			repo, preview := declassifyPreview(t, proprietaryPortal)
+			repo, preview, _ := declassifyPreview(t, proprietaryPortal)
 			if code, stderr := preview(); code != 0 {
 				t.Fatalf("before: exit %d: %s", code, stderr)
 			}
@@ -470,15 +466,16 @@ func TestDeclassifyRefusalsNamingAFixClearOnceItIsMade(t *testing.T) {
 	}
 }
 
-func TestDeclassifyRefusesACodenameTheSquashMessageNamesUntilItIsRemoved(t *testing.T) {
+func TestDeclassifyRefusesASquashMessageCarryingATermOfTheList(t *testing.T) {
 	hygiene.Isolate(t)
-	repo, preview := declassifyPreview(t, "format_version = 1\ncodenames = [\"squash\"]\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-05-01\nreason = \"server\"\n"+portalName)
-	if code, stderr := preview(); code != 1 || !strings.Contains(stderr, `Remove "squash" from the record's codenames`) {
-		t.Fatalf("a codename the squash message names: exit %d: %s", code, stderr)
+	_, preview, termList := declassifyPreview(t, proprietaryPortal)
+	testsupport.WriteTermList(t, termList, testsupport.TermListOf("squash"))
+	if code, stderr := preview(); code != 1 || !strings.Contains(stderr, "the squash commits' fixed message carries a confidential term") {
+		t.Fatalf("a term the squash message carries: exit %d: %s", code, stderr)
 	}
-	repo.Write(lifecycle.RecordFile, proprietaryPortal)
+	testsupport.WriteTermList(t, termList, testsupport.TermListOf("moonbeam"))
 	if code, stderr := preview(); code != 0 {
-		t.Fatalf("with the codename removed: exit %d: %s", code, stderr)
+		t.Fatalf("with the term out of the list: exit %d: %s", code, stderr)
 	}
 }
 

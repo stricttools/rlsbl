@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/confidential"
 	"github.com/stricttools/strictspec/go/lifecycle"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
 
 	"github.com/stricttools/rlsbl/internal/changelog"
 	"github.com/stricttools/rlsbl/internal/ci"
@@ -67,7 +67,6 @@ type execution struct {
 	ghRepo           github.Repository
 	reg              registry.Client
 	record           *lifecycle.Record
-	index            *index.Index
 	scanner          *publishrules.Scanner
 	timeouts         Timeouts
 	ecosystemTagging bool
@@ -277,7 +276,7 @@ func (x *execution) bumpPlan() (BumpPlan, error) {
 func (x *execution) bumpExecution(preview bool) BumpExecution {
 	return BumpExecution{
 		Workspace: x.ws, Releasable: x.name(), Repo: x.repo, LiveRoot: x.session.LiveRoot,
-		Environment: x.env, Rerun: x.rerun(), Preview: preview, Record: x.record, Index: x.index,
+		Environment: x.env, Rerun: x.rerun(), Preview: preview, Record: x.record, Scanner: x.scanner,
 		Scratch: x.req.Scratch, Now: x.now, Log: x.req.Log,
 	}
 }
@@ -365,7 +364,7 @@ func (x *execution) pushCandidate() error {
 		x.req.Log(fmt.Sprintf("The push of %s cannot trigger the CI of %s, and its candidate was published once before: it is pushed and the CI router dispatched with %s=true, so every member's jobs run on it", short(x.candidate), x.name(), "run_all"))
 	}
 	if needsPush {
-		if err := pushCarriesNoConfidentialName(x.scanner, x.live, x.candidate, remote, x.branch); err != nil {
+		if err := pushCarriesNoConfidentialTerm(x.scanner, x.live, x.candidate, remote, x.branch); err != nil {
 			return err
 		}
 		x.pushAttempted = true
@@ -533,8 +532,12 @@ func (x *execution) archive() error {
 	if err != nil {
 		return err
 	}
+	resolved, err := x.resolvedConfidentialHits()
+	if err != nil {
+		return err
+	}
 	if hasFile || hasArchive {
-		if err := releaserecord.ArchiveReleaseFile(x.e, root, x.name(), x.version, rc); err != nil {
+		if err := releaserecord.ArchiveReleaseFile(x.e, root, x.name(), x.version, rc, resolved); err != nil {
 			return err
 		}
 	} else {
@@ -543,9 +546,10 @@ func (x *execution) archive() error {
 			return fmt.Errorf("the releasable %q has no release file %s to archive, and the release state holds no bump and description to write the archive of %s from", x.name(), releaseFile, x.version)
 		}
 		if _, err := releaserecord.WriteArchive(x.e, root, dir, x.version, releaserecord.ArchiveSpec{
-			ReleaseFile:   releaserecord.ReleaseFile{Bump: bump, Include: x.state.Include, Exclude: x.state.Exclude, Description: x.state.Description, Context: x.state.Context},
-			Fate:          releaserecord.FateRecorded,
-			ReleaseCommit: rc,
+			ReleaseFile:      releaserecord.ReleaseFile{Bump: bump, Include: x.state.Include, Exclude: x.state.Exclude, Description: x.state.Description, Context: x.state.Context},
+			Fate:             releaserecord.FateRecorded,
+			ReleaseCommit:    rc,
+			ConfidentialHits: resolved,
 		}); err != nil {
 			return err
 		}
@@ -620,6 +624,53 @@ func (x *execution) expectedRefs() (targets.ExpectedRefs, error) {
 	return targets.ExpectedRefsOf(x.version, targets.RefInputs{SchemeTag: tag, Members: members, Aliases: aliases})
 }
 
+// resolvedConfidentialHits is every recorded resolution that resolves a
+// confidential-term hit the release publishes, which its archive records: in
+// the commits from the nearest release (exclusive) to the candidate, which
+// carry the release file and the changelog entries the published notes are
+// made of, and in the tag names the version owns. A hit nothing resolves
+// refuses the step: the candidate push refuses one, so it can only come from
+// a resolution taken away since.
+func (x *execution) resolvedConfidentialHits() ([]confidential.Resolution, error) {
+	if !x.scanner.Active() {
+		return nil, nil
+	}
+	nearest, err := releaserecord.New(x.repo, x.name(), x.scheme, x.req.Fork.Upstream).Nearest(x.candidate)
+	if err != nil {
+		return nil, err
+	}
+	var exclude []string
+	if nearest != nil && nearest.ReleaseCommit != "" {
+		exclude = append(exclude, nearest.ReleaseCommit)
+	}
+	hits, err := x.scanner.HitsInRange(x.repo, []string{x.candidate}, exclude)
+	if err != nil {
+		return nil, err
+	}
+	tags, err := x.tagNameTexts()
+	if err != nil {
+		return nil, err
+	}
+	hits = append(hits, x.scanner.HitsInTexts(tags)...)
+	if err := x.scanner.Refuse(fmt.Sprintf("the release of %s %s", x.name(), x.version), hits); err != nil {
+		return nil, err
+	}
+	return x.scanner.Used(), nil
+}
+
+// tagNameTexts are the names of the tags the version owns, as texts to scan.
+func (x *execution) tagNameTexts() ([]publishrules.Text, error) {
+	refs, err := x.expectedRefs()
+	if err != nil {
+		return nil, err
+	}
+	var texts []publishrules.Text
+	for _, tag := range refs.Tags() {
+		texts = append(texts, publishrules.Text{Name: "a tag name of " + x.version.String(), Content: tag})
+	}
+	return texts, nil
+}
+
 // tag takes the tagged step: every tag the version owns is created on the
 // commit CI verified. A tag already there at that commit is a resumed tag
 // step; one at another commit is refused, since a release never moves a
@@ -633,6 +684,13 @@ func (x *execution) tag() error {
 		return fmt.Errorf("the release resolved its tag as %s, and the releasable's refs name %s for %s; both read the same declarations, so one of them was given other ones. Nothing was tagged", x.state.Tag, refs.Primary, x.version)
 	}
 	tags := refs.Tags()
+	texts, err := x.tagNameTexts()
+	if err != nil {
+		return err
+	}
+	if err := x.scanner.ScanTexts(texts); err != nil {
+		return err
+	}
 	for _, tag := range tags {
 		sha, found, err := x.live.TagCommit(tag)
 		if err != nil {
@@ -677,7 +735,7 @@ func (x *execution) push() error {
 		remote = ""
 	}
 	if remote != tip {
-		if err := pushCarriesNoConfidentialName(x.scanner, x.live, tip, remote, x.branch); err != nil {
+		if err := pushCarriesNoConfidentialTerm(x.scanner, x.live, tip, remote, x.branch); err != nil {
 			return err
 		}
 		x.pushAttempted = true

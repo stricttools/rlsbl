@@ -303,9 +303,9 @@ func addEntries(rec *lifecycle.Record, m movedEntries) error {
 	return nil
 }
 
-// renderRecord is a new record document holding the moved entries, the
-// confidential terms, and the unversioned tags.
-func renderRecord(m movedEntries, codenames, terms []string, tags []lifecycle.UnversionedTag) []byte {
+// renderRecord is a new record document holding the moved entries and the
+// unversioned tags.
+func renderRecord(m movedEntries, tags []lifecycle.UnversionedTag) []byte {
 	q := tomledit.QuoteString
 	day := func(t time.Time) string { return t.UTC().Format(time.DateOnly) }
 	list := func(values []string) string {
@@ -317,12 +317,6 @@ func renderRecord(m movedEntries, codenames, terms []string, tags []lifecycle.Un
 	}
 	var b strings.Builder
 	b.WriteString("format_version = 1\n")
-	if len(codenames) > 0 {
-		b.WriteString("codenames = " + list(codenames) + "\n")
-	}
-	if len(terms) > 0 {
-		b.WriteString("distinctive_terms = " + list(terms) + "\n")
-	}
 	period := func(p lifecycle.Period) {
 		b.WriteString("from = " + day(p.From) + "\n")
 		if !p.Open() {

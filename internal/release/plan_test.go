@@ -3,18 +3,18 @@ package release_test
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/confidential"
 	"github.com/stricttools/strictspec/go/lifecycle"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
 	"github.com/stricttools/testisolation/go/hygiene"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
+	"github.com/stricttools/rlsbl/internal/publishrules"
 	"github.com/stricttools/rlsbl/internal/release"
 	"github.com/stricttools/rlsbl/internal/semver"
 	"github.com/stricttools/rlsbl/internal/testsupport"
@@ -200,11 +200,11 @@ func executeBump(t *testing.T, repo *testsupport.Repo, dryRun bool) (strictcli.R
 		if err != nil {
 			return err
 		}
-		idx, err := index.Load(filepath.Join(t.TempDir(), "confidential-names.toml"))
+		scanner, err := emptyScanner(record)
 		if err != nil {
 			return err
 		}
-		result, err = release.ExecuteBumpPlan(e, plan, release.BumpExecution{Workspace: ws, Releasable: "portal", Repo: r, LiveRoot: repo.Dir, Rerun: "run the release again", Preview: dryRun, Record: record, Index: idx, Now: time.Date(2026, 10, 7, 0, 0, 0, 0, time.UTC), Log: func(string) {}})
+		result, err = release.ExecuteBumpPlan(e, plan, release.BumpExecution{Workspace: ws, Releasable: "portal", Repo: r, LiveRoot: repo.Dir, Rerun: "run the release again", Preview: dryRun, Record: record, Scanner: scanner, Now: time.Date(2026, 10, 7, 0, 0, 0, 0, time.UTC), Log: func(string) {}})
 		return err
 	})
 	return res, result, err
@@ -306,11 +306,11 @@ func TestExecutingTheBumpRefusesAPackedFileAnotherMemberOwns(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			idx, err := index.Load(filepath.Join(t.TempDir(), "confidential-names.toml"))
+			scanner, err := emptyScanner(&lifecycle.Record{})
 			if err != nil {
 				return err
 			}
-			_, err = release.ExecuteBumpPlan(e, plan, release.BumpExecution{Workspace: ws, Releasable: "widget", Repo: r, LiveRoot: repo.Dir, Rerun: "run the release again", Record: &lifecycle.Record{}, Index: idx, Now: time.Date(2026, 10, 7, 0, 0, 0, 0, time.UTC), Log: func(string) {}})
+			_, err = release.ExecuteBumpPlan(e, plan, release.BumpExecution{Workspace: ws, Releasable: "widget", Repo: r, LiveRoot: repo.Dir, Rerun: "run the release again", Record: &lifecycle.Record{}, Scanner: scanner, Now: time.Date(2026, 10, 7, 0, 0, 0, 0, time.UTC), Log: func(string) {}})
 			return err
 		})
 		return err
@@ -325,4 +325,13 @@ func TestExecutingTheBumpRefusesAPackedFileAnotherMemberOwns(t *testing.T) {
 	repo.Git("checkout", "--", ".")
 	repo.CommitFile("widget/inner/go.mod", "module example.com/widget/inner\n\ngo 1.22\n", "inner is a module of its own")
 	mustNotFail(t, execute())
+}
+
+// emptyScanner is the confidential-term scanner of a list with no terms.
+func emptyScanner(record *lifecycle.Record) (*publishrules.Scanner, error) {
+	list, err := confidential.FromEntries("no list", nil)
+	if err != nil {
+		return nil, err
+	}
+	return publishrules.NewScanner(record, time.Date(2026, 10, 7, 0, 0, 0, 0, time.UTC), list, nil, nil)
 }

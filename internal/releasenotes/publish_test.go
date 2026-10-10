@@ -2,15 +2,14 @@ package releasenotes_test
 
 import (
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/confidential"
 	"github.com/stricttools/strictspec/go/lifecycle"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
 	"github.com/stricttools/testisolation/go/hygiene"
 
 	"github.com/stricttools/rlsbl/internal/git"
@@ -302,33 +301,26 @@ func TestAMissingTagIsAnsweredOnceTheTagExists(t *testing.T) {
 	}
 }
 
-// diskWriter performs the index's writes, for a fixture.
-type diskWriter struct{}
-
-func (diskWriter) WriteFile(path string, data []byte) error { return os.WriteFile(path, data, 0o644) }
-func (diskWriter) MkdirAll(path string) error               { return os.MkdirAll(path, 0o755) }
-
-// scanner is the confidential-name scanner of a public repository whose
-// index holds the name confidential, none when it is empty.
-func scanner(t *testing.T, confidential string) *publishrules.Scanner {
+// scanner is the confidential-term scanner of a public repository whose
+// list names term, none when it is empty.
+func scanner(t *testing.T, term string) *publishrules.Scanner {
 	t.Helper()
-	idx, err := index.Load(filepath.Join(t.TempDir(), index.FileName))
+	var entries []confidential.Entry
+	if term != "" {
+		entries = append(entries, confidential.Entry{Term: term, Added: "2026-10-01", Reason: "a private project"})
+	}
+	list, err := confidential.FromEntries("the test list", entries)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if confidential != "" {
-		if err := idx.Upsert(diskWriter{}, []string{"gadget"}, []string{confidential}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	s, err := publishrules.NewScanner(&lifecycle.Record{}, time.Now(), idx)
+	s, err := publishrules.NewScanner(&lifecycle.Record{}, time.Now(), list, []string{"portal"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return s
 }
 
-func TestEveryReleaseBodyWriterRefusesAConfidentialName(t *testing.T) {
+func TestEveryReleaseBodyWriterRefusesAConfidentialTerm(t *testing.T) {
 	hygiene.Isolate(t)
 	leaky := releasenotes.Document{Tag: "v0.4.0", Version: version(t, "0.4.0"), Notes: "- Talks to Moonbeam now", ReleaseCommit: commitA}
 	gh := testsupport.FakeGH(t,

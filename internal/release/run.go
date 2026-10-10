@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/confidential"
 	"github.com/stricttools/strictspec/go/lifecycle"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
 
 	"github.com/stricttools/rlsbl/internal/changelog"
 	"github.com/stricttools/rlsbl/internal/checks"
@@ -49,11 +49,11 @@ type RunRequest struct {
 	// Checks runs the preflight checks: the checks.Runner of the app, which
 	// runs them for the member directory each check context names.
 	Checks CheckRunner
-	// Home is the user's home directory and IndexPath the machine-local
-	// confidential-name index, both read by the checks; IndexPath is also
-	// what the published texts are scanned against.
-	Home      string
-	IndexPath string
+	// Home is the user's home directory, read by the checks, and TermList
+	// where the confidential-term list is, which the checks and every
+	// published text are scanned against.
+	Home     string
+	TermList confidential.Location
 	// Scratch is the command's scratch directory, where npm writes its
 	// cache when the release lists an npm upload.
 	Scratch targets.Scratch
@@ -72,8 +72,8 @@ func (r RunRequest) check() error {
 		return errors.New("a release needs the check runner its preflight runs through")
 	case r.Now == nil || r.Sleep == nil || r.Log == nil || r.Warn == nil:
 		return errors.New("a release needs a clock, a sleep, a log, and a warning stream")
-	case r.IndexPath == "":
-		return errors.New("a release needs the path of the confidential-name index")
+	case r.TermList.List == "" || r.TermList.Identity == "":
+		return errors.New("a release needs the location of the confidential-term list")
 	}
 	return nil
 }
@@ -584,11 +584,7 @@ func newExecution(e *strictcli.Effects, s *Session, req RunRequest, in execution
 	if err != nil {
 		return nil, err
 	}
-	idx, err := index.Load(req.IndexPath)
-	if err != nil {
-		return nil, err
-	}
-	scanner, err := publishrules.NewScanner(in.record, in.now, idx)
+	scanner, err := publishrules.LoadScannerAt(live, in.ws.Root, req.TermList, in.now)
 	if err != nil {
 		return nil, err
 	}
@@ -609,7 +605,7 @@ func newExecution(e *strictcli.Effects, s *Session, req RunRequest, in execution
 		releasable: in.releasable, representative: in.representative, scheme: scheme,
 		version: in.version, current: in.current, primary: in.primary, syncs: in.syncs,
 		env: in.environment, gh: in.gh, ghRepo: in.ghRepo, reg: in.reg, record: in.record,
-		index: idx, scanner: scanner, timeouts: timeouts, ecosystemTagging: !taggingOff,
+		scanner: scanner, timeouts: timeouts, ecosystemTagging: !taggingOff,
 		publishesFromCI: in.publishesFromCI, branch: in.branch, now: in.now, resuming: in.resuming, batch: in.batch, req: req,
 	}, nil
 }
@@ -647,7 +643,7 @@ func (x *execution) preflight() error {
 func (x *execution) runPreflight(m declarations.Member, sel PreflightSelection, label string) error {
 	ctx, err := checks.NewContext(x.e, checks.Inputs{
 		Dir: x.ws.MemberDir(m), Releasable: x.releasable.Name, Branch: x.branch, Now: x.now, CheckTimeout: x.timeouts.Check,
-		Home: x.req.Home, IndexPath: x.req.IndexPath, Scratch: x.req.Scratch,
+		Home: x.req.Home, TermList: x.req.TermList, Scratch: x.req.Scratch,
 	})
 	if err != nil {
 		return err
@@ -683,7 +679,7 @@ func (x *execution) hookContext(bump, description string) HookContext {
 }
 
 // publishedSectionClean scans the changelog section the release publishes
-// (in CHANGELOG.md and in the GitHub Release) for confidential names, in a
+// (in CHANGELOG.md and in the GitHub Release) for confidential terms, in a
 // public repository, before anything is written.
 func (x *execution) publishedSectionClean(pending *changelog.Pending) error {
 	sections, err := changelog.Sections(x.ws.Root, x.releasable.Name, 2, pending)
@@ -696,18 +692,19 @@ func (x *execution) publishedSectionClean(pending *changelog.Pending) error {
 	return x.scanner.ScanTexts([]publishrules.Text{{Name: fmt.Sprintf("the changelog section of %s %s", x.releasable.Name, x.version), Content: sections[0]}})
 }
 
-// pushCarriesNoConfidentialName refuses a push of the branch from remote
-// (origin's commit, empty when origin has no such branch) to tip when a
-// commit the push carries holds a confidential name, in its message or in a
-// text blob it adds or changes. An origin commit this repository does not
-// have is refused: what the push would carry cannot be told.
-func pushCarriesNoConfidentialName(scanner *publishrules.Scanner, repo git.Repo, tip, remote, branch string) error {
+// pushCarriesNoConfidentialTerm refuses a push of the branch from remote
+// (origin's commit, empty when origin has no such branch) to tip while a
+// commit the push carries holds an unresolved confidential-term hit, in its
+// message, a path it adds, or a line it adds or changes. An origin commit
+// this repository does not have is refused: what the push would carry cannot
+// be told.
+func pushCarriesNoConfidentialTerm(scanner *publishrules.Scanner, repo git.Repo, tip, remote, branch string) error {
 	var exclude []string
 	if remote != "" {
 		if _, found, err := repo.ResolveCommit(remote); err != nil {
 			return err
 		} else if !found {
-			return fmt.Errorf("origin's %s is at %s, which this repository does not have, so which commits the push carries cannot be scanned for confidential names; fetch origin and run the command again", branch, short(remote))
+			return fmt.Errorf("origin's %s is at %s, which this repository does not have, so which commits the push carries cannot be scanned for confidential terms; fetch origin and run the command again", branch, short(remote))
 		}
 		exclude = []string{remote}
 	}

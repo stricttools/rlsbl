@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/confidential"
 	"github.com/stricttools/strictspec/go/lifecycle"
 
 	"github.com/stricttools/rlsbl/internal/changelog"
@@ -49,8 +50,9 @@ type Inputs struct {
 	PushLines []string
 	// Home is the user's home directory, where ~/.npmrc is read.
 	Home string
-	// IndexPath is the machine-local confidential-name index.
-	IndexPath string
+	// TermList is where the confidential-term list and the identity that
+	// decrypts it are.
+	TermList confidential.Location
 	// UVProjectEnvironment is UV_PROJECT_ENVIRONMENT as the caller read it
 	// (empty when unset): uv's own relocation of a project's environment,
 	// where the dev overlays are installed.
@@ -372,11 +374,11 @@ func (c *Context) Home() string {
 // UVProjectEnvironment is UV_PROJECT_ENVIRONMENT as the caller read it.
 func (c *Context) UVProjectEnvironment() string { return c.in.UVProjectEnvironment }
 
-// IndexPath is the confidential-name index file, refused when the caller
+// TermList is where the confidential-term list is, refused when the caller
 // stated none.
-func (c *Context) IndexPath() string {
-	if c.in.IndexPath == "" {
-		panic(unanswered("no confidential-name index was given to scan with"))
+func (c *Context) TermList() confidential.Location {
+	if c.in.TermList.List == "" || c.in.TermList.Identity == "" {
+		panic(unanswered("no confidential-term list was given to scan with"))
 	}
-	return c.in.IndexPath
+	return c.in.TermList
 }

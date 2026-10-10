@@ -113,6 +113,13 @@ description = "The notices `rlsbl release deprecate` and `rlsbl release yank` pu
 type = "string"
 non_empty = true
 
+[types.ReleaseFile.fields.confidential_hits]
+type = "array"
+required = false
+description = "The resolutions of the confidential-term hits this release published, copied from .strictmetadata/confidential-hits/resolutions.toml by the release flow at its archive step: each hit the agent judged a false positive (with its certainty and reason) and each the owner approved publishing (with the owner's reason). Never authored by hand, and refused in the editable unreleased.toml."
+[types.ReleaseFile.fields.confidential_hits.item]
+type = "ConfidentialHit"
+
 [[types.ReleaseFile.constraints]]
 form = "collections-disjoint"
 left = "include"
@@ -142,6 +149,45 @@ form = "forbidden-when"
 field = "shipped_as"
 when = { field = "never_released", predicate = "present" }
 description = "A never-released version shipped under no tag."
+
+[types.ConfidentialHit]
+type = "record"
+
+[types.ConfidentialHit.fields.hit]
+type = "string"
+required = true
+regex = "^[0-9a-f]{16}$"
+description = "The hit's id: derived from the list entry that matched, the matched text, and the words after it, so it names no confidential text."
+
+[types.ConfidentialHit.fields.location]
+type = "string"
+required = true
+non_empty = true
+description = "Where the hit was when it was resolved, with every confidential match redacted."
+
+[types.ConfidentialHit.fields.resolution]
+type = "enum"
+required = true
+values = ["false-positive", "approved"]
+description = "false-positive: the agent judged the hit not confidential; approved: the owner approved publishing it."
+
+[types.ConfidentialHit.fields.certainty]
+type = "integer"
+required = false
+min = 70
+max = 100
+description = "The agent's certainty, in percent, that the hit is a false positive. Carried by a false positive only."
+
+[types.ConfidentialHit.fields.reason]
+type = "string"
+required = true
+non_empty = true
+description = "One line: the agent's reason for a false positive, the owner's for an approval."
+
+[types.ConfidentialHit.fields.recorded]
+type = "date"
+required = true
+description = "The day the resolution was recorded."
 
 [types.GitObjectHash]
 type = "string"

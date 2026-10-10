@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/confidential"
 
 	"github.com/stricttools/rlsbl/internal/git"
 	"github.com/stricttools/rlsbl/internal/semver"
@@ -175,9 +176,9 @@ type ScrubRequest struct {
 	FromCommit    string
 	EntireHistory bool
 	Reason        string
-	// IndexPath is the machine-local confidential-name index the rewritten
-	// Release bodies are scanned against.
-	IndexPath string
+	// TermList is where the confidential-term list the rewritten Release
+	// bodies are scanned against is.
+	TermList confidential.Location
 }
 
 // validate refuses a request no scrub can run, before anything is read.

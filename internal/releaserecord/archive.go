@@ -8,6 +8,7 @@ import (
 
 	tomledit "github.com/stricttools/go-toml-edit"
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/confidential"
 
 	"github.com/stricttools/rlsbl/internal/semver"
 )
@@ -62,6 +63,9 @@ type ArchiveSpec struct {
 	// ReleaseCommit is set for FateRecorded and empty otherwise.
 	ReleaseCommit ReleaseCommit
 	ShippedAs     string
+	// ConfidentialHits are the resolutions of the confidential-term hits
+	// the release published.
+	ConfidentialHits []confidential.Resolution
 	// Header replaces the comment block at the top of the file, one line per
 	// element, for a writer other than the release flow (the backfill says
 	// the archive was written after the fact).
@@ -128,6 +132,7 @@ func WriteArchive(e *strictcli.Effects, root, dir string, v semver.Version, spec
 		fmt.Fprintf(&b, "release_commit = %s\n", quote(spec.ReleaseCommit.Commit))
 		b.WriteString(renderTrees(spec.ReleaseCommit.Trees))
 	}
+	b.WriteString(renderConfidentialHits(spec.ConfidentialHits))
 	data := []byte(b.String())
 	if _, err := parseArchive(rel, v, data); err != nil {
 		return "", err
@@ -203,7 +208,7 @@ func setReleaseCommit(d *tomledit.Document, c ReleaseCommit) error {
 // and the release file gone, and does nothing. An archive of v recording
 // anything else is refused and left as it is: a never-released archive above
 // all, since rlsbl never releases under a number recorded never released.
-func ArchiveReleaseFile(e *strictcli.Effects, root, releasable string, v semver.Version, c ReleaseCommit) error {
+func ArchiveReleaseFile(e *strictcli.Effects, root, releasable string, v semver.Version, c ReleaseCommit, hits []confidential.Resolution) error {
 	if err := c.check(); err != nil {
 		return err
 	}
@@ -244,6 +249,12 @@ func ArchiveReleaseFile(e *strictcli.Effects, root, releasable string, v semver.
 	if err != nil {
 		return err
 	}
+	if len(hits) > 0 {
+		out = append(out, renderConfidentialHits(hits)...)
+		if _, err := parseArchive(archive, v, out); err != nil {
+			return err
+		}
+	}
 	if err := writeFile(e, root, archive, out, archiveMode); err != nil {
 		return err
 	}
@@ -251,6 +262,16 @@ func ArchiveReleaseFile(e *strictcli.Effects, root, releasable string, v semver.
 		return fmt.Errorf("removing %s: %w", release, err)
 	}
 	return nil
+}
+
+// renderConfidentialHits writes each resolution as a [[confidential_hits]]
+// table, which goes after every other field of an archive.
+func renderConfidentialHits(hits []confidential.Resolution) string {
+	var b strings.Builder
+	for _, h := range hits {
+		b.WriteString(confidential.RenderResolution(fieldConfidentialHits, h))
+	}
+	return b.String()
 }
 
 func describeArchiveFate(a Archive) string {

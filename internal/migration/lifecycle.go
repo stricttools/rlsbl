@@ -11,7 +11,6 @@ import (
 
 	tomledit "github.com/stricttools/go-toml-edit"
 	"github.com/stricttools/strictspec/go/lifecycle"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/github"
@@ -142,33 +141,31 @@ func releasableNames(d *declarations.Releasables) []string {
 	return out
 }
 
-// githubRepository is the repository GitHub knows this one as, and its
-// origin remote's URL, whose last path segment is one of the repository's
-// names; the URL is empty when the repository has no origin remote.
-func (b *builder) githubRepository(d *declarations.Releasables) (github.Repository, string, error) {
+// githubRepository is the repository GitHub knows this one as, named by
+// the declarations or the origin remote.
+func (b *builder) githubRepository(d *declarations.Releasables) (github.Repository, error) {
 	origin := ""
 	configured, err := b.repo.RemoteConfigured("origin")
 	if err != nil {
-		return github.Repository{}, "", err
+		return github.Repository{}, err
 	}
 	if configured {
 		if origin, err = b.repo.RemoteURL("origin"); err != nil {
-			return github.Repository{}, "", err
+			return github.Repository{}, err
 		}
 	}
 	repo, err := github.ResolveRepository(d.GitHubRepository, origin)
 	if err != nil {
-		return github.Repository{}, "", fmt.Errorf("the migration reads GitHub's visibility of the repository, and cannot name it: %w. Add the origin remote, then migrate", err)
+		return github.Repository{}, fmt.Errorf("the migration reads GitHub's visibility of the repository, and cannot name it: %w. Add the origin remote, then migrate", err)
 	}
-	return repo, origin, nil
+	return repo, nil
 }
 
 // convertLifecycle composes the lifecycle-and-license record: one active
 // lifecycle period and one license period per releasable from the migration
 // date, a retired period per closed release history, the releasable-name
 // identities with their renames, the identity transitions, the registry
-// names, and the unversioned tags. It also decides the confidential-name
-// index entry.
+// names, and the unversioned tags.
 func (b *builder) convertLifecycle(d *declarations.Releasables) {
 	if ok, err := exists(b.root, lifecycle.RecordFile); err != nil {
 		b.p.add("%v", err)
@@ -178,7 +175,7 @@ func (b *builder) convertLifecycle(d *declarations.Releasables) {
 		return
 	}
 	licenses := b.licenseOf(d)
-	repo, origin, err := b.githubRepository(d)
+	repo, err := b.githubRepository(d)
 	if err != nil {
 		b.p.add("%v", err)
 		return
@@ -270,17 +267,6 @@ func (b *builder) convertLifecycle(d *declarations.Releasables) {
 		}
 		b.addWrite(write{path: rel, sources: b.history.sources, change: change, data: w.writes[rel]})
 	}
-	names, err := index.RepositoryNames(b.root, origin)
-	if err != nil {
-		b.p.add("%v", err)
-		return
-	}
-	update, err := index.Plan(rec, now, append(names, repo.Name)...)
-	if err != nil {
-		b.p.add("%v", err)
-		return
-	}
-	b.plan.index = &update
 }
 
 // firstCommitDate is the earliest committer date of the commits HEAD

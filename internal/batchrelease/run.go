@@ -58,8 +58,8 @@ func Run(e *strictcli.Effects, req release.RunRequest) (err error) {
 	if req.Releasable != "" {
 		return errors.New("a batch release takes no --releasable: the batch release file names the releasables it releases")
 	}
-	if req.Checks == nil || req.Now == nil || req.Sleep == nil || req.Log == nil || req.Warn == nil || req.IndexPath == "" {
-		return errors.New("a batch release needs the check runner, a clock, a sleep, a log, a warning stream, and the path of the confidential-name index")
+	if req.Checks == nil || req.Now == nil || req.Sleep == nil || req.Log == nil || req.Warn == nil || req.TermList.List == "" || req.TermList.Identity == "" {
+		return errors.New("a batch release needs the check runner, a clock, a sleep, a log, a warning stream, and the location of the confidential-term list")
 	}
 	live, err := git.Open(e, req.LiveRoot)
 	if err != nil {

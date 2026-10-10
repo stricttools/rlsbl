@@ -28,6 +28,7 @@ Install rlsbl with `go install github.com/stricttools/rlsbl/cmd/rlsbl@latest`, `
 - [Declarations](declarations.md): `releasables.toml` and `test-runner.toml`, key by key
 - [On-disk layout](on-disk-layout.md): every `.strictmetadata/` directory rlsbl owns, residue of the old layout, and the record migration
 - [Lifecycle and license](lifecycle-and-license.md): the record of each releasable's lifecycle, license, and identities, confidential repositories, and the `transition` commands
+- [Confidential terms](confidential-terms.md): the confidential-term list a release scans against, hit ids, false-positive judgments and owner approvals, and the release record
 - [Release targets](targets.md): go, npm, and pypi, version files, companion tags, and the support matrix
 - [Pipelines](pipelines.md): publishing from CI or locally, Go binaries on npm and PyPI, and private-repository rules
 - [Workspaces](monorepo.md): members, releasables, the dependency graph, the CI router, and batch releases

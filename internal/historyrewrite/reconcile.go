@@ -12,6 +12,7 @@ import (
 
 	tomledit "github.com/stricttools/go-toml-edit"
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/confidential"
 	"github.com/stricttools/strictspec/go/lifecycle"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
@@ -71,9 +72,9 @@ type ReconcileRequest struct {
 	PushTimeout time.Duration
 	// Version is the running rlsbl's version, recorded in the plan.
 	Version string
-	// IndexPath is the machine-local confidential-name index every Release
-	// body the apply writes is scanned against.
-	IndexPath string
+	// TermList is where the confidential-term list every Release body the
+	// apply writes is scanned against is.
+	TermList confidential.Location
 }
 
 // SelectReleasable is the releasable the working directory dir selects, or
@@ -315,7 +316,7 @@ func Reconcile(ctx *strictcli.Context, root string, req ReconcileRequest, now fu
 	if err != nil {
 		return err
 	}
-	scanner, err := publishrules.LoadScanner(root, req.IndexPath, now())
+	scanner, err := publishrules.LoadScanner(repo, req.TermList, now())
 	if err != nil {
 		return err
 	}

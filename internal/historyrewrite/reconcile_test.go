@@ -54,7 +54,7 @@ func reconcile(t *testing.T, dir, named string, mode historyrewrite.ReconcileMod
 		if err != nil {
 			return err
 		}
-		return historyrewrite.Reconcile(ctx, ws.Root, historyrewrite.ReconcileRequest{Mode: mode, Releasable: rel, PushTimeout: time.Minute, Version: "0.0.0-test", IndexPath: filepath.Join(t.TempDir(), "confidential-names.toml")}, scrubNow)
+		return historyrewrite.Reconcile(ctx, ws.Root, historyrewrite.ReconcileRequest{Mode: mode, Releasable: rel, PushTimeout: time.Minute, Version: "0.0.0-test", TermList: testsupport.TermList(t)}, scrubNow)
 	})
 }
 

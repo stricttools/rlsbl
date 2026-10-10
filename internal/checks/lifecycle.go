@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/confidential"
 	"github.com/stricttools/strictspec/go/lifecycle"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
 
 	"github.com/stricttools/rlsbl/internal/publishrules"
 	"github.com/stricttools/rlsbl/internal/releaserecord"
@@ -18,13 +19,13 @@ import (
 )
 
 // The lifecycle family: the lifecycle-and-license record itself, the
-// confidential names a public repository must not carry, and GitHub's
+// confidential terms a public repository must not publish unresolved, and GitHub's
 // visibility against what the record makes the repository. Each answers
 // for the whole repository.
 func lifecycleChecks() []check {
 	return []check{
 		repositoryWide(errorCheck("lifecycle-record-valid", checkLifecycleRecordValid)),
-		repositoryWide(errorCheck("confidential-names", checkConfidentialNames)),
+		repositoryWide(errorCheck("confidential-terms", checkConfidentialTerms)),
 		repositoryWide(errorCheck("repository-visibility", checkRepositoryVisibility)),
 	}
 }
@@ -119,21 +120,78 @@ func appendOnlyProblems(c *Context, record *lifecycle.Record) (compared int, pro
 	return compared, problems
 }
 
-func checkConfidentialNames(c *Context, r *strictcli.ErrorReporter) strictcli.CheckOutcome {
-	idx, err := index.Load(c.IndexPath())
-	if err != nil {
-		panic(unanswered(fmt.Sprintf("the confidential-name index cannot be read: %v", err)))
-	}
-	scanner, err := publishrules.NewScanner(c.Record(), c.Now(), idx)
+func checkConfidentialTerms(c *Context, r *strictcli.ErrorReporter) strictcli.CheckOutcome {
+	scanner, hits, what, err := ConfidentialHits(c)
 	if err != nil {
 		panic(unanswered(err.Error()))
 	}
 	if !scanner.Active() {
-		return r.Skipped("the repository is confidential, and its names are its own to carry")
+		return r.Skipped("the repository is confidential, and its text is its own to carry")
+	}
+	o := scanner.Resolve(hits)
+	if resolved := o.ReportResolved(); resolved != "" {
+		r.Note("hits the repository's resolutions resolve:\n" + strings.TrimRight(resolved, "\n"))
+	}
+	if o.Clear() {
+		return r.Passed(fmt.Sprintf("%s carries no unresolved confidential-term hit (%d resolved); %s", what, len(o.Resolved), scanner.Status()))
+	}
+	r.Note(publishrules.ResolveFix)
+	return reportErrors(r, o.UnresolvedReports(), fmt.Sprintf("%s carries %d unresolved confidential-term hit(s)", what, len(o.Unresolved)), "")
+}
+
+// ConfidentialHits are the confidential-term hits of the next push of the
+// run's branch (see pushRange and publishrules.Scanner.HitsInRange), with the
+// scanner that found them and the range's name: what a release would push
+// before its own commits, and what the confidential commands resolve hits
+// of.
+func ConfidentialHits(c *Context) (*publishrules.Scanner, []confidential.Hit, string, error) {
+	names, err := publishrules.RepositoryNames(c.Repo())
+	if err != nil {
+		return nil, nil, "", err
+	}
+	list, err := confidential.Load(c.TermList())
+	if err != nil {
+		return nil, nil, "", err
+	}
+	resolutions, err := confidential.LoadResolutions(c.Root())
+	if err != nil {
+		return nil, nil, "", err
+	}
+	scanner, err := publishrules.NewScanner(c.Record(), c.Now(), list, names, resolutions)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	include, exclude, what := pushRange(c)
+	hits, err := scanner.HitsInRange(c.Repo(), include, exclude)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	return scanner, hits, what, nil
+}
+
+// ResolvableHits are the hits a resolution may name: those of the next push
+// of the run's branch (ConfidentialHits), and those in the text of every
+// file the repository tracks, which what a release packs and the
+// documentation tool builds is made from. A file that is not UTF-8 text, or
+// holds a NUL byte, is binary and not scanned. A question the scan cannot
+// answer is an error.
+func ResolvableHits(c *Context) (scanner *publishrules.Scanner, hits []confidential.Hit, err error) {
+	defer func() {
+		if p := recover(); p != nil {
+			u, ok := p.(Unanswered)
+			if !ok {
+				panic(p)
+			}
+			scanner, hits, err = nil, nil, errors.New(u.Reason)
+		}
+	}()
+	scanner, hits, _, err = ConfidentialHits(c)
+	if err != nil || !scanner.Active() || scanner.Matcher().Len() == 0 {
+		return scanner, hits, err
 	}
 	files, err := c.Repo().TrackedFiles()
 	if err != nil {
-		panic(unanswered(err.Error()))
+		return nil, nil, err
 	}
 	var texts []publishrules.Text
 	for _, rel := range files {
@@ -142,23 +200,14 @@ func checkConfidentialNames(c *Context, r *strictcli.ErrorReporter) strictcli.Ch
 			continue
 		}
 		if err != nil {
-			panic(unanswered(err.Error()))
+			return nil, nil, err
 		}
 		if bytes.IndexByte(data, 0) >= 0 || !utf8.Valid(data) {
 			continue
 		}
 		texts = append(texts, publishrules.Text{Name: rel, Content: string(data)})
 	}
-	var problems []string
-	if err := scanner.ScanTexts(texts); err != nil {
-		problems = append(problems, err.Error())
-	}
-	include, exclude, what := pushRange(c)
-	if err := scanner.ScanRange(c.Repo(), include, exclude, what); err != nil {
-		problems = append(problems, err.Error())
-	}
-	return reportErrors(r, problems, "tracked files or unpushed commits carry confidential names",
-		fmt.Sprintf("no tracked text file (%d scanned) and no commit of %s carries a confidential name", len(texts), what))
+	return scanner, append(hits, scanner.HitsInTexts(texts)...), nil
 }
 
 // pushRange is the commits the next push of the run's branch carries: those

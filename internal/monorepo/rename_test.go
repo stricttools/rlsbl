@@ -2,14 +2,12 @@ package monorepo
 
 import (
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/stricttools/strictcli/go/strictcli"
 	"github.com/stricttools/strictspec/go/lifecycle"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
 	"github.com/stricttools/testisolation/go/hygiene"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
@@ -105,12 +103,8 @@ func renaming(repo *testsupport.Repo, old, new string, dryRun bool, out *Renamed
 		if err != nil {
 			return err
 		}
-		indexPath, err := index.DefaultPath()
-		if err != nil {
-			return err
-		}
 		got, err := RenameReleasable(e, r, ws, RenameRequest{
-			Old: old, New: new, DryRun: dryRun, Now: today, Say: say, IndexPath: indexPath,
+			Old: old, New: new, DryRun: dryRun, Now: today, Say: say,
 			Sync: func(renamed *workspace.Workspace) (workflows.SyncResult, error) {
 				if synced != nil {
 					for _, rel := range renamed.Releasables() {
@@ -140,28 +134,9 @@ func TestRenameMovesTheStateAndTheSubjectsAndAliasesTheCurrentVersion(t *testing
 	hygiene.Isolate(t)
 	testsupport.FakeSafegit(t)
 	repo, released := renameFixture(t, renameDecls, widgetRecord)
-	indexPath, err := index.DefaultPath()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(filepath.Dir(indexPath), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(indexPath, []byte("format_version = 1\n\n[[repositories]]\nsubjects = [\"widget\"]\nnames = [\"widget\"]\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
 	var out Renamed
 	var synced []string
 	mustRun(t, strictcli.EffectMutating, false, renaming(repo, "widget", "portal", false, &out, &synced))
-
-	// The index entry the old name keyed is keyed by the new one.
-	idx, err := index.Load(indexPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if entries := idx.Entries(); len(entries) != 1 || !slices.Equal(entries[0].Subjects, []string{"portal"}) || !slices.Equal(entries[0].Names, []string{"widget"}) {
-		t.Fatalf("index entries %+v", entries)
-	}
 
 	ws := load(t, repo)
 	if _, ok := ws.Declarations.Releasable("portal"); !ok || ws.Declarations.Members[1].Releasable != "portal" {

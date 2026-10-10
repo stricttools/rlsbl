@@ -123,7 +123,6 @@ func TestLicenseRefusesProprietaryUntilClassifyMakesIt(t *testing.T) {
 	if l, ok := rec.LicenseOn("portal", today); !ok || !l.Proprietary() {
 		t.Fatalf("portal's license is %+v", l)
 	}
-	requireContains(t, f.indexText(t), `subjects = ["portal"]`, `"portal"`)
 	f.clean(t)
 }
 
@@ -178,37 +177,24 @@ func TestClassifyRefusesAPublicRepositoryUntilTheOwnerMakesItPrivate(t *testing.
 	}
 }
 
-// A confidential repository without an origin remote is classified: the
-// index keys its names by its record's releasable-name identities.
-func TestAConfidentialRepositoryWithoutAnOriginIsKeyedByItsReleasableNames(t *testing.T) {
+// A repository without an origin remote is classified.
+func TestARepositoryWithoutAnOriginIsClassified(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newFixture(t, mitSince)
 	testsupport.FakeSafegit(t)
 	testsupport.FakeGH(t, ghVisibility("private"))
 	r := f.run(t, false, func(inv lifecycleops.Invocation, dir string) error { return inv.Classify(dir, "portal", "server") })
 	requireExit(t, r, 0)
-	requireContains(t, f.indexText(t), `subjects = ["portal"]`, `"portal"`)
 }
 
-// A confidential record without a releasable-name identity has nothing to
-// key its names by, and is refused until the identity the refusal names is
-// recorded.
-func TestAConfidentialRecordNeedsAReleasableNameUntilOneIsRecorded(t *testing.T) {
+// Classifying needs no releasable-name identity: the record holds license
+// and lifecycle facts only, and no name is keyed by an identity.
+func TestClassifyNeedsNoReleasableNameIdentity(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newFixture(t, strings.TrimSuffix(mitSince, portalName))
 	testsupport.FakeSafegit(t)
 	testsupport.FakeGH(t, ghVisibility("private"))
 	r := f.run(t, false, func(inv lifecycleops.Invocation, dir string) error { return inv.Classify(dir, "portal", "server") })
-	requireExit(t, r, 1)
-	requireContains(t, r.Stderr, "rlsbl transition identity --facet releasable-name")
-	if strings.Contains(f.record(t), "proprietary") {
-		t.Fatal("a refused classify wrote the record")
-	}
-	r = f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
-		return inv.Identity(lifecycleops.IdentityRequest{Dir: dir, Subject: "portal", Facet: lifecycle.FacetReleasableName, Value: "portal", TagPatterns: []string{"v*"}, Reason: "its name"})
-	})
-	requireExit(t, r, 0)
-	r = f.run(t, false, func(inv lifecycleops.Invocation, dir string) error { return inv.Classify(dir, "portal", "server") })
 	requireExit(t, r, 0)
 }
 
@@ -276,7 +262,7 @@ func TestInitMinimalRecordWritesTheRecordAndRefusesManagedRepositories(t *testin
 	testsupport.FakeSafegit(t)
 	repo := testsupport.NewRepo(t)
 	repo.CommitFile("README.md", "readme\n", "start")
-	f := &fixture{repo: repo, index: t.TempDir() + "/index.toml"}
+	f := &fixture{repo: repo, termList: testsupport.TermList(t)}
 	initRecord := func() (int, string) {
 		r := f.run(t, false, func(inv lifecycleops.Invocation, dir string) error { return inv.InitMinimalRecord(dir) })
 		return r.ExitCode, r.Stderr
@@ -303,7 +289,7 @@ func TestInitMinimalRecordWritesTheRecordAndRefusesManagedRepositories(t *testin
 	}
 	old := testsupport.NewRepo(t)
 	old.CommitFile(".rlsbl/config.json", "{}\n", "old layout")
-	g := &fixture{repo: old, index: t.TempDir() + "/index.toml"}
+	g := &fixture{repo: old, termList: testsupport.TermList(t)}
 	if r := g.run(t, false, func(inv lifecycleops.Invocation, dir string) error { return inv.InitMinimalRecord(dir) }); r.ExitCode != 1 || !strings.Contains(r.Stderr, ".rlsbl/ of the old layout") {
 		t.Fatalf("an old layout: exit %d: %s", r.ExitCode, r.Stderr)
 	}
@@ -314,11 +300,10 @@ func TestInitMinimalRecordWritesTheRecordAndRefusesManagedRepositories(t *testin
 
 func TestShowJudgesEveryRule(t *testing.T) {
 	hygiene.Isolate(t)
-	record := "format_version = 1\ncodenames = [\"moonbeam\"]\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-01-01\nreason = \"server\"\n\n[[lifecycle]]\nsubject = \"portal\"\nstatus = \"on-hold\"\nfrom = 2026-01-01\nreason = \"paused\"\n" + portalName
+	record := "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-01-01\nreason = \"server\"\n\n[[lifecycle]]\nsubject = \"portal\"\nstatus = \"on-hold\"\nfrom = 2026-01-01\nreason = \"paused\"\n" + portalName
 	f := newFixture(t, record)
 	f.repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
 	testsupport.FakeGH(t, ghVisibility("public"))
-	f.refreshIndex(t)
 	var report lifecycleops.Report
 	r := f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
 		var err error
@@ -326,7 +311,7 @@ func TestShowJudgesEveryRule(t *testing.T) {
 		return err
 	})
 	requireExit(t, r, 0)
-	if !report.Present || !report.Confidential || len(report.Codenames) != 1 || len(report.Problems) != 0 {
+	if !report.Present || !report.Confidential || len(report.Problems) != 0 {
 		t.Fatalf("report %+v", report)
 	}
 	verdicts := map[string]string{}
@@ -338,7 +323,6 @@ func TestShowJudgesEveryRule(t *testing.T) {
 		"proprietary-refuses-public-output/portal": lifecycleops.VerdictRefuses,
 		"private-repository-publishing/":           lifecycleops.VerdictRefuses,
 		"lifecycle-allows-release/portal":          lifecycleops.VerdictRefuses,
-		"confidential-names/":                      lifecycleops.VerdictHolds,
 		"proprietary-history-is-squashed/":         lifecycleops.VerdictHolds,
 		"identity-owns-its-tags/":                  lifecycleops.VerdictNotApplicable,
 		"registry-names-are-held/":                 lifecycleops.VerdictHolds,
@@ -350,79 +334,11 @@ func TestShowJudgesEveryRule(t *testing.T) {
 	}
 }
 
-// refreshIndex runs what every mutating command runs after it: the index
-// entry brought in step with the record.
-func (f *fixture) refreshIndex(t *testing.T) {
-	t.Helper()
-	requireExit(t, f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
-		return lifecycleops.RefreshIndex(inv.E, dir, f.index, today)
-	}), 0)
-}
-
-// confidentialNamesVerdict is show's confidential-names verdict.
-func (f *fixture) confidentialNamesVerdict(t *testing.T) lifecycleops.Verdict {
-	t.Helper()
-	var report lifecycleops.Report
-	requireExit(t, f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
-		var err error
-		report, err = inv.Show(dir)
-		return err
-	}), 0)
-	for _, v := range report.Verdicts {
-		if v.Rule == string(lifecycle.RuleConfidentialNames) {
-			return v
-		}
-	}
-	t.Fatalf("no confidential-names verdict in %+v", report.Verdicts)
-	return lifecycleops.Verdict{}
-}
-
-func TestShowReadsTheConfidentialNameIndexAndTheRefreshClearsAStaleEntry(t *testing.T) {
-	hygiene.Isolate(t)
-	confidential := "format_version = 1\ncodenames = [\"moonbeam\"]\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-01-01\nreason = \"server\"\n" + portalName
-	f := newFixture(t, confidential)
-	f.repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
-	testsupport.FakeGH(t, ghVisibility("private"))
-	v := f.confidentialNamesVerdict(t)
-	if v.Verdict != lifecycleops.VerdictRefuses || !strings.Contains(v.Detail, "moonbeam") || !strings.Contains(v.Detail, "mutating rlsbl command") {
-		t.Fatalf("a confidential repository missing from the index: %+v", v)
-	}
-	f.refreshIndex(t)
-	if v := f.confidentialNamesVerdict(t); v.Verdict != lifecycleops.VerdictHolds {
-		t.Fatalf("after the refresh: %+v", v)
-	}
-
-	// The repository goes public while the index keeps its entry.
-	public := "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"MIT\"\nfrom = 2026-01-01\nreason = \"open\"\n" + portalName
-	f.repo.Write(lifecycle.RecordFile, public)
-	v = f.confidentialNamesVerdict(t)
-	if v.Verdict != lifecycleops.VerdictRefuses || !strings.Contains(v.Detail, "public") || !strings.Contains(v.Detail, "mutating rlsbl command") {
-		t.Fatalf("a public repository the index still holds: %+v", v)
-	}
-	f.refreshIndex(t)
-	if v := f.confidentialNamesVerdict(t); v.Verdict != lifecycleops.VerdictNotApplicable {
-		t.Fatalf("after the refresh: %+v", v)
-	}
-}
-
-func TestShowHoldsForAConfidentialRepositoryWithoutAnOrigin(t *testing.T) {
-	hygiene.Isolate(t)
-	f := newFixture(t, "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"proprietary\"\nfrom = 2026-01-01\nreason = \"server\"\n"+portalName)
-	testsupport.FakeGH(t, ghVisibility("private"))
-	if v := f.confidentialNamesVerdict(t); v.Verdict != lifecycleops.VerdictRefuses || !strings.Contains(v.Detail, "mutating rlsbl command") {
-		t.Fatalf("a confidential repository missing from the index: %+v", v)
-	}
-	f.refreshIndex(t)
-	if v := f.confidentialNamesVerdict(t); v.Verdict != lifecycleops.VerdictHolds {
-		t.Fatalf("after the refresh: %+v", v)
-	}
-}
-
 func TestARecordValidationRefusesBeforeAnySuccessLineIsPrinted(t *testing.T) {
 	hygiene.Isolate(t)
-	// The record holds codenames while the repository is public, so every
-	// change to it is refused by the validation.
-	f := newFixture(t, "format_version = 1\ncodenames = [\"moonbeam\"]\n")
+	// The record holds an open period of a subject the declarations do not
+	// declare, so every change to it is refused by the validation.
+	f := newFixture(t, "format_version = 1\n\n[[lifecycle]]\nsubject = \"ghost\"\nstatus = \"active\"\nfrom = 2026-01-01\nreason = \"gone\"\n")
 	f.repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
 	for name, fn := range map[string]func(inv lifecycleops.Invocation, dir string) error{
 		"lifecycle": func(inv lifecycleops.Invocation, dir string) error {

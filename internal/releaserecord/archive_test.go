@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/confidential"
 	"github.com/stricttools/testisolation/go/hygiene"
 
 	"github.com/stricttools/rlsbl/internal/git"
@@ -130,7 +131,7 @@ func TestArchivingTheReleaseFileKeepsItAndAddsTheReleaseCommit(t *testing.T) {
 	v := version(t, "0.4.0")
 	archive := func() error {
 		_, err := writing(t, root, false, func(e *strictcli.Effects, _ git.Repo) error {
-			return releaserecord.ArchiveReleaseFile(e, root, releasable, v, recorded(commitA))
+			return releaserecord.ArchiveReleaseFile(e, root, releasable, v, recorded(commitA), nil)
 		})
 		return err
 	}
@@ -163,7 +164,7 @@ func TestArchivingRefusesANeverReleasedArchive(t *testing.T) {
 	rel := writeArchive(t, root, "0.4.0", "never-released", "")
 	before := readText(t, filepath.Join(root, rel))
 	_, err := writing(t, root, false, func(e *strictcli.Effects, _ git.Repo) error {
-		return releaserecord.ArchiveReleaseFile(e, root, releasable, version(t, "0.4.0"), recorded(commitA))
+		return releaserecord.ArchiveReleaseFile(e, root, releasable, version(t, "0.4.0"), recorded(commitA), nil)
 	})
 	if err == nil {
 		t.Fatal("archived over a never-released archive")
@@ -182,7 +183,7 @@ func TestADryRunArchiveWritesNothing(t *testing.T) {
 	root := t.TempDir()
 	testsupport.WriteFile(t, filepath.Join(root, fileName), releaseFile)
 	res, err := writing(t, root, true, func(e *strictcli.Effects, _ git.Repo) error {
-		return releaserecord.ArchiveReleaseFile(e, root, releasable, version(t, "0.4.0"), recorded(commitA))
+		return releaserecord.ArchiveReleaseFile(e, root, releasable, version(t, "0.4.0"), recorded(commitA), nil)
 	})
 	mustNotFail(t, err)
 	if _, err := os.Stat(filepath.Join(root, ".strictmetadata/releases/gadget/v0.4.0.toml")); !os.IsNotExist(err) {
@@ -363,4 +364,31 @@ func TestAReleaseFileWriterRefusesWhatItsReaderRefuses(t *testing.T) {
 	if f.Bump != semver.Patch || f.Include[0] != "go" {
 		t.Fatalf("read back %+v", f)
 	}
+}
+
+// The resolutions of the confidential-term hits a release published are
+// recorded in its archive, and the editable release file may not carry
+// them: only the release writes them.
+func TestArchivingRecordsTheConfidentialHitResolutions(t *testing.T) {
+	hygiene.Isolate(t)
+	root := t.TempDir()
+	testsupport.WriteFile(t, filepath.Join(root, fileName), releaseFile)
+	hits := []confidential.Resolution{
+		{Hit: "0123456789abcdef", Location: "README.md in commit abc, line 1, column 5", Decision: confidential.FalsePositive, Certainty: 80, Reason: "a word", Recorded: "2026-10-01"},
+		{Hit: "fedcba9876543210", Location: "notes.md in commit abc, line 2, column 1", Decision: confidential.Approved, Reason: "the owner publishes it", Recorded: "2026-10-02"},
+	}
+	_, err := writing(t, root, false, func(e *strictcli.Effects, _ git.Repo) error {
+		return releaserecord.ArchiveReleaseFile(e, root, releasable, version(t, "0.4.0"), recorded(commitA), hits)
+	})
+	mustNotFail(t, err)
+	a, err := releaserecord.ReadArchive(root, releaserecord.ArchiveDir(releasable), version(t, "0.4.0"))
+	mustNotFail(t, err)
+	if len(a.ConfidentialHits) != 2 || a.ConfidentialHits[0] != hits[0] || a.ConfidentialHits[1] != hits[1] {
+		t.Fatalf("the archive records %+v, want %+v", a.ConfidentialHits, hits)
+	}
+	_, err = releaserecord.ParseReleaseFile(fileName, []byte(releaseFile+confidential.RenderResolution("confidential_hits", hits[0])))
+	if err == nil {
+		t.Fatal("an editable release file carrying confidential_hits was accepted")
+	}
+	requireContains(t, err.Error(), "confidential_hits")
 }

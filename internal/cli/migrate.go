@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
 
 	"github.com/stricttools/rlsbl/internal/migration"
 )
@@ -29,8 +28,7 @@ const migrateRecordsHelp = "Convert the rlsbl records of the repository holding 
 	"period per closed release history (whose release state moves to .strictmetadata/retired-release-histories/), the " +
 	"releasable-name identities with their renames, the identity transitions (pending until their version is released), the " +
 	"registry names of every releasable and retired subject that published from CI (a retired subject's read at its release " +
-	"commits), and the unversioned tags; and it records the " +
-	"repository's confidential names in the machine-local index. A license comes from the package manifests or from --licenses, " +
+	"commits), and the unversioned tags. A license comes from the package manifests or from --licenses, " +
 	"never from a LICENSE file. GitHub's visibility of the repository is read with gh. Every refusal is reported before anything " +
 	"is written, each naming its fix: a value the new layout has no place for, a target other than go, npm, and pypi, a retired " +
 	"key, a missing license, a private repository with no releasable declared proprietary, configs disagreeing on a " +
@@ -65,11 +63,7 @@ func runMigrateRecords(ctx *strictcli.Context, kw map[string]any, version string
 	if err != nil {
 		return err
 	}
-	indexPath, err := index.DefaultPath()
-	if err != nil {
-		return err
-	}
-	req := migration.Request{Root: root, Now: time.Now(), RlsblVersion: version, IndexPath: indexPath}
+	req := migration.Request{Root: root, Now: time.Now(), RlsblVersion: version}
 	if file, ok := strictcli.GetOpt[string](kw, "licenses"); ok {
 		if !filepath.IsAbs(file) {
 			file = filepath.Join(dir, file)

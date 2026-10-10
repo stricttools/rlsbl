@@ -4,7 +4,7 @@
 // and private-repository-publishing rules, which the lifecycle library
 // decides), the deploy command's license precondition, the publish workflow
 // features scaffold may render, the packed-artifact contents check, and the
-// scan of published text for confidential names.
+// scan of published text for confidential terms.
 //
 // The rules themselves live in the lifecycle library; this package supplies
 // what the library needs from rlsbl's world (GitHub's answer, the

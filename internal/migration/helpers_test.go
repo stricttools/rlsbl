@@ -52,7 +52,6 @@ type fixture struct {
 	repo      *testsupport.Repo
 	name      string
 	licenses  map[string]string
-	indexPath string
 	safermDir string
 }
 
@@ -73,7 +72,7 @@ func newFixture(t *testing.T, name, visibility string) *fixture {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	return &fixture{t: t, repo: repo, name: name, indexPath: filepath.Join(t.TempDir(), "confidential-names.toml"), safermDir: dir}
+	return &fixture{t: t, repo: repo, name: name, safermDir: dir}
 }
 
 func (f *fixture) write(rel, content string) {
@@ -123,7 +122,7 @@ func (f *fixture) commit(message string) string {
 }
 
 func (f *fixture) request() Request {
-	return Request{Root: f.repo.Dir, Licenses: f.licenses, LicensesFile: "licenses.toml", Now: testNow, RlsblVersion: "0.132.0", IndexPath: f.indexPath}
+	return Request{Root: f.repo.Dir, Licenses: f.licenses, LicensesFile: "licenses.toml", Now: testNow, RlsblVersion: "0.132.0"}
 }
 
 func commandOptions(dryRun bool) testsupport.CommandOptions {

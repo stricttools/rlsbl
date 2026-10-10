@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -149,10 +148,10 @@ func portalRepo(t *testing.T, mode string, files map[string]string) *testsupport
 func inputs(t *testing.T, dir string) Inputs {
 	t.Helper()
 	return Inputs{
-		Dir:       dir,
-		Now:       today,
-		Home:      t.TempDir(),
-		IndexPath: filepath.Join(t.TempDir(), "confidential-names.toml"),
+		Dir:      dir,
+		Now:      today,
+		Home:     t.TempDir(),
+		TermList: testsupport.TermList(t),
 	}
 }
 

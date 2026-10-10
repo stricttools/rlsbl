@@ -830,14 +830,9 @@ func (dep *departure) observeDestination() error {
 		}
 	}
 	on := dep.req.Now
-	destRecord, err := lifecycle.Parse(renderRecord(moved, nil, nil, unversioned))
+	destRecord, err := lifecycle.Parse(renderRecord(moved, unversioned))
 	if err != nil {
 		return fmt.Errorf("the new repository's lifecycle-and-license record would be refused: %w", err)
-	}
-	if destRecord.Confidential(on) && (len(rec.Codenames()) > 0 || len(rec.DistinctiveTerms()) > 0) {
-		if destRecord, err = lifecycle.Parse(renderRecord(moved, rec.Codenames(), rec.DistinctiveTerms(), unversioned)); err != nil {
-			return fmt.Errorf("the new repository's lifecycle-and-license record would be refused: %w", err)
-		}
 	}
 	reason := fmt.Sprintf("extracted from %s with `rlsbl monorepo extract %s`", dep.ws.Root, rel.Name)
 	if err := moveTagNamespace(destRecord, rel.Name, dep.ownScheme.ListGlob(), dep.destScheme.ListGlob(), on, reason); err != nil {

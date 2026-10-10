@@ -10,8 +10,8 @@ import (
 	"github.com/stricttools/rlsbl/internal/publishrules"
 )
 
-// Check refuses a document whose Release body carries a confidential name
-// in a public repository (the scanner decides). Every writer of a Release
+// Check refuses a document whose Release body carries an unresolved
+// confidential-term hit in a public repository (the scanner decides). Every writer of a Release
 // body below runs it on the body it writes before writing; a command that
 // writes elsewhere first (an archive notice) runs it before that, too. A
 // missing scanner is an error, so no body is ever written unscanned.
@@ -25,7 +25,7 @@ func Check(scanner *publishrules.Scanner, doc Document) error {
 
 func checkBody(scanner *publishrules.Scanner, tag, body string) error {
 	if scanner == nil {
-		return fmt.Errorf("the GitHub Release body of %s is written only after the confidential-name scan, and no scanner was given", tag)
+		return fmt.Errorf("the GitHub Release body of %s is written only after the confidential-term scan, and no scanner was given", tag)
 	}
 	return scanner.ScanTexts([]publishrules.Text{{Name: "the GitHub Release body of " + tag, Content: body}})
 }

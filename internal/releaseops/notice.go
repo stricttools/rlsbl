@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/confidential"
 
 	"github.com/stricttools/rlsbl/internal/github"
 	"github.com/stricttools/rlsbl/internal/publishrules"
@@ -30,9 +31,9 @@ type NoticeRequest struct {
 	Reason string
 	// Use is the version to use instead, and empty when not given.
 	Use string
-	// IndexPath is the machine-local confidential-name index the
-	// rewritten Release body is scanned against.
-	IndexPath string
+	// TermList is where the confidential-term list the rewritten Release
+	// body is scanned against is.
+	TermList confidential.Location
 }
 
 // Notice is the line a deprecate or yank puts on top of a Release body:
@@ -95,7 +96,7 @@ func prepareNotice(ctx *strictcli.Context, s Selection, req NoticeRequest, label
 	if err != nil {
 		return noticeTarget{}, err
 	}
-	scanner, err := publishrules.LoadScanner(s.Root(), req.IndexPath, time.Now())
+	scanner, err := publishrules.LoadScanner(s.Repo, req.TermList, time.Now())
 	if err != nil {
 		return noticeTarget{}, err
 	}

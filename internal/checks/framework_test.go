@@ -22,7 +22,7 @@ var keptChecks = []string{
 	"branch-sync", "changelog-batch-commits", "changelog-batch-entries", "changelog-coverage",
 	"changelog-entry", "changelog-format-version", "changelog-hashes", "changelog-orphans",
 	"changelog-range", "changelog-schema", "changelog-user-facing", "ci-publish-secrets",
-	"confidential-names", "cross-repo-path-sources", "declarations-valid", "dep-floors", "dep-locks",
+	"confidential-terms", "cross-repo-path-sources", "declarations-valid", "dep-floors", "dep-locks",
 	"description-consistency", "dev-only-boundary", "dev-overlay-drift", "dunder-version-missing",
 	"go-companion-tags", "go-deprecation-published", "go-module-identity", "go-module-major-suffix",
 	"go-toolchain-declared", "go-workspace-replace", "go-workspace-require-current", "ldflags-symbol",

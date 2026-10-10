@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
+	"github.com/stricttools/strictspec/go/confidential"
 
 	"github.com/stricttools/rlsbl/internal/checks"
 )
@@ -46,9 +46,11 @@ func checkContext(ctx *strictcli.Context) (strictcli.CheckContext, error) {
 	if home, err := os.UserHomeDir(); err == nil {
 		in.Home = home
 	}
-	if path, err := index.DefaultPath(); err == nil {
-		in.IndexPath = path
+	termList, err := confidential.DefaultLocation()
+	if err != nil {
+		return nil, err
 	}
+	in.TermList = termList
 	if lines, ok := ctx.InfraValue(pushStdinEnv); ok {
 		in.PushLines = strings.Split(lines, "\n")
 	}

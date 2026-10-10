@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
+	"github.com/stricttools/strictspec/go/confidential"
 
 	"github.com/stricttools/rlsbl/internal/historyrewrite"
 	"github.com/stricttools/rlsbl/internal/release"
@@ -139,11 +139,11 @@ func runReleaseScrub(ctx *strictcli.Context, kw map[string]any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	indexPath, err := index.DefaultPath()
+	termList, err := confidential.DefaultLocation()
 	if err != nil {
 		return nil, err
 	}
-	req := historyrewrite.ScrubRequest{Reason: strictcli.Get[string](kw, "reason"), IndexPath: indexPath}
+	req := historyrewrite.ScrubRequest{Reason: strictcli.Get[string](kw, "reason"), TermList: termList}
 	mode := strictcli.GetElected(kw, "mode")
 	switch {
 	case mode.Is(scrubPattern):
@@ -212,7 +212,7 @@ func runReleaseReconcile(ctx *strictcli.Context, kw map[string]any, version stri
 	if strictcli.GetElected(kw, "mode").Is(reconcileApplyChoice) {
 		mode = historyrewrite.ReconcileApply
 	}
-	indexPath, err := index.DefaultPath()
+	termList, err := confidential.DefaultLocation()
 	if err != nil {
 		return err
 	}
@@ -221,7 +221,7 @@ func runReleaseReconcile(ctx *strictcli.Context, kw map[string]any, version stri
 		Releasable:  releasable,
 		PushTimeout: timeout,
 		Version:     version,
-		IndexPath:   indexPath,
+		TermList:    termList,
 	}, time.Now)
 }
 

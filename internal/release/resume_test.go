@@ -228,7 +228,7 @@ func previewResumeIn(t *testing.T, repo *testsupport.Repo) error {
 		say := func(string) {}
 		ferr = release.ResumeIn(e, s, release.RunRequest{
 			Dir: repo.Dir, LiveRoot: repo.Dir, DryRun: true, RlsblVersion: "0.0.0-test",
-			Checks: &passingChecks{}, IndexPath: filepath.Join(t.TempDir(), "confidential-names.toml"),
+			Checks: &passingChecks{}, TermList: testsupport.TermList(t),
 			Now: func() time.Time { return validationDay }, Sleep: func(time.Duration) {}, Log: say, Warn: say,
 		}, "portal")
 		return ferr

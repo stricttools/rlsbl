@@ -1,12 +1,10 @@
 package releaseops_test
 
 import (
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/stricttools/strictcli/go/strictcli"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
 	"github.com/stricttools/testisolation/go/hygiene"
 
 	"github.com/stricttools/rlsbl/internal/releaseops"
@@ -49,7 +47,7 @@ func portalWithTwoReleases(t *testing.T) *project {
 
 func deprecate(t *testing.T, p *project, dryRun bool, req releaseops.NoticeRequest) strictcli.Result {
 	t.Helper()
-	req.Dir, req.IndexPath = p.Dir, p.indexPath
+	req.Dir, req.TermList = p.Dir, p.termList
 	return run(t, nil, dryRun, func(ctx *strictcli.Context) error { return releaseops.Deprecate(ctx, req) })
 }
 
@@ -184,34 +182,22 @@ func TestADryRunDeprecateWritesNothing(t *testing.T) {
 	}
 }
 
-// diskWriter performs the index's writes, for a fixture.
-type diskWriter struct{}
-
-func (diskWriter) WriteFile(path string, data []byte) error { return os.WriteFile(path, data, 0o644) }
-func (diskWriter) MkdirAll(path string) error               { return os.MkdirAll(path, 0o755) }
-
-func TestANoticeNamingAConfidentialNameIsRefusedBeforeAnythingIsWritten(t *testing.T) {
+func TestANoticeNamingAConfidentialTermIsRefusedBeforeAnythingIsWritten(t *testing.T) {
 	hygiene.Isolate(t)
 	p := portalWithTwoReleases(t)
-	idx, err := index.Load(p.indexPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := idx.Upsert(diskWriter{}, []string{"gadget"}, []string{"moonbeam"}); err != nil {
-		t.Fatal(err)
-	}
+	testsupport.WriteTermList(t, p.termList, testsupport.TermListOf("moonbeam"))
 	testsupport.FakeSafegit(t)
 	gh := testsupport.FakeGH(t, authStatus, releaseExists("v0.3.0"), testsupport.GHAnswer{Args: rewriteArgs("v0.3.0", true)})
 	head := p.Head()
 	r := deprecate(t, p, false, releaseops.NoticeRequest{Version: "0.3.0", Reason: "Moonbeam replaces it"})
 	requireExit(t, r, 1)
-	requireContains(t, r.Stderr, "confidential", "the GitHub Release body of v0.3.0", `"moonbeam"`)
+	requireContains(t, r.Stderr, "confidential", "the GitHub Release body of v0.3.0", ">>Moonbeam<<")
 	if p.Head() != head || strings.Contains(p.read(".strictmetadata/releases/portal/v0.3.0.toml"), "Moonbeam") {
 		t.Fatal("a refused notice was recorded")
 	}
 	if _, ok := called(gh.Calls(), rewriteArgs("v0.3.0", true)); ok {
 		t.Fatal("a refused notice rewrote the Release")
 	}
-	// The fix the refusal names: the name removed from the text.
+	// One fix the refusal names: the term removed from the text.
 	requireExit(t, deprecate(t, p, false, releaseops.NoticeRequest{Version: "0.3.0", Reason: "A successor replaces it"}), 0)
 }

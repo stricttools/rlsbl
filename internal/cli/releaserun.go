@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
+	"github.com/stricttools/strictspec/go/confidential"
 
 	"github.com/stricttools/rlsbl/internal/release"
 	"github.com/stricttools/rlsbl/internal/runstate"
@@ -148,7 +148,7 @@ func releaseRunRequest(ctx *strictcli.Context, kw map[string]any, version string
 	if err != nil {
 		return release.RunRequest{}, err
 	}
-	indexPath, err := index.DefaultPath()
+	termList, err := confidential.DefaultLocation()
 	if err != nil {
 		return release.RunRequest{}, err
 	}
@@ -160,7 +160,7 @@ func releaseRunRequest(ctx *strictcli.Context, kw map[string]any, version string
 		Fork:         fork,
 		RlsblVersion: version,
 		Checks:       checks,
-		IndexPath:    indexPath,
+		TermList:     termList,
 		Scratch:      ctx.ScratchDir,
 		Now:          time.Now,
 		Sleep:        time.Sleep,

@@ -185,7 +185,7 @@ func runRequest(t *testing.T, repo *testsupport.Repo, dir string, dryRun bool, s
 	t.Helper()
 	return release.RunRequest{
 		Dir: dir, LiveRoot: repo.Dir, DryRun: dryRun, RlsblVersion: "0.0.0-test",
-		Checks: passingChecks{}, IndexPath: filepath.Join(t.TempDir(), "confidential-names.toml"),
+		Checks: passingChecks{}, TermList: testsupport.TermList(t),
 		Now:   func() time.Time { return validationDay },
 		Sleep: func(time.Duration) {},
 		Log:   say, Warn: say,

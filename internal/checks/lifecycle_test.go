@@ -2,9 +2,11 @@ package checks
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/stricttools/strictspec/go/confidential"
 	"github.com/stricttools/testisolation/go/hygiene"
 
 	"github.com/stricttools/rlsbl/internal/testsupport"
@@ -33,13 +35,13 @@ func TestARecordTheSchemaRefusesFailsAndLeavesItsReadersUnanswered(t *testing.T)
 	}
 }
 
-func TestCodenamesOfAPublicRepositoryAreRefused(t *testing.T) {
+func TestConfidentialTermFieldsInTheRecordAreRefused(t *testing.T) {
 	hygiene.Isolate(t)
 	r := portalRepo(t, "none", map[string]string{recordFile: strings.Replace(publicRecord, "format_version = 1\n", "format_version = 1\ncodenames = [\"gizmo\"]\n", 1)})
 	got := runCheck(t, inputs(t, r.Dir), "lifecycle-record-valid")
 	mustStatus(t, got, "fail")
 	mustMention(t, got, "codenames")
-	// The fix the refusal names: remove the codenames field.
+	// The fix: remove the field; confidential terms live in the list.
 	r.Write(recordFile, publicRecord)
 	mustStatus(t, runCheck(t, inputs(t, r.Dir), "lifecycle-record-valid"), "pass")
 }
@@ -63,8 +65,13 @@ func TestARecordKeepsWhatItHeldAtTheNearestReleaseCommit(t *testing.T) {
 	mustStatus(t, runCheck(t, inputs(t, r.Dir), "lifecycle-record-valid"), "pass")
 }
 
-// confidentialIndex holds the names of another, confidential repository.
-const confidentialIndex = "format_version = 1\n\n[[repositories]]\nsubjects = [\"secret\"]\nnames = [\"gizmo\"]\n"
+// withGizmo writes a confidential-term list naming "gizmo", another
+// repository's private name, where in looks for the list.
+func withGizmo(t *testing.T, in Inputs) Inputs {
+	t.Helper()
+	testsupport.WriteTermList(t, in.TermList, testsupport.TermListOf("gizmo"))
+	return in
+}
 
 // pushedToOrigin gives r a bare origin holding its main branch as it is now,
 // with the remote-tracking branch a fetch leaves.
@@ -74,50 +81,105 @@ func pushedToOrigin(r *testsupport.Repo) {
 	r.Git("fetch", "-q", "origin")
 }
 
-func TestAConfidentialNameInATrackedFileFailsUntilItIsRemoved(t *testing.T) {
-	hygiene.Isolate(t)
-	r := portalRepo(t, "none", map[string]string{"README.md": "portal talks to Gizmo.\n"})
-	pushedToOrigin(r)
-	in := inputs(t, r.Dir)
-	testsupport.WriteFile(t, in.IndexPath, confidentialIndex)
-	got := runCheck(t, in, "confidential-names")
-	mustStatus(t, got, "fail")
-	mustMention(t, got, "README.md", `"gizmo"`)
-	r.Write("README.md", "portal talks to a server.\n")
-	mustStatus(t, runCheck(t, in, "confidential-names"), "pass")
+var hitIDPattern = regexp.MustCompile(`hit ([0-9a-f]{16})`)
+
+// hitIDs are the hit ids an outcome names, in order.
+func hitIDs(got result) []string {
+	var ids []string
+	for _, m := range hitIDPattern.FindAllStringSubmatch(got.texts(), -1) {
+		ids = append(ids, m[1])
+	}
+	return ids
 }
 
-func TestAConfidentialNameAddedAndRemovedInTheUnpushedRangeFailsUntilTheHistoryIsRewritten(t *testing.T) {
+// writeResolution writes a resolutions file holding r, as the confidential
+// commands write it.
+func writeResolution(t *testing.T, repo *testsupport.Repo, r confidential.Resolution) {
+	t.Helper()
+	repo.Write(confidential.StoreFile, string(confidential.RenderResolutions([]confidential.Resolution{r})))
+}
+
+func TestAConfidentialTermInAnUnpushedFileFailsUntilJudgedAFalsePositive(t *testing.T) {
+	hygiene.Isolate(t)
+	r := portalRepo(t, "none", nil)
+	pushedToOrigin(r)
+	added := r.CommitFile("README.md", "portal talks to Gizmo.\n", "Describe the portal")
+	in := withGizmo(t, inputs(t, r.Dir))
+	got := runCheck(t, in, "confidential-terms")
+	mustStatus(t, got, "fail")
+	mustMention(t, got, "README.md in commit "+added[:12]+", line 1, column 17", ">>Gizmo<<", "the term \"gizmo\"", "origin/main..HEAD", "rlsbl confidential judge-false-positive")
+	ids := hitIDs(got)
+	if len(ids) != 1 {
+		t.Fatalf("hit ids %v in %s", ids, got)
+	}
+	// The fix the refusal names: a recorded false-positive judgment.
+	writeResolution(t, r, confidential.Resolution{Hit: ids[0], Location: "README.md, line 1, column 17", Decision: confidential.FalsePositive, Certainty: 80, Reason: "a word in a sentence", Recorded: "2026-10-01"})
+	got = runCheck(t, in, "confidential-terms")
+	mustStatus(t, got, "pass")
+	mustMention(t, got, "(1 resolved)", "passed over as a false positive (80% certain): a word in a sentence")
+}
+
+func TestAnOwnerApprovalResolvesAHit(t *testing.T) {
+	hygiene.Isolate(t)
+	r := portalRepo(t, "none", nil)
+	pushedToOrigin(r)
+	r.CommitFile("README.md", "portal talks to Gizmo.\n", "Describe the portal")
+	in := withGizmo(t, inputs(t, r.Dir))
+	ids := hitIDs(runCheck(t, in, "confidential-terms"))
+	writeResolution(t, r, confidential.Resolution{Hit: ids[0], Location: "README.md, line 1, column 17", Decision: confidential.Approved, Reason: "the owner publishes this name", Recorded: "2026-10-01"})
+	got := runCheck(t, in, "confidential-terms")
+	mustStatus(t, got, "pass")
+	mustMention(t, got, "published with the owner's approval: the owner publishes this name")
+}
+
+func TestEveryHitIsReportedAtOnce(t *testing.T) {
+	hygiene.Isolate(t)
+	r := portalRepo(t, "none", nil)
+	pushedToOrigin(r)
+	r.CommitFile("README.md", "portal talks to Gizmo.\nand gizmo answers\n", "Describe the portal")
+	named := r.CommitFile("main.go", "package main\n", "Serve what gizmo asks for")
+	in := withGizmo(t, inputs(t, r.Dir))
+	got := runCheck(t, in, "confidential-terms")
+	mustStatus(t, got, "fail")
+	mustMention(t, got, "3 unresolved confidential-term hit(s)", "the message of commit "+named[:12], "line 2, column 5")
+	if ids := hitIDs(got); len(ids) != 3 {
+		t.Fatalf("hit ids %v in %s", ids, got)
+	}
+}
+
+func TestALineTheFileAlreadyHeldIsNotAHit(t *testing.T) {
+	hygiene.Isolate(t)
+	r := portalRepo(t, "none", map[string]string{"README.md": "portal talks to Gizmo.\nmore\n"})
+	pushedToOrigin(r)
+	r.CommitFile("README.md", "portal talks to Gizmo.\nmore text\n", "Reword")
+	mustStatus(t, runCheck(t, withGizmo(t, inputs(t, r.Dir)), "confidential-terms"), "pass")
+}
+
+func TestThePathOfAnAddedFileIsScanned(t *testing.T) {
+	hygiene.Isolate(t)
+	r := portalRepo(t, "none", nil)
+	pushedToOrigin(r)
+	added := r.CommitFile("notes/gizmo-plan.md", "the plan\n", "Plan the work")
+	got := runCheck(t, withGizmo(t, inputs(t, r.Dir)), "confidential-terms")
+	mustStatus(t, got, "fail")
+	mustMention(t, got, "the path of a file commit "+added[:12]+" adds")
+}
+
+func TestATermAddedAndRemovedInTheUnpushedRangeFailsUntilTheHistoryIsRewritten(t *testing.T) {
 	hygiene.Isolate(t)
 	r := portalRepo(t, "none", nil)
 	pushedToOrigin(r)
 	pushed := r.Head()
 	added := r.CommitFile("notes/plan.md", "talk to Gizmo first\n", "Plan the work")
 	r.CommitFile("notes/plan.md", "talk to the server first\n", "Reword the plan")
-	in := inputs(t, r.Dir)
-	testsupport.WriteFile(t, in.IndexPath, confidentialIndex)
-	got := runCheck(t, in, "confidential-names")
+	in := withGizmo(t, inputs(t, r.Dir))
+	got := runCheck(t, in, "confidential-terms")
 	mustStatus(t, got, "fail")
-	mustMention(t, got, "commit "+added+", notes/plan.md, line 1, column 9", `"gizmo"`, "origin/main..HEAD")
-	// The fix the refusal names: rewrite the unpushed commits so that none
-	// carries the name.
+	mustMention(t, got, "notes/plan.md in commit "+added[:12]+", line 1, column 9", "origin/main..HEAD")
+	// The other fix: rewrite the unpushed commits so that none carries it.
 	r.Git("reset", "-q", "--hard", pushed)
 	r.CommitFile("notes/plan.md", "talk to the server first\n", "Plan the work")
-	mustStatus(t, runCheck(t, in, "confidential-names"), "pass")
-}
-
-func TestAConfidentialNameInAnUnpushedCommitMessageFails(t *testing.T) {
-	hygiene.Isolate(t)
-	r := portalRepo(t, "none", nil)
-	pushedToOrigin(r)
-	named := r.CommitFile("main.go", "package main\n", "Serve what gizmo asks for")
-	in := inputs(t, r.Dir)
-	testsupport.WriteFile(t, in.IndexPath, confidentialIndex)
-	got := runCheck(t, in, "confidential-names")
-	mustStatus(t, got, "fail")
-	mustMention(t, got, "commit "+named+", its message", `"gizmo"`)
-	r.Git("commit", "-q", "--amend", "-m", "Serve what the server asks for")
-	mustStatus(t, runCheck(t, in, "confidential-names"), "pass")
+	mustStatus(t, runCheck(t, in, "confidential-terms"), "pass")
 }
 
 // Binary blobs and text that is not UTF-8 are not scanned, and do not stop
@@ -130,13 +192,12 @@ func TestAnUnpushedBinaryOrNonUTF8FileIsNotScanned(t *testing.T) {
 	r.Write("latin1.txt", "caf\xe9 au lait\n")
 	r.Git("add", "-A")
 	r.Git("commit", "-q", "-m", "Add a logo and a note")
-	in := inputs(t, r.Dir)
-	testsupport.WriteFile(t, in.IndexPath, confidentialIndex)
-	mustStatus(t, runCheck(t, in, "confidential-names"), "pass")
+	in := withGizmo(t, inputs(t, r.Dir))
+	mustStatus(t, runCheck(t, in, "confidential-terms"), "pass")
 	named := r.CommitFile("notes.md", "ask gizmo\n", "Take notes")
-	got := runCheck(t, in, "confidential-names")
+	got := runCheck(t, in, "confidential-terms")
 	mustStatus(t, got, "fail")
-	mustMention(t, got, "commit "+named+", notes.md")
+	mustMention(t, got, "notes.md in commit "+named[:12])
 }
 
 func TestWithNoRemoteTrackingBranchTheWholeHistoryIsScanned(t *testing.T) {
@@ -144,19 +205,24 @@ func TestWithNoRemoteTrackingBranchTheWholeHistoryIsScanned(t *testing.T) {
 	r := portalRepo(t, "none", nil)
 	named := r.CommitFile("notes.md", "gizmo\n", "Take notes")
 	r.CommitFile("notes.md", "nothing\n", "Clear the notes")
-	in := inputs(t, r.Dir)
-	testsupport.WriteFile(t, in.IndexPath, confidentialIndex)
-	got := runCheck(t, in, "confidential-names")
+	got := runCheck(t, withGizmo(t, inputs(t, r.Dir)), "confidential-terms")
 	mustStatus(t, got, "fail")
-	mustMention(t, got, "commit "+named+", notes.md", "the history of HEAD")
+	mustMention(t, got, "notes.md in commit "+named[:12], "the history of HEAD")
 }
 
-func TestAConfidentialRepositoryCarriesItsOwnNames(t *testing.T) {
+func TestAMissingTermListHasNoTermsAndSaysSo(t *testing.T) {
+	hygiene.Isolate(t)
+	r := portalRepo(t, "none", nil)
+	r.CommitFile("notes.md", "gizmo\n", "Take notes")
+	got := runCheck(t, inputs(t, r.Dir), "confidential-terms")
+	mustStatus(t, got, "pass")
+	mustMention(t, got, "does not exist, so there are no confidential terms to scan for")
+}
+
+func TestAConfidentialRepositoryIsNotScanned(t *testing.T) {
 	hygiene.Isolate(t)
 	r := portalRepo(t, "none", map[string]string{recordFile: proprietaryRecord, "README.md": "gizmo\n"})
-	in := inputs(t, r.Dir)
-	testsupport.WriteFile(t, in.IndexPath, confidentialIndex)
-	mustStatus(t, runCheck(t, in, "confidential-names"), "skip")
+	mustStatus(t, runCheck(t, withGizmo(t, inputs(t, r.Dir)), "confidential-terms"), "skip")
 }
 
 func TestRepositoryVisibilityHoldsGitHubToTheRecord(t *testing.T) {

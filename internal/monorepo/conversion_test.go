@@ -134,7 +134,7 @@ func TestARenderedRecordReadsBackAndMovesItsTagNamespace(t *testing.T) {
 		t.Fatal(err)
 	}
 	moved := entriesOf(rec, map[string]string{"widget": "widget"})
-	back, err := lifecycle.Parse(renderRecord(moved, nil, nil, nil))
+	back, err := lifecycle.Parse(renderRecord(moved, nil))
 	if err != nil {
 		t.Fatal(err)
 	}

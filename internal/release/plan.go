@@ -12,7 +12,6 @@ import (
 
 	"github.com/stricttools/strictcli/go/strictcli"
 	"github.com/stricttools/strictspec/go/lifecycle"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
 
 	"github.com/stricttools/rlsbl/internal/changelog"
 	"github.com/stricttools/rlsbl/internal/declarations"
@@ -291,7 +290,7 @@ func BuildBumpPlan(in BumpPlanInputs) (BumpPlan, error) {
 		if err := add(PlanEntry{Type: EntrySecretScan, Summary: "scan the built artifacts for secrets (gitleaks)", Dirs: built}); err != nil {
 			return BumpPlan{}, err
 		}
-		if err := add(PlanEntry{Type: EntryPackedContents, Summary: "refuse a packed artifact carrying a file from outside the releasable's members, or a confidential name"}); err != nil {
+		if err := add(PlanEntry{Type: EntryPackedContents, Summary: "refuse a packed artifact carrying a file from outside the releasable's members, or an unresolved confidential-term hit"}); err != nil {
 			return BumpPlan{}, err
 		}
 	}
@@ -404,7 +403,8 @@ type BumpExecution struct {
 	// the packed contents, the guard) say so instead of running.
 	Preview bool
 	Record  *lifecycle.Record
-	Index   *index.Index
+	// Scanner scans the packed artifacts for confidential terms.
+	Scanner *publishrules.Scanner
 	// Scratch is the command's scratch directory, where npm writes its cache
 	// when the packed contents list an npm upload.
 	Scratch targets.Scratch
@@ -598,8 +598,8 @@ func siblingConstraints(w *workspace.Workspace) (map[string]string, error) {
 }
 
 // checkPacked lists what the release would publish and refuses a file from
-// outside the releasable's members and, in a public repository, a
-// confidential name in any packed text.
+// outside the releasable's members and, in a public repository, an
+// unresolved confidential-term hit in any packed text.
 func checkPacked(e *strictcli.Effects, x BumpExecution) error {
 	artifacts, err := publishrules.PackedArtifacts(e, x.Repo, x.Workspace, x.Releasable, x.Scratch)
 	if err != nil {
@@ -608,11 +608,10 @@ func checkPacked(e *strictcli.Effects, x BumpExecution) error {
 	if err := publishrules.CheckPackedContents(x.Workspace.Declarations, x.Releasable, artifacts); err != nil {
 		return err
 	}
-	scanner, err := publishrules.NewScanner(x.Record, x.Now, x.Index)
-	if err != nil {
-		return err
+	if x.Scanner == nil {
+		return errors.New("the packed artifacts are scanned for confidential terms, and no scanner was given")
 	}
-	return scanner.ScanArtifacts(x.Workspace.Root, artifacts)
+	return x.Scanner.ScanArtifacts(x.Workspace.Root, artifacts)
 }
 
 // guardUnexpected refuses a change in the release checkout outside the

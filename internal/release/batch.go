@@ -215,11 +215,11 @@ func PublishBatchCandidate(e *strictcli.Effects, s *Session, req RunRequest, pen
 		}
 	}
 	if needsPush {
-		scanner, err := publishrules.LoadScanner(s.Root, req.IndexPath, req.Now())
+		scanner, err := publishrules.LoadScannerAt(live, s.Root, req.TermList, req.Now())
 		if err != nil {
 			return "", err
 		}
-		if err := pushCarriesNoConfidentialName(scanner, live, sha, remote, branch); err != nil {
+		if err := pushCarriesNoConfidentialTerm(scanner, live, sha, remote, branch); err != nil {
 			return "", fmt.Errorf("the batch release candidate %s was not pushed: %w", short(sha), err)
 		}
 		if err := live.PushFastForward(origin, ref, sha, timeouts.Push); err != nil {

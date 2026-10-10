@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/confidential"
 	"github.com/stricttools/strictspec/go/lifecycle"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
@@ -44,11 +45,11 @@ releasable = "portal"
 // today is the date every command in these tests runs on.
 var today = time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
 
-// fixture is a repository and the confidential-name index its commands
+// fixture is a repository and the confidential-term list its commands
 // use.
 type fixture struct {
-	repo  *testsupport.Repo
-	index string
+	repo     *testsupport.Repo
+	termList confidential.Location
 }
 
 // newFixture is a repository with portal's declarations and the record
@@ -64,7 +65,7 @@ func newFixture(t *testing.T, record string) *fixture {
 		paths = append(paths, lifecycle.RecordFile, lifecycle.ManifestFile)
 	}
 	repo.Commit("the project", paths...)
-	return &fixture{repo: repo, index: filepath.Join(t.TempDir(), "confidential-names.toml")}
+	return &fixture{repo: repo, termList: testsupport.TermList(t)}
 }
 
 // run runs fn with an invocation dated today in a mutating command
@@ -72,7 +73,7 @@ func newFixture(t *testing.T, record string) *fixture {
 func (f *fixture) run(t *testing.T, dryRun bool, fn func(inv lifecycleops.Invocation, dir string) error) strictcli.Result {
 	t.Helper()
 	return testsupport.RunCommand(t, testsupport.CommandOptions{Effect: strictcli.EffectMutating, DryRun: dryRun, Allowlist: previewapply.Prefixes()}, func(ctx *strictcli.Context) error {
-		inv := lifecycleops.Invocation{E: ctx.Effects(), DryRun: ctx.DryRun(), Say: ctx.Out, Now: func() time.Time { return today }, IndexPath: f.index}
+		inv := lifecycleops.Invocation{E: ctx.Effects(), DryRun: ctx.DryRun(), Say: ctx.Out, Now: func() time.Time { return today }, TermList: f.termList}
 		return fn(inv, f.repo.Dir)
 	})
 }
@@ -96,18 +97,6 @@ func requireContains(t *testing.T, text string, wants ...string) {
 func (f *fixture) record(t *testing.T) string {
 	t.Helper()
 	data, err := os.ReadFile(f.repo.Path(lifecycle.RecordFile))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return string(data)
-}
-
-func (f *fixture) indexText(t *testing.T) string {
-	t.Helper()
-	data, err := os.ReadFile(f.index)
-	if os.IsNotExist(err) {
-		return ""
-	}
 	if err != nil {
 		t.Fatal(err)
 	}

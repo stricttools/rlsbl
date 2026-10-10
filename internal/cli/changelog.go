@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/stricttools/strictcli/go/strictcli"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
+	"github.com/stricttools/strictspec/go/confidential"
 
 	"github.com/stricttools/rlsbl/internal/changelog"
 	"github.com/stricttools/rlsbl/internal/declarations"
@@ -338,11 +338,11 @@ func resyncRelease(ctx *strictcli.Context, o changelog.Outcome) error {
 	if err != nil {
 		return err
 	}
-	indexPath, err := index.DefaultPath()
+	termList, err := confidential.DefaultLocation()
 	if err != nil {
 		return err
 	}
-	if err := releaseops.Edit(ctx, releaseops.EditRequest{Dir: dir, Version: v, IndexPath: indexPath}); err != nil {
+	if err := releaseops.Edit(ctx, releaseops.EditRequest{Dir: dir, Version: v, TermList: termList}); err != nil {
 		return fmt.Errorf("the changelog of %s is written, but its GitHub Release was not rewritten from it: %w\nOnce the cause is fixed, `rlsbl release edit %s` rewrites it", v, err, v)
 	}
 	return nil

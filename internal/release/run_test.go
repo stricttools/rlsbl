@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/confidential"
 	"github.com/stricttools/testisolation/go/hygiene"
 
 	"github.com/stricttools/rlsbl/internal/changelog"
@@ -193,11 +195,11 @@ func releaseCommandWith(t *testing.T, repo *testsupport.Repo, resume, dryRun boo
 	var ferr error
 	var out strings.Builder
 	say := func(s string) { out.WriteString(s + "\n") }
-	indexPath := filepath.Join(t.TempDir(), "confidential-names.toml")
+	termList := testsupport.TermList(t)
 	testsupport.RunCommand(t, testsupport.CommandOptions{Effect: strictcli.EffectMutating, DryRun: dryRun, Allowlist: previewapply.Prefixes(), HTTPClient: testsupport.NewFakeHTTP(t).Client()}, func(ctx *strictcli.Context) error {
 		req := release.RunRequest{
 			Dir: repo.Dir, LiveRoot: repo.Dir, DryRun: dryRun, RlsblVersion: "0.0.0-test",
-			Checks: &passingChecks{}, IndexPath: indexPath,
+			Checks: &passingChecks{}, TermList: termList,
 			Now:   func() time.Time { return validationDay },
 			Sleep: func(time.Duration) {},
 			Log:   say, Warn: say,
@@ -305,7 +307,7 @@ func TestAReleaseRunsToItsGitHubReleaseAndConvertsThePendingIdentity(t *testing.
 	}
 }
 
-func TestAReleaseRefusesToPushACommitCarryingAConfidentialNameUntilTheHistoryIsRewritten(t *testing.T) {
+func TestAReleaseRefusesToPushACommitCarryingAConfidentialTermUntilTheHistoryIsRewritten(t *testing.T) {
 	hygiene.Isolate(t)
 	testsupport.FakeGH(t, answers(validationAnswers("public"), releaseCreation("v0.5.0"))...)
 	repo := runRepo(t, "", "MIT", nil)
@@ -313,14 +315,14 @@ func TestAReleaseRefusesToPushACommitCarryingAConfidentialNameUntilTheHistoryIsR
 	added := repo.CommitFile("notes.md", "ask Gizmo\n", "Take notes")
 	repo.Git("rm", "-q", "notes.md")
 	repo.Git("commit", "-q", "-m", "Drop the notes")
-	indexPath := filepath.Join(t.TempDir(), "confidential-names.toml")
-	testsupport.WriteFile(t, indexPath, "format_version = 1\n\n[[repositories]]\nsubjects = [\"secret\"]\nnames = [\"gizmo\"]\n")
-	withIndex := func(req *release.RunRequest) { req.IndexPath = indexPath }
-	out, err := releaseCommandWith(t, repo, false, false, withIndex)
+	termList := testsupport.TermList(t)
+	testsupport.WriteTermList(t, termList, testsupport.TermListOf("gizmo"))
+	withList := func(req *release.RunRequest) { req.TermList = termList }
+	out, err := releaseCommandWith(t, repo, false, false, withList)
 	if err == nil {
-		t.Fatalf("a push carrying a confidential name was not refused:\n%s", out)
+		t.Fatalf("a push carrying a confidential term was not refused:\n%s", out)
 	}
-	for _, want := range []string{"commit " + added + ", notes.md, line 1, column 5", `"gizmo"`, "origin/main"} {
+	for _, want := range []string{"notes.md in commit " + added[:12] + ", line 1, column 5: ask >>Gizmo<<", "origin/main", "rlsbl confidential judge-false-positive"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("the refusal does not name %q: %v", want, err)
 		}
@@ -328,14 +330,41 @@ func TestAReleaseRefusesToPushACommitCarryingAConfidentialNameUntilTheHistoryIsR
 	if remoteRef(t, repo, "refs/heads/main") != prepared {
 		t.Errorf("origin's main moved though the push was refused")
 	}
-	// The fix the refusal names: rewrite the unpushed commits so that none
-	// carries the name.
+	// One fix the refusal names: rewrite the unpushed commits so that none
+	// carries the term.
 	repo.Git("reset", "-q", "--hard", prepared)
-	if out, err := releaseCommandWith(t, repo, false, false, withIndex); err != nil {
+	if out, err := releaseCommandWith(t, repo, false, false, withList); err != nil {
 		t.Fatalf("the release of a clean history failed: %v\n%s", err, out)
 	}
 	if remoteRef(t, repo, "refs/heads/main") != repo.Head() {
 		t.Errorf("origin's main is not the released branch")
+	}
+}
+
+func TestAReleaseOfAJudgedHitRecordsTheJudgmentInItsArchive(t *testing.T) {
+	hygiene.Isolate(t)
+	testsupport.FakeGH(t, answers(validationAnswers("public"), releaseCreation("v0.5.0"))...)
+	repo := runRepo(t, "", "MIT", nil)
+	repo.CommitFile("notes.md", "ask Gizmo\n", "Take notes")
+	termList := testsupport.TermList(t)
+	testsupport.WriteTermList(t, termList, testsupport.TermListOf("gizmo"))
+	withList := func(req *release.RunRequest) { req.TermList = termList }
+	_, err := releaseCommandWith(t, repo, false, false, withList)
+	if err == nil {
+		t.Fatal("a push carrying an unresolved hit was not refused")
+	}
+	m := regexp.MustCompile(`hit ([0-9a-f]{16})`).FindStringSubmatch(err.Error())
+	if m == nil {
+		t.Fatalf("the refusal names no hit id: %v", err)
+	}
+	resolution := confidential.Resolution{Hit: m[1], Location: "notes.md, line 1, column 5", Decision: confidential.FalsePositive, Certainty: 90, Reason: "a word in a note", Recorded: "2026-10-01"}
+	repo.CommitFile(confidential.StoreFile, string(confidential.RenderResolutions([]confidential.Resolution{resolution})), "Judge the hit")
+	if out, err := releaseCommandWith(t, repo, false, false, withList); err != nil {
+		t.Fatalf("the release of a judged hit failed: %v\n%s", err, out)
+	}
+	archive := read(t, filepath.Join(repo.Dir, ".strictmetadata/releases/portal/v0.5.0.toml"))
+	if !strings.Contains(archive, string(confidential.RenderResolution("confidential_hits", resolution))) {
+		t.Errorf("the archive does not record the judgment:\n%s", archive)
 	}
 }
 

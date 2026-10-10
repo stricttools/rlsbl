@@ -782,9 +782,6 @@ func (arr *arrival) observeRecords(src git.Repo) error {
 	if err != nil {
 		return fmt.Errorf("the source repository's lifecycle-and-license record: %w", err)
 	}
-	if len(arriving.Codenames()) > 0 || len(arriving.DistinctiveTerms()) > 0 {
-		return fmt.Errorf("the source repository's %s holds codenames or distinctive terms, which have no place the absorb can carry them to. Remove them from the source's record and commit, absorb, then add them to this repository's record by hand", lifecycle.RecordFile)
-	}
 	rename := map[string]string{declarations.RootName: arr.name}
 	if arr.sourceName != "" {
 		rename[arr.sourceName] = arr.name

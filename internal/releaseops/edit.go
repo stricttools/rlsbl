@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stricttools/strictcli/go/strictcli"
+	"github.com/stricttools/strictspec/go/confidential"
 
 	"github.com/stricttools/rlsbl/internal/publishrules"
 	"github.com/stricttools/rlsbl/internal/releasenotes"
@@ -18,9 +19,9 @@ type EditRequest struct {
 	// Version is the version whose Release is rewritten, and empty for the
 	// releasable's latest release.
 	Version string
-	// IndexPath is the machine-local confidential-name index the rewritten
-	// Release body is scanned against.
-	IndexPath string
+	// TermList is where the confidential-term list the rewritten Release
+	// body is scanned against is.
+	TermList confidential.Location
 }
 
 // Edit rewrites one released version's GitHub Release in place from the
@@ -50,7 +51,7 @@ func Edit(ctx *strictcli.Context, req EditRequest) error {
 	if _, err := s.releasedArchive(v); err != nil {
 		return err
 	}
-	scanner, err := publishrules.LoadScanner(s.Root(), req.IndexPath, time.Now())
+	scanner, err := publishrules.LoadScanner(s.Repo, req.TermList, time.Now())
 	if err != nil {
 		return err
 	}

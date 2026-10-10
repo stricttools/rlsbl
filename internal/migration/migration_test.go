@@ -10,7 +10,6 @@ import (
 
 	"github.com/stricttools/strictcli/go/strictcli"
 	"github.com/stricttools/strictspec/go/lifecycle"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
 	"github.com/stricttools/testisolation/go/hygiene"
 
 	"github.com/stricttools/rlsbl/internal/changelog"
@@ -128,9 +127,6 @@ func TestADryRunWritesNothing(t *testing.T) {
 	if after := f.repo.Git("status", "--porcelain", "--ignored"); after != before || f.repo.Head() != head {
 		t.Fatalf("the dry run changed the repository:\n%s\n%s", before, after)
 	}
-	if _, err := os.Stat(f.indexPath); err == nil {
-		t.Fatal("the dry run wrote the confidential-name index")
-	}
 }
 
 func TestTheCommitCarriesOnlyThePathsTheMigrationTouched(t *testing.T) {
@@ -218,13 +214,6 @@ func TestAPrivateRepositoryWithoutAProprietaryReleasableIsRefusedUntilOneIsDecla
 	}
 	if !rec.Confidential(testNow) {
 		t.Fatal("the record does not make the repository confidential")
-	}
-	idx, err := index.Load(f.indexPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if names := strings.Join(idx.Names(), ","); !strings.Contains(names, "portal") {
-		t.Fatalf("the confidential-name index holds %s", names)
 	}
 }
 
@@ -655,36 +644,6 @@ func TestDisagreeingPublishModesWithinAReleasableAreRefused(t *testing.T) {
 	f.write(".rlsbl-monorepo/releasables/widget/config.json", `{"publish_mode": "none"}`+"\n")
 	f.commit("disagreeing publish modes")
 	f.refused("disagree on publish_mode")
-}
-
-func TestAConfidentialRepositoryWithoutAnOriginIsIndexedByItsReleasableNames(t *testing.T) {
-	hygiene.Isolate(t)
-	f := newFixture(t, "portal", "private")
-	f.repo.Git("remote", "remove", "origin")
-	f.write("package.json", `{"name": "portal", "version": "0.1.0", "license": "MIT"}`+"\n")
-	f.write(".rlsbl/config.json", `{"publish_mode": "none", "targets": ["npm"], "pipelines": {}, "github_repo": "owner/portal"}`+"\n")
-	f.commit("the old layout")
-	f.licenses = map[string]string{"portal": "proprietary"}
-	f.migrate()
-	idx, err := index.Load(f.indexPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if entries := idx.Entries(); len(entries) != 1 || !slices.Equal(entries[0].Subjects, []string{"portal"}) || !slices.Contains(entries[0].Names, "portal") {
-		t.Fatalf("the confidential-name index entries: %+v", entries)
-	}
-}
-
-func TestAPublicRepositoryWithoutAnOriginRemovesTheEntryOfItsReleasableNames(t *testing.T) {
-	hygiene.Isolate(t)
-	f := newFixture(t, "portal", "public")
-	f.repo.Git("remote", "remove", "origin")
-	f.write("package.json", `{"name": "portal", "version": "0.1.0", "license": "MIT"}`+"\n")
-	f.write(".rlsbl/config.json", `{"publish_mode": "none", "targets": ["npm"], "pipelines": {}, "github_repo": "owner/portal"}`+"\n")
-	f.commit("the old layout")
-	if plan := f.mustPlan(); plan.index == nil || plan.index.Confidential() || !slices.Equal(plan.index.Subjects, []string{"portal"}) {
-		t.Fatalf("the plan's index update: %+v", plan.index)
-	}
 }
 
 func TestARepositoryNamingNoGitHubRepositoryIsRefusedUntilTheOriginIsAdded(t *testing.T) {

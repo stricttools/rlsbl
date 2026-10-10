@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/stricttools/strictspec/go/lifecycle"
-	"github.com/stricttools/strictspec/go/lifecycle/index"
 
 	"github.com/stricttools/rlsbl/internal/declarations"
 	"github.com/stricttools/rlsbl/internal/git"
@@ -28,18 +27,15 @@ const (
 // Report is what `transition show` prints: the record's entries and every
 // rule's verdict on the command's date.
 type Report struct {
-	RecordFile       string               `json:"record_file"`
-	Present          bool                 `json:"present"`
-	Date             string               `json:"date"`
-	Confidential     bool                 `json:"confidential"`
-	Lifecycle        []ReportPeriod       `json:"lifecycle"`
-	Licenses         []ReportPeriod       `json:"licenses"`
-	Identities       []ReportIdentity     `json:"identities"`
-	RegistryNames    []ReportName         `json:"registry_names"`
-	UnversionedTags  []ReportTag          `json:"unversioned_tags"`
-	PublicClients    []ReportPublicClient `json:"public_clients"`
-	Codenames        []string             `json:"codenames"`
-	DistinctiveTerms []string             `json:"distinctive_terms"`
+	RecordFile      string           `json:"record_file"`
+	Present         bool             `json:"present"`
+	Date            string           `json:"date"`
+	Confidential    bool             `json:"confidential"`
+	Lifecycle       []ReportPeriod   `json:"lifecycle"`
+	Licenses        []ReportPeriod   `json:"licenses"`
+	Identities      []ReportIdentity `json:"identities"`
+	RegistryNames   []ReportName     `json:"registry_names"`
+	UnversionedTags []ReportTag      `json:"unversioned_tags"`
 	// Problems are why the record is not valid against the declarations on
 	// the date; empty when it is.
 	Problems []string  `json:"problems"`
@@ -83,13 +79,6 @@ type ReportTag struct {
 	Tag      string `json:"tag"`
 	Reason   string `json:"reason"`
 	Recorded string `json:"recorded"`
-}
-
-// ReportPublicClient is one public-client declaration.
-type ReportPublicClient struct {
-	Subject  string `json:"subject"`
-	Reason   string `json:"reason"`
-	Declared string `json:"declared"`
 }
 
 // Verdict is one rule's verdict, for the repository or one subject.
@@ -137,8 +126,7 @@ func (inv Invocation) Show(dir string) (Report, error) {
 	on := inv.Now()
 	r := Report{RecordFile: lifecycle.RecordFile, Present: rec.Present(), Date: day(on), Confidential: rec.Confidential(on),
 		Lifecycle: []ReportPeriod{}, Licenses: []ReportPeriod{}, Identities: []ReportIdentity{}, RegistryNames: []ReportName{},
-		UnversionedTags: []ReportTag{}, PublicClients: []ReportPublicClient{}, Codenames: append([]string{}, rec.Codenames()...),
-		DistinctiveTerms: append([]string{}, rec.DistinctiveTerms()...), Problems: []string{}, Verdicts: []Verdict{}}
+		UnversionedTags: []ReportTag{}, Problems: []string{}, Verdicts: []Verdict{}}
 	for _, l := range rec.Lifecycle() {
 		r.Lifecycle = append(r.Lifecycle, ReportPeriod{l.Subject, string(l.Status), day(l.From), dateOrEmpty(l.Until), l.Reason})
 	}
@@ -153,9 +141,6 @@ func (inv Invocation) Show(dir string) (Report, error) {
 	}
 	for _, u := range rec.UnversionedTags() {
 		r.UnversionedTags = append(r.UnversionedTags, ReportTag{u.Tag, u.Reason, day(u.Recorded)})
-	}
-	for _, p := range rec.PublicClients() {
-		r.PublicClients = append(r.PublicClients, ReportPublicClient{p.Subject, p.Reason, day(p.Declared)})
 	}
 	var declared, releasables []string
 	if d != nil {
@@ -176,12 +161,8 @@ func (inv Invocation) Show(dir string) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
-	names, err := inv.confidentialNamesVerdict(repo, rec, on)
-	if err != nil {
-		return Report{}, err
-	}
 	for _, rule := range lifecycle.Rules() {
-		verdicts, err := judge(rule, rec, previous, releasables, source, names, on)
+		verdicts, err := judge(rule, rec, previous, releasables, source, on)
 		if err != nil {
 			return Report{}, err
 		}
@@ -235,107 +216,10 @@ func verdictOf(rule lifecycle.Rule, subject string, err error, holds string) Ver
 	return v
 }
 
-// confidentialNamesVerdict compares the confidential-name index entry of
-// the repository, keyed by its record's open releasable-name identities,
-// with the names the record makes confidential on the date of on: a
-// confidential repository's entry must hold them, and a public repository
-// must have none.
-func (inv Invocation) confidentialNamesVerdict(repo git.Repo, rec *lifecycle.Record, on time.Time) (Verdict, error) {
-	rule := lifecycle.RuleConfidentialNames
-	v := Verdict{Rule: string(rule), Class: string(rule.Class())}
-	if inv.IndexPath == "" {
-		return Verdict{}, errors.New("no confidential-name index path was given to the command")
-	}
-	names, err := repositoryNames(repo)
-	if err != nil {
-		return Verdict{}, err
-	}
-	update, err := index.Plan(rec, on, names...)
-	if err != nil {
-		v.Verdict, v.Detail = VerdictRefuses, err.Error()
-		return v, nil
-	}
-	idx, err := index.Load(inv.IndexPath)
-	if err != nil {
-		return Verdict{}, err
-	}
-	held := idx.Held(update.Subjects)
-	key := strings.Join(update.Subjects, ", ")
-	const fix = "the next mutating rlsbl command run in the repository brings the entry in step"
-	if !update.Confidential() {
-		if len(held) > 0 {
-			v.Verdict, v.Detail = VerdictRefuses, fmt.Sprintf("the repository is public, but the index %s still holds names under %s (%s); %s", inv.IndexPath, describeEntries(held), strings.Join(heldNames(held), ", "), fix)
-		} else {
-			v.Verdict, v.Detail = VerdictNotApplicable, "the repository is public, and the index holds no entry for it"
-		}
-		return v, nil
-	}
-	if len(update.Names) == 0 {
-		if len(held) > 0 {
-			v.Verdict, v.Detail = VerdictRefuses, fmt.Sprintf("the repository is confidential with no name to protect (its public-client declarations take them out), but the index %s still holds names under %s (%s); %s", inv.IndexPath, describeEntries(held), strings.Join(heldNames(held), ", "), fix)
-		} else {
-			v.Verdict, v.Detail = VerdictHolds, "the repository is confidential with no name to protect (its public-client declarations take them out), and the index holds no entry for it"
-		}
-		return v, nil
-	}
-	if len(held) != 1 || strings.Join(held[0].Subjects, ", ") != key || !sameNames(held[0].Names, update.Names) {
-		v.Verdict, v.Detail = VerdictRefuses, fmt.Sprintf("the repository is confidential, and the index %s holds [%s] under %s where the record names [%s] under %s; %s", inv.IndexPath, strings.Join(heldNames(held), ", "), describeEntries(held), strings.Join(update.Names, ", "), key, fix)
-		return v, nil
-	}
-	v.Verdict, v.Detail = VerdictHolds, fmt.Sprintf("the index %s holds the repository's names under %s, and publishing them is refused", inv.IndexPath, key)
-	return v, nil
-}
-
-// describeEntries names index entries by their subjects.
-func describeEntries(entries []index.Entry) string {
-	if len(entries) == 0 {
-		return "no entry"
-	}
-	var parts []string
-	for _, e := range entries {
-		parts = append(parts, strings.Join(e.Subjects, ", "))
-	}
-	return strings.Join(parts, "; ")
-}
-
-// heldNames is every name the entries hold.
-func heldNames(entries []index.Entry) []string {
-	var out []string
-	for _, e := range entries {
-		out = append(out, e.Names...)
-	}
-	return out
-}
-
-// sameNames compares two name lists as the index stores them: trimmed,
-// without empty names, and ignoring case and order.
-func sameNames(a, b []string) bool {
-	set := func(names []string) map[string]bool {
-		out := map[string]bool{}
-		for _, n := range names {
-			if t := strings.TrimSpace(n); t != "" {
-				out[strings.ToLower(t)] = true
-			}
-		}
-		return out
-	}
-	x, y := set(a), set(b)
-	if len(x) != len(y) {
-		return false
-	}
-	for n := range x {
-		if !y[n] {
-			return false
-		}
-	}
-	return true
-}
-
 // judge is one rule's verdicts on the date of on. previous is the record
 // HEAD commits, which the permanent rules hold the working tree's record
-// to; nil when HEAD holds none. names is the confidential-names verdict,
-// decided against the index.
-func judge(rule lifecycle.Rule, rec, previous *lifecycle.Record, releasables []string, source publishrules.VisibilitySource, names Verdict, on time.Time) ([]Verdict, error) {
+// to; nil when HEAD holds none.
+func judge(rule lifecycle.Rule, rec, previous *lifecycle.Record, releasables []string, source publishrules.VisibilitySource, on time.Time) ([]Verdict, error) {
 	class := string(rule.Class())
 	switch rule {
 	case lifecycle.RuleProprietaryRequiresPrivate:
@@ -382,8 +266,6 @@ func judge(rule lifecycle.Rule, rec, previous *lifecycle.Record, releasables []s
 			out = append(out, verdictOf(rule, subject, rec.ReleaseAllowed(subject, on), "released while its lifecycle is active or unstated"))
 		}
 		return out, nil
-	case lifecycle.RuleConfidentialNames:
-		return []Verdict{names}, nil
 	case lifecycle.RuleProprietaryHistoryIsSquashed:
 		periods := rec.ProprietaryPeriods()
 		if len(periods) == 0 {
