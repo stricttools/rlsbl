@@ -42,3 +42,10 @@ Both commands accept only an id the next push or a tracked file of the repositor
 ## The release record
 
 At its archive step, the release records in the version's release archive (`.strictmetadata/releases/<releasable>/v<version>.toml`) every resolution that resolved a hit of the release, under `[[confidential_hits]]`: the hit's id, its redacted location, `resolution` (`false-positive` or `approved`), the certainty of a false positive, the reason, and the day it was recorded. Only the release writes `confidential_hits`; the editable release file refuses it.
+
+## Why it is built this way
+
+- **One shared store, not the release file.** Resolutions live in `.strictmetadata/confidential-hits/resolutions.toml`, not in a release file, so the same judgment serves every release and selfdoc's publishing, in a workspace's batch releases as in a single one; the archive records which ones each release used.
+- **Ids from the words after a match.** The same phrase appears as a JSON changelog line, a `CHANGELOG.md` list item, and a Release body; leaving out what precedes the match keeps one id across them, so a judgment made before the release still holds when the release renders its notes.
+- **Only added lines of a push.** A line the file already held was published with it earlier; scanning it again on every push that touches the file would ask for the same judgment over and over.
+- **Ids are checked against what the repository carries.** The resolution commands accept only an id of a hit in the next push or a tracked file, so a mistyped id is refused instead of recorded as a resolution that resolves nothing.
