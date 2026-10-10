@@ -22,7 +22,7 @@ In a public repository, a release scans everything it would push or publish:
 - the names of the tags the version owns;
 - the GitHub Release body, and every Release body a later command rewrites (`release edit`, `release deprecate`, `release yank`, `release reconcile`, `release scrub`, `transition declassify`).
 
-A confidential repository is not scanned: what it carries is its own, and its public outputs are refused by the [lifecycle-and-license rules](lifecycle-and-license.md).
+In a confidential repository only the packed artifacts are scanned: a registry is public whatever the repository is, while its pushes and Releases stay private, and its other public outputs are refused by the [lifecycle-and-license rules](lifecycle-and-license.md).
 
 ## Hits and their ids
 

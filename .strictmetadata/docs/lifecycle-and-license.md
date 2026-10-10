@@ -64,7 +64,7 @@ A subject is a releasable or member the declarations hold, the subject of a clos
 
 No field declares a repository's disclosure. A repository is **confidential** while one of its releasables has a `proprietary` license period in effect, and **public** otherwise; a repository without a record is public. Every tool derives this from the license periods, offline.
 
-The record holds license and lifecycle facts only. Confidential terms (private project names, details about the owner, machine paths) are never written into a repository: they live in the confidential-term list outside every repository, which a release scans what it would push or publish against, as [confidential terms](confidential-terms.md) describes. A confidential repository's own text is not scanned: what it carries is its own, and its public outputs are refused by the rules below.
+The record holds license and lifecycle facts only. Confidential terms (private project names, details about the owner, machine paths) are never written into a repository: they live in the confidential-term list outside every repository, which a release scans what it would push or publish against, as [confidential terms](confidential-terms.md) describes. A confidential repository's pushes and Releases are not scanned, since they stay private; the artifacts it publishes are.
 
 ## The rules
 

@@ -35,8 +35,9 @@ const ResolveFix = "Judge each hit. When you are at least 70% certain it is a fa
 // repository publishes, and refuses while a hit is neither judged a false
 // positive nor approved by the owner in the repository's resolutions
 // (.strictmetadata/confidential-hits/resolutions.toml). In a confidential
-// repository it scans nothing: the repository's own text is its to carry,
-// and its public outputs are refused by the publishing rules.
+// repository it scans only the packed artifacts: its pushes and Releases
+// stay private, and its other public outputs are refused by the publishing
+// rules.
 type Scanner struct {
 	list        *confidential.List
 	matcher     *confidential.Matcher
@@ -194,9 +195,11 @@ func (s *Scanner) ScanTexts(texts []Text) error {
 // ScanArtifacts scans every text file the artifacts carry: a wheel entry
 // from the wheel itself, every other file from the repository rooted at
 // root. A file that is not UTF-8 text, or holds a NUL byte, is binary and
-// not scanned.
+// not scanned. Artifacts are scanned in a confidential repository too: a
+// registry is public whatever the repository is, and a releasable that may
+// publish from a confidential repository publishes there.
 func (s *Scanner) ScanArtifacts(root string, artifacts []Artifact) error {
-	if !s.active || s.matcher.Len() == 0 {
+	if s.matcher.Len() == 0 {
 		return nil
 	}
 	var texts []Text
@@ -219,7 +222,11 @@ func (s *Scanner) ScanArtifacts(root string, artifacts []Artifact) error {
 			texts = append(texts, Text{Name: f.Entry + " in " + a.Label, Content: string(data)})
 		}
 	}
-	return s.Refuse("the packed artifacts", s.HitsInTexts(texts))
+	var hits []confidential.Hit
+	for _, t := range texts {
+		hits = append(hits, s.matcher.Scan(t.Name, t.Content)...)
+	}
+	return s.Refuse("the packed artifacts", hits)
 }
 
 // HitsInRange are the hits in the commits reachable from include and from

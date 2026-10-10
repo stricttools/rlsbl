@@ -126,7 +126,7 @@ func checkConfidentialTerms(c *Context, r *strictcli.ErrorReporter) strictcli.Ch
 		panic(unanswered(err.Error()))
 	}
 	if !scanner.Active() {
-		return r.Skipped("the repository is confidential, and its text is its own to carry")
+		return r.Skipped("the repository is confidential, so its pushes stay private and are not scanned")
 	}
 	o := scanner.Resolve(hits)
 	if resolved := o.ReportResolved(); resolved != "" {

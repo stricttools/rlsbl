@@ -81,8 +81,9 @@ func TestATermMatchesInsideLongerWords(t *testing.T) {
 	}
 }
 
-// A confidential repository's own outputs are not scanned.
-func TestAConfidentialRepositoryIsNotScanned(t *testing.T) {
+// A confidential repository's pushes and Releases are not scanned, and its
+// packed artifacts, which a registry makes public, are.
+func TestAConfidentialRepositoryScansOnlyItsArtifacts(t *testing.T) {
 	hygiene.Isolate(t)
 	s := scanner(t, confidentialRecord)
 	if s.Active() {
@@ -90,6 +91,12 @@ func TestAConfidentialRepositoryIsNotScanned(t *testing.T) {
 	}
 	if err := s.ScanTexts([]publishrules.Text{{Name: "notes", Content: "gadget\n"}}); err != nil {
 		t.Errorf("err = %v", err)
+	}
+	root := t.TempDir()
+	testsupport.WriteFile(t, filepath.Join(root, "client/README.md"), "talks to the gadget server\n")
+	err := s.ScanArtifacts(root, []publishrules.Artifact{{Label: "the wheel", Files: []publishrules.PackedFile{{Entry: "README.md", Source: "client/README.md"}}}})
+	if err == nil || !strings.Contains(err.Error(), ">>gadget<<") {
+		t.Errorf("a packed artifact of a confidential repository was not scanned: %v", err)
 	}
 }
 

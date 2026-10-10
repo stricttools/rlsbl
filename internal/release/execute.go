@@ -628,12 +628,14 @@ func (x *execution) expectedRefs() (targets.ExpectedRefs, error) {
 // confidential-term hit the release publishes, which its archive records: in
 // the commits from the nearest release (exclusive) to the candidate, which
 // carry the release file and the changelog entries the published notes are
-// made of, and in the tag names the version owns. A hit nothing resolves
+// made of, and in the tag names the version owns, together with the
+// resolutions the scans of the packed artifacts used. A hit nothing resolves
 // refuses the step: the candidate push refuses one, so it can only come from
 // a resolution taken away since.
 func (x *execution) resolvedConfidentialHits() ([]confidential.Resolution, error) {
 	if !x.scanner.Active() {
-		return nil, nil
+		// Only the packed artifacts were scanned.
+		return x.scanner.Used(), nil
 	}
 	nearest, err := releaserecord.New(x.repo, x.name(), x.scheme, x.req.Fork.Upstream).Nearest(x.candidate)
 	if err != nil {
