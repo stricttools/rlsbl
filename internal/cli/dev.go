@@ -55,7 +55,7 @@ func registerDev(r *commandSet) {
 			strictcli.BoolFlag("all", "In a workspace, install every member that is not dev-only", strictcli.Optional()),
 			strictcli.StringFlag("include", "In a workspace, the comma-separated names of the only members to install", strictcli.Optional()),
 			strictcli.StringFlag("exclude", "In a workspace, the comma-separated names of members to leave out", strictcli.Optional()),
-			strictcli.BoolFlag("uninstall", "Reverse a previous install where the target has a reverse (installs when not passed)", strictcli.Optional()),
+			strictcli.BoolFlag("uninstall", "Reverse a previous install where the target has a reverse (--uninstall), or install (--no-uninstall)", strictcli.Required()),
 		},
 		run: runDevInstall,
 	})
@@ -105,7 +105,7 @@ func workingWorkspace() (string, *workspace.Workspace, error) {
 func runDevInstall(ctx *strictcli.Context, kw map[string]any) (any, error) {
 	req := devtools.InstallRequest{Mode: devtools.InstallMode(strictcli.Get[string](kw, "target"))}
 	req.All, _ = strictcli.GetOpt[bool](kw, "all")
-	req.Uninstall, _ = strictcli.GetOpt[bool](kw, "uninstall")
+	req.Uninstall = strictcli.Get[bool](kw, "uninstall")
 	var err error
 	if req.Include, err = memberNames(kw, "include"); err != nil {
 		return nil, err

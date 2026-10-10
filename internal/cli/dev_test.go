@@ -73,13 +73,13 @@ func TestDevInstallThroughTheApplication(t *testing.T) {
 	standaloneNpmProject(t)
 	dir := fakePrograms(t, "npm")
 	app := appWith(t, testsupport.NewFakeHTTP(t))
-	if r := app.Test([]string{"dev", "install"}); r.ExitCode == 0 || !strings.Contains(r.Stderr, "target") {
+	if r := app.Test([]string{"dev", "install", "--no-uninstall"}); r.ExitCode == 0 || !strings.Contains(r.Stderr, "target") {
 		t.Fatalf("a missing --target: exit %d: %s", r.ExitCode, r.Stderr)
 	}
-	if r := app.Test([]string{"dev", "install", "--target", "everywhere"}); r.ExitCode == 0 {
+	if r := app.Test([]string{"dev", "install", "--target", "everywhere", "--no-uninstall"}); r.ExitCode == 0 {
 		t.Fatalf("an unknown mode: exit %d: %s", r.ExitCode, r.Stderr)
 	}
-	r := app.Test([]string{"dev", "install", "--target", "global"})
+	r := app.Test([]string{"dev", "install", "--target", "global", "--no-uninstall"})
 	if r.ExitCode != 0 {
 		t.Fatalf("exit %d:\n%s%s", r.ExitCode, r.Stdout, r.Stderr)
 	}
@@ -96,7 +96,7 @@ func TestDevInstallRefusesAnEmptyMemberName(t *testing.T) {
 	hygiene.Isolate(t)
 	standaloneNpmProject(t)
 	fakePrograms(t, "npm")
-	r := appWith(t, testsupport.NewFakeHTTP(t)).Test([]string{"dev", "install", "--target", "global", "--include", "widget,,gadget"})
+	r := appWith(t, testsupport.NewFakeHTTP(t)).Test([]string{"dev", "install", "--target", "global", "--no-uninstall", "--include", "widget,,gadget"})
 	if r.ExitCode != 1 || !strings.Contains(r.Stderr, "holds an empty member name") {
 		t.Fatalf("exit %d: %s", r.ExitCode, r.Stderr)
 	}

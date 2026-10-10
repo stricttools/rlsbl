@@ -6,9 +6,9 @@ description = "Local development with rlsbl: dev install for the go, npm, and py
 
 ## Installing a project locally
 
-`rlsbl dev install --target global|venv` installs the project the way its targets install, running each target's own command from the target's directory:
+`rlsbl dev install --target global|venv --no-uninstall` installs the project the way its targets install, running each target's own command from the target's directory:
 
-| Target | `--target global` | `--target venv` | `--uninstall` |
+| Target | `--target global --no-uninstall` | `--target venv --no-uninstall` | `--uninstall` |
 | --- | --- | --- | --- |
 | go | `go install` of each main package the member's go pipeline names in `install_paths` | nothing | nothing |
 | npm | `npm link` | `npm install` | `npm unlink` |

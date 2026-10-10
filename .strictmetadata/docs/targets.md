@@ -4,7 +4,7 @@ description = "The release targets go, npm, and pypi: how a member's targets are
 
 # Release targets
 
-A release target is the ecosystem a member's version lives in: it decides which files a release writes the version into, which tags the release owes besides the releasable's own, how the built-in tests run, and how `rlsbl dev install` installs the member. Publishing is a separate concern, declared as [pipelines](pipelines.md). rlsbl supports the targets in this table, and no others:
+A release target is the ecosystem a member's version lives in: it decides which files a release writes the version into, which tags the release owes besides the releasable's own, how the built-in tests run, and how `rlsbl dev install --no-uninstall` installs the member. Publishing is a separate concern, declared as [pipelines](pipelines.md). rlsbl supports the targets in this table, and no others:
 
 :-: table-targets
 
@@ -44,19 +44,19 @@ A Go module is published by its tag, and the module proxy resolves a module belo
 - `go.mod` is parsed strictly; one the go command refuses is an error naming it. The checks `go-module-identity`, `go-module-major-suffix`, and `go-toolchain-declared` hold every module's path and toolchain line, and `go-workspace-require-current` and `go-workspace-replace` its relations to the workspace's other modules.
 - A release refuses a module whose `go mod tidy` would change it, since the release's own tidy would commit dependency edits nobody made.
 - The built-in tests run `go test ./... -race -short -count=1` in the module's directory, or the member's `test.go_command`.
-- `rlsbl dev install --target global` runs `go install` for each main package the member's go pipeline names in `install_paths`; a module with main packages and no `install_paths` is refused.
+- `rlsbl dev install --target global --no-uninstall` runs `go install` for each main package the member's go pipeline names in `install_paths`; a module with main packages and no `install_paths` is refused.
 
 ### npm
 
 - The package manager is read from the lockfile (`pnpm-lock.yaml`, `yarn.lock`, or `package-lock.json`), and the CI workflow is rendered for that package manager.
 - `npm-private-mismatch` refuses a `package.json` with `"private": true` in a releasable that publishes from CI.
-- The built-in tests run `npm test`. `rlsbl dev install` runs `npm link` globally and `npm install` into the project.
+- The built-in tests run `npm test`. `rlsbl dev install --no-uninstall` runs `npm link` with `--target global` and `npm install` with `--target venv`.
 
 ### pypi
 
 - uv is required: the built-in tests run `uv run python -P -m pytest` after a sync, and there is no fallback to a bare pytest.
 - The build rewrites a workspace member's path dependencies on its siblings into registry constraints for the published artifact, keeping each dependency's extras and environment marker.
-- `rlsbl dev install` runs `uv tool install -e .` globally and `uv sync --all-packages` into the project.
+- `rlsbl dev install --no-uninstall` runs `uv tool install -e .` with `--target global` and `uv sync --all-packages` with `--target venv`.
 
 ## The support matrix
 
