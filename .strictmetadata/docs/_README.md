@@ -118,7 +118,7 @@ See [workspaces](.strictmetadata/docs/monorepo.md) and [repository conversions](
 
 ## Lifecycle and license
 
-Each repository keeps a record of every releasable's dated lifecycle (active, on hold, retired), license, and identities in `.strictmetadata/lifecycle-and-license/lifecycle-and-license.toml`. A releasable whose license is `proprietary` makes the repository confidential: it must be private on GitHub, publishes nothing anywhere public, and its names are kept out of every public commit, page, and artifact. The `rlsbl transition` commands write the record. See [lifecycle and license](.strictmetadata/docs/lifecycle-and-license.md).
+Each repository keeps a record of every releasable's dated lifecycle (active, on hold, retired; a releasable with no lifecycle period is active once released and unreleased before, which refuses its releases), license, and identities in `.strictmetadata/lifecycle-and-license/lifecycle-and-license.toml`. A releasable whose license is `proprietary` makes the repository confidential: it must be private on GitHub, publishes nothing anywhere public, and its names are kept out of every public commit, page, and artifact. The `rlsbl transition` commands write the record. See [lifecycle and license](.strictmetadata/docs/lifecycle-and-license.md).
 
 ## Ecosystem tagging
 
