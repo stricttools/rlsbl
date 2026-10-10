@@ -953,7 +953,7 @@
     },
     "status": {
       "name": "status",
-      "help": "Report on the member whose directory holds the working directory and one of its targets: the package name and version the target's manifest declares, the branch and whether the working tree is clean, the latest release in the releasable's release archives (annotated when this checkout does not contain it, when its commit is unrecoverable, and with the versions archived above it that were never released), whether the changelog holds the released file of the current version, changelog coverage of the commits since the nearest release this checkout contains (covered of those needing an entry, and how many are exempt), the member's own CI workflows and publish workflow, and a warning when commits needing an entry wait since the nearest release. A member with several targets needs --target naming one; a workspace root whose root member has no target is refused, naming `rlsbl monorepo status`. With --registry, the registry's package listing (npm's or PyPI's package document, or the Go module proxy's version list) is read for the latest published version and compared with the local one; no request names a single version, a registry that fails to answer is an error, and a member whose releasable publishes nothing is not asked about.",
+      "help": "Report on the member whose directory holds the working directory and one of its targets: the package name and version the target's manifest declares, the branch and whether the working tree is clean, the releasable's lifecycle status today (the status of its lifecycle period in effect, and otherwise active when its archives record a release and unreleased when they do not; an unreleased releasable's releases are refused until an active period is recorded), the latest release in the releasable's release archives (annotated when this checkout does not contain it, when its commit is unrecoverable, and with the versions archived above it that were never released), whether the changelog holds the released file of the current version, changelog coverage of the commits since the nearest release this checkout contains (covered of those needing an entry, and how many are exempt), the member's own CI workflows and publish workflow, and a warning when commits needing an entry wait since the nearest release. A member with several targets needs --target naming one; a workspace root whose root member has no target is refused, naming `rlsbl monorepo status`. With --registry, the registry's package listing (npm's or PyPI's package document, or the Go module proxy's version list) is read for the latest published version and compared with the local one; no request names a single version, a registry that fails to answer is an error, and a member whose releasable publishes nothing is not asked about.",
       "effect": "read_only",
       "payload_schema": {
         "additionalProperties": false,
@@ -1048,6 +1048,19 @@
               "null"
             ]
           },
+          "lifecycle": {
+            "enum": [
+              "active",
+              "on-hold",
+              "retired",
+              "unreleased",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "member": {
             "type": "string"
           },
@@ -1115,6 +1128,7 @@
           "latest_release_in_checkout",
           "latest_release_label",
           "latest_release_state",
+          "lifecycle",
           "member",
           "name",
           "nearest_release_tag",
@@ -1499,7 +1513,7 @@
         },
         "init": {
           "name": "init",
-          "help": "Write .strictmetadata/releasables/releasables.toml for a repository that declares nothing yet, as a workspace whose only member is the root member (path \".\", named root), which owns every file no other member claims. --root-member states what the root member is: root-dev-node declares it dev-only and versioned under no releasable, so its files need no changelog entry; root-releasable versions it under the releasable --releasable names, created with the --tag-format and --publish-mode stated (neither has a default), and a root releasable publishing from CI states --publish-ci-check-pattern, the pattern of the check-run names the root's own CI reports, which publishing waits for. The root releasable also states --license, an SPDX identifier or proprietary (which requires GitHub to report the repository private, as `rlsbl transition classify` does), and the lifecycle-and-license record gains its active lifecycle period, its license period, and its releasable-name identity owning its tag namespace, from today. --release-branch names each branch a release may run from. A repository whose declarations exist is refused. The declarations and the record are committed unless --no-auto-commit is passed; when the commit fails, the files the init created are removed again through saferm and a record it changed is put back as it was, so running it again starts afresh.",
+          "help": "Write .strictmetadata/releasables/releasables.toml for a repository that declares nothing yet, as a workspace whose only member is the root member (path \".\", named root), which owns every file no other member claims. --root-member states what the root member is: root-dev-node declares it dev-only and versioned under no releasable, so its files need no changelog entry; root-releasable versions it under the releasable --releasable names, created with the --tag-format and --publish-mode stated (neither has a default), and a root releasable publishing from CI states --publish-ci-check-pattern, the pattern of the check-run names the root's own CI reports, which publishing waits for. The root releasable also states --license, an SPDX identifier or proprietary (which requires GitHub to report the repository private, as `rlsbl transition classify` does), and the lifecycle-and-license record gains its license period and its releasable-name identity owning its tag namespace, from today, and no lifecycle period: the new releasable is unreleased, and its releases are refused until `rlsbl transition lifecycle --status active` records the owner's decision to release it. --release-branch names each branch a release may run from. A repository whose declarations exist is refused. The declarations and the record are committed unless --no-auto-commit is passed; when the commit fails, the files the init created are removed again through saferm and a record it changed is put back as it was, so running it again starts afresh.",
           "effect": "mutating",
           "dry_run_supported": false,
           "dry_run_unsupported_reason": "it writes the declarations every other command reads, and there are no declarations to preview against until they exist",
@@ -1601,7 +1615,7 @@
         },
         "add": {
           "name": "add",
-          "help": "Declare the directory at <path> (relative to the repository root) as a member of the workspace, then scaffold it as `rlsbl scaffold` does, which regenerates the workspace's CI router and publish router, and commit what the three wrote as one commit. The member is named --name, or its directory's name. It needs a release target: one detected from its manifests, or the one --target names, which the scaffold declares when it is not detected. --releasable names the releasable it is versioned under, or is false for none; naming a releasable the workspace does not declare creates it, and then --tag-format and --publish-mode are required, because a tag scheme and a publish mode are stated, never derived, and so is --license, an SPDX identifier or proprietary (which requires GitHub to report the repository private, as `rlsbl transition classify` does); all three are refused when no releasable is created. A created releasable gets its active lifecycle period, its license period, and its releasable-name identity owning its tag namespace in the lifecycle-and-license record, from today, written before the scaffold, which renders the member's LICENSE from it. --depends-on names a member it depends on (repeatable), --library and --dev-only mark it, and --registry-name is its name on the registries. Every refusal is made before anything is written. When the scaffold, the routers, or the commit fails, every path the add changed is put back as it was and nothing is committed. A path that had uncommitted changes before the add and is written by it is left uncommitted and named. --no-auto-commit leaves everything uncommitted. Under --dry-run the declarations are previewed and the scaffold is named, not previewed, since it renders from the declarations the preview did not write.",
+          "help": "Declare the directory at <path> (relative to the repository root) as a member of the workspace, then scaffold it as `rlsbl scaffold` does, which regenerates the workspace's CI router and publish router, and commit what the three wrote as one commit. The member is named --name, or its directory's name. It needs a release target: one detected from its manifests, or the one --target names, which the scaffold declares when it is not detected. --releasable names the releasable it is versioned under, or is false for none; naming a releasable the workspace does not declare creates it, and then --tag-format and --publish-mode are required, because a tag scheme and a publish mode are stated, never derived, and so is --license, an SPDX identifier or proprietary (which requires GitHub to report the repository private, as `rlsbl transition classify` does); all three are refused when no releasable is created. A created releasable gets its license period and its releasable-name identity owning its tag namespace in the lifecycle-and-license record, from today, and no lifecycle period (it is unreleased, and its releases are refused until `rlsbl transition lifecycle --status active` records the owner's decision to release it), written before the scaffold, which renders the member's LICENSE from it. --depends-on names a member it depends on (repeatable), --library and --dev-only mark it, and --registry-name is its name on the registries. Every refusal is made before anything is written. When the scaffold, the routers, or the commit fails, every path the add changed is put back as it was and nothing is committed. A path that had uncommitted changes before the add and is written by it is left uncommitted and named. --no-auto-commit leaves everything uncommitted. Under --dry-run the declarations are previewed and the scaffold is named, not previewed, since it renders from the declarations the preview did not write.",
           "effect": "mutating",
           "flags": [
             {
@@ -1815,7 +1829,7 @@
         },
         "status": {
           "name": "status",
-          "help": "Report on every releasable and member of the workspace. Each releasable's row holds its version file's version (empty before its first release), its latest release (annotated when this checkout does not contain it), its changelog coverage (the commits since the nearest release this checkout contains that touch its members or its records, covered/needing an entry, with the exempt ones counted apart, as `rlsbl status` counts them; a fork leaves out its upstream's history), and its members. Each member's row holds its targets, its version (its first target's, or its releasable's version file when that releasable publishes nothing, since nothing bumps its manifests), its releasable, its flags, and how many members it depends on and how many depend on it. A manifest the dependency graph cannot read is refused.",
+          "help": "Report on every releasable and member of the workspace. Each releasable's row holds its lifecycle status today (its lifecycle period's in effect, and otherwise active when its archives record a release and unreleased when they do not), its version file's version (empty before its first release), its latest release (annotated when this checkout does not contain it), its changelog coverage (the commits since the nearest release this checkout contains that touch its members or its records, covered/needing an entry, with the exempt ones counted apart, as `rlsbl status` counts them; a fork leaves out its upstream's history), and its members. Each member's row holds its targets, its version (its first target's, or its releasable's version file when that releasable publishes nothing, since nothing bumps its manifests), its releasable, its flags, and how many members it depends on and how many depend on it. A manifest the dependency graph cannot read is refused.",
           "effect": "read_only",
           "payload_schema": {
             "additionalProperties": false,
@@ -1907,6 +1921,9 @@
                     "latest": {
                       "type": "string"
                     },
+                    "lifecycle": {
+                      "type": "string"
+                    },
                     "members": {
                       "items": {
                         "type": "string"
@@ -1926,6 +1943,7 @@
                   "required": [
                     "coverage",
                     "latest",
+                    "lifecycle",
                     "members",
                     "name",
                     "version"
@@ -2602,7 +2620,7 @@
         },
         "absorb": {
           "name": "absorb",
-          "help": "Bring the repository at <source_repo> into this workspace as a member at <dest_path>. Its history is rewritten under that path by git-filter-repo on a clone inside this repository's git directory, fetched without tags, and merged; the merge carries trailers naming the member, the source's root commit, and the releasable, by which a run completing an interrupted absorb finds it. Its version tags are created under the releasable's scheme at the rewritten commits, and its tag of the current version beside them under its own name; no tag here is ever moved or deleted. Its records move into the new layout: its changelog and release archives into the releasable's directories, every commit id and release commit mapped through the commit map and every recorded tree checked at the new commit; its lifecycle-and-license entries into this repository's record under the member's name, with the source recorded as the member's closed repository-url identity; and its transition record's events into this repository's, scoped to the releasable. The arriving changelog and release directories and its CHANGELOG.md are then deleted (through saferm unless --delete-with-rm is passed); the rest of its .strictmetadata/ is residue `rlsbl monorepo cleanup` removes. The member is declared and scaffolded (which regenerates the routers), and the absorb is recorded in the transition record, each committed. --releasable joins a declared releasable; without it a releasable named after the member is created with the stated --tag-format and --license (an SPDX identifier, or proprietary, which requires GitHub to report this repository private), and with --publish-mode when the source declares none (the source's own otherwise); --license is refused with --releasable. The created releasable keeps the arriving lifecycle period and license period when the source's record holds them (a different --license is refused), and is given otherwise an active lifecycle period and a license period under --license from today, and its releasable-name identity under its own name. The source may be a standalone project in the new layout or declare nothing; one in the old layout or a workspace is refused. Refused before anything is written: a dirty source or workspace, a destination path taken, a name taken, a tag or version this workspace holds already, a version the source cannot state, and records the result would leave invalid. The source repository is never changed, and nothing is pushed. Use --dry-run to print the plan.",
+          "help": "Bring the repository at <source_repo> into this workspace as a member at <dest_path>. Its history is rewritten under that path by git-filter-repo on a clone inside this repository's git directory, fetched without tags, and merged; the merge carries trailers naming the member, the source's root commit, and the releasable, by which a run completing an interrupted absorb finds it. Its version tags are created under the releasable's scheme at the rewritten commits, and its tag of the current version beside them under its own name; no tag here is ever moved or deleted. Its records move into the new layout: its changelog and release archives into the releasable's directories, every commit id and release commit mapped through the commit map and every recorded tree checked at the new commit; its lifecycle-and-license entries into this repository's record under the member's name, with the source recorded as the member's closed repository-url identity; and its transition record's events into this repository's, scoped to the releasable. The arriving changelog and release directories and its CHANGELOG.md are then deleted (through saferm unless --delete-with-rm is passed); the rest of its .strictmetadata/ is residue `rlsbl monorepo cleanup` removes. The member is declared and scaffolded (which regenerates the routers), and the absorb is recorded in the transition record, each committed. --releasable joins a declared releasable; without it a releasable named after the member is created with the stated --tag-format and --license (an SPDX identifier, or proprietary, which requires GitHub to report this repository private), and with --publish-mode when the source declares none (the source's own otherwise); --license is refused with --releasable. The created releasable keeps the arriving lifecycle period and license period when the source's record holds them (a different --license is refused), and is given otherwise a license period under --license from today and no lifecycle period (its status is derived: active when the arriving archives record a release, unreleased when they do not), and its releasable-name identity under its own name. The source may be a standalone project in the new layout or declare nothing; one in the old layout or a workspace is refused. Refused before anything is written: a dirty source or workspace, a destination path taken, a name taken, a tag or version this workspace holds already, a version the source cannot state, and records the result would leave invalid. The source repository is never changed, and nothing is pushed. Use --dry-run to print the plan.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
@@ -3564,7 +3582,7 @@
       "commands": {
         "records": {
           "name": "records",
-          "help": "Convert the rlsbl records of the repository holding the working directory to the .strictmetadata/ layout, once: the release declarations (releasables.toml, from every config.json, workspace.toml, and releasable.toml), the test runner's settings, each releasable's changelog (every line restamped to format_version 2, an id minted where a line has none, a batch exclusion moved onto the entry it exempts as batch_reason), its release file, archives, version file, and undo audits (a pre-release of the dropped pre-release channel, MAJOR.MINOR.PATCH-alpha.N, -beta.N, or -rc.N, is folded: its changelog entries move into the file of the stable version it preceded when that version was released, and into the unreleased file otherwise, an entry naming the commits a kept entry names left out, its archive is not carried, and its tag, when this repository holds it, is recorded as an unversioned tag; a retired subject's pre-releases are refused, naming the hand edit), the batch release files, the transition record's surgery events, the scaffold state and merge bases, customized hook scripts (each moved to .strictmetadata/release-hooks/ and run by a hooks declaration), .strictmetadata/go.mod, the options entries of renamed options and of those that moved to strictcode, and strictcode.toml (the tool declarations, the library lint lists, the dead-modules suppressions, and ruff-lint's coverage as strictcode's lint rule). It writes the lifecycle-and-license record: one active lifecycle period and one license period per releasable from today, a retired period per closed release history (whose release state moves to .strictmetadata/retired-release-histories/), the releasable-name identities with their renames, the identity transitions (pending until their version is released), the registry names of every releasable and retired subject that published from CI (a retired subject's read at its release commits), and the unversioned tags. A license comes from the package manifests or from --licenses, never from a LICENSE file. GitHub's visibility of the repository is read with gh. Every refusal is reported before anything is written, each naming its fix: a value the new layout has no place for, a target other than go, npm, and pypi, a retired key, a missing license, a private repository with no releasable declared proprietary, configs disagreeing on a repository-wide value, a release or history rewrite in progress, a file of the old layout it does not recognize, and an uncommitted change to any path it writes or removes. Otherwise it writes the new records, regenerates the changelogs, removes the old layout through saferm, and commits the paths it wrote or removed, and no others, with the Autogenerated trailer; uncommitted changes to other paths are listed and left alone. A repository already converted has nothing to do. Use --dry-run to print, per file, the source, the destination, and the change, and every refusal, writing nothing.",
+          "help": "Convert the rlsbl records of the repository holding the working directory to the .strictmetadata/ layout, once: the release declarations (releasables.toml, from every config.json, workspace.toml, and releasable.toml), the test runner's settings, each releasable's changelog (every line restamped to format_version 2, an id minted where a line has none, a batch exclusion moved onto the entry it exempts as batch_reason), its release file, archives, version file, and undo audits (a pre-release of the dropped pre-release channel, MAJOR.MINOR.PATCH-alpha.N, -beta.N, or -rc.N, is folded: its changelog entries move into the file of the stable version it preceded when that version was released, and into the unreleased file otherwise, an entry naming the commits a kept entry names left out, its archive is not carried, and its tag, when this repository holds it, is recorded as an unversioned tag; a retired subject's pre-releases are refused, naming the hand edit), the batch release files, the transition record's surgery events, the scaffold state and merge bases, customized hook scripts (each moved to .strictmetadata/release-hooks/ and run by a hooks declaration), .strictmetadata/go.mod, the options entries of renamed options and of those that moved to strictcode, and strictcode.toml (the tool declarations, the library lint lists, the dead-modules suppressions, and ruff-lint's coverage as strictcode's lint rule). It writes the lifecycle-and-license record: one license period per releasable from today (no lifecycle period: a releasable's status is derived, active when its archives record a release and unreleased when they do not), a retired period per closed release history (whose release state moves to .strictmetadata/retired-release-histories/), the releasable-name identities with their renames, the identity transitions (pending until their version is released), the registry names of every releasable and retired subject that published from CI (a retired subject's read at its release commits), and the unversioned tags. A license comes from the package manifests or from --licenses, never from a LICENSE file. GitHub's visibility of the repository is read with gh. Every refusal is reported before anything is written, each naming its fix: a value the new layout has no place for, a target other than go, npm, and pypi, a retired key, a missing license, a private repository with no releasable declared proprietary, configs disagreeing on a repository-wide value, a release or history rewrite in progress, a file of the old layout it does not recognize, and an uncommitted change to any path it writes or removes. Otherwise it writes the new records, regenerates the changelogs, removes the old layout through saferm, and commits the paths it wrote or removed, and no others, with the Autogenerated trailer; uncommitted changes to other paths are listed and left alone. A repository already converted has nothing to do. Use --dry-run to print, per file, the source, the destination, and the change, and every refusal, writing nothing.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
@@ -3974,7 +3992,7 @@
     },
     "transition": {
       "name": "transition",
-      "help": "The lifecycle-and-license record, .strictmetadata/lifecycle-and-license/lifecycle-and-license.toml: each releasable's dated lifecycle (active, on-hold, retired), license, and identity periods, the registry names it holds, the tags that release no version: license and lifecycle facts only (confidential terms live in the confidential-term list, which a release scans for). A repository is confidential while a releasable's license is proprietary. A command that opens a period closes the subject's period in effect on today's date first. A command that changes the record validates the whole record against the declarations, writes it, and commits it with the Autogenerated trailer, together with whatever else its own help says it changes.",
+      "help": "The lifecycle-and-license record, .strictmetadata/lifecycle-and-license/lifecycle-and-license.toml: each releasable's dated lifecycle (active, on-hold, retired; without a period in effect, active once released and unreleased before), license, and identity periods, the registry names it holds, the tags that release no version: license and lifecycle facts only (confidential terms live in the confidential-term list, which a release scans for). A repository is confidential while a releasable's license is proprietary. A command that opens a period closes the subject's period in effect on today's date first. A command that changes the record validates the whole record against the declarations, writes it, and commits it with the Autogenerated trailer, together with whatever else its own help says it changes.",
       "commands": {
         "show": {
           "name": "show",
@@ -4140,6 +4158,29 @@
                 },
                 "type": "array"
               },
+              "statuses": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "derived": {
+                      "type": "boolean"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "subject": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "derived",
+                    "status",
+                    "subject"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
               "unversioned_tags": {
                 "items": {
                   "additionalProperties": false,
@@ -4205,6 +4246,7 @@
               "problems",
               "record_file",
               "registry_names",
+              "statuses",
               "unversioned_tags",
               "verdicts"
             ],
@@ -4213,7 +4255,7 @@
         },
         "lifecycle": {
           "name": "lifecycle",
-          "help": "Close a releasable's or member's lifecycle period on today's date and open one with --status: active, on-hold (its releases are refused), or retired (its release history is a record). The subject is declared, or one the record already holds a lifecycle period of. A status the subject already has is refused.",
+          "help": "Close a releasable's or member's lifecycle period on today's date and open one with --status: active, on-hold (its releases are refused), or retired (its release history is a record). A releasable without a lifecycle period in effect has a derived status, never recorded: active when its release archives record a release, and unreleased when they do not, which refuses its releases. Recording active for an unreleased releasable is the owner's decision that allows its first release. The subject is declared, or one the record already holds a lifecycle period of. A status its lifecycle period in effect already holds is refused.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
@@ -4240,7 +4282,7 @@
               "choices": [
                 {
                   "value": "active",
-                  "help": "released as usual"
+                  "help": "released as usual; for an unreleased releasable, its first release is allowed"
                 },
                 {
                   "value": "on-hold",
