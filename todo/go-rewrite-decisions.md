@@ -104,3 +104,7 @@ Made by the session leading the campaign, not by the owner.
 - `release undo --version` evidence and the registry probe in `rewrite uv-path-sources` use package-level listings of already-published versions, with tests; no request ever names one of our unpublished versions.
 - A releasable whose lifecycle is on-hold refuses releases.
 - browserbuddy's names leave the confidential-name index through its public-client declaration (`rlsbl transition public-client`), since its published npm and PyPI packages keep their names; this supersedes the line under "Lifecycle and license" by which its names entered the index (decided during the release campaign).
+
+## The unreleased lifecycle status
+
+- A releasable that has never been released is unreleased, and its releases are refused. The status is derived, never recorded: a releasable whose release record holds no release and that has no active lifecycle period is unreleased, with nothing written to its lifecycle-and-license record. The refusal names the transition command, and the deliberate transition to `active` (an explicit active period, written by `rlsbl transition lifecycle`) is what allows its first release. Releasables that already have releases are active as before, and every never-released releasable in the family is unreleased.
