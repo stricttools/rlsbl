@@ -31,7 +31,7 @@ reason = "first release"
 ` + portalName
 
 // portalName is portal's releasable-name identity since the start of the
-// year, by which the confidential-name index keys the repository.
+// year.
 const portalName = `
 [[identities]]
 subject = "portal"

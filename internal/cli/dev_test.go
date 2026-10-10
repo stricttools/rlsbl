@@ -28,8 +28,7 @@ func fakePrograms(t *testing.T, names ...string) string {
 		}
 	}
 	// Put first, the fakes shadow the programs they name; git stays
-	// reachable for the confidential-name index refresh every mutating
-	// command makes.
+	// reachable for the commands that read the repository.
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	return dir
 }

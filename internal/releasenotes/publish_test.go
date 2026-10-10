@@ -345,14 +345,14 @@ func TestEveryReleaseBodyWriterRefusesAConfidentialTerm(t *testing.T) {
 	for name, write := range writers {
 		err := withGH(t, func(c github.Client) error { return write(c, scanner(t, "moonbeam"), leaky) })
 		if err == nil || !strings.Contains(err.Error(), "confidential") || !strings.Contains(err.Error(), "the GitHub Release body of v0.4.0") {
-			t.Errorf("%s wrote a body naming a confidential name: %v", name, err)
+			t.Errorf("%s wrote a body naming a confidential term: %v", name, err)
 		}
 		if err := withGH(t, func(c github.Client) error { return write(c, nil, doc(t)) }); err == nil {
 			t.Errorf("%s wrote without a scanner", name)
 		}
 	}
 	if err := withGH(t, func(c github.Client) error { return releasenotes.Check(scanner(t, "moonbeam"), leaky) }); err == nil {
-		t.Error("Check passed a body naming a confidential name")
+		t.Error("Check passed a body naming a confidential term")
 	}
 	for _, c := range gh.Calls() {
 		if c.Args[1] == "create" || c.Args[1] == "edit" {
