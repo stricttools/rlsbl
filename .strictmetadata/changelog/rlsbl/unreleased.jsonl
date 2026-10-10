@@ -3,3 +3,4 @@
 {"format_version":2,"id":"18dd44c08ed8388724900c529e13465eadd66e1ca936dd10","commits":["c76b44b9b93afe361b3fbeeb205e396b7c70a7bf"],"user_facing":true,"description":"**A confidential repository's packed artifacts are scanned for confidential terms.** A registry is public whatever the repository is, so a release from a confidential repository scans the artifacts it publishes, and records the resolutions it used.","type":"feature"}
 {"format_version":2,"id":"18dd4564c2bf55355270fc493e28479696cf30335ef04fbb","commits":["71d2a3f9401657e15ac763d8b2a821195e863ca8"],"user_facing":false}
 {"format_version":2,"id":"18dd4648229054365280fef9b43842a196bf0d9a73ba0450","commits":["da15aebbd6c421ff9c6a577cb474156509d4c262"],"user_facing":false}
+{"format_version":2,"id":"18dd465184b9ba5218bc0519caa64f1f8ffcc3e3239c2904","commits":["3cb89b5edce151d48b1277121e379c122d0ab160"],"user_facing":false}
