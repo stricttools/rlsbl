@@ -342,3 +342,58 @@ func TestTheObserveAllowlistAdmitsFilesHoldingsGrep(t *testing.T) {
 		t.Fatalf("the observe allowlist does not admit git %s", strings.Join(git.GrepArgv, " "))
 	}
 }
+
+func TestBlobsReadsManyObjectsByteExact(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := testsupport.NewRepo(t)
+	repo.Write("a.txt", "first\n")
+	repo.Write("b.txt", "")
+	repo.Write("c.txt", "no final newline")
+	repo.Git("add", "-A")
+	repo.Git("commit", "-q", "-m", "three files")
+	ids := map[string]string{}
+	for _, f := range []string{"a.txt", "b.txt", "c.txt"} {
+		ids[f] = repo.Git("rev-parse", "HEAD:"+f)
+	}
+	reading(t, repo.Dir, func(r git.Repo) error {
+		got, err := r.Blobs([]string{ids["a.txt"], ids["b.txt"], ids["c.txt"], ids["a.txt"]})
+		if err != nil {
+			return err
+		}
+		if got[ids["a.txt"]] != "first\n" || got[ids["b.txt"]] != "" || got[ids["c.txt"]] != "no final newline" || len(got) != 3 {
+			return fmt.Errorf("blobs %q", got)
+		}
+		if _, err := r.Blobs([]string{strings.Repeat("d", 40)}); err == nil {
+			return errors.New("a missing object was read")
+		}
+		return nil
+	})
+}
+
+func TestRangeChangesNamesTheBlobAPathHeldBefore(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := testsupport.NewRepo(t)
+	first := repo.CommitFile("a.txt", "one\n", "add")
+	second := repo.CommitFile("a.txt", "two\n", "change")
+	reading(t, repo.Dir, func(r git.Repo) error {
+		commits, err := r.RangeChanges([]string{second}, []string{first})
+		if err != nil {
+			return err
+		}
+		if len(commits) != 1 || len(commits[0].Changes) != 1 {
+			return fmt.Errorf("commits %+v", commits)
+		}
+		ch := commits[0].Changes[0]
+		if ch.OldBlob != repo.Git("rev-parse", first+":a.txt") || ch.Blob != repo.Git("rev-parse", second+":a.txt") {
+			return fmt.Errorf("change %+v", ch)
+		}
+		added, err := r.RangeChanges([]string{first}, nil)
+		if err != nil {
+			return err
+		}
+		if len(added) != 1 || added[0].Changes[0].OldBlob != "" {
+			return fmt.Errorf("an added path names a blob it held before: %+v", added)
+		}
+		return nil
+	})
+}

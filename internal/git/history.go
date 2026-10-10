@@ -327,3 +327,54 @@ func (r Repo) TrackedAndUntrackedFiles() ([]string, error) {
 	}
 	return nulFields(out), nil
 }
+
+// Blobs is the content of each blob object, byte for byte, read through one
+// git cat-file --batch. A missing object or one that is not a blob is an
+// error.
+func (r Repo) Blobs(objects []string) (map[string]string, error) {
+	out := make(map[string]string, len(objects))
+	var unique []string
+	for _, o := range objects {
+		if _, seen := out[o]; !seen {
+			out[o] = ""
+			unique = append(unique, o)
+		}
+	}
+	if len(unique) == 0 {
+		return out, nil
+	}
+	args := []string{"cat-file", "--batch"}
+	res, err := r.read(localTimeout, []byte(strings.Join(unique, "\n")+"\n"), args...)
+	if err != nil {
+		return nil, err
+	}
+	if res.code != 0 {
+		return nil, r.failed(args, res)
+	}
+	rest := res.stdout
+	for _, object := range unique {
+		header, body, ok := strings.Cut(rest, "\n")
+		if !ok {
+			return nil, fmt.Errorf("git cat-file --batch in %s stopped before %s", r.dir, object)
+		}
+		fields := strings.Fields(header)
+		if len(fields) == 2 && fields[1] == "missing" {
+			return nil, fmt.Errorf("object %s is missing from %s", object, r.dir)
+		}
+		if len(fields) != 3 {
+			return nil, fmt.Errorf("git cat-file --batch in %s printed an unreadable header %q", r.dir, header)
+		}
+		if fields[1] != "blob" {
+			return nil, fmt.Errorf("object %s is a %s, not a blob", object, fields[1])
+		}
+		size, err := strconv.Atoi(fields[2])
+		if err != nil || size > len(body) {
+			return nil, fmt.Errorf("git cat-file --batch in %s printed a header %q that does not match the content", r.dir, header)
+		}
+		out[object] = body[:size]
+		// Each object's content ends in a newline git adds, which the read
+		// may have trimmed after the last one.
+		rest = strings.TrimPrefix(body[size:], "\n")
+	}
+	return out, nil
+}

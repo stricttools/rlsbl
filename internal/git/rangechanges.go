@@ -13,10 +13,13 @@ type RangeCommit struct {
 	Changes []BlobChange
 }
 
-// BlobChange is one blob a commit adds or changes, at its path.
+// BlobChange is one blob a commit adds or changes, at its path, and the
+// blob the path held before (against the parent the change is taken
+// against), empty when the commit adds the path.
 type BlobChange struct {
-	Path string
-	Blob string
+	Path    string
+	Blob    string
+	OldBlob string
 }
 
 // RangeChanges lists the commits reachable from every include revision and
@@ -84,11 +87,14 @@ func (r Repo) RangeChanges(include, exclude []string) ([]RangeCommit, error) {
 		}
 		i++
 		path := tokens[i]
-		newMode, newBlob, status := meta[1], meta[3], meta[4]
+		oldMode, newMode, oldBlob, newBlob, status := meta[0], meta[1], meta[2], meta[3], meta[4]
 		if status == "D" || newMode == "160000" || IsNullObjectID(newBlob) {
 			continue
 		}
-		commits[current].Changes = append(commits[current].Changes, BlobChange{Path: path, Blob: newBlob})
+		if IsNullObjectID(oldBlob) || strings.TrimPrefix(oldMode, ":") == "160000" {
+			oldBlob = ""
+		}
+		commits[current].Changes = append(commits[current].Changes, BlobChange{Path: path, Blob: newBlob, OldBlob: oldBlob})
 	}
 	return commits, nil
 }
