@@ -38,7 +38,7 @@ const releaseResumeHelp = "Continue the release in progress of the releasable th
 	"finalized, nothing is adopted any more: the resume finishes the release on the candidate the state records, and the commits made " +
 	"since it stopped stay on the branch, named, for the next release. A failed deploy or post-release " +
 	"hook runs again. Before anything is written, the resume is refused what release validation refuses about the lifecycle and " +
-	"publishing: a releasable or member on hold or retired, a repository whose visibility disagrees with the lifecycle-and-license record, an " +
+	"publishing: a releasable or member on hold or retired, an unreleased releasable, a repository whose visibility disagrees with the lifecycle-and-license record, an " +
 	"output the publishing rules forbid, and a deploy command on a releasable that may not deploy. --dry-run reports what would be adopted " +
 	"and which steps would run, and writes nothing."
 
