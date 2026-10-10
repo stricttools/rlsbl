@@ -2,4 +2,7 @@ go 1.26.3
 
 toolchain go1.26.6
 
-use .
+use (
+	.
+	../strictspec/go
+)
