@@ -42,6 +42,12 @@
     "description": "af92b1a151897b4489927194447cdec51c7fa5e04e06b1276bf99014b9fd4677",
     "schema_hash": "97ff010f1ebdc1d109947df8681a5e8b9978038ee5dc89512e30e88b45cb58e6"
   },
+  "en/cli-confidential.md": {
+    "content": "d5079b8255723f8179b4e0768cfb189a76558f1a30ff9fd96ddcb2213f450e0d",
+    "description": "20b16a8324ac4f2917414918df83651bd7bb64dcd7c215fb4111f5d41a4218b7",
+    "schema_hash": "bc0eaab8cab4e4f35c7b93eb2223ecdb9d5cd64d79c538f43e748eff4a855ade",
+    "seed_hash": "20b16a8324ac4f2917414918df83651bd7bb64dcd7c215fb4111f5d41a4218b7"
+  },
   "en/cli-dev.md": {
     "content": "cfc6e89cba5da78d60ecbf91a855f8ff6ecb416d97f9627d54d34ac347a92e82",
     "description": "5c1d7b36f9f18c8fbcaf4fab50ba780e714edda9dc09a44576e96d73755df9ff",
@@ -59,14 +65,14 @@
     "seed_hash": "714ac7a57eb755ee99fb4bb89966aeba7cd9faaae19b83c604ca9e151162efe8"
   },
   "en/cli-index.md": {
-    "content": "8355820642d510e58d2f3735189780fd03f4a829a9a69be188129693c6997307",
+    "content": "0ed144182f1327a1dd087b082677ff77fbc933e585e87ea93c0d025a2ec8b7f6",
     "description": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2",
     "seed_hash": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2"
   },
   "en/cli-migrate.md": {
-    "content": "a507302fab42430b0c4f3964aa03bd3880c5e7fa336c190530db7b248aa120ce",
+    "content": "e3053dae785e6f419f11fd8d10162e113903b21df5e248dcb19771e7d3557fe3",
     "description": "952dd13c76a195f2b38923324890903577400c92380d6f77b36ae558e6af4ed3",
-    "schema_hash": "8e46c99ad31754a33ff749ad4c4576a104cc7567df263a5ce2207fd1a138f19c",
+    "schema_hash": "8fcf68530445c246e877211c0b1cf26968436b5b3b5c356a876574cd66259448",
     "seed_hash": "952dd13c76a195f2b38923324890903577400c92380d6f77b36ae558e6af4ed3"
   },
   "en/cli-monorepo.md": {
@@ -147,6 +153,10 @@
     "content": "5802cb040c0858d3b78be18d27f7ee59353ee83535ffb9eb0b1af39f03fe0ca2",
     "description": "f33573dba833ae9ad00e5d2b2be499b764e0c07ab9b17bb5715d646b6bfee5d0",
     "source_docstring": "2703990b10cd383a0f761f078f4a930cecfaa83037f5cba14ce7f66cf4ae78b3"
+  },
+  "en/confidential-terms.md": {
+    "content": "556d23f1693b35403a92f3075746437dc0a85f82edea413edc6c0bba3929724e",
+    "description": "93860836a1e05a783a2b7ef14b22e63413a1673e7b960ee09bba7c7933cfeec8"
   },
   "en/configuration.md": {
     "content": "9ee91618f84f7cfc28c2e6c3799f80e976d240b5212de1963f8cc56fb69aa01f",

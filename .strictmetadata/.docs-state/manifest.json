@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "name": "release-checkout",
+  "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.132.0",
+  "version": "0.132.1",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, and the Go module proxy",
   "language": "go",
   "base_url": "https://smmh.dev/rlsbl",
@@ -360,6 +360,38 @@
           "level": 2,
           "text": "Arguments",
           "anchor": "arguments"
+        }
+      ]
+    },
+    {
+      "path": "cli-confidential.md",
+      "title": "rlsbl confidential",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "rlsbl confidential",
+          "anchor": "rlsbl-confidential"
+        },
+        {
+          "level": 2,
+          "text": "confidential judge-false-positive",
+          "anchor": "confidential-judge-false-positive"
+        },
+        {
+          "level": 3,
+          "text": "Flags",
+          "anchor": "flags"
+        },
+        {
+          "level": 2,
+          "text": "confidential approve-hit",
+          "anchor": "confidential-approve-hit"
+        },
+        {
+          "level": 3,
+          "text": "Flags",
+          "anchor": "flags-1"
         }
       ]
     },
@@ -1031,16 +1063,6 @@
         },
         {
           "level": 2,
-          "text": "transition public-client",
-          "anchor": "transition-public-client"
-        },
-        {
-          "level": 3,
-          "text": "Flags",
-          "anchor": "flags-6"
-        },
-        {
-          "level": 2,
           "text": "transition init-minimal-record",
           "anchor": "transition-init-minimal-record"
         }
@@ -1116,6 +1138,48 @@
           "level": 3,
           "text": "`Version`",
           "anchor": "version"
+        }
+      ]
+    },
+    {
+      "path": "confidential-terms.md",
+      "title": "Confidential terms",
+      "type": "doc",
+      "headings": [
+        {
+          "level": 1,
+          "text": "Confidential terms",
+          "anchor": "confidential-terms"
+        },
+        {
+          "level": 2,
+          "text": "The list",
+          "anchor": "the-list"
+        },
+        {
+          "level": 2,
+          "text": "What a release scans",
+          "anchor": "what-a-release-scans"
+        },
+        {
+          "level": 2,
+          "text": "Hits and their ids",
+          "anchor": "hits-and-their-ids"
+        },
+        {
+          "level": 2,
+          "text": "Resolving a hit",
+          "anchor": "resolving-a-hit"
+        },
+        {
+          "level": 2,
+          "text": "The release record",
+          "anchor": "the-release-record"
+        },
+        {
+          "level": 2,
+          "text": "Why it is built this way",
+          "anchor": "why-it-is-built-this-way"
         }
       ]
     },
@@ -2140,6 +2204,16 @@
         },
         {
           "level": 3,
+          "text": "`ConfidentialHits`",
+          "anchor": "confidentialhits"
+        },
+        {
+          "level": 3,
+          "text": "`ResolvableHits`",
+          "anchor": "resolvablehits"
+        },
+        {
+          "level": 3,
           "text": "`Context.ProjectRoot`",
           "anchor": "contextprojectroot"
         },
@@ -2250,8 +2324,8 @@
         },
         {
           "level": 3,
-          "text": "`Context.IndexPath`",
-          "anchor": "contextindexpath"
+          "text": "`Context.TermList`",
+          "anchor": "contexttermlist"
         },
         {
           "level": 3,
@@ -2656,6 +2730,16 @@
           "level": 3,
           "text": "`New`",
           "anchor": "new"
+        },
+        {
+          "level": 3,
+          "text": "`effectsStoreWriter.WriteFile`",
+          "anchor": "effectsstorewriterwritefile"
+        },
+        {
+          "level": 3,
+          "text": "`effectsStoreWriter.MkdirAll`",
+          "anchor": "effectsstorewritermkdirall"
         },
         {
           "level": 3,
@@ -4007,6 +4091,11 @@
         },
         {
           "level": 3,
+          "text": "`Repo.Blobs`",
+          "anchor": "repoblobs"
+        },
+        {
+          "level": 3,
           "text": "`Repo.PushChangedFiles`",
           "anchor": "repopushchangedfiles"
         },
@@ -5090,23 +5179,8 @@
         },
         {
           "level": 3,
-          "text": "`ReportPublicClient`",
-          "anchor": "reportpublicclient"
-        },
-        {
-          "level": 3,
           "text": "`Verdict`",
           "anchor": "verdict"
-        },
-        {
-          "level": 3,
-          "text": "`RefreshIndex`",
-          "anchor": "refreshindex"
-        },
-        {
-          "level": 3,
-          "text": "`RenameInIndex`",
-          "anchor": "renameinindex"
         },
         {
           "level": 3,
@@ -5152,11 +5226,6 @@
           "level": 3,
           "text": "`Invocation.Classify`",
           "anchor": "invocationclassify"
-        },
-        {
-          "level": 3,
-          "text": "`Invocation.PublicClient`",
-          "anchor": "invocationpublicclient"
         },
         {
           "level": 3,
@@ -6147,6 +6216,11 @@
         },
         {
           "level": 3,
+          "text": "`ResolveFix`",
+          "anchor": "resolvefix"
+        },
+        {
+          "level": 3,
           "text": "`WorkflowsDir`",
           "anchor": "workflowsdir"
         },
@@ -6227,6 +6301,16 @@
         },
         {
           "level": 3,
+          "text": "`LoadScannerAt`",
+          "anchor": "loadscannerat"
+        },
+        {
+          "level": 3,
+          "text": "`RepositoryNames`",
+          "anchor": "repositorynames"
+        },
+        {
+          "level": 3,
           "text": "`ReleasableUses`",
           "anchor": "releasableuses"
         },
@@ -6287,6 +6371,41 @@
         },
         {
           "level": 3,
+          "text": "`Scanner.Matcher`",
+          "anchor": "scannermatcher"
+        },
+        {
+          "level": 3,
+          "text": "`Scanner.Resolutions`",
+          "anchor": "scannerresolutions"
+        },
+        {
+          "level": 3,
+          "text": "`Scanner.Status`",
+          "anchor": "scannerstatus"
+        },
+        {
+          "level": 3,
+          "text": "`Scanner.Used`",
+          "anchor": "scannerused"
+        },
+        {
+          "level": 3,
+          "text": "`Scanner.Resolve`",
+          "anchor": "scannerresolve"
+        },
+        {
+          "level": 3,
+          "text": "`Scanner.Refuse`",
+          "anchor": "scannerrefuse"
+        },
+        {
+          "level": 3,
+          "text": "`Scanner.HitsInTexts`",
+          "anchor": "scannerhitsintexts"
+        },
+        {
+          "level": 3,
           "text": "`Scanner.ScanTexts`",
           "anchor": "scannerscantexts"
         },
@@ -6294,6 +6413,11 @@
           "level": 3,
           "text": "`Scanner.ScanArtifacts`",
           "anchor": "scannerscanartifacts"
+        },
+        {
+          "level": 3,
+          "text": "`Scanner.HitsInRange`",
+          "anchor": "scannerhitsinrange"
         },
         {
           "level": 3,
@@ -8199,6 +8323,11 @@
           "level": 3,
           "text": "`RawReleaseFields`",
           "anchor": "rawreleasefields"
+        },
+        {
+          "level": 3,
+          "text": "`RawConfidentialHit`",
+          "anchor": "rawconfidentialhit"
         },
         {
           "level": 3,
@@ -11473,16 +11602,10 @@
       ]
     }
   ],
-  "last_gen": "2026-10-09T15:41:33.708754+00:00",
+  "last_gen": "2026-10-10T21:35:12.949921+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
-      {
-        "word": "codename",
-        "aliases": [
-          "codenames"
-        ]
-      },
       {
         "word": "esbuild",
         "aliases": []
