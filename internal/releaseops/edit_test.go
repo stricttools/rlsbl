@@ -18,11 +18,11 @@ func edit(t *testing.T, p *project, dryRun bool, version string) strictcli.Resul
 	})
 }
 
-func TestEditRewritesTheLatestReleaseFromTheRecord(t *testing.T) {
+func TestEditRewritesTheNamedReleaseFromTheRecord(t *testing.T) {
 	hygiene.Isolate(t)
 	p := portalWithTwoReleases(t)
 	gh := testsupport.FakeGH(t, authStatus, releaseExists("v0.4.0"), testsupport.GHAnswer{Args: rewriteArgs("v0.4.0", false)})
-	r := edit(t, p, false, "")
+	r := edit(t, p, false, "0.4.0")
 	requireExit(t, r, 0)
 	requireContains(t, r.Stdout, "Rewrote the GitHub Release of v0.4.0")
 	c, ok := called(gh.Calls(), rewriteArgs("v0.4.0", false))
@@ -53,11 +53,11 @@ func TestEditRefusesAMissingReleaseUntilItExists(t *testing.T) {
 	hygiene.Isolate(t)
 	p := portalWithTwoReleases(t)
 	testsupport.FakeGH(t, authStatus, releaseMissing("v0.4.0"))
-	r := edit(t, p, false, "")
+	r := edit(t, p, false, "0.4.0")
 	requireExit(t, r, 1)
 	requireContains(t, r.Stderr, "has no GitHub Release for v0.4.0", "rlsbl release reconcile")
 	testsupport.FakeGH(t, authStatus, releaseExists("v0.4.0"), testsupport.GHAnswer{Args: rewriteArgs("v0.4.0", false)})
-	requireExit(t, edit(t, p, false, ""), 0)
+	requireExit(t, edit(t, p, false, "0.4.0"), 0)
 }
 
 func TestEditRefusesAVersionTheRecordHoldsNoReleaseOf(t *testing.T) {

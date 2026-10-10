@@ -12,7 +12,7 @@ import (
 
 const releaseEditHelp = "Rewrite one released version's GitHub Release in place from the record: the notes its changelog holds, the deprecate and " +
 	"yank notices its release archive records on top, the rlsbl-ci-sha marker naming the commit it shipped from, and the pre-release flag, set " +
-	"when a notice is recorded and cleared otherwise. The version defaults to the latest release the archives record. A version the record holds no release " +
+	"when a notice is recorded and cleared otherwise. A version the record holds no release " +
 	"of, and one without a GitHub Release, are refused before anything is written. Run from the directory of a member versioned under the " +
 	"releasable."
 
@@ -81,11 +81,11 @@ func registerReleaseOps(r *commandSet) {
 		help:   releaseEditHelp,
 		effect: mutating,
 		args: []strictcli.Arg{
-			strictcli.NewArg("version", "The released version whose Release is rewritten, bare (0.4.0); the latest release when omitted", strictcli.ArgOptional()),
+			strictcli.NewArg("version", "The released version whose Release is rewritten, bare (0.4.0)", strictcli.ArgRequired()),
 		},
 		run: func(ctx *strictcli.Context, kw map[string]any) (any, error) {
-			version, given := strictcli.GetOpt[string](kw, "version")
-			if given && version == "" {
+			version := strictcli.Get[string](kw, "version")
+			if version == "" {
 				return nil, emptyArgument("version")
 			}
 			dir, _, err := workingRepository()

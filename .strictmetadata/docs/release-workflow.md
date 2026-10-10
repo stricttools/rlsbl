@@ -225,9 +225,9 @@ The repair and retraction commands:
 | --- | --- |
 | `rlsbl release undo` | Deletes a release's GitHub Release and tags, reverts its version-bump commit (the latest release only), restores its changelog and release file, and pushes the branch. |
 | `rlsbl release reconcile` | Pushes the refs origin lacks, force-pushes with a lease the ones a recorded rewrite moved, and creates the absent Releases. |
-| `rlsbl release edit` | Rewrites one Release from the record. |
+| `rlsbl release edit <version>` | Rewrites one Release from the record. |
 | `rlsbl release deprecate`, `rlsbl release yank` | Record a notice in the archive and rewrite the Release with it on top, marked pre-release; `yank` also makes each registry's own removal. |
-| `rlsbl changelog amend`, `edit`, `remove` | Rewrite a released version's changelog and then its Release. |
+| `changelog amend`, `edit`, `remove` | Rewrite a released version's changelog and then its Release. |
 | `rlsbl monorepo rename-releasable` | Pushes one boundary alias tag at the renamed releasable's current version. |
 | `rlsbl upstream adopt-tags` | Moves a fork's inherited tags out of `refs/tags`, here and on origin. |
 
@@ -235,7 +235,7 @@ The repair and retraction commands:
 
 | Command | What it does |
 | --- | --- |
-| `rlsbl release edit [version]` | Rewrites a version's GitHub Release in place from the record: the notes its changelog holds, the notices its archive records on top, the `rlsbl-ci-sha` marker, and the pre-release flag (set when a notice is recorded). Defaults to the latest release. |
+| `rlsbl release edit <version>` | Rewrites a version's GitHub Release in place from the record: the notes its changelog holds, the notices its archive records on top, the `rlsbl-ci-sha` marker, and the pre-release flag (set when a notice is recorded). |
 | `rlsbl release retry --watch` | Dispatches the latest release's workflows again at its tag, from `.strictmetadata/.release-state/<releasable>/retry.toml` (written, when missing, naming every workflow of the tagged tree with a `workflow_dispatch` trigger). A ref other than the tag is refused. A dispatch that fails leaves the file holding the workflows not yet dispatched, so no workflow is dispatched twice. |
 | `rlsbl release undo [--version <v>]` | Reverts a release that is provably unpublished: the registries' package listings, origin's Go module tags, and the publish runs of its tag must show it absent and none may show it published. Without `--version` the latest release, its version-bump commit reverted; with it an earlier one, its commits left. An audit line is committed to `undo-audits.jsonl` before the first deletion. |
 | `rlsbl release deprecate <version> --reason <text> [--use <version>]` | Records `> **Deprecated:** <reason>. Use v<use> instead.` in the archive's `release_notices`, commits it, and rewrites the Release with the notice on top, marked pre-release. |
