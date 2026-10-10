@@ -1,6 +1,6 @@
 +++
 title = "internal/publishrules"
-description = "The lifecycle-and-license rules at release time: repository visibility, refused public outputs, the deploy precondition, packed contents, confidential names."
+description = "The lifecycle-and-license rules at release time: repository visibility, refused public outputs, the deploy precondition, packed contents, and the confidential-term scan."
 generated = true
 nav_group = "API Reference"
 nav_order = 20
