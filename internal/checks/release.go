@@ -155,7 +155,7 @@ func checkUnpublishedRefs(c *Context, r *strictcli.ErrorReporter) strictcli.Chec
 	if len(problems) > 0 {
 		return reportErrors(r, problems, fmt.Sprintf("%d ref or Release problem(s) of archived releases of %q", len(problems), rel.Name), "")
 	}
-	released := len(versions) - len(tally.neverReleased)
+	released := len(versions) - len(tally.neverReleased) - len(tally.retracted)
 	subjects := "every ref"
 	if tally.releasesListed {
 		subjects = "every ref and GitHub Release"

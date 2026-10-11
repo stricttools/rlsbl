@@ -108,7 +108,7 @@ func TestARetractedVersionOwesItsTagsButNoGitHubRelease(t *testing.T) {
 	testsupport.FakeGH(t, testsupport.GHAnswer{Args: list, Stdout: ""})
 	got := runCheck(t, inputs(t, r.Dir), "unpublished-refs")
 	mustStatus(t, got, "pass")
-	mustMention(t, got, "retracted", "1.0.0", "1.0.1")
+	mustMention(t, got, "for 0 released version(s); 2 version(s) retracted", "1.0.0", "1.0.1")
 	// Its tags are still demanded.
 	r.Git("tag", "-d", "v1.0.1")
 	got = runCheck(t, inputs(t, r.Dir), "unpublished-refs")
