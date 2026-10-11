@@ -9,7 +9,7 @@ Inputs, in order of authority:
 - The Python tree `rlsbl/` and `tests/` at the commit this plan is committed on: the behavior to port, minus what the rulings drop.
 - `~/Projects/CONTEXT/strict.md` (the `.strictmetadata/` layout and the options rule) and `~/Projects/CONTEXT/building-a-cli.md` (strictcli's effects regime, consent, and flag naming).
 
-Deviations found during the work are appended to `todo/go-rewrite-plan.deviations.md`, one entry per deviation: what the plan says, what the work found, what was built instead. The plan file itself is not edited after it is committed.
+Deviations found during the work are appended to `todo/go-rewrite-plan-deviations.md`, one entry per deviation: what the plan says, what the work found, what was built instead. The plan file itself is not edited after it is committed.
 
 ## Execution rules for every implementor
 
