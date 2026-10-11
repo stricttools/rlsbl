@@ -43,9 +43,9 @@
     "schema_hash": "97ff010f1ebdc1d109947df8681a5e8b9978038ee5dc89512e30e88b45cb58e6"
   },
   "en/cli-confidential.md": {
-    "content": "d5079b8255723f8179b4e0768cfb189a76558f1a30ff9fd96ddcb2213f450e0d",
+    "content": "2248f4ed754eab22740f2ddd7aea57ff7e5b6b70f754e8259e825c5d8cb25798",
     "description": "20b16a8324ac4f2917414918df83651bd7bb64dcd7c215fb4111f5d41a4218b7",
-    "schema_hash": "bc0eaab8cab4e4f35c7b93eb2223ecdb9d5cd64d79c538f43e748eff4a855ade",
+    "schema_hash": "c1f44c27a07256695c2a17649a6fdcbfcf487a3823b30a0c558e9ab133c3fe25",
     "seed_hash": "20b16a8324ac4f2917414918df83651bd7bb64dcd7c215fb4111f5d41a4218b7"
   },
   "en/cli-dev.md": {
@@ -65,14 +65,14 @@
     "seed_hash": "714ac7a57eb755ee99fb4bb89966aeba7cd9faaae19b83c604ca9e151162efe8"
   },
   "en/cli-index.md": {
-    "content": "0ed144182f1327a1dd087b082677ff77fbc933e585e87ea93c0d025a2ec8b7f6",
+    "content": "5dbe62baaace59b742d6c312f58a4f509e685ef89f1a49a0c303bd82f22b523a",
     "description": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2",
     "seed_hash": "3e97def3f73b8e72ae1147e1ad3b8c31a9459f8426045a2079b68028733fccd2"
   },
   "en/cli-migrate.md": {
-    "content": "e3053dae785e6f419f11fd8d10162e113903b21df5e248dcb19771e7d3557fe3",
+    "content": "d2696779b5146e2eb047241e959d238dbf41b2f6ba11c6378826d952b6fc3cc5",
     "description": "952dd13c76a195f2b38923324890903577400c92380d6f77b36ae558e6af4ed3",
-    "schema_hash": "8fcf68530445c246e877211c0b1cf26968436b5b3b5c356a876574cd66259448",
+    "schema_hash": "d93b7ee18247d3c39fed2e1b5203b0d17758aa57c805b87946dc53445d7f90cf",
     "seed_hash": "952dd13c76a195f2b38923324890903577400c92380d6f77b36ae558e6af4ed3"
   },
   "en/cli-monorepo.md": {
@@ -113,9 +113,9 @@
     "schema_hash": "862bed9d0f9b4c91b56eda86f41e6fcd2600923342202037496ace3a1d44a7d4"
   },
   "en/cli-secrets.md": {
-    "content": "8079612b2d7330bf1a910345de52ddb9e39139770babac374ff3a1b9bb410003",
+    "content": "55acd456efb1c5cfdfd73ba03de692e4890bbf0be6cd63b48726b5c7a25cdbbb",
     "description": "ec4e0109f8f2cba6cdcd10d3d92f1558a9b22565562a1b6ecba851c6a4da9e69",
-    "schema_hash": "727a5dd49595c405732faea52dd8d14bb129cb3367286dea45fb387ba6d00c74",
+    "schema_hash": "21cc32ac87ed647d963acccff3a3efb05176430586c7c5a1f0b6b31b92a90e6b",
     "seed_hash": "ec4e0109f8f2cba6cdcd10d3d92f1558a9b22565562a1b6ecba851c6a4da9e69"
   },
   "en/cli-status.md": {

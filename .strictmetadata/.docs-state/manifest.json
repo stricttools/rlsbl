@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "name": "release-checkout",
+  "name": "rlsbl",
   "slug": "rlsbl",
-  "version": "0.132.1",
+  "version": "0.133.0",
   "description": "Release orchestration and project scaffolding CLI that bumps versions, validates a structured JSONL changelog, tags only the commit CI verified, and publishes to npm, PyPI, and the Go module proxy",
   "language": "go",
   "base_url": "https://smmh.dev/rlsbl",
@@ -811,13 +811,23 @@
         },
         {
           "level": 2,
+          "text": "release retract",
+          "anchor": "release-retract"
+        },
+        {
+          "level": 3,
+          "text": "Flags",
+          "anchor": "flags-4"
+        },
+        {
+          "level": 2,
           "text": "release deprecate",
           "anchor": "release-deprecate"
         },
         {
           "level": 3,
           "text": "Flags",
-          "anchor": "flags-4"
+          "anchor": "flags-5"
         },
         {
           "level": 3,
@@ -832,7 +842,7 @@
         {
           "level": 3,
           "text": "Flags",
-          "anchor": "flags-5"
+          "anchor": "flags-6"
         },
         {
           "level": 3,
@@ -847,7 +857,7 @@
         {
           "level": 3,
           "text": "Flags",
-          "anchor": "flags-6"
+          "anchor": "flags-7"
         },
         {
           "level": 2,
@@ -857,7 +867,7 @@
         {
           "level": 3,
           "text": "Flags",
-          "anchor": "flags-7"
+          "anchor": "flags-8"
         },
         {
           "level": 2,
@@ -867,7 +877,7 @@
         {
           "level": 3,
           "text": "Flags",
-          "anchor": "flags-8"
+          "anchor": "flags-9"
         }
       ]
     },
@@ -1814,6 +1824,11 @@
           "level": 3,
           "text": "`Unfinalize`",
           "anchor": "unfinalize"
+        },
+        {
+          "level": 3,
+          "text": "`RetractedNote`",
+          "anchor": "retractednote"
         },
         {
           "level": 3,
@@ -4820,6 +4835,11 @@
         },
         {
           "level": 3,
+          "text": "`AddRetractionRange`",
+          "anchor": "addretractionrange"
+        },
+        {
+          "level": 3,
           "text": "`WorkUses`",
           "anchor": "workuses"
         },
@@ -5161,6 +5181,11 @@
           "level": 3,
           "text": "`ReportPeriod`",
           "anchor": "reportperiod"
+        },
+        {
+          "level": 3,
+          "text": "`ReportStatus`",
+          "anchor": "reportstatus"
         },
         {
           "level": 3,
@@ -7620,8 +7645,13 @@
         },
         {
           "level": 3,
-          "text": "`RefuseHeldLifecycle`",
-          "anchor": "refuseheldlifecycle"
+          "text": "`RefuseLifecycleDisallowingRelease`",
+          "anchor": "refuselifecycledisallowingrelease"
+        },
+        {
+          "level": 3,
+          "text": "`LifecycleStatus`",
+          "anchor": "lifecyclestatus"
         },
         {
           "level": 3,
@@ -7904,6 +7934,11 @@
         },
         {
           "level": 3,
+          "text": "`RetractInvocation`",
+          "anchor": "retractinvocation"
+        },
+        {
+          "level": 3,
           "text": "`AbandonRequest`",
           "anchor": "abandonrequest"
         },
@@ -7946,6 +7981,11 @@
           "level": 3,
           "text": "`Selection`",
           "anchor": "selection"
+        },
+        {
+          "level": 3,
+          "text": "`RetractRequest`",
+          "anchor": "retractrequest"
         },
         {
           "level": 3,
@@ -8001,6 +8041,11 @@
           "level": 3,
           "text": "`ParseVersion`",
           "anchor": "parseversion"
+        },
+        {
+          "level": 3,
+          "text": "`Retract`",
+          "anchor": "retract"
         },
         {
           "level": 3,
@@ -8466,6 +8511,11 @@
         },
         {
           "level": 3,
+          "text": "`MarkRetracted`",
+          "anchor": "markretracted"
+        },
+        {
+          "level": 3,
           "text": "`RecordReleaseNotice`",
           "anchor": "recordreleasenotice"
         },
@@ -8573,6 +8623,11 @@
           "level": 3,
           "text": "`LatestReleasedVersion`",
           "anchor": "latestreleasedversion"
+        },
+        {
+          "level": 3,
+          "text": "`HasRelease`",
+          "anchor": "hasrelease"
         },
         {
           "level": 3,
@@ -8788,6 +8843,11 @@
           "level": 3,
           "text": "`Fate.Released`",
           "anchor": "fatereleased"
+        },
+        {
+          "level": 3,
+          "text": "`Archive.Retracted`",
+          "anchor": "archiveretracted"
         },
         {
           "level": 3,
@@ -11413,6 +11473,11 @@
         },
         {
           "level": 3,
+          "text": "Retracting Go module versions",
+          "anchor": "retracting-go-module-versions"
+        },
+        {
+          "level": 3,
           "text": "Scrubbing history",
           "anchor": "scrubbing-history"
         },
@@ -11569,8 +11634,8 @@
         },
         {
           "level": 2,
-          "text": "`rlsbl discover`",
-          "anchor": "rlsbl-discover"
+          "text": "`rlsbl discover --mine` and `--no-mine`",
+          "anchor": "rlsbl-discover-mine-and-no-mine"
         },
         {
           "level": 2,
@@ -11579,8 +11644,8 @@
         },
         {
           "level": 2,
-          "text": "`rlsbl secrets sync-npm-token`",
-          "anchor": "rlsbl-secrets-sync-npm-token"
+          "text": "`rlsbl secrets sync-npm-token --no-all` and `--all`",
+          "anchor": "rlsbl-secrets-sync-npm-token-no-all-and-all"
         },
         {
           "level": 2,
@@ -11602,7 +11667,7 @@
       ]
     }
   ],
-  "last_gen": "2026-10-10T21:38:54.180948+00:00",
+  "last_gen": "2026-10-11T11:57:12.800709+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [

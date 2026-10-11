@@ -17,4 +17,4 @@ List the GitHub repositories carrying the rlsbl topic, most recently updated fir
 
 | Name | Short | Type | Presence | Env | Description |
 | --- | --- | --- | --- | --- | --- |
-| `--mine`, `--no-mine` |  | bool | default: `false` |  | List only the repositories the authenticated GitHub account owns |
+| `--mine`, `--no-mine` |  | bool | required |  | List only the repositories the authenticated GitHub account owns (--mine), or every repository tagged as part of the rlsbl ecosystem (--no-mine) |

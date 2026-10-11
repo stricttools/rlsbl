@@ -54,7 +54,7 @@ Append an entry to a released version's read-only <version>.jsonl, which stays r
 | `--commits` |  | str | required |  | Comma-separated commit ids the entry describes |
 | `--description` |  | str | optional |  | The change in one line of markdown (required for a user-facing entry) |
 | `--type` |  | str | optional |  | What the change is (required for a user-facing entry) Values: `feature` (a new capability users can reach), `fix` (a user-visible defect that no longer happens), `breaking` (a change that requires action from users). |
-| `--user-facing`, `--no-user-facing` |  | bool | optional |  | Whether CHANGELOG.md and the release notes show the entry (user-facing when neither form is passed) |
+| `--user-facing`, `--no-user-facing` |  | bool | required |  | Whether CHANGELOG.md and the release notes show the entry (--user-facing) or leave it out (--no-user-facing) |
 | `--validate-hashes`, `--no-validate-hashes` |  | bool | optional |  | Resolve every commit and check it against the releasable's scope (validated when neither form is passed) |
 
 ## changelog edit

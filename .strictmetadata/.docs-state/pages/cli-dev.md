@@ -25,7 +25,7 @@ Install the project for local development by running each of its targets' own in
 | `--all`, `--no-all` |  | bool | optional |  | In a workspace, install every member that is not dev-only |
 | `--include` |  | str | optional |  | In a workspace, the comma-separated names of the only members to install |
 | `--exclude` |  | str | optional |  | In a workspace, the comma-separated names of members to leave out |
-| `--uninstall`, `--no-uninstall` |  | bool | optional |  | Reverse a previous install where the target has a reverse (installs when not passed) |
+| `--uninstall`, `--no-uninstall` |  | bool | required |  | Reverse a previous install where the target has a reverse (--uninstall), or install (--no-uninstall) |
 
 ## dev sync
 
