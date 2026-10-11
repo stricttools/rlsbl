@@ -338,7 +338,7 @@ func resyncRelease(ctx *strictcli.Context, o changelog.Outcome) error {
 	if err != nil {
 		return err
 	}
-	termList, err := confidential.DefaultLocation()
+	termList, err := confidential.ConfiguredLocation()
 	if err != nil {
 		return err
 	}

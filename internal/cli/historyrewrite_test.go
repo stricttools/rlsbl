@@ -24,6 +24,9 @@ func historyRewriteProject(t *testing.T) *testsupport.Repo {
 	repo.AddBareRemote("origin")
 	repo.Git("push", "-q", "origin", "main")
 	hygiene.Chdir(t, repo.Dir)
+	// The commands that scan for confidential terms read the list's
+	// location from the family's settings file.
+	testsupport.ConfigureTermList(t)
 	return repo
 }
 

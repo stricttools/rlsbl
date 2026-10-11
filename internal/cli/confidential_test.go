@@ -19,11 +19,7 @@ import (
 func confidentialProject(t *testing.T) (*testsupport.Repo, string) {
 	t.Helper()
 	repo := releaseCommandsProject(t)
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	testsupport.WriteTermList(t, confidential.LocationIn(home), testsupport.TermListOf("gizmo"))
+	testsupport.WriteTermList(t, testsupport.ConfigureTermList(t), testsupport.TermListOf("gizmo"))
 	repo.CommitFile("notes.md", "ask Gizmo first\n", "Take notes")
 	testsupport.FakeSafegit(t)
 	r := appWith(t, testsupport.NewFakeHTTP(t)).Test([]string{"check", "--name", "confidential-terms"})
@@ -110,5 +106,32 @@ func TestApproveHitIsTheOwnersAndRecordsTheOwnersReason(t *testing.T) {
 	text := repo.Git("show", "HEAD:"+confidential.StoreFile)
 	if !strings.Contains(text, `resolution = "approved"`) || !strings.Contains(text, `reason = "the owner publishes this name"`) || strings.Contains(text, "certainty") {
 		t.Errorf("the committed approval:\n%s", text)
+	}
+}
+
+// Without the family's settings file, only what reads the confidential-term
+// list refuses, naming the file and the setting to write; writing it clears
+// the refusal.
+func TestAMissingSettingRefusesOnlyWhatReadsTheList(t *testing.T) {
+	hygiene.Isolate(t)
+	releaseCommandsProject(t)
+	settings, err := confidential.SettingsPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(settings); err != nil {
+		t.Fatal(err)
+	}
+	app := appWith(t, testsupport.NewFakeHTTP(t))
+	r := app.Test([]string{"check", "--name", "confidential-terms"})
+	if out := r.Stdout + r.Stderr; r.ExitCode == 0 || !strings.Contains(out, settings) || !strings.Contains(out, confidential.TermListSetting) {
+		t.Fatalf("the check did not refuse naming the settings file (exit %d):\n%s", r.ExitCode, out)
+	}
+	if r := app.Test([]string{"check", "--name", "stash-free"}); r.ExitCode != 0 {
+		t.Fatalf("a check that reads no list refused without the setting:\n%s%s", r.Stdout, r.Stderr)
+	}
+	testsupport.ConfigureTermList(t)
+	if r := app.Test([]string{"check", "--name", "confidential-terms"}); r.ExitCode != 0 {
+		t.Fatalf("writing the settings file did not clear the refusal:\n%s%s", r.Stdout, r.Stderr)
 	}
 }

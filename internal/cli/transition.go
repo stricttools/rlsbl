@@ -239,17 +239,14 @@ func registerTransition(r *commandSet) {
 }
 
 // transitionInvocation is the invocation a transition command runs as,
-// dated today, and the working directory.
+// dated today, and the working directory. The confidential-term list's
+// location is left unstated: only declassify scans with it, and reads it.
 func transitionInvocation(ctx *strictcli.Context) (lifecycleops.Invocation, string, error) {
 	dir, err := os.Getwd()
 	if err != nil {
 		return lifecycleops.Invocation{}, "", err
 	}
-	termList, err := confidential.DefaultLocation()
-	if err != nil {
-		return lifecycleops.Invocation{}, "", err
-	}
-	return lifecycleops.Invocation{E: ctx.Effects(), DryRun: ctx.DryRun(), Say: ctx.Out, Now: time.Now, TermList: termList}, dir, nil
+	return lifecycleops.Invocation{E: ctx.Effects(), DryRun: ctx.DryRun(), Say: ctx.Out, Now: time.Now}, dir, nil
 }
 
 // runPeriod runs a lifecycle or license change, the value read from flag.
@@ -342,6 +339,9 @@ func runTransitionDeclassify(ctx *strictcli.Context, kw map[string]any) (any, er
 	}
 	inv, dir, err := transitionInvocation(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if inv.TermList, err = confidential.ConfiguredLocation(); err != nil {
 		return nil, err
 	}
 	return nil, inv.Declassify(lifecycleops.DeclassifyRequest{Dir: dir, Licenses: licenses, Reason: strictcli.Get[string](kw, "reason")})

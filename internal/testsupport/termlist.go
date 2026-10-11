@@ -2,6 +2,7 @@ package testsupport
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,11 +11,46 @@ import (
 	"github.com/stricttools/strictspec/go/confidential"
 )
 
-// TermList is a confidential-term list location under a fresh home
-// directory, with no list written there: a list with no terms.
+// TermList is a confidential-term list location under a fresh directory,
+// with no list written there: a list with no terms.
 func TermList(t testing.TB) confidential.Location {
 	t.Helper()
-	return confidential.LocationIn(t.TempDir())
+	return termListIn(t.TempDir())
+}
+
+// termListIn is a list and its identity under home, the identity where
+// confidential.ConfiguredLocation looks for it.
+func termListIn(home string) confidential.Location {
+	return confidential.Location{
+		List:     filepath.Join(home, "lists", "terms.toml.age"),
+		Identity: filepath.Join(home, filepath.FromSlash(confidential.IdentityRel)),
+	}
+}
+
+// ConfigureTermList writes the family's settings file in the user's
+// configuration directory (a test's throwaway one), naming a list under the
+// home directory, and returns that list's location, which
+// confidential.ConfiguredLocation then gives. No list is written: a list with
+// no terms until WriteTermList writes one.
+func ConfigureTermList(t testing.TB) confidential.Location {
+	t.Helper()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	loc := termListIn(home)
+	settings, err := confidential.SettingsPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(settings), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	text := fmt.Sprintf("format_version = %d\n%s = %q\n", confidential.SettingsFormatVersion, confidential.TermListSetting, loc.List)
+	if err := os.WriteFile(settings, []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return loc
 }
 
 // WriteTermList encrypts plaintext, a confidential-term list, to a fresh

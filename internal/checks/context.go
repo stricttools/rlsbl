@@ -53,6 +53,10 @@ type Inputs struct {
 	// TermList is where the confidential-term list and the identity that
 	// decrypts it are.
 	TermList confidential.Location
+	// TermListErr is why TermList could not be found (the family's settings
+	// file names no list, say): only the checks that read the list refuse,
+	// with it.
+	TermListErr error
 	// UVProjectEnvironment is UV_PROJECT_ENVIRONMENT as the caller read it
 	// (empty when unset): uv's own relocation of a project's environment,
 	// where the dev overlays are installed.
@@ -375,8 +379,11 @@ func (c *Context) Home() string {
 func (c *Context) UVProjectEnvironment() string { return c.in.UVProjectEnvironment }
 
 // TermList is where the confidential-term list is, refused when the caller
-// stated none.
+// could not find it or stated none.
 func (c *Context) TermList() confidential.Location {
+	if c.in.TermListErr != nil {
+		panic(unanswered(c.in.TermListErr.Error()))
+	}
 	if c.in.TermList.List == "" || c.in.TermList.Identity == "" {
 		panic(unanswered("no confidential-term list was given to scan with"))
 	}

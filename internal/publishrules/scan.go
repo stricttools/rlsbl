@@ -75,7 +75,7 @@ func LoadScanner(repo git.Repo, loc confidential.Location, on time.Time) (*Scann
 // repository's names come from repo.
 func LoadScannerAt(repo git.Repo, root string, loc confidential.Location, on time.Time) (*Scanner, error) {
 	if loc.List == "" || loc.Identity == "" {
-		return nil, fmt.Errorf("scanning for confidential terms needs the confidential-term list's location (confidential.DefaultLocation)")
+		return nil, fmt.Errorf("scanning for confidential terms needs the confidential-term list's location (confidential.ConfiguredLocation)")
 	}
 	record, err := lifecycle.Load(root)
 	if err != nil {

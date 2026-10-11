@@ -42,7 +42,7 @@ type Invocation struct {
 	// every period it opens starts there.
 	Now func() time.Time
 	// TermList is where the confidential-term list is
-	// (confidential.DefaultLocation in the binary), which what a command
+	// (confidential.ConfiguredLocation in the binary), which what a command
 	// publishes is scanned against.
 	TermList confidential.Location
 }

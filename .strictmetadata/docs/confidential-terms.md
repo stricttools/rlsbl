@@ -8,7 +8,14 @@ Some terms must never appear in anything public: the names of private projects, 
 
 ## The list
 
-The list is `Projects/CONTEXT/confidential/terms.toml.age` under the user's home directory, a TOML file encrypted with [age](https://age-encryption.org) to the identity in `~/.age-key.txt`. rlsbl decrypts it in memory and never writes the plaintext anywhere. A list that does not exist has no terms, and every scan says so in its output; a list that exists and cannot be decrypted or read is an error. strictspec's `confidential` package reads it, and its documentation states the format: each `[[terms]]` entry has one `term` (a literal) or one `pattern` (a Go regular expression), the day it was `added`, a one-line `reason`, and a `scope`, either `"everywhere"` or `{ except = ["<repository>", ...] }`, which leaves out the repositories named (by their directory's name or their `origin` remote's last path segment).
+The list is a TOML file encrypted with [age](https://age-encryption.org) to the identity in `~/.age-key.txt`, at the absolute path the `confidential_term_list` setting names in the family's settings file, `stricttools/config.toml` under the user's configuration directory (`$XDG_CONFIG_HOME`, else `~/.config`):
+
+```toml
+format_version = 1
+confidential_term_list = "/absolute/path/of/terms.toml.age"
+```
+
+Nothing is filled in for it: a missing settings file or setting is an error naming what to write, and so is a path that is not absolute. Only the commands and checks that read the list refuse without it. rlsbl decrypts it in memory and never writes the plaintext anywhere. A list that does not exist has no terms, and every scan says so in its output; a list that exists and cannot be decrypted or read is an error. strictspec's `confidential` package reads it, and its documentation states the format: each `[[terms]]` entry has one `term` (a literal) or one `pattern` (a Go regular expression), the day it was `added`, a one-line `reason`, and a `scope`, either `"everywhere"` or `{ except = ["<repository>", ...] }`, which leaves out the repositories named (by their directory's name or their `origin` remote's last path segment).
 
 Matching ignores case, and a literal matches anywhere, inside a longer word too: whether a match is a leak is judged hit by hit, never by the matcher.
 

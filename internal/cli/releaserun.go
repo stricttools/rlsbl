@@ -148,7 +148,7 @@ func releaseRunRequest(ctx *strictcli.Context, kw map[string]any, version string
 	if err != nil {
 		return release.RunRequest{}, err
 	}
-	termList, err := confidential.DefaultLocation()
+	termList, err := confidential.ConfiguredLocation()
 	if err != nil {
 		return release.RunRequest{}, err
 	}

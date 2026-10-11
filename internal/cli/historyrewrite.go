@@ -139,7 +139,7 @@ func runReleaseScrub(ctx *strictcli.Context, kw map[string]any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	termList, err := confidential.DefaultLocation()
+	termList, err := confidential.ConfiguredLocation()
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +212,7 @@ func runReleaseReconcile(ctx *strictcli.Context, kw map[string]any, version stri
 	if strictcli.GetElected(kw, "mode").Is(reconcileApplyChoice) {
 		mode = historyrewrite.ReconcileApply
 	}
-	termList, err := confidential.DefaultLocation()
+	termList, err := confidential.ConfiguredLocation()
 	if err != nil {
 		return err
 	}

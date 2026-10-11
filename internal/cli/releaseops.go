@@ -92,7 +92,7 @@ func registerReleaseOps(r *commandSet) {
 			if err != nil {
 				return nil, err
 			}
-			termList, err := confidential.DefaultLocation()
+			termList, err := confidential.ConfiguredLocation()
 			if err != nil {
 				return nil, err
 			}
@@ -191,7 +191,7 @@ func registerReleaseOps(r *commandSet) {
 				if req.Dir, _, err = workingRepository(); err != nil {
 					return nil, err
 				}
-				if req.TermList, err = confidential.DefaultLocation(); err != nil {
+				if req.TermList, err = confidential.ConfiguredLocation(); err != nil {
 					return nil, err
 				}
 				return nil, op.run(ctx, req)

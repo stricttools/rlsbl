@@ -15,8 +15,9 @@ import (
 )
 
 const confidentialGroupHelp = "Resolve the confidential-term hits of what this repository publishes. The confidential-term list " +
-	"(" + confidential.ListRel + " under the home directory, encrypted with age to the identity in ~/" + confidential.IdentityRel + ", " +
-	"and decrypted in memory only; a missing list has no terms) names terms that must not appear in anything public. A release " +
+	"(at the absolute path the " + confidential.TermListSetting + " setting of the family's settings file, " + confidential.SettingsRel + " under " +
+	"the user's configuration directory, names; a missing settings file or setting is an error naming what to write; encrypted with age " +
+	"to the identity in ~/" + confidential.IdentityRel + ", and decrypted in memory only; a missing list has no terms) names terms that must not appear in anything public. A release " +
 	"(and selfdoc's publishing) scans what it would push or publish, reports every hit at once, each with an id, its location, and " +
 	"the text around it, and refuses while a hit has no resolution in .strictmetadata/confidential-hits/resolutions.toml. Each hit " +
 	"is judged by the agent: one it is at least 70% certain is a false positive is recorded with judge-false-positive; every other " +
@@ -92,7 +93,7 @@ func resolveHit(ctx *strictcli.Context, id string, build func(*confidential.Matc
 	if err != nil {
 		return err
 	}
-	termList, err := confidential.DefaultLocation()
+	termList, err := confidential.ConfiguredLocation()
 	if err != nil {
 		return err
 	}
