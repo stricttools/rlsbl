@@ -186,17 +186,35 @@ func Retracted(f *modfile.File, version string) bool {
 // removed from the proxy, only retracted, and the retraction takes effect
 // once a later version carrying it is published.
 func AddRetraction(path string, data []byte, version, rationale string) (out []byte, changed bool, err error) {
+	return AddRetractionRange(path, data, version, version, rationale)
+}
+
+// AddRetractionRange appends one retract directive covering every version
+// from low to high (vX.Y.Z each, low at most high), as AddRetraction does for
+// one: `retract [low, high]`, or `retract low` when the two are the same.
+// changed is false when one retraction already covers the whole range.
+func AddRetractionRange(path string, data []byte, low, high, rationale string) (out []byte, changed bool, err error) {
 	f, err := Parse(path, data)
 	if err != nil {
 		return nil, false, err
 	}
-	if !semver.IsValid(version) || semver.Canonical(version) != version {
-		return nil, false, fmt.Errorf("%q is not a canonical module version (vMAJOR.MINOR.PATCH)", version)
+	for _, v := range []string{low, high} {
+		if !semver.IsValid(v) || semver.Canonical(v) != v {
+			return nil, false, fmt.Errorf("%q is not a canonical module version (vMAJOR.MINOR.PATCH)", v)
+		}
 	}
-	if Retracted(f, version) {
-		return data, false, nil
+	if semver.Compare(low, high) > 0 {
+		return nil, false, fmt.Errorf("the retracted range [%s, %s] starts above its end", low, high)
 	}
-	line := "retract " + version
+	for _, r := range f.Retract {
+		if semver.Compare(r.Low, low) <= 0 && semver.Compare(high, r.High) <= 0 {
+			return data, false, nil
+		}
+	}
+	line := "retract " + low
+	if low != high {
+		line = "retract [" + low + ", " + high + "]"
+	}
 	if r := strings.Join(strings.Fields(rationale), " "); r != "" {
 		line += " // " + r
 	}

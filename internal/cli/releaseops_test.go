@@ -97,3 +97,28 @@ func TestYankThroughTheApplicationRefusesAProprietaryReleasable(t *testing.T) {
 		t.Fatalf("a refused yank asked a registry: %q", fake.URLs())
 	}
 }
+
+// The retraction's flags reach it as given: every --versions, refused when
+// a version is spelled with a leading v, and a releasable without a Go
+// module is refused before anything is asked.
+func TestRetractThroughTheApplication(t *testing.T) {
+	hygiene.Isolate(t)
+	repo := releaseCommandsProject(t)
+	fake := testsupport.NewFakeHTTP(t)
+	app := appWith(t, fake)
+	check := func(argv, want string) {
+		t.Helper()
+		r := app.Test(strings.Fields(argv))
+		if r.ExitCode == 0 || !strings.Contains(r.Stdout+r.Stderr, want) {
+			t.Errorf("%s: exit %d, want %q in:\n%s%s", argv, r.ExitCode, want, r.Stdout, r.Stderr)
+		}
+	}
+	check("release retract --versions 0.4.0 --reason Broken --approve-consequential", "has no Go module")
+	check("release retract --versions v0.4.0 --reason Broken --approve-consequential", `leading "v"`)
+	check("release retract --reason Broken --approve-consequential", "--versions")
+	repo.CommitFile("go.mod", "module github.com/acme/portal\n\ngo 1.26\n", "The Go module")
+	check("release retract --versions 0.4.0 --versions 0.3.0 --reason Broken --approve-consequential", "0.3.0 has no release archive")
+	if len(fake.Requests()) != 0 {
+		t.Fatalf("a refused retraction asked a registry: %q", fake.URLs())
+	}
+}

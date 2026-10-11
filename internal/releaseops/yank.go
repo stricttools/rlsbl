@@ -237,14 +237,8 @@ func retract(ctx *strictcli.Context, s Selection, st yankStep, v semver.Version,
 		// planYank asks retracted first, so a covered version never gets here.
 		return fmt.Errorf("%s already retracts v%s, and the yank planned a retraction of it", st.goMod, v)
 	}
-	text := string(out)
-	e := ctx.Effects()
-	tmp := path + ".rlsbl-writing"
-	if _, err := e.Write(tmp, text); err != nil {
-		return fmt.Errorf("writing %s: %w", st.goMod, err)
-	}
-	if _, err := e.Rename(tmp, path); err != nil {
-		return fmt.Errorf("writing %s: %w", st.goMod, err)
+	if err := writeGoMod(ctx.Effects(), path, st.goMod, out); err != nil {
+		return err
 	}
 	message := fmt.Sprintf("Retract v%s of %s: release a new version to publish the retraction", v, st.pkg.Name)
 	if err := commit(ctx, s, message, []string{st.goMod}, false); err != nil {

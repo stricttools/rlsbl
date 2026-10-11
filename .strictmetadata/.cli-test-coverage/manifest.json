@@ -43,6 +43,7 @@
   "release.init",
   "release.reconcile",
   "release.resume",
+  "release.retract",
   "release.retry",
   "release.run",
   "release.scrub",

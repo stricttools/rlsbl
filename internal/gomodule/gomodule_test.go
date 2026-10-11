@@ -147,6 +147,41 @@ func TestARetractionIsAppendedKeepingTheFileAndNotRepeated(t *testing.T) {
 	}
 }
 
+func TestARangeRetractionIsAppendedAsOneLine(t *testing.T) {
+	hygiene.Isolate(t)
+	before := "module example.com/portal\n\ngo 1.21\n"
+	out, changed, err := AddRetractionRange("go.mod", []byte(before), "v0.5.0", "v0.5.1", "published by mistake")
+	if err != nil || !changed {
+		t.Fatalf("changed %v, err %v", changed, err)
+	}
+	if want := before + "\nretract [v0.5.0, v0.5.1] // published by mistake\n"; string(out) != want {
+		t.Fatalf("got:\n%s", out)
+	}
+	f, err := Parse("go.mod", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range []string{"v0.5.0", "v0.5.1"} {
+		if !Retracted(f, v) {
+			t.Errorf("%s is not retracted", v)
+		}
+	}
+	if Retracted(f, "v0.5.2") || Retracted(f, "v0.4.9") {
+		t.Error("the range retracts a version outside it")
+	}
+	if _, changed, err := AddRetractionRange("go.mod", out, "v0.5.0", "v0.5.1", "again"); err != nil || changed {
+		t.Fatalf("a range retracted already: changed %v, err %v", changed, err)
+	}
+	if _, _, err := AddRetractionRange("go.mod", []byte(before), "v0.5.1", "v0.5.0", ""); err == nil {
+		t.Fatal("a range whose low end is above its high end was accepted")
+	}
+	// A range of one version is the single-version form.
+	out, _, err = AddRetractionRange("go.mod", []byte(before), "v0.5.0", "v0.5.0", "")
+	if err != nil || !strings.HasSuffix(string(out), "\nretract v0.5.0\n") {
+		t.Fatalf("a one-version range: %v\n%s", err, out)
+	}
+}
+
 func TestGoWorkUsesAreRead(t *testing.T) {
 	hygiene.Isolate(t)
 	root := t.TempDir()

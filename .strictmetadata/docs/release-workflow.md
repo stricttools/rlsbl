@@ -51,7 +51,7 @@ Between them `include` and `exclude` name every target the releasable's members 
 
 Every release but `infra` refuses to run without a user-facing changelog entry, naming `bump = "infra"`; an `infra` release refuses one. `description` is required and may not be blank; `context` is optional and renders as a collapsible block in `CHANGELOG.md`. Both remain after the release in the version's archive, which every later regeneration reads. Versions are `MAJOR.MINOR.PATCH`: there is no pre-release channel, and a file carrying `preid`, `blog`, or `bump = "prerelease"` is refused.
 
-The fields the release itself records (`release_commit`, `released_trees`, the fates, `shipped_as`, and `release_notices`) are refused in the editable file: no value of them exists before the release runs.
+Every field rlsbl's own commands record into an archive (the release commit and its trees, the fates, `shipped_as`, the notices, and the retraction's fields among them) is refused in the editable file: no value of them exists before the release runs.
 
 ## Validation
 
@@ -168,11 +168,11 @@ While a state file exists, `rlsbl release run --watch` refuses and names `rlsbl 
 
 The next version comes from the version files and the release record, never from an archive's mere existence:
 
-- A **first release**, whose record holds no released version, ships the version files' version as it is; the declared bump is ignored. In a workspace each releasable asks its own record.
+- A **first release**, whose record holds no released version (a retracted version is none), ships the version files' version as it is; the declared bump is ignored. In a workspace each releasable asks its own record.
 - Version files naming a **released** version, or one recorded **never released**, are bumped from (a `minor` bump from a never-released 0.29.4 gives 0.30.0).
 - Version files naming a version recorded **unrecoverable** whose tag is gone are refused, naming the tag to restore at the commit it shipped from.
 - Version files naming a version with neither an archive nor a tag are refused: above the latest release, that is what an abandoned attempt leaves, and the refusal names `rlsbl release abandon`; below it, the version files are behind and must name at least the latest release.
-- A next version the record holds as **never released** is refused: a never-released number is never used again, and the refusal names the version-files value that bumps past it.
+- A next version the record holds as **never released** or **retracted** is refused: neither number is used again, and the refusal names the version-files value that bumps past it.
 
 ## The version fates
 
@@ -185,6 +185,8 @@ Every archive records one of the fates in the table below, and every question ab
 | never released | `never_released = true` | The version number exists in the record, and nothing was ever published under it. |
 
 A never-released version is not a release: it is not the latest release, does not bound the unreleased range, is not undone, and owns no refs or Release. Its changelog section is still rendered, marked as never released. An archive stating no fate is an error wherever the record is read for use, naming the backfill.
+
+A recorded or unrecoverable version may also be **retracted**: `retracted_by = "<version>"` names the retraction version whose go.mod retracts it ([retracting](#retracting-go-module-versions)). A retracted version is not a release either: it is not the latest release, a releasable whose every version is retracted is unreleased, and no release lands on its number. It keeps its tags, which the Go module proxy keeps for good, and has no GitHub Release; its changelog section is rendered, marked as retracted. A retracted release still bounds the unreleased range, since what it shipped was published; the retraction version, whose commit carries only the retraction, does not. The retraction version's archive retracts itself and lists the other versions it retracts in `retracts`.
 
 `shipped_as` names the tag a version shipped under when it differs from the tag its releasable's format gives it now (after a rename, say). That tag stays the version's primary ref: the one its Release hangs off and the one `release edit`, `deprecate`, `yank`, `retry`, and `reconcile` resolve. It is allowed on a recorded or unrecoverable archive, and refused on a never-released one.
 
@@ -227,6 +229,7 @@ The repair and retraction commands:
 | `rlsbl release reconcile` | Pushes the refs origin lacks, force-pushes with a lease the ones a recorded rewrite moved, and creates the absent Releases. |
 | `rlsbl release edit <version>` | Rewrites one Release from the record. |
 | `rlsbl release deprecate`, `rlsbl release yank` | Record a notice in the archive and rewrite the Release with it on top, marked pre-release; `yank` also makes each registry's own removal. |
+| `rlsbl release retract` | Pushes the tags of a retraction version, and nothing else, and deletes the retracted versions' Releases. |
 | `changelog amend`, `edit`, `remove` | Rewrite a released version's changelog and then its Release. |
 | `rlsbl monorepo rename-releasable` | Pushes one boundary alias tag at the renamed releasable's current version. |
 | `rlsbl upstream adopt-tags` | Moves a fork's inherited tags out of `refs/tags`, here and on origin. |
@@ -240,11 +243,24 @@ The repair and retraction commands:
 | `rlsbl release undo [--version <v>]` | Reverts a release that is provably unpublished: the registries' package listings, origin's Go module tags, and the publish runs of its tag must show it absent and none may show it published. Without `--version` the latest release, its version-bump commit reverted; with it an earlier one, its commits left. An audit line is committed to `undo-audits.jsonl` before the first deletion. |
 | `rlsbl release deprecate <version> --reason <text> [--use <version>]` | Records `> **Deprecated:** <reason>. Use v<use> instead.` in the archive's `release_notices`, commits it, and rewrites the Release with the notice on top, marked pre-release. |
 | `rlsbl release yank <version> --reason <text> [--use <version>]` | For each published package: npm deprecates the version, a Go module gains a `retract` line (committed, published by the next release), and PyPI is yanked by hand, the command exiting 1 naming the steps until PyPI's project document shows the files yanked. Records the yank notice and rewrites the Release. Nothing is ever unpublished, and a proprietary releasable is refused. |
+| `rlsbl release retract --versions <version> --reason <text>` | Retracts released versions of a Go module through a new version carrying the go.mod retraction ([retracting](#retracting-go-module-versions)). |
 | `rlsbl release scrub` | Rewrites history through safegit and repairs every record the rewrite renamed ([scrubbing](#scrubbing-history)). |
 | `rlsbl release reconcile --mode plan\|apply` | Repairs origin's refs and Releases from the record ([reconciling](#reconciling-published-metadata)). |
 | `rlsbl release backfill` | Brings old archives into the fate model ([backfilling](#backfilling-an-existing-repository)). |
 
-`deprecate` and `yank` refuse the latest release (which `undo` reverts), a version the record holds no release of, and one without a Release. Every command here acts on the releasable of the member holding the working directory and takes the release lock.
+`deprecate` and `yank` refuse the latest release (which `undo` reverts), a version the record holds no release of, and one without a Release. The commands here that act on a release refuse a retracted version, which is none. Every command here acts on the releasable of the member holding the working directory and takes the release lock.
+
+### Retracting Go module versions
+
+A Go module version can never be removed from the module proxy, only retracted, and a retraction takes effect once a version carrying it is published. `rlsbl release retract --versions <version> [--versions <version> ...] --reason <one line> --approve-consequential` does both in one command:
+
+1. It takes the next version number no archive and no tag here or on origin holds (a patch above the highest), and refuses a range that would retract a version `--versions` does not name.
+2. It adds one line to every Go module's go.mod, `retract [v<lowest named>, v<new>] // <reason>`, and commits it on the release branch with the `Autogenerated: true` trailer.
+3. It records the retraction: each named version's archive gains `retracted_by`, and the new version is archived with its release commit, `retracted_by` naming itself, and `retracts` listing the others. Committed, again machine-made.
+4. It tags the retraction commit and pushes only its tags, each on its own: not the branch, and no GitHub Release, since a retraction-only version has nothing to download or read.
+5. It deletes the retracted versions' GitHub Releases. Their tags stay.
+
+No registry is asked about any version, and the releasable's lifecycle is not asked, so an unreleased releasable retracts too. A proprietary releasable is refused. A run that stops is finished by running the same command again, which finds the retraction recorded and does what is left. `--dry-run` prints the plan.
 
 ### Scrubbing history
 
