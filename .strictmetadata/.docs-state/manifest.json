@@ -6673,6 +6673,11 @@
         },
         {
           "level": 3,
+          "text": "`RequestGoVersion`",
+          "anchor": "requestgoversion"
+        },
+        {
+          "level": 3,
           "text": "`GoStdlib`",
           "anchor": "gostdlib"
         },
@@ -11667,7 +11672,7 @@
       ]
     }
   ],
-  "last_gen": "2026-10-11T11:57:12.800709+00:00",
+  "last_gen": "2026-10-11T14:48:11.181230+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
