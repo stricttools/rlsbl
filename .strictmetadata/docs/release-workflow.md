@@ -59,7 +59,7 @@ Before it writes anything, the release refuses, each refusal naming its fix:
 
 - a working directory that selects no releasable, or a member versioned under none;
 - an unfinished release: an `in-progress.toml` names `rlsbl release resume --watch` or `rlsbl release abandon`, by its version's fate;
-- a releasable, or a member versioned under it, whose lifecycle is `on-hold` or `retired`, and an `unreleased` releasable (no lifecycle period in effect and no release in its archives), naming the `rlsbl transition lifecycle --status active` that allows its first release;
+- a releasable, or a member versioned under it, whose lifecycle is `non-releasing` or `retired`, and an `unreleased` releasable (no lifecycle period in effect and no release in its archives), naming the `rlsbl transition lifecycle --status active` that allows its first release;
 - a missing or unreadable release file, a target it includes that no member of the releasable has, and a bump the user-facing rule refuses;
 - an environment file that cannot be read;
 - a stash (work git names in no working tree, which the release would neither see nor carry);

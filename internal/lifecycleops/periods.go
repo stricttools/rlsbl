@@ -34,11 +34,11 @@ func (inv Invocation) Lifecycle(req PeriodRequest) error {
 	}
 	status := lifecycle.Status(req.Value)
 	switch status {
-	case lifecycle.StatusActive, lifecycle.StatusOnHold, lifecycle.StatusRetired:
+	case lifecycle.StatusActive, lifecycle.StatusNonReleasing, lifecycle.StatusRetired:
 	case lifecycle.StatusUnreleased:
-		return fmt.Errorf("unreleased is never recorded: a releasable whose archives record no release and that has no lifecycle period in effect is unreleased; the statuses a period records are %s, %s, and %s", lifecycle.StatusActive, lifecycle.StatusOnHold, lifecycle.StatusRetired)
+		return fmt.Errorf("unreleased is never recorded: a releasable whose archives record no release and that has no lifecycle period in effect is unreleased; the statuses a period records are %s, %s, and %s", lifecycle.StatusActive, lifecycle.StatusNonReleasing, lifecycle.StatusRetired)
 	default:
-		return fmt.Errorf("%q is not a lifecycle status; the statuses are %s, %s, and %s", req.Value, lifecycle.StatusActive, lifecycle.StatusOnHold, lifecycle.StatusRetired)
+		return fmt.Errorf("%q is not a lifecycle status; the statuses are %s, %s, and %s", req.Value, lifecycle.StatusActive, lifecycle.StatusNonReleasing, lifecycle.StatusRetired)
 	}
 	if !m.knownSubject(req.Subject) {
 		return fmt.Errorf("%q is neither a releasable or member the declarations declare nor a subject the record holds a lifecycle period of; the declared subjects are %s", req.Subject, strings.Join(m.ws.Declarations.SubjectNames(), ", "))

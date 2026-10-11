@@ -16,7 +16,7 @@ import (
 )
 
 const transitionGroupHelp = "The lifecycle-and-license record, .strictmetadata/lifecycle-and-license/lifecycle-and-license.toml: each " +
-	"releasable's dated lifecycle (active, on-hold, retired; without a period in effect, active once released and unreleased before), license, and identity periods, the registry names it holds, the tags " +
+	"releasable's dated lifecycle (active, non-releasing, retired; without a period in effect, active once released and unreleased before), license, and identity periods, the registry names it holds, the tags " +
 	"that release no version: license and lifecycle facts only (confidential terms live in the confidential-term list, which a " +
 	"release scans for). A repository is confidential while a releasable's license is proprietary. A command that opens a " +
 	"period closes the subject's period in effect on today's date first. A command that changes the record validates the whole " +
@@ -32,7 +32,7 @@ const transitionShowHelp = "Print the lifecycle-and-license record and every rul
 	"declarations or without a record."
 
 const transitionLifecycleHelp = "Close a releasable's or member's lifecycle period on today's date and open one with --status: active, " +
-	"on-hold (its releases are refused), or retired (its release history is a record). A releasable without a lifecycle period in effect has " +
+	"non-releasing (its releases are refused), or retired (its release history is a record). A releasable without a lifecycle period in effect has " +
 	"a derived status, never recorded: active when its release archives record a release, and unreleased when they do not, which refuses its " +
 	"releases. Recording active for an unreleased releasable is the owner's decision that allows its first release. The subject is declared, " +
 	"or one the record already holds a lifecycle period of. A status its lifecycle period in effect already holds is refused."
@@ -112,7 +112,7 @@ func registerTransition(r *commandSet) {
 			strictcli.StringFlag("subject", "The releasable or member whose lifecycle changes", strictcli.Required()),
 			strictcli.StringFlag("status", "The status from today", strictcli.Required(), strictcli.Choices(
 				strictcli.Ch(string(lifecycle.StatusActive), "released as usual; for an unreleased releasable, its first release is allowed"),
-				strictcli.Ch(string(lifecycle.StatusOnHold), "its releases are refused until it is active again"),
+				strictcli.Ch(string(lifecycle.StatusNonReleasing), "its releases are refused until it is active again"),
 				strictcli.Ch(string(lifecycle.StatusRetired), "its release history is closed, a record nothing releases from"),
 			)),
 			reason,

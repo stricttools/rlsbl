@@ -13,7 +13,7 @@ format_version = 1
 
 [[lifecycle]]
 subject = "portal"                    # a releasable or member name
-status = "active"                     # "active", "on-hold", or "retired" ("unreleased" is derived, never recorded)
+status = "active"                     # "active", "non-releasing", or "retired" ("unreleased" is derived, never recorded)
 from = 2026-10-07
 reason = "..."
 
@@ -77,7 +77,7 @@ The rules are fixed in the library's code; nothing in the record names one. `rls
 | proprietary requires private | A releasable whose license is `proprietary` makes the repository confidential, and GitHub must report the repository private. A private repository with no proprietary releasable is refused too. | Release validation; the `repository-visibility` check. |
 | proprietary refuses public output | A proprietary releasable publishes to no registry and makes no registry write (no npm deprecate, no Go retract), gets no build attestation, no public docs, and no blog post. | Release validation of its pipelines; `release yank`. |
 | private repository publishing | In a confidential or private repository: no npm build attestations (`--provenance`), no PyPI attestations, no Go module proxy request, no Go `library` pipeline, no Homebrew tap, and no published manifest field naming the repository (`package.json` `repository`, `homepage`, `bugs`; `pyproject.toml` `[project.urls]`). | Release validation; the `private-repo-publishing` check; the publish workflows `rlsbl scaffold` renders. |
-| lifecycle allows release | A subject whose lifecycle is `on-hold` or `retired` is not released, and neither is an `unreleased` releasable (no lifecycle period in effect, and no release in its archives); the refusal names the `transition lifecycle --status active` that records the owner's decision to release it. | Release validation and batch release planning; `releasable-residue` leaves a retired subject's history alone. |
+| lifecycle allows release | A subject whose lifecycle is `non-releasing` or `retired` is not released, and neither is an `unreleased` releasable (no lifecycle period in effect, and no release in its archives); the refusal names the `transition lifecycle --status active` that records the owner's decision to release it. | Release validation and batch release planning; `releasable-residue` leaves a retired subject's history alone. |
 | proprietary history is squashed | Before the repository goes public, the commits of each proprietary period are squashed into one commit per period whose message names no confidential term. | `transition declassify`. |
 | identity owns its tags | A tag one of an identity's `tag_patterns` owns, created while that identity's period ran, belongs to it; once the period closes, those tags are accounted for, never demanded, scrubbed, or refused. A tag pattern is the glob of a tag scheme (one `*` standing for the version), and it owns a tag only when the tag is the text before the `*`, a `MAJOR.MINOR.PATCH` version, then the text after it, as a releasable's tag format owns its tags: `v*` owns `v1.2.0` and never `video-proc@v0.1.0` or `vnext`. A pattern that is no scheme's glob is refused. | `release backfill`, `release reconcile`, `unpublished-refs`, `go-companion-tags`. |
 | registry names are held | A recorded registry name stays in the record, and no rlsbl command unpublishes a package. | `lifecycle-record-valid`. |
@@ -92,7 +92,7 @@ A command that opens a period closes the subject's period in effect on the comma
 | Command | What it records |
 | --- | --- |
 | `rlsbl transition show` | Nothing: prints the record and every rule's verdict. Works without declarations and without a record. |
-| `rlsbl transition lifecycle --subject <name> --status active\|on-hold\|retired --reason <text>` | A lifecycle period. `on-hold` refuses the subject's releases; `retired` makes its release history a record; `active` for an unreleased releasable allows its first release. `unreleased` is refused: it is never recorded. |
+| `rlsbl transition lifecycle --subject <name> --status active\|non-releasing\|retired --reason <text>` | A lifecycle period. `non-releasing` refuses the subject's releases; `retired` makes its release history a record; `active` for an unreleased releasable allows its first release. `unreleased` is refused: it is never recorded. |
 | `rlsbl transition license --subject <releasable> --license <SPDX> --reason <text>` | A license period. `proprietary` is refused (use `classify`), and so is a change that would leave no releasable proprietary in a confidential repository (use `declassify`). |
 | `rlsbl transition identity --subject <name> --facet <facet> --value <value> [--registry <registry>] [--tag-pattern <glob>]... [--from <date> [--until <date>]] --reason <text>` | An identity period. Without `--from` it starts on the command's date and closes the subject's open identity of the facet (in the same registry, for a `package-name`); with `--from` (and `--until`) it is recorded as given, which is how a dead identity's tags become accounted for. In a tag pattern `*` matches any run of characters, slashes included. |
 | `rlsbl transition unversioned-tag --tag <tag> --reason <text>` | A tag that releases no version (a nightly marker, an imported vendor tag), so the backfill, the reconcile, and the tag checks account for it. |

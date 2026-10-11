@@ -123,7 +123,7 @@ func statusPayloadSchema() map[string]any {
 		"releasable_version":    schemaNullString,
 		"branch":                schemaNullString,
 		"clean":                 map[string]any{"type": "boolean"},
-		"lifecycle":             map[string]any{"type": []any{"string", "null"}, "enum": []any{"active", "on-hold", "retired", "unreleased", nil}},
+		"lifecycle":             map[string]any{"type": []any{"string", "null"}, "enum": []any{"active", "non-releasing", "retired", "unreleased", nil}},
 		"changelog_has_version": schemaNullBool,
 		"coverage":              closedObject(true, schemaCoverageShape),
 		"commits_ahead":         schemaNullInteger,

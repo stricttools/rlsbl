@@ -224,30 +224,30 @@ func requireNoDispatch(t *testing.T, gh *testsupport.GH) {
 	}
 }
 
-const onHoldRecord = `format_version = 1
+const nonReleasingRecord = `format_version = 1
 
 [[lifecycle]]
 subject = "portal"
-status = "on-hold"
+status = "non-releasing"
 from = 2026-01-01
 reason = "paused"
 `
 
-func TestRetryRefusesAReleasableOnHoldUntilItIsActive(t *testing.T) {
+func TestRetryRefusesANonReleasingReleasableUntilItIsActive(t *testing.T) {
 	hygiene.Isolate(t)
 	p := portalWithWorkflows(t)
-	p.Write(lifecycle.RecordFile, onHoldRecord)
-	p.Commit("put portal on hold", lifecycle.RecordFile)
+	p.Write(lifecycle.RecordFile, nonReleasingRecord)
+	p.Commit("make portal non-releasing", lifecycle.RecordFile)
 	gh := testsupport.FakeGH(t, authStatus, repoInfo("public"), releaseExists("v0.4.0"))
 	r := retry(t, p, false)
 	requireExit(t, r, 1)
-	requireContains(t, r.Stderr, "on-hold", "Nothing was dispatched")
+	requireContains(t, r.Stderr, "non-releasing", "Nothing was dispatched")
 	requireNoDispatch(t, gh)
 	if p.exists(runstate.RetryPath("portal")) {
 		t.Fatal("a refused retry wrote its retry file")
 	}
 	// The fix the refusal names: an active lifecycle period.
-	p.Write(lifecycle.RecordFile, strings.Replace(onHoldRecord, "reason = \"paused\"\n", "until = 2026-02-01\nreason = \"paused\"\n", 1)+"\n[[lifecycle]]\nsubject = \"portal\"\nstatus = \"active\"\nfrom = 2026-02-01\nreason = \"resumed\"\n")
+	p.Write(lifecycle.RecordFile, strings.Replace(nonReleasingRecord, "reason = \"paused\"\n", "until = 2026-02-01\nreason = \"paused\"\n", 1)+"\n[[lifecycle]]\nsubject = \"portal\"\nstatus = \"active\"\nfrom = 2026-02-01\nreason = \"resumed\"\n")
 	p.Commit("portal is active again", lifecycle.RecordFile)
 	testsupport.FakeGH(t, authStatus, repoInfo("public"), releaseExists("v0.4.0"),
 		testsupport.GHAnswer{Args: dispatchArgs("ci.yml", false)},

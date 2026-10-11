@@ -417,7 +417,7 @@ func resumeIn(e *strictcli.Effects, s *Session, req RunRequest, releasable strin
 		return err
 	}
 	// What was allowed when the release started may not be now: the
-	// releasable put on hold or retired, classified, or given a deploy
+	// releasable made non-releasing or retired, classified, or given a deploy
 	// command since. The steps left publish and deploy, so they are held to
 	// the rules release validation applies.
 	info, err := gh.Info(ghRepo)

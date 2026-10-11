@@ -162,14 +162,14 @@ func lifecycleRecord(status string) string {
 
 const recordPath = ".strictmetadata/lifecycle-and-license/lifecycle-and-license.toml"
 
-func TestAReleasableOnHoldIsRefusedUntilActiveAgain(t *testing.T) {
+func TestANonReleasingReleasableIsRefusedUntilActiveAgain(t *testing.T) {
 	hygiene.Isolate(t)
 	gitHub(t, "public", true)
 	repo := readyRepo(t, "")
-	repo.CommitFile(recordPath, lifecycleRecord("on-hold"), "hold portal")
+	repo.CommitFile(recordPath, lifecycleRecord("non-releasing"), "make portal non-releasing")
 	_, err := validate(t, repo, nil, nil)
-	if err == nil || !strings.Contains(err.Error(), "on-hold") {
-		t.Fatalf("an on-hold releasable was released: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "non-releasing") {
+		t.Fatalf("an non-releasing releasable was released: %v", err)
 	}
 	// The fix the refusal names: an active lifecycle period.
 	repo.CommitFile(recordPath, lifecycleRecord("active"), "resume portal")

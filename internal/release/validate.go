@@ -144,7 +144,7 @@ func validate(e *strictcli.Effects, req Request, batch *releaserecord.ReleaseFil
 	if v.Lifecycle, err = lifecycle.Load(req.Root); err != nil {
 		return nil, err
 	}
-	if err := refuseHeldLifecycle(v.Lifecycle, ws, v.Releasable, req.Now); err != nil {
+	if err := refuseLifecycleDisallowingRelease(v.Lifecycle, ws, v.Releasable, req.Now); err != nil {
 		return nil, err
 	}
 	if v.Environment, err = releaseEnvironmentFile(ws.Declarations, req.LiveRoot, req.Environment); err != nil {
@@ -311,18 +311,18 @@ func refuseInProgress(repo git.Repo, liveRoot string, r declarations.Releasable)
 	return nil, &ValidationError{Message: strings.Join(parts, "")}
 }
 
-// RefuseHeldLifecycle is refuseHeldLifecycle, for the batch release file's
+// RefuseLifecycleDisallowingRelease is refuseLifecycleDisallowingRelease, for the batch release file's
 // scaffolding: a table is never written for a releasable no release takes.
-func RefuseHeldLifecycle(record *lifecycle.Record, ws *workspace.Workspace, r declarations.Releasable, now time.Time) error {
-	return refuseHeldLifecycle(record, ws, r, now)
+func RefuseLifecycleDisallowingRelease(record *lifecycle.Record, ws *workspace.Workspace, r declarations.Releasable, now time.Time) error {
+	return refuseLifecycleDisallowingRelease(record, ws, r, now)
 }
 
-// refuseHeldLifecycle evaluates lifecycle-allows-release for the releasable
-// and every member versioned under it: a subject on hold or retired is not
+// refuseLifecycleDisallowingRelease evaluates lifecycle-allows-release for the releasable
+// and every member versioned under it: a non-releasing or retired subject is not
 // released, and neither is an unreleased releasable (no lifecycle period in
 // effect and no release in its archives). A member's release history is its
 // releasable's, so a member without a period of its own follows it.
-func refuseHeldLifecycle(record *lifecycle.Record, ws *workspace.Workspace, r declarations.Releasable, now time.Time) error {
+func refuseLifecycleDisallowingRelease(record *lifecycle.Record, ws *workspace.Workspace, r declarations.Releasable, now time.Time) error {
 	released, err := releaserecord.HasRelease(ws.Root, r.Name)
 	if err != nil {
 		return err
@@ -721,7 +721,7 @@ func refusePublishing(v *Validated, repo git.Repo, info github.RepositoryInfo, n
 // publishing rules refusePublishing applies, over the declarations and the
 // workflows committed at rev, the tree whose workflows run.
 func RefuseRepublishing(ws *workspace.Workspace, r declarations.Releasable, record *lifecycle.Record, repo git.Repo, rev string, info github.RepositoryInfo, now time.Time) error {
-	if err := refuseHeldLifecycle(record, ws, r, now); err != nil {
+	if err := refuseLifecycleDisallowingRelease(record, ws, r, now); err != nil {
 		return err
 	}
 	return publishingRules(ws, r, record, repo, rev, info, now)
