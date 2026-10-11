@@ -71,7 +71,10 @@ const releaseRetractHelp = "Retract released versions of the releasable's Go mod
 	"release archive and no tag here or on origin holds (a patch above the highest), committed on the release branch with one go.mod " +
 	"retract directive covering the versions --versions names and the new version itself, with --reason as its comment, in every Go module " +
 	"of the releasable. The new version is tagged at that commit and only its tags are pushed, each on its own: not the branch, and no " +
-	"GitHub Release, since a retraction-only version has nothing to download or read. The record then holds every version the directive " +
+	"GitHub Release, since a retraction-only version has nothing to download or read. Right after the tags are pushed, the new version " +
+	"of every Go module is requested from the Go module proxy (proxy.golang.org, the version's info document), which makes the proxy " +
+	"fetch it and so publishes the retraction, and the command reports no success until the proxy returns it: a proxy that does not " +
+	"stops the run. The record then holds every version the directive " +
 	"covers as retracted, none of them a release: each named version's release archive names the retraction version (retracted_by), " +
 	"which is archived with its release commit and the versions it retracts (retracts); a releasable whose every version is retracted is " +
 	"unreleased. The retracted versions' tags stay, as the Go module proxy keeps them for good, and their GitHub Releases are deleted. A " +
@@ -81,7 +84,7 @@ const releaseRetractHelp = "Retract released versions of the releasable's Go mod
 	"release of, one retracted already, a directive range that would also retract a version --versions does not name, a releasable " +
 	"without a Go module (`rlsbl release yank` withdraws other packages) or with a proprietary license, a go.mod with uncommitted " +
 	"changes, a release in progress, a branch that is not a release branch, and a confidential-term hit in what the tag push publishes. " +
-	"No registry is asked about any version. --dry-run prints the plan and writes nothing."
+	"The proxy is asked about no other version, and no other registry is asked anything. --dry-run prints the plan and writes nothing."
 
 // noticeFlags are deprecate's and yank's flags.
 func noticeFlags(verb string) []strictcli.Flag {

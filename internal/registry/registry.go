@@ -4,13 +4,15 @@
 // deprecation notice, name claims, and whether the npm token on this machine
 // is live and copied into a repository's NPM_TOKEN secret.
 //
-// It never asks a registry about one version it might own: a lookup can
-// record a version and so burn it. Every read is package-level: the npm
-// package document (https://registry.npmjs.org/<name>), the PyPI project
-// document (https://pypi.org/pypi/<name>/json) and its simple index page,
-// and the Go proxy's version list (https://proxy.golang.org/<module>/@v/list).
-// The one version-specific URL is a Go module's go.mod, and it is built only
-// for a version a version list already returned (GoListing.Mod), so the
+// It never asks a registry about one version it might own and has not
+// published: a lookup can record a version and so burn it. Every read is
+// package-level: the npm package document (https://registry.npmjs.org/<name>),
+// the PyPI project document (https://pypi.org/pypi/<name>/json) and its
+// simple index page, and the Go proxy's version list
+// (https://proxy.golang.org/<module>/@v/list). The version-specific URLs are
+// a Go module's go.mod, built only for a version a version list already
+// returned (GoListing.Mod), and a Go module version's info document, built
+// only by RequestGoVersion for a version whose tag is pushed; either way the
 // version it names is published. @latest and sum.golang.org are never
 // requested. The URL builders in this file are the only places a registry
 // URL is made.
@@ -158,6 +160,13 @@ func goListURL(module string) string {
 // for a version the list returned.
 func goModURL(module, version string) string {
 	return goProxy + "/" + EscapeModulePath(module) + "/@v/" + version + ".mod"
+}
+
+// goInfoURL is one version's info document, whose request makes the proxy
+// fetch the version. Only RequestGoVersion builds it, for a version whose tag
+// is pushed.
+func goInfoURL(module, version string) string {
+	return goProxy + "/" + EscapeModulePath(module) + "/@v/" + version + ".info"
 }
 
 // EscapeModulePath writes a module path the way the Go module proxy demands:

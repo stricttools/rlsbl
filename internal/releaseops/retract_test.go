@@ -13,14 +13,35 @@ import (
 	"github.com/stricttools/rlsbl/internal/testsupport"
 )
 
+// retractionInfoURL is the Go module proxy's info document of portal's
+// retraction version, 0.5.1, which every retraction here publishes.
+const retractionInfoURL = "https://proxy.golang.org/github.com/acme/portal/@v/v0.5.1.info"
+
+// proxyReturns is the proxy returning the retraction version.
+var proxyReturns = get(retractionInfoURL, 200, `{"Version":"v0.5.1","Time":"2026-10-11T00:00:00Z"}`)
+
 func retract(t *testing.T, p *project, dryRun bool, versions ...string) strictcli.Result {
 	t.Helper()
+	return retractWithProxy(t, p, dryRun, proxyReturns, versions...)
+}
+
+// retractWithProxy runs a retraction whose request to the Go module proxy is
+// answered with proxy. The proxy is asked for the retraction version, which
+// its pushed tag publishes, and about no other version: once by a run that
+// succeeds, at most once by one that stops, never by a dry run.
+func retractWithProxy(t *testing.T, p *project, dryRun bool, proxy testsupport.HTTPAnswer, versions ...string) strictcli.Result {
+	t.Helper()
 	req := releaseops.RetractRequest{Dir: p.Dir, Versions: versions, Reason: "Published by mistake", TermList: p.termList}
-	// No registry is asked anything: the fake answers no request.
-	fake := testsupport.NewFakeHTTP(t)
+	fake := testsupport.NewFakeHTTP(t, proxy)
 	r := run(t, fake, dryRun, func(ctx *strictcli.Context) error { return releaseops.Retract(ctx, req) })
-	if len(fake.Requests()) != 0 {
-		t.Fatalf("the retraction asked a registry: %q", fake.URLs())
+	urls := fake.URLs()
+	for _, u := range urls {
+		if u != retractionInfoURL {
+			t.Fatalf("the retraction asked for something other than the retraction version: %q", urls)
+		}
+	}
+	if len(urls) > 1 || (r.ExitCode == 0 && !dryRun && len(urls) != 1) || (dryRun && len(urls) != 0) {
+		t.Fatalf("the retraction (exit %d, dry run %v) asked the proxy %d times: %q", r.ExitCode, dryRun, len(urls), urls)
 	}
 	return r
 }
@@ -116,6 +137,33 @@ func TestARetractionThatStoppedIsFinishedByRunningItAgain(t *testing.T) {
 	}
 	if p.Head() != head || strings.Count(p.read("go.mod"), "retract") != 1 {
 		t.Fatal("the run that finished it wrote again")
+	}
+}
+
+func TestARetractionIsNoSuccessUntilTheProxyReturnsTheRetractionVersion(t *testing.T) {
+	hygiene.Isolate(t)
+	p, _ := goPortalAt050(t)
+	testsupport.FakeSafegit(t)
+	gh := testsupport.FakeGH(t, authStatus, releaseExists("v0.5.0"), testsupport.GHAnswer{Args: deleteArgs("v0.5.0")})
+	r := retractWithProxy(t, p, false, get(retractionInfoURL, 404, "not found: unknown revision v0.5.1\n"), "0.5.0")
+	requireExit(t, r, 1)
+	requireContains(t, r.Stderr, "the Go module proxy did not return github.com/acme/portal@v0.5.1", "HTTP 404", "unknown revision", "rlsbl release retract")
+	if strings.Contains(r.Stdout, "Retracted") {
+		t.Fatalf("a retraction the proxy did not return reported success:\n%s", r.Stdout)
+	}
+	if p.originRefs()["refs/tags/v0.5.1"] == "" {
+		t.Fatal("the proxy was asked before the tag was pushed")
+	}
+	if _, ok := called(gh.Calls(), deleteArgs("v0.5.0")); ok {
+		t.Fatal("the run went on past the proxy's refusal")
+	}
+	// Running it again asks the proxy again, and nothing else is written.
+	head := p.Head()
+	r = retract(t, p, false, "0.5.0")
+	requireExit(t, r, 0)
+	requireContains(t, r.Stdout, "Retracted v0.5.0 of portal through 0.5.1", "Go module proxy: github.com/acme/portal@v0.5.1 returned")
+	if p.Head() != head {
+		t.Fatal("the run that finished it committed")
 	}
 }
 

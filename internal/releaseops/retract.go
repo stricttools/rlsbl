@@ -16,6 +16,7 @@ import (
 	"github.com/stricttools/rlsbl/internal/github"
 	"github.com/stricttools/rlsbl/internal/gomodule"
 	"github.com/stricttools/rlsbl/internal/publishrules"
+	"github.com/stricttools/rlsbl/internal/registry"
 	"github.com/stricttools/rlsbl/internal/releaserecord"
 	"github.com/stricttools/rlsbl/internal/runstate"
 	"github.com/stricttools/rlsbl/internal/semver"
@@ -48,6 +49,12 @@ type retraction struct {
 	// goMods are the go.mod files of the releasable's Go modules,
 	// repository-relative.
 	goMods []string
+	// modules are the module paths those go.mod files declare, in the same
+	// order.
+	modules []string
+	// requested is true once the Go module proxy returned the retraction
+	// version of every module.
+	requested bool
 	// commit is the retraction commit, known once it exists (a run that
 	// finishes a stopped one reads it from the retraction archive).
 	commit string
@@ -64,7 +71,8 @@ type retraction struct {
 // the next free version number is committed with a go.mod retract directive
 // covering the named versions and itself, tagged, and only its tags are
 // pushed (no branch, no GitHub Release, since it has nothing to download or
-// read). The record then holds every one of them as retracted, so none
+// read), and the Go module proxy is asked for it until it returns it, which
+// publishes the retraction to every consumer. The record then holds every one of them as retracted, so none
 // counts as a release: the retracted versions' archives name the retraction
 // version, which is archived with its release commit and the versions it
 // retracts. The retracted versions' tags stay, as the Go module proxy keeps
@@ -160,7 +168,16 @@ func planRetraction(ctx *strictcli.Context, s Selection, versions []semver.Versi
 	}
 	for _, p := range pkgs {
 		if p.Target == declarations.TargetGo {
-			r.goMods = append(r.goMods, declarations.Join(p.Dir, gomodule.FileName))
+			goMod := declarations.Join(p.Dir, gomodule.FileName)
+			module, found, err := gomodule.ModulePath(s.abs(p.Dir))
+			if err != nil {
+				return nil, err
+			}
+			if !found {
+				return nil, fmt.Errorf("%s does not exist, yet %s declares a Go module there. Nothing was changed", goMod, declarations.ReleasablesFile)
+			}
+			r.goMods = append(r.goMods, goMod)
+			r.modules = append(r.modules, module)
 		}
 	}
 	if len(r.goMods) == 0 {
@@ -516,8 +533,11 @@ func (r *retraction) targets() ([]string, []string) {
 }
 
 // publish creates the retraction version's tags at the retraction commit,
-// pushes each one on its own (and nothing else), and deletes the retracted
-// versions' GitHub Releases. Each step finds what a stopped run already did.
+// pushes each one on its own (and nothing else), requests the retraction
+// version of every module from the Go module proxy until the proxy returns
+// it, and deletes the retracted versions' GitHub Releases. Each step finds
+// what a stopped run already did; the proxy is asked again on every run, as
+// asking for a published version changes nothing.
 func (r *retraction) publish(ctx *strictcli.Context) error {
 	s := r.s
 	tags, err := r.refs()
@@ -552,6 +572,16 @@ func (r *retraction) publish(ctx *strictcli.Context) error {
 		}
 		ctx.Info(fmt.Sprintf("Pushed %s -> %s (the retraction commit)", tag, r.commit))
 	}
+	// The tags are pushed, so the version is published, and asking the proxy
+	// for it burns nothing.
+	for _, ref := range r.moduleRefs() {
+		module, version, _ := strings.Cut(ref, "@")
+		if err := registry.RequestGoVersion(ctx.Effects(), module, version); err != nil {
+			return fmt.Errorf("the Go module proxy did not return %s: %w\n  The retraction is pushed, and takes effect once the proxy returns it; run `%s` again to request it", ref, err, RetractInvocation)
+		}
+		ctx.Info(fmt.Sprintf("The Go module proxy returned %s", ref))
+	}
+	r.requested = true
 	for _, tag := range r.releases {
 		if err := r.gh.DeleteRelease(r.slug, tag); err != nil {
 			return fmt.Errorf("deleting the GitHub Release of %s failed: %w\n  The retraction is pushed; run `%s` again to delete the Releases left", tag, err, RetractInvocation)
@@ -569,6 +599,11 @@ func (r *retraction) describe(verb, reason string) string {
 	if tags, err := r.refs(); err == nil {
 		fmt.Fprintf(&b, "  tags pushed, and nothing else: %s\n", strings.Join(tags, ", "))
 	}
+	if r.requested {
+		fmt.Fprintf(&b, "  Go module proxy: %s returned\n", strings.Join(r.moduleRefs(), ", "))
+	} else {
+		fmt.Fprintf(&b, "  Go module proxy: %s requested once the tags are pushed\n", strings.Join(r.moduleRefs(), ", "))
+	}
 	if len(r.releases) > 0 {
 		fmt.Fprintf(&b, "  GitHub Releases deleted: %s (their tags stay)\n", strings.Join(r.releases, ", "))
 	} else {
@@ -576,6 +611,15 @@ func (r *retraction) describe(verb, reason string) string {
 	}
 	fmt.Fprintf(&b, "  The record holds %s as retracted: none counts as a release.", versionPhrase(r.retracted()))
 	return b.String()
+}
+
+// moduleRefs are the retraction version of every Go module, module@version.
+func (r *retraction) moduleRefs() []string {
+	refs := make([]string, len(r.modules))
+	for i, m := range r.modules {
+		refs[i] = m + "@v" + r.next.String()
+	}
+	return refs
 }
 
 // versionPhrase lists versions as prose: "v0.5.0", "v0.5.0 and v0.5.1",
