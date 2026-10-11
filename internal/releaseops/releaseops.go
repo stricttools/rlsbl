@@ -137,7 +137,8 @@ func (s Selection) archive(v semver.Version) (releaserecord.Archive, bool, error
 
 // releasedArchive reads the archive of a version a command acts on as a
 // release: one that exists and records a release, recorded or
-// unrecoverable. Every other state is refused, naming what the record says.
+// unrecoverable, and not retracted. Every other state is refused, naming
+// what the record says.
 func (s Selection) releasedArchive(v semver.Version) (releaserecord.Archive, error) {
 	a, found, err := s.archive(v)
 	if err != nil {
@@ -152,6 +153,9 @@ func (s Selection) releasedArchive(v semver.Version) (releaserecord.Archive, err
 		return releaserecord.Archive{}, fmt.Errorf("%s records that no release was ever published under %s (never_released = true), so there is no release of it to act on", rel, v)
 	case releaserecord.FateUnstated:
 		return releaserecord.Archive{}, fmt.Errorf("%s states no fate (recorded, unrecoverable, or never released), so whether %s shipped cannot be told. Backfill it, previewing first: `rlsbl release backfill --dry-run`, then `rlsbl release backfill --approve-consequential`", rel, v)
+	}
+	if a.Retracted() {
+		return releaserecord.Archive{}, fmt.Errorf("%s records %s as retracted by %s: it does not count as a release and has no GitHub Release, so there is no release of it to act on", rel, v, a.RetractedBy)
 	}
 	return a, nil
 }

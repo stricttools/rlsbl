@@ -120,6 +120,38 @@ func TestAMissingReleaseIsCreatedFromTheRecord(t *testing.T) {
 	}
 }
 
+// A retracted version, the retraction version included, has no GitHub
+// Release, so the reconcile creates none for it; its tag is still owed.
+func TestARetractedVersionGetsNoGitHubRelease(t *testing.T) {
+	hygiene.Isolate(t)
+	f := newReleased(t, true)
+	tree := f.repo.Git("rev-parse", f.h.R+"^{tree}")
+	retracted := strings.Replace(archiveText(f.h.R, tree), "release_commit", "retracted_by = \"0.1.1\"\nrelease_commit", 1)
+	f.repo.Write(archivePath, retracted)
+	retraction := strings.Replace(archiveText(f.h.S, tree), "release_commit", "retracted_by = \"0.1.1\"\nretracts = [\"0.1.0\"]\nrelease_commit", 1)
+	f.repo.Write(".strictmetadata/releases/portal/v0.1.1.toml", retraction)
+	commitAll(t, f.repo, map[string]string{}, "retract 0.1.0")
+	f.repo.Git("tag", "v0.1.1", f.h.S)
+	fake := gh(t, listed())
+	requireExit(t, reconcile(t, f.repo.Dir, "", historyrewrite.ReconcilePlan, false), 0)
+	plan := readFile(t, f.repo, planPath)
+	if strings.Contains(plan, "create the GitHub Release") {
+		t.Fatalf("the plan creates a Release for a retracted version:\n%s", plan)
+	}
+	if !strings.Contains(plan, "refs/tags/v0.1.1") {
+		t.Fatalf("the retraction version's tag is not judged:\n%s", plan)
+	}
+	requireExit(t, reconcile(t, f.repo.Dir, "", historyrewrite.ReconcileApply, false), 0)
+	if got := testsupport.Refs(t, f.bare)["refs/tags/v0.1.1"]; got != f.h.S {
+		t.Fatalf("origin's v0.1.1 is %q, want %s", got, f.h.S)
+	}
+	for _, c := range fake.Calls() {
+		if len(c.Args) > 1 && c.Args[0] == "release" && c.Args[1] == "create" {
+			t.Fatalf("a Release was created: %v", c.Args)
+		}
+	}
+}
+
 func TestATagARecordedRewriteMovedIsRePointedWithItsMarker(t *testing.T) {
 	hygiene.Isolate(t)
 	f := newReleased(t, false)

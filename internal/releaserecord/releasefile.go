@@ -72,7 +72,18 @@ type Archive struct {
 	// ConfidentialHits are the resolutions of the confidential-term hits
 	// the release published, in hit-id order.
 	ConfidentialHits []confidential.Resolution
+	// RetractedBy is the retraction version whose go.mod retracts this
+	// version (bare, MAJOR.MINOR.PATCH), and empty for a version not
+	// retracted. A retracted version does not count as a release. The
+	// retraction version names itself.
+	RetractedBy string
+	// Retracts are the versions the retraction version retracts besides
+	// itself; empty on every other archive.
+	Retracts []semver.Version
 }
+
+// Retracted reports whether a retraction covers the version.
+func (a Archive) Retracted() bool { return a.RetractedBy != "" }
 
 // The flow-owned fields: written only by rlsbl's own commands (the release
 // flow, the backfill, deprecate and yank, the history rewrites), refused in
@@ -86,9 +97,11 @@ const (
 	fieldShippedAs        = "shipped_as"
 	fieldReleaseNotices   = "release_notices"
 	fieldConfidentialHits = "confidential_hits"
+	fieldRetractedBy      = "retracted_by"
+	fieldRetracts         = "retracts"
 )
 
-var flowOwnedFields = []string{fieldReleaseCommit, fieldReleasedTrees, fieldUnrecoverable, fieldNeverReleased, fieldShippedAs, fieldReleaseNotices, fieldConfidentialHits}
+var flowOwnedFields = []string{fieldReleaseCommit, fieldReleasedTrees, fieldUnrecoverable, fieldNeverReleased, fieldShippedAs, fieldReleaseNotices, fieldConfidentialHits, fieldRetractedBy, fieldRetracts}
 
 // RawReleaseFields are the fields of one release, in the release file and in
 // each table of the batch release file, as decoded. The type is exported
@@ -108,6 +121,8 @@ type RawReleaseFields struct {
 	ReleaseNotices *[]string          `toml:"release_notices"`
 	// ConfidentialHits is exported for the decoder, as the fields are.
 	ConfidentialHits *[]RawConfidentialHit `toml:"confidential_hits"`
+	RetractedBy      *string               `toml:"retracted_by"`
+	Retracts         *[]string             `toml:"retracts"`
 }
 
 // RawConfidentialHit is one [[confidential_hits]] entry as decoded.
@@ -135,6 +150,8 @@ type document struct {
 	shippedAs     *string
 	notices       *[]string
 	hits          *[]confidential.Resolution
+	retractedBy   *semver.Version
+	retracts      *[]semver.Version
 }
 
 // flowOwnedPresent names the flow-owned fields the document carries.
@@ -151,6 +168,8 @@ func (d document) flowOwnedPresent() []string {
 		{fieldShippedAs, d.shippedAs != nil},
 		{fieldReleaseNotices, d.notices != nil},
 		{fieldConfidentialHits, d.hits != nil},
+		{fieldRetractedBy, d.retractedBy != nil},
+		{fieldRetracts, d.retracts != nil},
 	} {
 		if f.set {
 			present = append(present, f.name)
@@ -277,6 +296,28 @@ func (r RawReleaseFields) convert(where string) (document, []string) {
 		}
 		hits = &converted
 	}
+	var retractedBy *semver.Version
+	if r.RetractedBy != nil {
+		v, err := semver.Parse(*r.RetractedBy)
+		if err != nil {
+			problems = append(problems, fmt.Sprintf("%sretracted_by: %v", where, err))
+		} else {
+			retractedBy = &v
+		}
+	}
+	var retracts *[]semver.Version
+	if r.Retracts != nil {
+		list := make([]semver.Version, 0, len(*r.Retracts))
+		for _, text := range *r.Retracts {
+			v, err := semver.Parse(text)
+			if err != nil {
+				problems = append(problems, fmt.Sprintf("%sretracts: %v", where, err))
+				continue
+			}
+			list = append(list, v)
+		}
+		retracts = &list
+	}
 	return document{
 		file: ReleaseFile{
 			Bump:        bump,
@@ -292,6 +333,8 @@ func (r RawReleaseFields) convert(where string) (document, []string) {
 		shippedAs:     r.ShippedAs,
 		notices:       r.ReleaseNotices,
 		hits:          hits,
+		retractedBy:   retractedBy,
+		retracts:      retracts,
 	}, problems
 }
 
@@ -391,7 +434,41 @@ func parseArchive(rel string, v semver.Version, data []byte) (Archive, error) {
 	if d.hits != nil {
 		a.ConfidentialHits = append([]confidential.Resolution{}, *d.hits...)
 	}
+	if problems := retractionProblems(d, v, a.Fate); len(problems) > 0 {
+		return Archive{}, refuseFile(rel, problems...)
+	}
+	if d.retractedBy != nil {
+		a.RetractedBy = d.retractedBy.String()
+	}
+	if d.retracts != nil {
+		a.Retracts = append([]semver.Version{}, *d.retracts...)
+	}
 	return a, nil
+}
+
+// retractionProblems are what an archive's retraction fields say that
+// cannot hold: a retraction of a version that did not ship, a retraction
+// version that retracts nothing besides itself, and a retracts list on any
+// other version.
+func retractionProblems(d document, v semver.Version, fate Fate) []string {
+	var problems []string
+	if d.retractedBy != nil && !fate.Released() {
+		problems = append(problems, fmt.Sprintf("retracted_by is recorded on a version whose fate is %s: only a version that shipped (recorded or unrecoverable) is retracted", fate))
+	}
+	self := d.retractedBy != nil && semver.Compare(*d.retractedBy, v) == 0
+	switch {
+	case self && (d.retracts == nil || len(*d.retracts) == 0):
+		problems = append(problems, fmt.Sprintf("retracted_by names %s itself, which only the retraction version does, and retracts lists no other version it retracts", v))
+	case d.retracts != nil && !self:
+		problems = append(problems, fmt.Sprintf("retracts is recorded on %s, which is not a retraction version: only the version whose retracted_by names itself lists what it retracts", v))
+	case d.retracts != nil:
+		for _, r := range *d.retracts {
+			if semver.Compare(r, v) >= 0 {
+				problems = append(problems, fmt.Sprintf("retracts names %s, which is not below the retraction version %s", r, v))
+			}
+		}
+	}
+	return problems
 }
 
 func copyTrees(trees map[string]string) map[string]string {

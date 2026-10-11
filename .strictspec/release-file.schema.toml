@@ -16,6 +16,11 @@
 #   unrecoverable    unrecoverable = true              -- it shipped, from a commit nothing can name
 #   never released   never_released = true             -- the version number exists, no release does
 #
+# A recorded or unrecoverable version may also be RETRACTED (retracted_by): its
+# go.mod retraction was published by a retraction version, and it no longer
+# counts as a release. The retraction version is recorded with its own release
+# commit, retracts itself, and lists the others in retracts.
+#
 # The schema refuses a document carrying two of them; an archive carrying none
 # is refused by the reader, because the same schema validates the editable
 # unreleased.toml, which carries none by design. Exclusion is judged on
@@ -113,6 +118,18 @@ description = "The notices `rlsbl release deprecate` and `rlsbl release yank` pu
 type = "string"
 non_empty = true
 
+[types.ReleaseFile.fields.retracted_by]
+type = "BareVersion"
+required = false
+description = "Written by `rlsbl release retract` only: the retraction version whose go.mod retracts this version, the retraction version naming itself. A retracted version does not count as a release; its tag stays, and its GitHub Release is deleted. Legal on a recorded and on an unrecoverable archive."
+
+[types.ReleaseFile.fields.retracts]
+type = "array"
+required = false
+description = "Written by `rlsbl release retract` only, on the retraction version's archive: the released versions it retracts besides itself, which its retracted_by names."
+[types.ReleaseFile.fields.retracts.item]
+type = "BareVersion"
+
 [types.ReleaseFile.fields.confidential_hits]
 type = "array"
 required = false
@@ -149,6 +166,18 @@ form = "forbidden-when"
 field = "shipped_as"
 when = { field = "never_released", predicate = "present" }
 description = "A never-released version shipped under no tag."
+
+[[types.ReleaseFile.constraints]]
+form = "forbidden-when"
+field = "retracted_by"
+when = { field = "never_released", predicate = "present" }
+description = "A version that was never released has nothing to retract."
+
+[[types.ReleaseFile.constraints]]
+form = "forbidden-when"
+field = "retracts"
+when = { field = "never_released", predicate = "present" }
+description = "A version that was never released retracts nothing."
 
 [types.ConfidentialHit]
 type = "record"
@@ -188,6 +217,11 @@ description = "One line: the agent's reason for a false positive, the owner's fo
 type = "date"
 required = true
 description = "The day the resolution was recorded."
+
+[types.BareVersion]
+type = "string"
+regex = "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+description = "A version as MAJOR.MINOR.PATCH, without a leading v."
 
 [types.GitObjectHash]
 type = "string"

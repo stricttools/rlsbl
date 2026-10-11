@@ -70,6 +70,11 @@ type ArchiveSpec struct {
 	// element, for a writer other than the release flow (the backfill says
 	// the archive was written after the fact).
 	Header []string
+	// RetractedBy, set only on the retraction version's archive, is the
+	// retraction version itself, and Retracts the versions it retracts
+	// besides itself; the zero version means none.
+	RetractedBy semver.Version
+	Retracts    []semver.Version
 }
 
 var defaultArchiveHeader = []string{
@@ -122,6 +127,14 @@ func WriteArchive(e *strictcli.Effects, root, dir string, v semver.Version, spec
 	b.WriteString(renderFields(spec.ReleaseFile))
 	if spec.ShippedAs != "" {
 		fmt.Fprintf(&b, "shipped_as = %s\n", quote(spec.ShippedAs))
+	}
+	if spec.RetractedBy != (semver.Version{}) {
+		fmt.Fprintf(&b, "%s = %s\n", fieldRetractedBy, quote(spec.RetractedBy.String()))
+		names := make([]string, len(spec.Retracts))
+		for i, r := range spec.Retracts {
+			names[i] = r.String()
+		}
+		fmt.Fprintf(&b, "%s = %s\n", fieldRetracts, stringArray(names))
 	}
 	switch spec.Fate {
 	case FateUnrecoverable:
@@ -372,6 +385,37 @@ func RecordShippedAs(e *strictcli.Effects, root, dir string, v semver.Version, t
 		}
 		return true, d.Set(fieldShippedAs, tag)
 	})
+}
+
+// MarkRetracted records on the existing archive of v in dir that the
+// retraction version by retracts it. It reports false, writing nothing, when
+// the archive already records that retraction. A version that did not ship
+// (never released, or stating no fate) is refused, and so is one another
+// retraction version retracts already: a version is retracted once.
+func MarkRetracted(e *strictcli.Effects, root, dir string, v, by semver.Version) (bool, error) {
+	return rewriteArchive(e, root, dir, v, func(a Archive, d *tomledit.Document) (bool, error) {
+		if !a.Fate.Released() {
+			return false, fmt.Errorf("refusing to retract %s: %s records it as %s, and only a version that shipped is retracted", v, a.Path, describeFate(a.Fate))
+		}
+		if a.RetractedBy == by.String() {
+			return false, nil
+		}
+		if a.Retracted() {
+			return false, fmt.Errorf("refusing to retract %s by %s: %s records it already retracted by %s, and a version is retracted once", v, by, a.Path, a.RetractedBy)
+		}
+		return true, d.Set(fieldRetractedBy, by.String())
+	})
+}
+
+// describeFate names a fate for a refusal.
+func describeFate(f Fate) string {
+	switch f {
+	case FateNeverReleased:
+		return "never released"
+	case FateUnstated:
+		return "stating no fate"
+	}
+	return string(f)
 }
 
 // RecordReleaseNotice puts notice first in the release_notices of the

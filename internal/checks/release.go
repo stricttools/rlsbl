@@ -89,6 +89,9 @@ type refTally struct {
 	unrecoverableRefs  int
 	unrecoverableNotes int
 	releasesListed     bool
+	// retracted are the retracted versions, whose tags are demanded and
+	// whose GitHub Releases are not.
+	retracted []string
 }
 
 func checkUnpublishedRefs(c *Context, r *strictcli.ErrorReporter) strictcli.CheckOutcome {
@@ -167,6 +170,9 @@ func checkUnpublishedRefs(c *Context, r *strictcli.ErrorReporter) strictcli.Chec
 	if tally.unrecoverableRefs > 0 {
 		scope += fmt.Sprintf("; %d ref(s) absent for versions recorded unrecoverable, which have no commit to recreate them at", tally.unrecoverableRefs)
 	}
+	if len(tally.retracted) > 0 {
+		scope += fmt.Sprintf("; %d version(s) retracted, which keep their refs and have no GitHub Release: %s", len(tally.retracted), strings.Join(tally.retracted, ", "))
+	}
 	if tally.unrecoverableNotes > 0 {
 		scope += fmt.Sprintf("; %d GitHub Release(s) absent for versions recorded unrecoverable", tally.unrecoverableNotes)
 	}
@@ -240,6 +246,10 @@ func versionRefProblems(c *Context, rel declarations.Releasable, scheme workspac
 		if _, onRemote := remote[ref]; !onRemote {
 			problems = append(problems, fmt.Sprintf("%s: the ref %s exists locally but not on origin, so the release is not published where consumers resolve it. %s", v, ref, reconcileFix))
 		}
+	}
+	if archive.Retracted() {
+		tally.retracted = append(tally.retracted, v.String())
+		return problems
 	}
 	if releases == nil || remote == nil {
 		return problems

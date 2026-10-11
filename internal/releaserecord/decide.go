@@ -46,8 +46,8 @@ func BehindLatestText(v, latest semver.Version, namedBy string) string {
 //     otherwise as the state an abandoned attempt leaves, which `release
 //     abandon` records.
 //
-// A bumped version the record holds as never released is refused too
-// (BumpedVersion).
+// A bumped version the record holds as never released or retracted is
+// refused too (BumpedVersion).
 func (r *Record) DecideVersion(current semver.Version, bump semver.Bump, latest LatestFact) (Decision, error) {
 	if _, err := semver.ParseBump(string(bump)); err != nil {
 		return Decision{}, err
@@ -88,8 +88,8 @@ func (r *Record) DecideVersion(current semver.Version, bump semver.Bump, latest 
 }
 
 // BumpedVersion is the release that applies bump to current, refusing a
-// result the record holds as never released and naming the version files'
-// value that bumps past it. `rewrite project-name` asks it directly for an
+// result the record holds as never released or retracted and naming the
+// version files' value that bumps past it. `rewrite project-name` asks it directly for an
 // unrecoverable current version, which the release refuses until its tag is
 // restored: the rename records the version that release then ships.
 func (r *Record) BumpedVersion(current semver.Version, bump semver.Bump) (Decision, error) {
@@ -97,15 +97,34 @@ func (r *Record) BumpedVersion(current semver.Version, bump semver.Bump) (Decisi
 	if err != nil {
 		return Decision{}, err
 	}
-	neverReleased := func(v semver.Version) (bool, error) {
+	// taken says why the record holds v's number from every release: never
+	// released (an abandoned attempt claimed it) or retracted; empty when
+	// it does not.
+	taken := func(v semver.Version) (string, error) {
 		f, err := r.Fate(v)
-		return f == FateNeverReleased, err
+		if err != nil || f == FateAbsent {
+			return "", err
+		}
+		if f == FateNeverReleased {
+			return "never released", nil
+		}
+		if f == FateUnstated {
+			return "", nil
+		}
+		a, err := ReadArchive(r.root(), r.dir, v)
+		if err != nil {
+			return "", err
+		}
+		if a.Retracted() {
+			return "retracted (by " + a.RetractedBy + ")", nil
+		}
+		return "", nil
 	}
-	reused, err := neverReleased(next)
+	why, err := taken(next)
 	if err != nil {
 		return Decision{}, err
 	}
-	if reused {
+	if why != "" {
 		base, candidate := next, next
 		for {
 			c, err := candidate.Bump(bump)
@@ -113,20 +132,21 @@ func (r *Record) BumpedVersion(current semver.Version, bump semver.Bump) (Decisi
 				return Decision{}, err
 			}
 			base, candidate = candidate, c
-			again, err := neverReleased(candidate)
+			again, err := taken(candidate)
 			if err != nil {
 				return Decision{}, err
 			}
-			if !again {
+			if again == "" {
 				break
 			}
 		}
-		return Decision{}, fmt.Errorf("the %s bump from %s gives %s, which the release record holds as never released: %s\n"+
-			"  That number was claimed by an abandoned attempt, and rlsbl never releases under a\n"+
-			"  never-released number. Nothing was changed.\n"+
-			"  Bump past it: set the version files to %s, which is recorded as never released, and\n"+
-			"  the %s bump then gives %s.",
-			bump, current, next, ArchivePath(r.dir, next), base, bump, candidate)
+		return Decision{}, fmt.Errorf("the %s bump from %s gives %s, which the release record holds as %s: %s\n"+
+			"  A never-released number was claimed by an abandoned attempt, and a retracted one is\n"+
+			"  retracted on the Go module proxy for good; rlsbl releases under neither. Nothing was\n"+
+			"  changed.\n"+
+			"  Bump past it: set the version files to %s, which the record holds, and the %s bump\n"+
+			"  then gives %s.",
+			bump, current, next, why, ArchivePath(r.dir, next), base, bump, candidate)
 	}
 	return Decision{Version: next, Bump: bump, Tag: r.scheme.Render(next)}, nil
 }

@@ -92,6 +92,30 @@ func TestATagOnOriginWithoutAGitHubReleaseFails(t *testing.T) {
 	mustMention(t, got, "every ref and GitHub Release")
 }
 
+// A retracted version, the retraction version included, keeps its tags but
+// has no GitHub Release: the retraction deleted the one it had and created
+// none for itself.
+func TestARetractedVersionOwesItsTagsButNoGitHubRelease(t *testing.T) {
+	hygiene.Isolate(t)
+	r, released, next := releasedPortal(t)
+	r.Write(".strictmetadata/releasables/releasables.toml", fmt.Sprintf(githubPortal, "none"))
+	r.Write(".strictmetadata/releases/portal/v1.0.0.toml", fmt.Sprintf("format_version = 2\nbump = \"minor\"\ninclude = []\nexclude = []\ndescription = \"the first release\"\nretracted_by = \"1.0.1\"\nrelease_commit = %q\n\n[released_trees]\n\".\" = %q\n", released, strings.Repeat("e", 40)))
+	r.Write(".strictmetadata/releases/portal/v1.0.1.toml", fmt.Sprintf("format_version = 2\nbump = \"patch\"\ninclude = [\"go\"]\nexclude = []\ndescription = \"Retracts v1.0.0 and v1.0.1: broken\"\nretracted_by = \"1.0.1\"\nretracts = [\"1.0.0\"]\nrelease_commit = %q\n\n[released_trees]\n\".\" = %q\n", next, strings.Repeat("f", 40)))
+	r.Git("tag", "v1.0.1", next)
+	r.AddBareRemote("origin")
+	r.Git("push", "-q", "origin", "main", "v1.0.0", "v1.0.1")
+	list := []string{"release", "list", "--repo", "acme/portal", "--limit", "1000", "--json", "tagName", "--jq", ".[].tagName"}
+	testsupport.FakeGH(t, testsupport.GHAnswer{Args: list, Stdout: ""})
+	got := runCheck(t, inputs(t, r.Dir), "unpublished-refs")
+	mustStatus(t, got, "pass")
+	mustMention(t, got, "retracted", "1.0.0", "1.0.1")
+	// Its tags are still demanded.
+	r.Git("tag", "-d", "v1.0.1")
+	got = runCheck(t, inputs(t, r.Dir), "unpublished-refs")
+	mustStatus(t, got, "fail")
+	mustMention(t, got, "v1.0.1", "does not exist locally")
+}
+
 func TestBranchSyncAgainstTheRemoteTrackingBranch(t *testing.T) {
 	hygiene.Isolate(t)
 	origin := portalRepo(t, "none", nil)

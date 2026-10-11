@@ -22,6 +22,13 @@ import (
 // the note keeps a reader from taking it for a release that happened.
 const NeverReleasedNote = "**Never released.** This version number exists in the release record, but no release was ever published under it."
 
+// RetractedNote is what a retracted version's section says first: the
+// version shipped, and the retraction version by retracts it, so it does
+// not count as a release.
+func RetractedNote(by string) string {
+	return fmt.Sprintf("**Retracted** by %s. This version was published and is retracted on the Go module proxy; it does not count as a release.", by)
+}
+
 // typeGroups are the entry types and their headings, in the order a
 // section lists them.
 var typeGroups = []struct{ typ, heading string }{
@@ -36,6 +43,9 @@ type SectionMeta struct {
 	Context       string
 	Bump          semver.Bump
 	NeverReleased bool
+	// RetractedBy is the retraction version that retracts the version, and
+	// empty when none does.
+	RetractedBy string
 }
 
 func heading(depth int, title string) string { return strings.Repeat("#", depth) + " " + title }
@@ -55,6 +65,9 @@ func Section(title string, entries []Entry, meta SectionMeta, depth int) string 
 	parts := []string{heading(depth, title)}
 	if meta.NeverReleased {
 		parts = append(parts, "", NeverReleasedNote)
+	}
+	if meta.RetractedBy != "" {
+		parts = append(parts, "", RetractedNote(meta.RetractedBy))
 	}
 	if meta.Description != "" {
 		parts = append(parts, "", meta.Description)
@@ -119,6 +132,7 @@ func archiveMeta(root, releasable string, archived map[string]bool, v semver.Ver
 		Context:       strings.TrimSpace(a.Context),
 		Bump:          a.Bump,
 		NeverReleased: a.Fate == releaserecord.FateNeverReleased,
+		RetractedBy:   a.RetractedBy,
 	}, nil
 }
 

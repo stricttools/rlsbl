@@ -15,7 +15,7 @@ const statusHelp = "Report on the member whose directory holds the working direc
 	"target's manifest declares, the branch and whether the working tree is clean, the releasable's lifecycle status today (the status of its lifecycle period in " +
 	"effect, and otherwise active when its archives record a release and unreleased when they do not; an unreleased releasable's releases are " +
 	"refused until an active period is recorded), the latest release in the releasable's release archives (annotated " +
-	"when this checkout does not contain it, when its commit is unrecoverable, and with the versions archived above it that were never released), " +
+	"when this checkout does not contain it, when its commit is unrecoverable, and with the versions archived above it that were never released or are retracted), " +
 	"whether the changelog holds the released file of the current version, changelog coverage of the commits since the nearest release this checkout " +
 	"contains (covered of those needing an entry, and how many are exempt), the member's own CI workflows and publish workflow, and a warning when " +
 	"commits needing an entry wait since the nearest release. A member with several targets needs --target naming one; a workspace root whose root " +

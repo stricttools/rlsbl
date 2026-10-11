@@ -203,12 +203,16 @@ func (r ReleaseRepair) rewriteOne(res *releaseResolver, tag string) (bool, error
 		return false, nil
 	}
 	x := found.refs
-	fate, err := archiveFate(r.Workspace.Root, x.archiveDir(), found.version)
+	fate, retractedBy, err := archiveFate(r.Workspace.Root, x.archiveDir(), found.version)
 	if err != nil {
 		return false, err
 	}
 	if fate == releaserecord.FateNeverReleased {
 		r.Say(fmt.Sprintf("%s: %s %s is recorded never released, so no GitHub Release is owed under it", tag, x.releasable.Name, found.version))
+		return false, nil
+	}
+	if retractedBy != "" {
+		r.Say(fmt.Sprintf("%s: %s %s is retracted by %s, so no GitHub Release is owed under it", tag, x.releasable.Name, found.version, retractedBy))
 		return false, nil
 	}
 	// A version released before its releasable kept a changelog file has no
@@ -291,23 +295,24 @@ func (r ReleaseRepair) keepNotes(tag, releasable string, doc releasenotes.Docume
 	return wrote, nil
 }
 
-// archiveFate is the fate the archive of v in dir states, FateAbsent when
-// there is none.
-func archiveFate(root, dir string, v semver.Version) (releaserecord.Fate, error) {
+// archiveFate is the fate the archive of v in dir records, FateAbsent when
+// there is none, and the retraction version that retracts it, empty when
+// none does.
+func archiveFate(root, dir string, v semver.Version) (releaserecord.Fate, string, error) {
 	versions, err := releaserecord.ArchivedVersions(root, dir)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	for _, a := range versions {
 		if semver.Compare(a, v) == 0 {
 			archive, err := releaserecord.ReadArchive(root, dir, v)
 			if err != nil {
-				return "", err
+				return "", "", err
 			}
-			return archive.Fate, nil
+			return archive.Fate, archive.RetractedBy, nil
 		}
 	}
-	return releaserecord.FateAbsent, nil
+	return releaserecord.FateAbsent, "", nil
 }
 
 // sortedKeys are m's keys in order.

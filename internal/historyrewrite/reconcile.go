@@ -617,6 +617,11 @@ func (r *reconcileRun) judge(repo git.Repo, obs observation, x explanations, hea
 				items = append(items, item)
 			}
 		}
+		if a.Retracted() {
+			// A retracted version has no GitHub Release: the retraction
+			// deleted the one it had and made none for itself.
+			continue
+		}
 		items = append(items, releaseVerdict(obs, expected.Primary, expected.SchemeSpelling, v, commit))
 	}
 	created, err := repo.TagCreationTimes()

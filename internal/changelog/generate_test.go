@@ -120,6 +120,20 @@ func TestANeverReleasedVersionIsAnnotated(t *testing.T) {
 	requireContains(t, got, "## 1.0.0\n\n"+changelog.NeverReleasedNote+"\n\nAbandoned\n")
 }
 
+func TestARetractedVersionIsAnnotated(t *testing.T) {
+	hygiene.Isolate(t)
+	root := t.TempDir()
+	writeReleased(t, root, "portal", "1.0.0", feature("1", "First thing", sha1))
+	writeArchive(t, root, "portal", "1.0.0", "recorded", sha1, "The first release")
+	path := filepath.Join(root, ".strictmetadata", "releases", "portal", "v1.0.0.toml")
+	data, err := os.ReadFile(path)
+	mustNotFail(t, err)
+	testsupport.WriteFile(t, path, strings.Replace(string(data), "release_commit", "retracted_by = \"1.0.1\"\nrelease_commit", 1))
+	got, err := changelog.Document(root, "portal", nil)
+	mustNotFail(t, err)
+	requireContains(t, got, "## 1.0.0\n\n"+changelog.RetractedNote("1.0.1")+"\n\nThe first release\n")
+}
+
 // The roll-up used to stack each releasable's CHANGELOG.md, one "#" heading
 // per releasable and versions at "##", so the document had as many titles
 // as releasables (todo/workspace-changelog-rollup-emits-one-h1-per-releasable.md).

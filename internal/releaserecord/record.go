@@ -100,6 +100,12 @@ type Entry struct {
 	// ShippedAs is the tag the version shipped under when the archive
 	// records one; never set on a never-released entry.
 	ShippedAs string
+	// RetractedBy is the retraction version that retracts the version, and
+	// empty when none does: a retracted version is not a release.
+	RetractedBy string
+	// Retraction is true for the retraction version itself, whose release
+	// commit carries only the retraction.
+	Retraction bool
 }
 
 // Tag is the tag the release carries: the one it shipped under when the
@@ -163,9 +169,9 @@ func (r *Record) Entry(v semver.Version) (Entry, error) {
 	case FateNeverReleased:
 		return Entry{Version: v, Path: a.Path, Fate: FateNeverReleased}, nil
 	case FateUnrecoverable:
-		return Entry{Version: v, Path: a.Path, Fate: FateUnrecoverable, ShippedAs: a.ShippedAs}, nil
+		return Entry{Version: v, Path: a.Path, Fate: FateUnrecoverable, ShippedAs: a.ShippedAs, RetractedBy: a.RetractedBy, Retraction: len(a.Retracts) > 0}, nil
 	}
-	entry := Entry{Version: v, Path: a.Path, Fate: FateRecorded, ReleaseCommit: a.ReleaseCommit.Commit, ShippedAs: a.ShippedAs}
+	entry := Entry{Version: v, Path: a.Path, Fate: FateRecorded, ReleaseCommit: a.ReleaseCommit.Commit, ShippedAs: a.ShippedAs, RetractedBy: a.RetractedBy, Retraction: len(a.Retracts) > 0}
 	tag := entry.Tag(r.scheme)
 	tagCommit, found, err := r.repo.TagCommit(tag)
 	if err != nil {
@@ -318,8 +324,10 @@ func indeterminable(e Entry, head string) error {
 // contains, and nil when the record holds none this checkout contains (a
 // releasable before its first release, or a checkout older than every
 // release). Unrecoverable and never-released versions are passed over: the
-// one has no commit to bound with, the other was never a release. This is
-// what bounds every unreleased range.
+// one has no commit to bound with, the other was never a release. So is a
+// retraction version, whose commit carries only the retraction on top of
+// whatever was unreleased then; a retracted release still bounds, since what
+// it shipped was published. This is what bounds every unreleased range.
 func (r *Record) Nearest(head string) (*Entry, error) {
 	versions, err := r.Versions()
 	if err != nil {
@@ -333,7 +341,7 @@ func (r *Record) Nearest(head string) (*Entry, error) {
 		if err != nil {
 			return nil, err
 		}
-		if entry.Fate != FateRecorded {
+		if entry.Fate != FateRecorded || entry.Retraction {
 			continue
 		}
 		verdict, err := r.repo.Ancestry(entry.ReleaseCommit, head)
@@ -376,6 +384,9 @@ type LatestFact struct {
 	// NeverReleasedAbove are the never-released versions archived above the
 	// latest release, highest first.
 	NeverReleasedAbove []semver.Version
+	// RetractedAbove are the retracted versions archived above the latest
+	// release, highest first.
+	RetractedAbove []semver.Version
 }
 
 // State is the fate of the latest release for a machine reader:
@@ -407,11 +418,10 @@ func (f LatestFact) Label() string {
 		}
 	}
 	if len(f.NeverReleasedAbove) > 0 {
-		names := make([]string, len(f.NeverReleasedAbove))
-		for i, v := range f.NeverReleasedAbove {
-			names[i] = v.String()
-		}
-		notes = append(notes, strings.Join(names, ", ")+" archived but never released")
+		notes = append(notes, versionList(f.NeverReleasedAbove)+" archived but never released")
+	}
+	if len(f.RetractedAbove) > 0 {
+		notes = append(notes, versionList(f.RetractedAbove)+" retracted")
 	}
 	if len(notes) == 0 {
 		return base
@@ -419,10 +429,20 @@ func (f LatestFact) Label() string {
 	return base + " (" + strings.Join(notes, "; ") + ")"
 }
 
+// versionList joins versions for a label.
+func versionList(vs []semver.Version) string {
+	names := make([]string, len(vs))
+	for i, v := range vs {
+		names[i] = v.String()
+	}
+	return strings.Join(names, ", ")
+}
+
 // Latest is the releasable's latest release: the highest archived version
-// that was released, whether or not head contains it, with the
-// never-released versions above it named. An empty record in a repository
-// carrying the scheme's tags is the unbackfilled read error.
+// that was released and is not retracted, whether or not head contains it,
+// with the never-released and retracted versions above it named. An empty
+// record in a repository carrying the scheme's tags is the unbackfilled read
+// error.
 func (r *Record) Latest(head string) (LatestFact, error) {
 	versions, err := r.Versions()
 	if err != nil {
@@ -431,18 +451,21 @@ func (r *Record) Latest(head string) (LatestFact, error) {
 	if err := r.requireBackfilled(versions); err != nil {
 		return LatestFact{}, err
 	}
-	var phantoms []semver.Version
+	var phantoms, retracted []semver.Version
 	for _, v := range versions {
 		entry, err := r.Entry(v)
 		if err != nil {
 			return LatestFact{}, err
 		}
-		switch entry.Fate {
-		case FateNeverReleased:
+		switch {
+		case entry.Fate == FateNeverReleased:
 			phantoms = append(phantoms, v)
 			continue
-		case FateUnrecoverable:
-			return LatestFact{Released: true, Version: v, Unrecoverable: true, NeverReleasedAbove: phantoms}, nil
+		case entry.RetractedBy != "":
+			retracted = append(retracted, v)
+			continue
+		case entry.Fate == FateUnrecoverable:
+			return LatestFact{Released: true, Version: v, Unrecoverable: true, NeverReleasedAbove: phantoms, RetractedAbove: retracted}, nil
 		}
 		verdict, err := r.repo.Ancestry(entry.ReleaseCommit, head)
 		if err != nil {
@@ -451,9 +474,9 @@ func (r *Record) Latest(head string) (LatestFact, error) {
 		if verdict == git.AncestryIndeterminable {
 			return LatestFact{}, indeterminable(entry, head)
 		}
-		return LatestFact{Released: true, Version: v, InCheckout: verdict == git.IsAncestor, NeverReleasedAbove: phantoms}, nil
+		return LatestFact{Released: true, Version: v, InCheckout: verdict == git.IsAncestor, NeverReleasedAbove: phantoms, RetractedAbove: retracted}, nil
 	}
-	return LatestFact{NeverReleasedAbove: phantoms}, nil
+	return LatestFact{NeverReleasedAbove: phantoms, RetractedAbove: retracted}, nil
 }
 
 // RequireCheckoutContainsLatest refuses to prepare a release on a history
@@ -485,7 +508,8 @@ func (r *Record) RequireCheckoutContainsLatest(head string) (LatestFact, error) 
 }
 
 // LatestReleasedVersion is the highest version the archives in dir
-// (repository-relative) record as released, and false when none is. It
+// (repository-relative) record as released and not retracted, and false
+// when none is. It
 // reads only the archives: no git, no network. An archive stating no fate is
 // an error naming it, since whether it was released cannot be told.
 func LatestReleasedVersion(root, dir string) (semver.Version, bool, error) {
@@ -504,14 +528,18 @@ func LatestReleasedVersion(root, dir string) (semver.Version, bool, error) {
 		case FateUnstated:
 			return semver.Version{}, false, fmt.Errorf("%s records no fate, so whether %s was released cannot be told; run `rlsbl release backfill --dry-run` to see how it would be recorded", a.Path, v)
 		}
+		if a.Retracted() {
+			continue
+		}
 		return v, true, nil
 	}
 	return semver.Version{}, false, nil
 }
 
 // HasRelease reports whether the releasable's release archives record a
-// release (recorded or unrecoverable). A releasable without one is unreleased
-// unless a lifecycle period in effect says otherwise.
+// release (recorded or unrecoverable, and not retracted). A releasable
+// without one is unreleased unless a lifecycle period in effect says
+// otherwise.
 func HasRelease(root, releasable string) (bool, error) {
 	_, released, err := LatestReleasedVersion(root, ArchiveDir(releasable))
 	return released, err

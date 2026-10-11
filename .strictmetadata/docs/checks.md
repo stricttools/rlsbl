@@ -121,7 +121,7 @@ For every archived release, the refs the version owns (its primary tag, which is
 | wrong commit | The ref points somewhere other than the release commit. |
 | no GitHub Release | The primary tag is on origin with no Release hanging off it. |
 
-Every archived release is checked, from one listing of the local tags, one of origin's, and one of the Releases. A version recorded `unrecoverable` has no commit to point a missing ref at, so its absences are counted and named rather than reported as fixable; a version recorded `never_released` owns no refs and is skipped. A repository without an `origin` remote skips the remote half, and one whose origin is no GitHub repository the Release half.
+Every archived release is checked, from one listing of the local tags, one of origin's, and one of the Releases. A version recorded `unrecoverable` has no commit to point a missing ref at, so its absences are counted and named rather than reported as fixable; a version recorded `never_released` owns no refs and is skipped; a retracted version owes its refs and no GitHub Release. A repository without an `origin` remote skips the remote half, and one whose origin is no GitHub repository the Release half.
 
 ## The lifecycle checks
 
