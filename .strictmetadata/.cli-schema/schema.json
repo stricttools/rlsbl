@@ -952,7 +952,7 @@
     },
     "status": {
       "name": "status",
-      "help": "Report on the member whose directory holds the working directory and one of its targets: the package name and version the target's manifest declares, the branch and whether the working tree is clean, the releasable's lifecycle status today (the status of its lifecycle period in effect, and otherwise active when its archives record a release and unreleased when they do not; an unreleased releasable's releases are refused until an active period is recorded), the latest release in the releasable's release archives (annotated when this checkout does not contain it, when its commit is unrecoverable, and with the versions archived above it that were never released), whether the changelog holds the released file of the current version, changelog coverage of the commits since the nearest release this checkout contains (covered of those needing an entry, and how many are exempt), the member's own CI workflows and publish workflow, and a warning when commits needing an entry wait since the nearest release. A member with several targets needs --target naming one; a workspace root whose root member has no target is refused, naming `rlsbl monorepo status`. With --registry, the registry's package listing (npm's or PyPI's package document, or the Go module proxy's version list) is read for the latest published version and compared with the local one; no request names a single version, a registry that fails to answer is an error, and a member whose releasable publishes nothing is not asked about.",
+      "help": "Report on the member whose directory holds the working directory and one of its targets: the package name and version the target's manifest declares, the branch and whether the working tree is clean, the releasable's lifecycle status today (the status of its lifecycle period in effect, and otherwise active when its archives record a release and unreleased when they do not; an unreleased releasable's releases are refused until an active period is recorded), the latest release in the releasable's release archives (annotated when this checkout does not contain it, when its commit is unrecoverable, and with the versions archived above it that were never released or are retracted), whether the changelog holds the released file of the current version, changelog coverage of the commits since the nearest release this checkout contains (covered of those needing an entry, and how many are exempt), the member's own CI workflows and publish workflow, and a warning when commits needing an entry wait since the nearest release. A member with several targets needs --target naming one; a workspace root whose root member has no target is refused, naming `rlsbl monorepo status`. With --registry, the registry's package listing (npm's or PyPI's package document, or the Go module proxy's version list) is read for the latest published version and compared with the local one; no request names a single version, a registry that fails to answer is an error, and a member whose releasable publishes nothing is not asked about.",
       "effect": "read_only",
       "payload_schema": {
         "additionalProperties": false,
@@ -1050,7 +1050,7 @@
           "lifecycle": {
             "enum": [
               "active",
-              "on-hold",
+              "non-releasing",
               "retired",
               "unreleased",
               null
@@ -2771,7 +2771,7 @@
             },
             "init": {
               "name": "init",
-              "help": "Write the batch release file .strictmetadata/batch-releases/unreleased.toml with one [releasables.<name>] table per releasable (the ones --releasables names, once per releasable, or, with --all, every declared one; one of the two is required, so no set of releasables is inferred), each with bump and description blank (a batch release refuses it until both are filled in), context blank, every target of the releasable's members in include, and exclude empty, and commit it. A releasable with no commit needing a changelog entry since its latest release is written commented out, and one with no target, one on hold or retired (it or a member), and one unreleased are each refused, naming --releasables to leave it out. A batch release file nobody filled in yet is left as it is; one somebody filled in is refused, never overwritten.",
+              "help": "Write the batch release file .strictmetadata/batch-releases/unreleased.toml with one [releasables.<name>] table per releasable (the ones --releasables names, once per releasable, or, with --all, every declared one; one of the two is required, so no set of releasables is inferred), each with bump and description blank (a batch release refuses it until both are filled in), context blank, every target of the releasable's members in include, and exclude empty, and commit it. A releasable with no commit needing a changelog entry since its latest release is written commented out, and one with no target, one non-releasing or retired (it or a member), and one unreleased are each refused, naming --releasables to leave it out. A batch release file nobody filled in yet is left as it is; one somebody filled in is refused, never overwritten.",
               "effect": "mutating",
               "dry_run_supported": false,
               "dry_run_unsupported_reason": "it writes one scaffolded file and commits it, and the file it would write is what this help describes",
@@ -3214,7 +3214,7 @@
         },
         "resume": {
           "name": "resume",
-          "help": "Continue the release in progress of the releasable the working directory selects (from a member versioned under none, the one releasable with a release in progress) from the step it stopped at. The resume pins again at the branch tip: what was committed since the release stopped (the fix after a red CI verdict, other sessions' work) is adopted, provided the changelog describes every adopted commit, and refused otherwise before anything is written, naming the `rlsbl changelog add` that records each. A resume adopting commits after the CI verdict pushes the tip as the candidate and waits for CI again, so the tag is put on what CI verified; one adopting nothing past the verdict tags the commit the state records, which must still be on the branch. Once the changelog is finalized, nothing is adopted any more: the resume finishes the release on the candidate the state records, and the commits made since it stopped stay on the branch, named, for the next release. A failed deploy or post-release hook runs again. Before anything is written, the resume is refused what release validation refuses about the lifecycle and publishing: a releasable or member on hold or retired, an unreleased releasable, a repository whose visibility disagrees with the lifecycle-and-license record, an output the publishing rules forbid, and a deploy command on a releasable that may not deploy. --dry-run reports what would be adopted and which steps would run, and writes nothing.",
+          "help": "Continue the release in progress of the releasable the working directory selects (from a member versioned under none, the one releasable with a release in progress) from the step it stopped at. The resume pins again at the branch tip: what was committed since the release stopped (the fix after a red CI verdict, other sessions' work) is adopted, provided the changelog describes every adopted commit, and refused otherwise before anything is written, naming the `rlsbl changelog add` that records each. A resume adopting commits after the CI verdict pushes the tip as the candidate and waits for CI again, so the tag is put on what CI verified; one adopting nothing past the verdict tags the commit the state records, which must still be on the branch. Once the changelog is finalized, nothing is adopted any more: the resume finishes the release on the candidate the state records, and the commits made since it stopped stay on the branch, named, for the next release. A failed deploy or post-release hook runs again. Before anything is written, the resume is refused what release validation refuses about the lifecycle and publishing: a releasable or member that is non-releasing or retired, an unreleased releasable, a repository whose visibility disagrees with the lifecycle-and-license record, an output the publishing rules forbid, and a deploy command on a releasable that may not deploy. --dry-run reports what would be adopted and which steps would run, and writes nothing.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
@@ -3285,7 +3285,7 @@
         },
         "retry": {
           "name": "retry",
-          "help": "Dispatch the workflows of the releasable's latest release again at its tag, for a release whose GitHub Release exists while its publish runs never started or failed for reasons outside it. A retry publishes again, so before anything is written or dispatched it is refused what release validation refuses: a releasable or member on hold or retired, an unreleased releasable, a repository whose visibility disagrees with the lifecycle-and-license record, and an output the publishing rules forbid in the declarations or the tagged tree's workflows. What is dispatched is the retry file, .strictmetadata/.release-state/<releasable>/retry.toml: ref, which must be the release tag (any other ref is refused, since a run there cannot be tied to the release), and the workflow files. A missing retry file is written first, naming every workflow of the tagged tree with a workflow_dispatch trigger. A workflow declaring a tag input is passed the tag. Workflows are dispatched one at a time; a dispatch that fails stops the run with the retry file rewritten to hold the workflows not yet dispatched, so running retry again never dispatches one twice, and the file is removed once every workflow was dispatched. --watch then watches the dispatched runs until they conclude and exits 1 unless every one passed; --no-watch prints the command that watches them.",
+          "help": "Dispatch the workflows of the releasable's latest release again at its tag, for a release whose GitHub Release exists while its publish runs never started or failed for reasons outside it. A retry publishes again, so before anything is written or dispatched it is refused what release validation refuses: a releasable or member that is non-releasing or retired, an unreleased releasable, a repository whose visibility disagrees with the lifecycle-and-license record, and an output the publishing rules forbid in the declarations or the tagged tree's workflows. What is dispatched is the retry file, .strictmetadata/.release-state/<releasable>/retry.toml: ref, which must be the release tag (any other ref is refused, since a run there cannot be tied to the release), and the workflow files. A missing retry file is written first, naming every workflow of the tagged tree with a workflow_dispatch trigger. A workflow declaring a tag input is passed the tag. Workflows are dispatched one at a time; a dispatch that fails stops the run with the retry file rewritten to hold the workflows not yet dispatched, so running retry again never dispatches one twice, and the file is removed once every workflow was dispatched. --watch then watches the dispatched runs until they conclude and exits 1 unless every one passed; --no-watch prints the command that watches them.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
@@ -3321,6 +3321,34 @@
           "help": "Record an abandoned release attempt's version as never released: write its release archive with never_released = true, commit it with the Autogenerated trailer, and delete the in-progress state file, as one operation. The version comes from the in-progress state, or from the version files when there is none. The attempt's commits are not reverted: the next release bumps from the abandoned version when the version files name it, and never releases under it again. When the in-progress state names a version already recorded never released, an earlier abandon stopped part-way, and this one finishes it. Refused before anything is written: nothing to abandon (no in-progress state, and the version files name a version the record already holds), a version already archived as a release, a version below the latest release, the attempt's tag here or on origin (a tag is evidence of a release, which release backfill adopts), and a GitHub Release under the attempt's tag (a published release, which release undo reverts). A question that cannot be answered is refused, never read as absence.",
           "effect": "mutating",
           "consequential": true
+        },
+        "retract": {
+          "name": "retract",
+          "help": "Retract released versions of the releasable's Go module through a new version: the next version number no release archive and no tag here or on origin holds (a patch above the highest), committed on the release branch with one go.mod retract directive covering the versions --versions names and the new version itself, with --reason as its comment, in every Go module of the releasable. The new version is tagged at that commit and only its tags are pushed, each on its own: not the branch, and no GitHub Release, since a retraction-only version has nothing to download or read. The record then holds every version the directive covers as retracted, none of them a release: each named version's release archive names the retraction version (retracted_by), which is archived with its release commit and the versions it retracts (retracts); a releasable whose every version is retracted is unreleased. The retracted versions' tags stay, as the Go module proxy keeps them for good, and their GitHub Releases are deleted. A later release refuses a bump landing on a retracted number. The releasable's lifecycle is not asked, so an unreleased releasable retracts too. The go.mod change and the records are committed with the Autogenerated trailer before the first tag is pushed; a run that stops is finished by running the same command again. Refused before anything is written: a version the record holds no release of, one retracted already, a directive range that would also retract a version --versions does not name, a releasable without a Go module (`rlsbl release yank` withdraws other packages) or with a proprietary license, a go.mod with uncommitted changes, a release in progress, a branch that is not a release branch, and a confidential-term hit in what the tag push publishes. No registry is asked about any version. --dry-run prints the plan and writes nothing.",
+          "effect": "mutating",
+          "consequential": true,
+          "flags": [
+            {
+              "name": "versions",
+              "help": "A released version to retract, bare (0.5.0); repeatable, once per version",
+              "value_schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "presence": "required",
+              "unique": true
+            },
+            {
+              "name": "reason",
+              "help": "Why the versions are retracted: one line, the go.mod retract directive's comment",
+              "value_schema": {
+                "type": "string"
+              },
+              "presence": "required"
+            }
+          ]
         },
         "deprecate": {
           "name": "deprecate",
@@ -3991,7 +4019,7 @@
     },
     "transition": {
       "name": "transition",
-      "help": "The lifecycle-and-license record, .strictmetadata/lifecycle-and-license/lifecycle-and-license.toml: each releasable's dated lifecycle (active, on-hold, retired; without a period in effect, active once released and unreleased before), license, and identity periods, the registry names it holds, the tags that release no version: license and lifecycle facts only (confidential terms live in the confidential-term list, which a release scans for). A repository is confidential while a releasable's license is proprietary. A command that opens a period closes the subject's period in effect on today's date first. A command that changes the record validates the whole record against the declarations, writes it, and commits it with the Autogenerated trailer, together with whatever else its own help says it changes.",
+      "help": "The lifecycle-and-license record, .strictmetadata/lifecycle-and-license/lifecycle-and-license.toml: each releasable's dated lifecycle (active, non-releasing, retired; without a period in effect, active once released and unreleased before), license, and identity periods, the registry names it holds, the tags that release no version: license and lifecycle facts only (confidential terms live in the confidential-term list, which a release scans for). A repository is confidential while a releasable's license is proprietary. A command that opens a period closes the subject's period in effect on today's date first. A command that changes the record validates the whole record against the declarations, writes it, and commits it with the Autogenerated trailer, together with whatever else its own help says it changes.",
       "commands": {
         "show": {
           "name": "show",
@@ -4254,7 +4282,7 @@
         },
         "lifecycle": {
           "name": "lifecycle",
-          "help": "Close a releasable's or member's lifecycle period on today's date and open one with --status: active, on-hold (its releases are refused), or retired (its release history is a record). A releasable without a lifecycle period in effect has a derived status, never recorded: active when its release archives record a release, and unreleased when they do not, which refuses its releases. Recording active for an unreleased releasable is the owner's decision that allows its first release. The subject is declared, or one the record already holds a lifecycle period of. A status its lifecycle period in effect already holds is refused.",
+          "help": "Close a releasable's or member's lifecycle period on today's date and open one with --status: active, non-releasing (its releases are refused), or retired (its release history is a record). A releasable without a lifecycle period in effect has a derived status, never recorded: active when its release archives record a release, and unreleased when they do not, which refuses its releases. Recording active for an unreleased releasable is the owner's decision that allows its first release. The subject is declared, or one the record already holds a lifecycle period of. A status its lifecycle period in effect already holds is refused.",
           "effect": "mutating",
           "consequential": true,
           "flags": [
@@ -4273,7 +4301,7 @@
                 "type": "string",
                 "enum": [
                   "active",
-                  "on-hold",
+                  "non-releasing",
                   "retired"
                 ]
               },
@@ -4284,7 +4312,7 @@
                   "help": "released as usual; for an unreleased releasable, its first release is allowed"
                 },
                 {
-                  "value": "on-hold",
+                  "value": "non-releasing",
                   "help": "its releases are refused until it is active again"
                 },
                 {
@@ -4557,7 +4585,7 @@
     },
     "confidential": {
       "name": "confidential",
-      "help": "Resolve the confidential-term hits of what this repository publishes. The confidential-term list (Projects/CONTEXT/confidential/terms.toml.age under the home directory, encrypted with age to the identity in ~/.age-key.txt, and decrypted in memory only; a missing list has no terms) names terms that must not appear in anything public. A release (and selfdoc's publishing) scans what it would push or publish, reports every hit at once, each with an id, its location, and the text around it, and refuses while a hit has no resolution in .strictmetadata/confidential-hits/resolutions.toml. Each hit is judged by the agent: one it is at least 70% certain is a false positive is recorded with judge-false-positive; every other one goes to the owner, who has the text fixed or approves publishing it with approve-hit. The release records the resolutions it used in the version's release archive. A hit id names the list entry, the matched text, and the words after it, so the same phrase has the same id wherever it appears, and a resolution resolves it everywhere. The `confidential-terms` check reports the hits of the next push.",
+      "help": "Resolve the confidential-term hits of what this repository publishes. The confidential-term list (at the absolute path the confidential_term_list setting of the family's settings file, stricttools/config.toml under the user's configuration directory, names; a missing settings file or setting is an error naming what to write; encrypted with age to the identity in ~/.age-key.txt, and decrypted in memory only; a missing list has no terms) names terms that must not appear in anything public. A release (and selfdoc's publishing) scans what it would push or publish, reports every hit at once, each with an id, its location, and the text around it, and refuses while a hit has no resolution in .strictmetadata/confidential-hits/resolutions.toml. Each hit is judged by the agent: one it is at least 70% certain is a false positive is recorded with judge-false-positive; every other one goes to the owner, who has the text fixed or approves publishing it with approve-hit. The release records the resolutions it used in the version's release archive. A hit id names the list entry, the matched text, and the words after it, so the same phrase has the same id wherever it appears, and a resolution resolves it everywhere. The `confidential-terms` check reports the hits of the next push.",
       "commands": {
         "judge-false-positive": {
           "name": "judge-false-positive",
