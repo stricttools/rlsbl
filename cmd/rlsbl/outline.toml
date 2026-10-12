@@ -2,16 +2,6 @@ format = 1
 help   = "Release orchestration and project scaffolding: bump versions, keep a structured changelog, tag only the commit CI verified, publish to npm, PyPI, and the Go module proxy, and scaffold CI workflows."
 checks = "checks.toml"
 
-# The confidential-term list's location. Today it is read from the family's
-# settings file, stricttools/config.toml under the user's configuration directory
-# (strictspec/go/confidential/settings.go); see the notes' format gaps.
-[[configuration]]
-name     = "confidential-term-list"
-type     = "string"
-help     = "Absolute path of the age-encrypted confidential-term list; absent means the commands that scan for confidential terms refuse, naming this key."
-optional = true
-wire     = "confidential_term_list"
-
 [[field-set]]
 name = "commit-choice"
 
@@ -61,41 +51,30 @@ name = "release-timeouts"
 [[field-set.field]]
 name     = "push-timeout"
 type     = "integer"
-help     = "Seconds each push may take; absent means the push_seconds of releasables.toml's [timeouts], and 300 when it states none."
+help     = "Seconds each push may take; absent means the push_seconds of releasables.toml's [timeouts], which must then state it."
 optional = true
+at-least = 1
 
 [[field-set.field]]
 name     = "ci-timeout"
 type     = "integer"
-help     = "Seconds the wait for CI's verdict on the candidate may take; absent means the ci_seconds of releasables.toml's [timeouts], and 3600 when it states none."
+help     = "Seconds the wait for CI's verdict on the candidate may take; absent means the ci_seconds of releasables.toml's [timeouts], which must then state it."
 optional = true
+at-least = 1
 
 [[field-set.field]]
 name     = "check-timeout"
 type     = "integer"
-help     = "Seconds each program a check, the help document, selfdoc, or the deploy starts may take; absent means the check_seconds of releasables.toml's [timeouts], and 900 when it states none."
+help     = "Seconds each program a check, the help document, selfdoc, or the deploy starts may take; absent means the check_seconds of releasables.toml's [timeouts], which must then state it."
 optional = true
+at-least = 1
 
 [[field-set.field]]
 name     = "hook-timeout"
 type     = "integer"
-help     = "Seconds each hook may take; absent means the hook_seconds of releasables.toml's [timeouts], and no bound when it states none."
+help     = "Seconds each hook may take; absent means the hook_seconds of releasables.toml's [timeouts], which must then state it."
 optional = true
-
-[[field-set]]
-name = "entry-selector"
-
-[[field-set.field]]
-name     = "id"
-type     = "string"
-help     = "The entry's id, as its line's own id field holds it; absent means --commits names the entry."
-optional = true
-
-[[field-set.field]]
-name     = "commits"
-type     = "string"
-help     = "Comma-separated commit ids, the entry naming any of them being the one meant; absent means --id names the entry."
-optional = true
+at-least = 1
 
 [[field-set]]
 name = "new-releasable"
@@ -179,20 +158,6 @@ help = "Refs or Releases still to move, push, or rewrite after the history chang
 list = true
 
 [[type]]
-name = "registry-answer"
-unknown-fields = "ignore"
-
-[[type.field]]
-name = "status"
-type = "integer"
-help = "The registry's HTTP status."
-
-[[type.field]]
-name = "body"
-type = "bytes"
-help = "The registry's document as it was sent."
-
-[[type]]
 name = "check-problem"
 
 [[type.field]]
@@ -261,19 +226,6 @@ help = "The registered name the candidate collides with."
 name = "rule"
 type = "string"
 help = "The normalization rule under which the two names collide."
-
-[[type]]
-name = "rule-sentence"
-
-[[type.field]]
-name = "rule"
-type = "string"
-help = "A rule the verdict names."
-
-[[type.field]]
-name = "sentence"
-type = "string"
-help = "The rule's explanation as the verdict prints it."
 
 [[type]]
 name = "name-verdict"
@@ -345,9 +297,9 @@ wire = "ultranorm_conflicts"
 
 [[type.field]]
 name = "rule-sentences"
-type = "rule-sentence"
-help = "The rules the verdict rests on, each with its explanation."
-list = true
+type = "string"
+help = "Each rule the verdict rests on, mapped to its explanation as the verdict prints it."
+map  = true
 wire = "rule_sentences"
 
 [[type.field]]
@@ -1576,6 +1528,7 @@ min     = 1
 name = "delay"
 type = "integer"
 help = "Milliseconds to wait between consecutive registry requests; the offline Go check never waits."
+at-least = 0
 
 [[command.arg]]
 name = "names"
@@ -2606,7 +2559,7 @@ path          = "changelog edit"
 help          = "Change one entry's description, type, or user-facing mark as a sparse update, in the unreleased file or a released version's file."
 consequential = false
 outstanding   = 4
-flag-sets     = ["entry-selector", "commit-choice"]
+flag-sets     = ["commit-choice"]
 
 [[command.flag]]
 name     = "description"
@@ -2645,9 +2598,19 @@ choices  = [
   { value = "no", help = "CHANGELOG.md and the release notes leave it out." },
 ]
 
-[[command.constraint]]
-class = "one-of"
-flags = ["id", "commits"]
+[[command.selector]]
+name = "entry"
+help = "Which entry the command acts on."
+
+[[command.selector.member]]
+name = "id"
+help = "The entry's id, as its line's own id field holds it."
+type = "string"
+
+[[command.selector.member]]
+name = "commits"
+help = "Comma-separated commit ids, the entry naming any of them being the one meant."
+type = "string"
 
 [[command.carry]]
 name = "step"
@@ -2775,11 +2738,21 @@ path          = "changelog remove"
 help          = "Delete one entry from the unreleased file or a released version's file, named by its id or by the commits it names."
 consequential = false
 outstanding   = 4
-flag-sets     = ["entry-selector", "commit-choice"]
+flag-sets     = ["commit-choice"]
 
-[[command.constraint]]
-class = "one-of"
-flags = ["id", "commits"]
+[[command.selector]]
+name = "entry"
+help = "Which entry the command acts on."
+
+[[command.selector.member]]
+name = "id"
+help = "The entry's id, as its line's own id field holds it."
+type = "string"
+
+[[command.selector.member]]
+name = "commits"
+help = "Comma-separated commit ids, the entry naming any of them being the one meant."
+type = "string"
 
 [[command.carry]]
 name = "step"
@@ -2856,6 +2829,8 @@ help = "The hit's id, as the confidential-terms check and a release's refusal pr
 name = "certainty"
 type = "integer"
 help = "How certain, in percent from 70 to 100, the agent is that the hit is a false positive."
+at-least = 70
+at-most  = 100
 
 [[command.flag]]
 name = "reason"
@@ -3094,7 +3069,6 @@ start = ["run-state writer claim"]
 after = "run-state writer claim"
 may   = [
   "github-reading program version", "github-reading credential check", "github-reading api get",
-  "history-absorption filter-repo version", "saferm-deletion program version",
 ]
 
 [[command.chain.next]]
@@ -3109,14 +3083,6 @@ may   = ["github-reading api get"]
 after = "github-reading api get"
 may   = ["history-absorption repository clone", "github-reading api get"]
 limit = 20
-
-[[command.chain.next]]
-after = "history-absorption filter-repo version"
-may   = []
-
-[[command.chain.next]]
-after = "saferm-deletion program version"
-may   = []
 
 [[command.chain.next]]
 after = "history-absorption repository clone"
@@ -3298,6 +3264,7 @@ optional = true
 name = "delay"
 type = "integer"
 help = "Milliseconds to wait between consecutive registry requests; the offline Go check never waits."
+at-least = 0
 
 [[command.output]]
 name = "delay-ms"
@@ -3515,16 +3482,8 @@ start = ["run-state writer claim"]
 [[command.chain.next]]
 after = "run-state writer claim"
 may   = [
-  "history-extraction filter-repo version", "saferm-deletion program version", "github-reading program version",
+  "github-reading program version",
 ]
-
-[[command.chain.next]]
-after = "history-extraction filter-repo version"
-may   = []
-
-[[command.chain.next]]
-after = "saferm-deletion program version"
-may   = []
 
 [[command.chain.next]]
 after = "github-reading program version"
@@ -3694,49 +3653,6 @@ outstanding   = 4
 flag-sets     = ["commit-choice"]
 
 [[command.flag]]
-name    = "root-member"
-type    = "string"
-help    = "What the root member is."
-choices = [
-  { value = "root-dev-node", help = "dev-only and versioned under no releasable." },
-  { value = "root-releasable", help = "versioned under a releasable created with it." },
-]
-
-[[command.flag]]
-name     = "releasable"
-type     = "string"
-help     = "With root-releasable, the name of the releasable the root member is versioned under; absent is refused then and required otherwise."
-optional = true
-
-[[command.flag]]
-name     = "tag-format"
-type     = "string"
-help     = "With root-releasable, the releasable's tag format holding {version} and optionally {name}; absent is refused then."
-optional = true
-
-[[command.flag]]
-name     = "publish-mode"
-type     = "string"
-help     = "With root-releasable, the releasable's publish mode; absent is refused then."
-optional = true
-choices  = [
-  { value = "ci", help = "publish from CI." },
-  { value = "none", help = "publish nothing to any registry." },
-]
-
-[[command.flag]]
-name     = "publish-ci-check-pattern"
-type     = "string"
-help     = "The pattern of the check-run names the root's own CI reports, which publishing waits for; absent is refused with --publish-mode ci."
-optional = true
-
-[[command.flag]]
-name     = "license"
-type     = "string"
-help     = "With root-releasable, the releasable's SPDX identifier or proprietary; absent is refused then."
-optional = true
-
-[[command.flag]]
 name   = "release-branch"
 type   = "string"
 help   = "A branch a release may run from, repeatable."
@@ -3744,9 +3660,49 @@ list   = true
 unique = true
 min    = 1
 
-[[command.constraint]]
-class = "together"
-flags = ["releasable", "tag-format", "publish-mode", "license"]
+[[command.selector]]
+name = "root-member"
+help = "What the root member is."
+
+[[command.selector.member]]
+name     = "root-dev-node"
+help     = "The root member is dev-only and versioned under no releasable."
+presence = true
+
+[[command.selector.member]]
+name     = "root-releasable"
+help     = "The root member is versioned under a releasable created with it."
+presence = true
+
+[[command.selector.member.flag]]
+name = "releasable"
+type = "string"
+help = "The name of the releasable the root member is versioned under."
+
+[[command.selector.member.flag]]
+name = "tag-format"
+type = "string"
+help = "The releasable's tag format holding {version} and optionally {name}."
+
+[[command.selector.member.flag]]
+name    = "publish-mode"
+type    = "string"
+help    = "The releasable's publish mode."
+choices = [
+  { value = "ci", help = "publish from CI." },
+  { value = "none", help = "publish nothing to any registry." },
+]
+
+[[command.selector.member.flag]]
+name     = "publish-ci-check-pattern"
+type     = "string"
+help     = "The pattern of the check-run names the root's own CI reports, which publishing waits for; absent is refused with --publish-mode ci."
+optional = true
+
+[[command.selector.member.flag]]
+name = "license"
+type = "string"
+help = "The releasable's SPDX identifier or proprietary."
 
 [[command.carry]]
 name = "step"
@@ -4096,7 +4052,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4128,7 +4084,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4161,7 +4117,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4194,7 +4150,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4227,7 +4183,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4260,7 +4216,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4293,7 +4249,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4326,7 +4282,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4359,7 +4315,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4392,7 +4348,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4425,7 +4381,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4458,7 +4414,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4491,7 +4447,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4524,7 +4480,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4557,7 +4513,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4585,7 +4541,7 @@ may   = [
   "release-checkout leftovers clean", "release-checkout submodules update", "release-hooks hook run",
   "help-documents python-help-document print", "help-documents go-help-document print",
   "help-documents typescript-help-document print", "docs-generation docs generate",
-  "docs-generation docs check", "docs-generation program version", "release-checkout paths stage",
+  "docs-generation docs check", "release-checkout paths stage",
   "release-checkout snapshot commit", "docs-generation root-docs generate", "docs-generation root-docs check",
   "build-verification python-sync preview", "build-verification npm-pack preview",
   "build-verification python-artifacts build", "build-verification go-packages list",
@@ -4612,7 +4568,7 @@ may   = [
   "release-checkout leftovers clean", "release-checkout submodules update", "release-hooks hook run",
   "help-documents python-help-document print", "help-documents go-help-document print",
   "help-documents typescript-help-document print", "docs-generation docs generate",
-  "docs-generation docs check", "docs-generation program version", "release-checkout paths stage",
+  "docs-generation docs check", "release-checkout paths stage",
   "release-checkout snapshot commit", "docs-generation root-docs generate", "docs-generation root-docs check",
   "build-verification python-sync preview", "build-verification npm-pack preview",
   "build-verification python-artifacts build", "build-verification go-packages list",
@@ -4639,7 +4595,7 @@ may   = [
   "release-checkout leftovers clean", "release-checkout submodules update", "release-hooks hook run",
   "help-documents python-help-document print", "help-documents go-help-document print",
   "help-documents typescript-help-document print", "docs-generation docs generate",
-  "docs-generation docs check", "docs-generation program version", "release-checkout paths stage",
+  "docs-generation docs check", "release-checkout paths stage",
   "release-checkout snapshot commit", "docs-generation root-docs generate", "docs-generation root-docs check",
   "build-verification python-sync preview", "build-verification npm-pack preview",
   "build-verification python-artifacts build", "build-verification go-packages list",
@@ -4666,7 +4622,7 @@ may   = [
   "release-checkout leftovers clean", "release-checkout submodules update", "release-hooks hook run",
   "help-documents python-help-document print", "help-documents go-help-document print",
   "help-documents typescript-help-document print", "docs-generation docs generate",
-  "docs-generation docs check", "docs-generation program version", "release-checkout paths stage",
+  "docs-generation docs check", "release-checkout paths stage",
   "release-checkout snapshot commit", "docs-generation root-docs generate", "docs-generation root-docs check",
   "build-verification python-sync preview", "build-verification npm-pack preview",
   "build-verification python-artifacts build", "build-verification go-packages list",
@@ -4693,7 +4649,7 @@ may   = [
   "release-checkout leftovers clean", "release-checkout submodules update", "release-hooks hook run",
   "help-documents python-help-document print", "help-documents go-help-document print",
   "help-documents typescript-help-document print", "docs-generation docs generate",
-  "docs-generation docs check", "docs-generation program version", "release-checkout paths stage",
+  "docs-generation docs check", "release-checkout paths stage",
   "release-checkout snapshot commit", "docs-generation root-docs generate", "docs-generation root-docs check",
   "build-verification python-sync preview", "build-verification npm-pack preview",
   "build-verification python-artifacts build", "build-verification go-packages list",
@@ -4718,7 +4674,7 @@ after = "release-hooks hook run"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4744,7 +4700,7 @@ after = "help-documents python-help-document print"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4770,7 +4726,7 @@ after = "help-documents go-help-document print"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4796,7 +4752,7 @@ after = "help-documents typescript-help-document print"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4822,7 +4778,7 @@ after = "docs-generation docs generate"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4848,33 +4804,7 @@ after = "docs-generation docs check"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
-  "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
-  "docs-generation root-docs check", "build-verification python-sync preview",
-  "build-verification npm-pack preview", "build-verification python-artifacts build",
-  "build-verification go-packages list", "build-verification go-build-list show",
-  "build-verification go-dependencies list", "build-verification go-tidy preview",
-  "build-verification go-module show", "build-verification go-workspace show",
-  "build-verification strictcode-rules list", "build-verification strictcode analysis run",
-  "build-verification npm-tokens list", "build-verification external-check run",
-  "build-verification test-suite run", "build-verification uv version", "lockfile-refresh uv-lock refresh",
-  "lockfile-refresh npm-lock refresh", "lockfile-refresh go-sum refresh",
-  "lockfile-refresh go-work-sum refresh", "build-verification artifact secrets scan",
-  "git-writing branch advance", "git-writing paths restore", "git-writing ref push", "github-reading runs list",
-  "github-reading run show", "github-reading run watch", "github-reading api get", "ci-waiting poll wait",
-  "github-writing run rerun", "git-writing ref create", "git-writing ref lease-push",
-  "github-writing release create", "github-writing release edit", "package-publishing npm-package publish",
-  "package-publishing python-package build", "package-publishing python-package publish",
-  "package-publishing go-proxy notify", "package-publishing go-binaries install", "release-hooks deploy run",
-]
-limit = 100000
-
-[[command.chain.next]]
-after = "docs-generation program version"
-may   = [
-  "release-hooks hook run", "help-documents python-help-document print",
-  "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4900,7 +4830,7 @@ after = "release-checkout paths stage"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4926,7 +4856,7 @@ after = "release-checkout snapshot commit"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4952,7 +4882,7 @@ after = "docs-generation root-docs generate"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -4978,7 +4908,7 @@ after = "docs-generation root-docs check"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "docs-generation root-docs generate",
   "docs-generation root-docs check", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
@@ -5924,8 +5854,9 @@ choices = [
 [[command.flag]]
 name     = "push-timeout"
 type     = "integer"
-help     = "Seconds each ref push may take; absent means the push_seconds of releasables.toml's [timeouts], and 300 when it states none."
+help     = "Seconds each ref push may take; absent means the push_seconds of releasables.toml's [timeouts], which must then state it."
 optional = true
+at-least = 1
 
 [[command.flag]]
 name     = "releasable"
@@ -6049,7 +5980,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6080,7 +6011,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6112,7 +6043,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6144,7 +6075,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6176,7 +6107,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6208,7 +6139,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6240,7 +6171,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6272,7 +6203,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6304,7 +6235,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6336,7 +6267,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6368,7 +6299,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6400,7 +6331,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6432,7 +6363,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6464,7 +6395,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6496,7 +6427,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6523,7 +6454,7 @@ may   = [
   "release-checkout leftovers clean", "release-checkout submodules update", "release-hooks hook run",
   "help-documents python-help-document print", "help-documents go-help-document print",
   "help-documents typescript-help-document print", "docs-generation docs generate",
-  "docs-generation docs check", "docs-generation program version", "release-checkout paths stage",
+  "docs-generation docs check", "release-checkout paths stage",
   "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6550,7 +6481,7 @@ may   = [
   "release-checkout leftovers clean", "release-checkout submodules update", "release-hooks hook run",
   "help-documents python-help-document print", "help-documents go-help-document print",
   "help-documents typescript-help-document print", "docs-generation docs generate",
-  "docs-generation docs check", "docs-generation program version", "release-checkout paths stage",
+  "docs-generation docs check", "release-checkout paths stage",
   "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6577,7 +6508,7 @@ may   = [
   "release-checkout leftovers clean", "release-checkout submodules update", "release-hooks hook run",
   "help-documents python-help-document print", "help-documents go-help-document print",
   "help-documents typescript-help-document print", "docs-generation docs generate",
-  "docs-generation docs check", "docs-generation program version", "release-checkout paths stage",
+  "docs-generation docs check", "release-checkout paths stage",
   "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6604,7 +6535,7 @@ may   = [
   "release-checkout leftovers clean", "release-checkout submodules update", "release-hooks hook run",
   "help-documents python-help-document print", "help-documents go-help-document print",
   "help-documents typescript-help-document print", "docs-generation docs generate",
-  "docs-generation docs check", "docs-generation program version", "release-checkout paths stage",
+  "docs-generation docs check", "release-checkout paths stage",
   "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6631,7 +6562,7 @@ may   = [
   "release-checkout leftovers clean", "release-checkout submodules update", "release-hooks hook run",
   "help-documents python-help-document print", "help-documents go-help-document print",
   "help-documents typescript-help-document print", "docs-generation docs generate",
-  "docs-generation docs check", "docs-generation program version", "release-checkout paths stage",
+  "docs-generation docs check", "release-checkout paths stage",
   "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6656,7 +6587,7 @@ after = "release-hooks hook run"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6681,7 +6612,7 @@ after = "help-documents python-help-document print"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6706,7 +6637,7 @@ after = "help-documents go-help-document print"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6731,7 +6662,7 @@ after = "help-documents typescript-help-document print"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6756,7 +6687,7 @@ after = "docs-generation docs generate"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6781,32 +6712,7 @@ after = "docs-generation docs check"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
-  "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
-  "build-verification npm-pack preview", "build-verification python-artifacts build",
-  "build-verification go-packages list", "build-verification go-build-list show",
-  "build-verification go-dependencies list", "build-verification go-tidy preview",
-  "build-verification go-module show", "build-verification go-workspace show",
-  "build-verification strictcode-rules list", "build-verification strictcode analysis run",
-  "build-verification npm-tokens list", "build-verification external-check run",
-  "build-verification test-suite run", "build-verification uv version", "lockfile-refresh uv-lock refresh",
-  "lockfile-refresh npm-lock refresh", "lockfile-refresh go-sum refresh",
-  "lockfile-refresh go-work-sum refresh", "build-verification artifact secrets scan",
-  "git-writing branch advance", "git-writing paths restore", "git-writing ref push", "github-reading runs list",
-  "github-reading run show", "github-reading run watch", "github-reading api get", "ci-waiting poll wait",
-  "github-writing run rerun", "git-writing ref create", "git-writing ref lease-push",
-  "github-writing release create", "github-writing release edit", "package-publishing npm-package publish",
-  "package-publishing python-package build", "package-publishing python-package publish",
-  "package-publishing go-proxy notify", "package-publishing go-binaries install", "release-hooks deploy run",
-]
-limit = 100000
-
-[[command.chain.next]]
-after = "docs-generation program version"
-may   = [
-  "release-hooks hook run", "help-documents python-help-document print",
-  "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6831,7 +6737,7 @@ after = "release-checkout paths stage"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -6856,7 +6762,7 @@ after = "release-checkout snapshot commit"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -7660,7 +7566,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -7691,7 +7597,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -7723,7 +7629,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -7755,7 +7661,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -7787,7 +7693,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -7819,7 +7725,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -7851,7 +7757,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -7883,7 +7789,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -7915,7 +7821,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -7947,7 +7853,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -7979,7 +7885,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -8011,7 +7917,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -8043,7 +7949,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -8075,7 +7981,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -8107,7 +8013,7 @@ may   = [
   "release-checkout checkout reset", "release-checkout leftovers clean", "release-checkout submodules update",
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -8134,7 +8040,7 @@ may   = [
   "release-checkout leftovers clean", "release-checkout submodules update", "release-hooks hook run",
   "help-documents python-help-document print", "help-documents go-help-document print",
   "help-documents typescript-help-document print", "docs-generation docs generate",
-  "docs-generation docs check", "docs-generation program version", "release-checkout paths stage",
+  "docs-generation docs check", "release-checkout paths stage",
   "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -8161,7 +8067,7 @@ may   = [
   "release-checkout leftovers clean", "release-checkout submodules update", "release-hooks hook run",
   "help-documents python-help-document print", "help-documents go-help-document print",
   "help-documents typescript-help-document print", "docs-generation docs generate",
-  "docs-generation docs check", "docs-generation program version", "release-checkout paths stage",
+  "docs-generation docs check", "release-checkout paths stage",
   "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -8188,7 +8094,7 @@ may   = [
   "release-checkout leftovers clean", "release-checkout submodules update", "release-hooks hook run",
   "help-documents python-help-document print", "help-documents go-help-document print",
   "help-documents typescript-help-document print", "docs-generation docs generate",
-  "docs-generation docs check", "docs-generation program version", "release-checkout paths stage",
+  "docs-generation docs check", "release-checkout paths stage",
   "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -8215,7 +8121,7 @@ may   = [
   "release-checkout leftovers clean", "release-checkout submodules update", "release-hooks hook run",
   "help-documents python-help-document print", "help-documents go-help-document print",
   "help-documents typescript-help-document print", "docs-generation docs generate",
-  "docs-generation docs check", "docs-generation program version", "release-checkout paths stage",
+  "docs-generation docs check", "release-checkout paths stage",
   "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -8242,7 +8148,7 @@ may   = [
   "release-checkout leftovers clean", "release-checkout submodules update", "release-hooks hook run",
   "help-documents python-help-document print", "help-documents go-help-document print",
   "help-documents typescript-help-document print", "docs-generation docs generate",
-  "docs-generation docs check", "docs-generation program version", "release-checkout paths stage",
+  "docs-generation docs check", "release-checkout paths stage",
   "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -8267,7 +8173,7 @@ after = "release-hooks hook run"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -8292,7 +8198,7 @@ after = "help-documents python-help-document print"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -8317,7 +8223,7 @@ after = "help-documents go-help-document print"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -8342,7 +8248,7 @@ after = "help-documents typescript-help-document print"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -8367,7 +8273,7 @@ after = "docs-generation docs generate"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -8392,32 +8298,7 @@ after = "docs-generation docs check"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
-  "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
-  "build-verification npm-pack preview", "build-verification python-artifacts build",
-  "build-verification go-packages list", "build-verification go-build-list show",
-  "build-verification go-dependencies list", "build-verification go-tidy preview",
-  "build-verification go-module show", "build-verification go-workspace show",
-  "build-verification strictcode-rules list", "build-verification strictcode analysis run",
-  "build-verification npm-tokens list", "build-verification external-check run",
-  "build-verification test-suite run", "build-verification uv version", "lockfile-refresh uv-lock refresh",
-  "lockfile-refresh npm-lock refresh", "lockfile-refresh go-sum refresh",
-  "lockfile-refresh go-work-sum refresh", "build-verification artifact secrets scan",
-  "git-writing branch advance", "git-writing paths restore", "git-writing ref push", "github-reading runs list",
-  "github-reading run show", "github-reading run watch", "github-reading api get", "ci-waiting poll wait",
-  "github-writing run rerun", "git-writing ref create", "git-writing ref lease-push",
-  "github-writing release create", "github-writing release edit", "package-publishing npm-package publish",
-  "package-publishing python-package build", "package-publishing python-package publish",
-  "package-publishing go-proxy notify", "package-publishing go-binaries install", "release-hooks deploy run",
-]
-limit = 100000
-
-[[command.chain.next]]
-after = "docs-generation program version"
-may   = [
-  "release-hooks hook run", "help-documents python-help-document print",
-  "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -8442,7 +8323,7 @@ after = "release-checkout paths stage"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -8467,7 +8348,7 @@ after = "release-checkout snapshot commit"
 may   = [
   "release-hooks hook run", "help-documents python-help-document print",
   "help-documents go-help-document print", "help-documents typescript-help-document print",
-  "docs-generation docs generate", "docs-generation docs check", "docs-generation program version",
+  "docs-generation docs generate", "docs-generation docs check",
   "release-checkout paths stage", "release-checkout snapshot commit", "build-verification python-sync preview",
   "build-verification npm-pack preview", "build-verification python-artifacts build",
   "build-verification go-packages list", "build-verification go-build-list show",
@@ -9094,20 +8975,23 @@ optional = true
 role     = "file"
 
 [[command.flag]]
-name     = "from-commit"
-type     = "string"
-help     = "The earliest commit rewritten; absent is refused unless --entire-history is given."
-optional = true
-
-[[command.flag]]
-name = "entire-history"
-type = "boolean"
-help = "Rewrite the whole history, or only from the commit --from-commit names."
-
-[[command.flag]]
 name = "reason"
 type = "string"
 help = "Why the content is scrubbed, recorded in the scrub commit and the rewrite's archive."
+
+[[command.selector]]
+name = "range-start"
+help = "Where the rewritten range of history begins."
+
+[[command.selector.member]]
+name = "from-commit"
+help = "The earliest commit rewritten."
+type = "string"
+
+[[command.selector.member]]
+name     = "entire-history"
+help     = "Rewrite the whole history."
+presence = true
 
 [[command.constraint]]
 class = "one-of"

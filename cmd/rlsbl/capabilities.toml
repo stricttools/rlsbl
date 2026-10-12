@@ -50,6 +50,7 @@ purpose = "Write each record through a temporary file renamed over it, and keep 
 scope   = "repo:cwd/.strictmetadata"
 match   = "subtree"
 modes   = ["read", "list", "stat", "create", "replace", "overwrite", "delete", "rename", "mkdir", "chmod"]
+perms   = "0755"
 
 [[capability]]
 name     = "project-writing"
@@ -69,6 +70,7 @@ purpose = "Write version files, CHANGELOG.md, CI workflows, go.mod directives, r
 scope   = "repo:cwd"
 match   = "subtree"
 modes   = ["create", "replace", "overwrite", "delete", "rename", "mkdir", "chmod"]
+perms   = "0755"
 
 [[capability]]
 name     = "run-state"
@@ -88,6 +90,7 @@ purpose = "Keep the in-progress, plan, retry, and scrub result files a resumed r
 scope   = "repo:cwd/.strictmetadata/.release-state"
 match   = "subtree"
 modes   = ["read", "list", "stat", "create", "replace", "delete", "rename", "mkdir"]
+perms   = "0755"
 
 [[capability.effect]]
 name    = "writer hold"
@@ -101,7 +104,7 @@ name    = "writer claim"
 class   = "lock"
 purpose = "Refuse to start while another rlsbl run changes release state, instead of waiting for it."
 path    = "repo:cwd/.strictmetadata/.release-state/lock"
-wait    = "1s"
+wait    = "0s"
 
 [[capability]]
 name     = "git-reading"
@@ -191,6 +194,20 @@ env        = [
   { name = "PATH", from = "env:PATH" },
 ]
 answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "object-contents read"
+class      = "program"
+purpose    = "Read blobs byte for byte through cat-file's framing, so a final newline is neither lost nor invented."
+vocabulary = "git"
+args       = ["cat-file", "--batch"]
+params     = { objects = "string" }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+stdin      = "param:objects"
+answer     = "frames"
 
 [[capability.read]]
 name       = "objects read"
@@ -301,12 +318,13 @@ name       = "ignore-rules check"
 class      = "program"
 purpose    = "Leave out of commits and scans the paths the repository's ignore rules exclude."
 vocabulary = "git"
-args       = ["check-ignore", "{args...}"]
-params     = { args = { type = "string", list = true } }
+args       = ["check-ignore", "-v", "-z", "--stdin"]
+params     = { paths = "string" }
 dir        = "repo:cwd"
 env        = [
   { name = "PATH", from = "env:PATH" },
 ]
+stdin      = "param:paths"
 answer     = "exit-and-output"
 
 [[capability.read]]
@@ -645,6 +663,7 @@ purpose = "Hold the release checkout, the release's own binaries, the secret sca
 scope   = "gitdir:cwd/rlsbl"
 match   = "subtree"
 modes   = ["read", "list", "stat", "create", "replace", "overwrite", "delete", "rename", "mkdir", "chmod"]
+perms   = "0755"
 
 [[capability.effect]]
 name      = "worktree add"
@@ -1135,7 +1154,7 @@ variable = "HOME"
 name      = "file delete"
 class     = "program"
 purpose   = "Archive a workflow file the routers no longer use, refusing when it is already gone."
-program   = "path:saferm"
+program   = "read:saferm-deletion.saferm-program resolve"
 args      = [
   "delete", "--no-recursive", "--no-ignore-missing", "--no-interactive", "--no-update-git-index",
   "--description", "{description}", "--on-error", "abort", "--", "{path}",
@@ -1156,7 +1175,7 @@ answer    = "exit"
 name      = "leftover delete"
 class     = "program"
 purpose   = "Archive a scaffolded file, merge base, or validation cache that may already be gone."
-program   = "path:saferm"
+program   = "read:saferm-deletion.saferm-program resolve"
 args      = [
   "delete", "--no-recursive", "--ignore-missing", "--no-interactive", "--no-update-git-index", "--description",
   "{description}", "--on-error", "abort", "--", "{path}",
@@ -1177,7 +1196,7 @@ answer    = "exit"
 name      = "tree delete"
 class     = "program"
 purpose   = "Archive the old layout's directories a conversion replaced."
-program   = "path:saferm"
+program   = "read:saferm-deletion.saferm-program resolve"
 args      = [
   "delete", "--recursive", "--no-ignore-missing", "--no-interactive", "--no-update-git-index", "--description",
   "{description}", "--on-error", "abort", "--", "{path}",
@@ -1198,7 +1217,7 @@ answer    = "exit"
 name      = "leftover-tree delete"
 class     = "program"
 purpose   = "Archive old-layout residue directories that may already be gone."
-program   = "path:saferm"
+program   = "read:saferm-deletion.saferm-program resolve"
 args      = [
   "delete", "--recursive", "--ignore-missing", "--no-interactive", "--no-update-git-index", "--description",
   "{description}", "--on-error", "abort", "--", "{path}",
@@ -1215,22 +1234,13 @@ unbounded = true
 deadline  = "2m"
 answer    = "exit"
 
-[[capability.effect]]
-name      = "program version"
-class     = "program"
-purpose   = "Refuse a conversion before anything is written when saferm cannot be run."
-program   = "path:saferm"
-args      = ["--version"]
-dir       = "repo:cwd"
-env       = [
-  { name = "PATH", from = "env:PATH" },
-  { name = "HOME", from = "env:HOME" },
-]
-stdin     = "none"
-output    = { stdout = "captured", stderr = "captured" }
-unbounded = true
-deadline  = "15s"
-answer    = "exit-and-output"
+[[capability.read]]
+name    = "saferm-program resolve"
+class   = "program-path"
+purpose = "Refuse a conversion before anything is written when saferm cannot be found, and run the same saferm afterwards."
+program = "path:saferm"
+answer  = "path"
+resolves = true
 
 [[capability]]
 name     = "docs-generation"
@@ -1255,8 +1265,8 @@ variable = "HOME"
 name      = "docs generate"
 class     = "program"
 purpose   = "Generate the member's documentation stamped with the version the release is about to ship."
-program   = "path:selfdoc"
-args      = ["gen", "--no-auto-commit", "--version-override", "{version}"]
+program   = "read:docs-generation.selfdoc-program resolve"
+args      = ["generate", "--no-auto-commit", "--version-override", "{version}"]
 params    = { version = "string", member = "string" }
 dir       = "gitdir:cwd/rlsbl/release-checkout"
 dir-below = "param:member"
@@ -1274,7 +1284,7 @@ answer    = "exit"
 name      = "docs check"
 class     = "program"
 purpose   = "Stop the release before anything is committed when the member's documentation fails selfdoc's checks."
-program   = "path:selfdoc"
+program   = "read:docs-generation.selfdoc-program resolve"
 args      = ["check", "--version-override", "{version}"]
 params    = { version = "string", member = "string" }
 dir       = "gitdir:cwd/rlsbl/release-checkout"
@@ -1293,8 +1303,8 @@ answer    = "exit"
 name      = "root-docs generate"
 class     = "program"
 purpose   = "Generate the documentation a workspace's unversioned root member declares before a batch releases anything."
-program   = "path:selfdoc"
-args      = ["gen", "--no-auto-commit"]
+program   = "read:docs-generation.selfdoc-program resolve"
+args      = ["generate", "--no-auto-commit"]
 dir       = "gitdir:cwd/rlsbl/release-checkout"
 env       = [
   { name = "PATH", from = "env:PATH" },
@@ -1310,7 +1320,7 @@ answer    = "exit"
 name      = "root-docs check"
 class     = "program"
 purpose   = "Stop a batch release before anything is released when the root member's documentation fails selfdoc's checks."
-program   = "path:selfdoc"
+program   = "read:docs-generation.selfdoc-program resolve"
 args      = ["check"]
 dir       = "gitdir:cwd/rlsbl/release-checkout"
 env       = [
@@ -1323,22 +1333,13 @@ unbounded = true
 deadline  = "15m"
 answer    = "exit"
 
-[[capability.effect]]
-name      = "program version"
-class     = "program"
-purpose   = "Refuse a release that declares documentation when selfdoc cannot be run."
-program   = "path:selfdoc"
-args      = ["--version"]
-dir       = "repo:cwd"
-env       = [
-  { name = "PATH", from = "env:PATH" },
-  { name = "HOME", from = "env:HOME" },
-]
-stdin     = "none"
-output    = { stdout = "captured", stderr = "captured" }
-unbounded = true
-deadline  = "15s"
-answer    = "exit-and-output"
+[[capability.read]]
+name    = "selfdoc-program resolve"
+class   = "program-path"
+purpose = "Refuse a release that declares documentation when selfdoc cannot be found, and run the same selfdoc afterwards."
+program = "path:selfdoc"
+answer  = "path"
+resolves = true
 
 [[capability]]
 name     = "github-reading"
@@ -1724,7 +1725,9 @@ headers            = [
 error-status-fails = false
 read               = true
 deadline           = "30s"
-answer             = "registry-answer"
+answer             = "raw"
+max-size           = "64MiB"
+answer-headers     = ["Retry-After"]
 
 [[capability.effect]]
 name               = "npm-names search"
@@ -1736,7 +1739,9 @@ params             = { text = "string" }
 error-status-fails = false
 read               = true
 deadline           = "30s"
-answer             = "registry-answer"
+answer             = "raw"
+max-size           = "4MiB"
+answer-headers     = ["Retry-After"]
 
 [[capability.effect]]
 name               = "pypi-project fetch"
@@ -1748,7 +1753,9 @@ params             = { name = "string" }
 error-status-fails = false
 read               = true
 deadline           = "30s"
-answer             = "registry-answer"
+answer             = "raw"
+max-size           = "64MiB"
+answer-headers     = ["Retry-After"]
 
 [[capability.effect]]
 name               = "pypi-index fetch"
@@ -1760,7 +1767,9 @@ params             = { name = "string" }
 error-status-fails = false
 read               = true
 deadline           = "30s"
-answer             = "registry-answer"
+answer             = "raw"
+max-size           = "16MiB"
+answer-headers     = ["Retry-After"]
 
 [[capability.effect]]
 name               = "go-versions list"
@@ -1772,7 +1781,9 @@ params             = { module = "string" }
 error-status-fails = false
 read               = true
 deadline           = "30s"
-answer             = "registry-answer"
+answer             = "raw"
+max-size           = "4MiB"
+answer-headers     = ["Retry-After"]
 
 [[capability.effect]]
 name               = "go-module-file fetch"
@@ -1784,7 +1795,9 @@ params             = { module = "string", version = "string" }
 error-status-fails = false
 read               = true
 deadline           = "30s"
-answer             = "registry-answer"
+answer             = "raw"
+max-size           = "4MiB"
+answer-headers     = ["Retry-After"]
 
 [[capability.effect]]
 name    = "rate-limit wait"
@@ -1812,7 +1825,8 @@ error-status-fails = false
 read               = false
 deadline           = "2m"
 consequential      = true
-answer             = "registry-answer"
+answer             = "raw"
+max-size           = "1MiB"
 
 [[capability]]
 name     = "npm-credentials"
@@ -1845,13 +1859,15 @@ class              = "http"
 purpose            = "Refuse to copy or publish with a token npm does not accept, naming the user it authenticates."
 method             = "GET"
 url                = "https://registry.npmjs.org/-/whoami"
+params             = { token = { type = "string", secret = true } }
 headers            = [
-  { name = "Authorization", secret = "env:NPM_TOKEN" },
+  { name = "Authorization", value = "Bearer {token}" },
 ]
 error-status-fails = false
 read               = true
 deadline           = "30s"
-answer             = "registry-answer"
+answer             = "raw"
+max-size           = "1MiB"
 
 [[capability]]
 name     = "pypi-credentials"
@@ -2625,6 +2641,25 @@ purpose  = "Let the program find its own login state and settings under the user
 modes    = ["read"]
 variable = "HOME"
 
+[[capability.resource]]
+name    = "releasables-declarations"
+class   = "structured"
+purpose = "Find the program a server releasable's deploy_command names, which the declarations hold."
+scope   = "repo:cwd/.strictmetadata/releasables/releasables.toml"
+match   = "exact"
+modes   = ["read"]
+format  = "toml"
+
+[[capability.read]]
+name        = "deploy-program resolve"
+class       = "structured"
+purpose     = "Resolve the program a server releasable deploys with from the first word of its deploy_command."
+resource    = "releasables-declarations"
+key         = "releasables.deploy_command"
+answer      = "path"
+relative-to = "repo:cwd"
+resolves    = true
+
 [[capability.effect]]
 name      = "hook run"
 class     = "program"
@@ -2655,9 +2690,9 @@ answer    = "exit"
 name          = "deploy run"
 class         = "program"
 purpose       = "Deploy a server releasable's released version with the command its declaration names."
-program       = "path:env"
-args          = ["{command...}"]
-params        = { command = { type = "string", list = true } }
+program       = "read:release-hooks.deploy-program resolve"
+args          = ["{arguments...}"]
+params        = { arguments = { type = "string", list = true } }
 dir           = "repo:cwd"
 env           = [
   { name = "PATH", from = "env:PATH" },
@@ -2925,7 +2960,7 @@ answer    = "exit-and-output"
 name      = "clone rewrite"
 class     = "program"
 purpose   = "Move the absorbed history under the member's directory in the private clone."
-program   = "path:git-filter-repo"
+program   = "read:history-absorption.filter-repo-program resolve"
 args      = ["--to-subdirectory-filter", "{dest}", "--force"]
 params    = { dest = "string", clone = "string" }
 dir       = "gitdir:cwd/rlsbl"
@@ -2976,22 +3011,13 @@ unbounded = true
 deadline  = "10m"
 answer    = "exit-and-output"
 
-[[capability.effect]]
-name      = "filter-repo version"
-class     = "program"
-purpose   = "Refuse an absorb before anything is written when git-filter-repo is not installed."
-program   = "path:git-filter-repo"
-args      = ["--version"]
-dir       = "repo:cwd"
-env       = [
-  { name = "PATH", from = "env:PATH" },
-  { name = "HOME", from = "env:HOME" },
-]
-stdin     = "none"
-output    = { stdout = "captured", stderr = "captured" }
-unbounded = true
-deadline  = "15s"
-answer    = "exit-and-output"
+[[capability.read]]
+name    = "filter-repo-program resolve"
+class   = "program-path"
+purpose = "Refuse an absorb before anything is written when git-filter-repo is not installed, and run the same one afterwards."
+program = "path:git-filter-repo"
+answer  = "path"
+resolves = true
 
 [[capability.read]]
 name       = "source-status inspect"
@@ -3112,7 +3138,7 @@ answer    = "exit-and-output"
 name      = "target rewrite"
 class     = "program"
 purpose   = "Keep only the departing members' history in the new repository, hoisting a lone member to its root."
-program   = "path:git-filter-repo"
+program   = "read:history-extraction.filter-repo-program resolve"
 args      = ["{args...}", "--force"]
 params    = { args = { type = "string", list = true } }
 dir       = "arg:target-path"
@@ -3183,22 +3209,13 @@ unbounded = true
 deadline  = "2m"
 answer    = "exit"
 
-[[capability.effect]]
-name      = "filter-repo version"
-class     = "program"
-purpose   = "Refuse an extract before anything is written when git-filter-repo is not installed."
-program   = "path:git-filter-repo"
-args      = ["--version"]
-dir       = "repo:cwd"
-env       = [
-  { name = "PATH", from = "env:PATH" },
-  { name = "HOME", from = "env:HOME" },
-]
-stdin     = "none"
-output    = { stdout = "captured", stderr = "captured" }
-unbounded = true
-deadline  = "15s"
-answer    = "exit-and-output"
+[[capability.read]]
+name    = "filter-repo-program resolve"
+class   = "program-path"
+purpose = "Refuse an extract before anything is written when git-filter-repo is not installed, and run the same one afterwards."
+program = "path:git-filter-repo"
+answer  = "path"
+resolves = true
 
 [[capability.read]]
 name       = "target-refs list"
@@ -3315,10 +3332,29 @@ commands = [
 ]
 
 [[capability.resource]]
+name    = "family-settings"
+class   = "structured"
+purpose = "Find where the owner keeps the confidential-term list, which every family tool reads from this one settings file."
+scope   = "config-dir/stricttools/config.toml"
+match   = "exact"
+modes   = ["read"]
+format  = "toml"
+
+[[capability.read]]
+name        = "term-list-location resolve"
+class       = "structured"
+purpose     = "Resolve the confidential-term list's absolute path from the family's settings file."
+resource    = "family-settings"
+key         = "confidential_term_list"
+answer      = "path"
+relative-to = "refused"
+resolves    = true
+
+[[capability.resource]]
 name    = "term-list"
 class   = "file"
 purpose = "Load the age-encrypted list of terms that must not appear in anything public."
-scope   = "config:confidential-term-list"
+scope   = "read:confidential-terms.term-list-location resolve"
 match   = "exact"
 modes   = ["read"]
 secret  = true
