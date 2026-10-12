@@ -1,0 +1,3723 @@
+format = 1
+
+[[capability]]
+name     = "working-tree-reading"
+purpose  = "Judge and plan from the declarations, records, manifests, workflows, and sources the repository holds."
+commands = [
+  "check", "failing-checks list", "commit", "scaffold", "status show", "targets list",
+  "unreleased-commits list", "watch", "changelog add", "changelog amend", "changelog edit",
+  "changelog generate", "changelog remap", "changelog remove", "confidential hit approve",
+  "confidential hit dismiss", "dev install", "dev status show", "dev sync", "records migrate",
+  "monorepo absorb", "monorepo add", "monorepo names check", "monorepo residue remove", "monorepo extract",
+  "monorepo graph render", "monorepo impact show", "monorepo init", "monorepo list",
+  "monorepo dependencies list", "monorepo remove", "monorepo releasable rename", "monorepo status show",
+  "monorepo sync", "monorepo release init", "monorepo release order show", "monorepo release run",
+  "options set", "release abandon", "release backfill", "release deprecate", "release edit", "release init",
+  "release reconcile", "release resume", "release retract", "release retry", "release run", "release scrub",
+  "release undo", "release yank", "go-module-path rewrite", "project-name rewrite", "uv-path-sources rewrite",
+  "transition classify", "transition declassify", "transition identity add", "transition minimal-record init",
+  "transition license change", "transition lifecycle change", "transition show",
+  "transition unversioned-tag add", "upstream tags adopt",
+]
+
+[[capability.resource]]
+name    = "working-tree"
+class   = "directory"
+purpose = "Load releasables.toml, the changelogs, release archives, options, lifecycle record, manifests, and workflows of the repository holding the working directory."
+scope   = "repo:cwd"
+match   = "subtree"
+modes   = ["read", "list", "stat"]
+
+[[capability]]
+name     = "record-writing"
+purpose  = "Keep the declarations, changelogs, release archives, options, and lifecycle record that every later command and release reads."
+commands = [
+  "scaffold", "changelog add", "changelog amend", "changelog edit", "changelog generate", "changelog remap",
+  "changelog remove", "confidential hit approve", "confidential hit dismiss", "records migrate",
+  "monorepo absorb", "monorepo add", "monorepo extract", "monorepo init", "monorepo remove",
+  "monorepo releasable rename", "monorepo sync", "monorepo release init", "monorepo release run", "options set",
+  "release abandon", "release backfill", "release deprecate", "release init", "release reconcile",
+  "release resume", "release retract", "release run", "release scrub", "release undo", "release yank",
+  "project-name rewrite", "uv-path-sources rewrite", "transition classify", "transition declassify",
+  "transition identity add", "transition minimal-record init", "transition license change",
+  "transition lifecycle change", "transition unversioned-tag add",
+]
+
+[[capability.resource]]
+name    = "metadata-tree"
+class   = "directory"
+purpose = "Write each record through a temporary file renamed over it, and keep released files read-only."
+scope   = "repo:cwd/.strictmetadata"
+match   = "subtree"
+modes   = ["read", "list", "stat", "create", "replace", "overwrite", "delete", "rename", "mkdir", "chmod"]
+
+[[capability]]
+name     = "project-writing"
+purpose  = "Bring the project's manifests, generated changelog, workflows, Go sources, and scaffolded files in line with its records."
+commands = [
+  "scaffold", "changelog amend", "changelog edit", "changelog generate", "changelog remap", "changelog remove",
+  "dev sync", "records migrate", "monorepo absorb", "monorepo add", "monorepo extract",
+  "monorepo releasable rename", "monorepo sync", "monorepo release run", "release resume", "release retract",
+  "release run", "release scrub", "release undo", "release yank", "go-module-path rewrite",
+  "project-name rewrite", "uv-path-sources rewrite", "transition declassify",
+]
+
+[[capability.resource]]
+name    = "project-tree"
+class   = "directory"
+purpose = "Write version files, CHANGELOG.md, CI workflows, go.mod directives, renamed imports, and hook scripts where the project keeps them."
+scope   = "repo:cwd"
+match   = "subtree"
+modes   = ["create", "replace", "overwrite", "delete", "rename", "mkdir", "chmod"]
+
+[[capability]]
+name     = "run-state"
+purpose  = "Let one command at a time change release state, and let a stopped release or rewrite resume where it stopped."
+commands = [
+  "scaffold", "changelog add", "changelog amend", "changelog edit", "changelog generate", "changelog remap",
+  "changelog remove", "monorepo absorb", "monorepo add", "monorepo residue remove", "monorepo extract",
+  "monorepo releasable rename", "monorepo release run", "release abandon", "release backfill",
+  "release deprecate", "release reconcile", "release resume", "release retract", "release retry", "release run",
+  "release scrub", "release undo", "release yank", "transition declassify",
+]
+
+[[capability.resource]]
+name    = "release-state"
+class   = "directory"
+purpose = "Keep the in-progress, plan, retry, and scrub result files a resumed run continues from."
+scope   = "repo:cwd/.strictmetadata/.release-state"
+match   = "subtree"
+modes   = ["read", "list", "stat", "create", "replace", "delete", "rename", "mkdir"]
+
+[[capability.effect]]
+name    = "writer hold"
+class   = "lock"
+purpose = "Wait for any other rlsbl run changing release state to finish before this one starts changing it."
+path    = "repo:cwd/.strictmetadata/.release-state/lock"
+wait    = "24h"
+
+[[capability.effect]]
+name    = "writer claim"
+class   = "lock"
+purpose = "Refuse to start while another rlsbl run changes release state, instead of waiting for it."
+path    = "repo:cwd/.strictmetadata/.release-state/lock"
+wait    = "1s"
+
+[[capability]]
+name     = "git-reading"
+purpose  = "Answer the history, ref, and working-tree questions every release decision rests on, without changing the repository."
+commands = [
+  "check", "failing-checks list", "commit", "scaffold", "status show", "unreleased-commits list", "watch",
+  "changelog add", "changelog amend", "changelog edit", "changelog generate", "changelog remap",
+  "changelog remove", "confidential hit approve", "confidential hit dismiss", "records migrate",
+  "monorepo absorb", "monorepo add", "monorepo residue remove", "monorepo extract", "monorepo impact show",
+  "monorepo init", "monorepo releasable rename", "monorepo status show", "monorepo sync",
+  "monorepo release init", "monorepo release run", "options set", "release abandon", "release backfill",
+  "release deprecate", "release edit", "release init", "release reconcile", "release resume", "release retract",
+  "release retry", "release run", "release scrub", "release undo", "release yank", "go-module-path rewrite",
+  "project-name rewrite", "secrets npm-token sync", "transition classify", "transition declassify",
+  "transition identity add", "transition minimal-record init", "transition license change",
+  "transition lifecycle change", "transition show", "transition unversioned-tag add", "upstream tags adopt",
+]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.read]]
+name       = "revisions resolve"
+class      = "program"
+purpose    = "Resolve revisions, the repository root, and the git common directory each command works from."
+vocabulary = "git"
+args       = ["rev-parse", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "commits list"
+class      = "program"
+purpose    = "Walk and count the commits a release range, a changelog's coverage, or an ancestry question spans."
+vocabulary = "git"
+args       = ["rev-list", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "history show"
+class      = "program"
+purpose    = "Read commit subjects, messages, trailers, dates, and first-parent history the records are judged against."
+vocabulary = "git"
+args       = ["log", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "work-tree inspect"
+class      = "program"
+purpose    = "Find uncommitted changes that would make a write or a release refuse."
+vocabulary = "git"
+args       = ["status", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "objects show"
+class      = "program"
+purpose    = "Read a file as a past commit holds it, such as go.mod at a release commit."
+vocabulary = "git"
+args       = ["show", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "objects read"
+class      = "program"
+purpose    = "Read blobs and object types by id without touching the working tree."
+vocabulary = "git"
+args       = ["cat-file", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "trees compare"
+class      = "program"
+purpose    = "List the paths two commits differ in, so only what a release changed is written back."
+vocabulary = "git"
+args       = ["diff", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "commit-trees compare"
+class      = "program"
+purpose    = "List the files each commit changed, which decides what a changelog must cover."
+vocabulary = "git"
+args       = ["diff-tree", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "index compare"
+class      = "program"
+purpose    = "Compare the index against a tree when deciding what a commit would carry."
+vocabulary = "git"
+args       = ["diff-index", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "files list"
+class      = "program"
+purpose    = "List tracked and untracked files, which bound every sweep and scan."
+vocabulary = "git"
+args       = ["ls-files", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "tree-entries list"
+class      = "program"
+purpose    = "Read a tree's entries at a commit, such as the workflows a tagged tree holds."
+vocabulary = "git"
+args       = ["ls-tree", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "text search"
+class      = "program"
+purpose    = "Find the files of a commit holding a confidential term before anything is pushed."
+vocabulary = "git"
+args       = ["grep", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "merge-base find"
+class      = "program"
+purpose    = "Answer whether one commit is an ancestor of another, the base of every release range."
+vocabulary = "git"
+args       = ["merge-base", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "ignore-rules check"
+class      = "program"
+purpose    = "Leave out of commits and scans the paths the repository's ignore rules exclude."
+vocabulary = "git"
+args       = ["check-ignore", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "refs list"
+class      = "program"
+purpose    = "List tags and refs with their objects and creation times, the evidence of past releases."
+vocabulary = "git"
+args       = ["for-each-ref", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "head-ref show"
+class      = "program"
+purpose    = "Name the branch HEAD is on, since releases run only from a release branch."
+vocabulary = "git"
+args       = ["symbolic-ref", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "settings show"
+class      = "program"
+purpose    = "Read the origin remote's address and the committer identity a conversion carries over."
+vocabulary = "git"
+args       = ["config", "--get", "{key}"]
+params     = { key = "string" }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "branches list"
+class      = "program"
+purpose    = "List the branches holding a commit when judging where a release commit lives."
+vocabulary = "git"
+args       = ["branch", "--list", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "tags list"
+class      = "program"
+purpose    = "List the tags pointing at a commit when judging what a release shipped."
+vocabulary = "git"
+args       = ["tag", "--list", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "stash-entries list"
+class      = "program"
+purpose    = "Refuse a rewrite or backfill while set-aside work would be lost with the old history."
+vocabulary = "git"
+args       = ["stash", "list"]
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "blobs hash"
+class      = "program"
+purpose    = "Compare working-tree files with what HEAD holds without staging anything."
+vocabulary = "git"
+args       = ["hash-object", "--", "{paths...}"]
+params     = { paths = { type = "string", list = true } }
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "worktrees list"
+class      = "program"
+purpose    = "Find the release checkout and other linked working trees of the repository."
+vocabulary = "git"
+args       = ["worktree", "list", "--porcelain"]
+dir        = "repo:cwd"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability]]
+name     = "git-writing"
+purpose  = "Move the refs, objects, and remote branches a release, rewrite, or tag adoption changes, each guarded by what was observed first."
+commands = [
+  "check", "failing-checks list", "scaffold", "monorepo absorb", "monorepo add", "monorepo releasable rename",
+  "monorepo release run", "release abandon", "release reconcile", "release resume", "release retract",
+  "release run", "release scrub", "release undo", "release yank", "transition declassify",
+  "upstream tags adopt",
+]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.resource]]
+name     = "home-directory"
+class    = "env"
+purpose  = "Let the program find its own login state and settings under the user's home directory."
+modes    = ["read"]
+variable = "HOME"
+
+[[capability.effect]]
+name      = "ref create"
+class     = "program"
+purpose   = "Create a release or kept tag only where no ref of that name exists yet."
+program   = "path:git"
+args      = ["update-ref", "{ref}", "{object}", "{absent}"]
+params    = { ref = "string", object = "string", absent = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "ref delete"
+class     = "program"
+purpose   = "Delete a tag only while it still points where the plan observed it."
+program   = "path:git"
+args      = ["update-ref", "-d", "{ref}", "{expected}"]
+params    = { ref = "string", expected = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "branch advance"
+class     = "program"
+purpose   = "Advance the release branch by compare-and-swap so commits made meanwhile are never lost."
+program   = "path:git"
+args      = ["update-ref", "-m", "{reason}", "{ref}", "{new}", "{old}"]
+params    = { reason = "string", ref = "string", new = "string", old = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "paths restore"
+class     = "program"
+purpose   = "Bring into the working tree only the files the release's own commits changed."
+program   = "path:git"
+args      = ["restore", "--source", "{source}", "--staged", "--worktree", "--", "{paths...}"]
+params    = { source = "string", paths = { type = "string", list = true } }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+  { name = "GIT_LITERAL_PATHSPECS", value = "1" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "blob store"
+class     = "program"
+purpose   = "Store one side of a three-way merge of a scaffolded file as a loose object to merge from."
+program   = "path:git"
+args      = ["hash-object", "-w", "--stdin"]
+params    = { content = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "param:content"
+output    = "captured"
+unbounded = true
+deadline  = "2m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "blobs merge"
+class     = "program"
+purpose   = "Merge a scaffolded file's new rendering into the project's own edits of it."
+program   = "path:git"
+args      = [
+  "merge-file", "--object-id", "-L", "ours", "-L", "base", "-L", "theirs", "{ours}", "{base}", "{theirs}",
+]
+params    = { ours = "string", base = "string", theirs = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "2m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "origin fetch"
+class     = "program"
+purpose   = "Learn whether origin's branch moved before a release builds on it."
+program   = "path:git"
+args      = ["fetch", "origin", "--quiet", "--no-tags"]
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "2m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "remote-refs list"
+class     = "program"
+purpose   = "Read which tags and branches origin or a fork's upstream holds before anything is pushed or adopted."
+program   = "path:git"
+args      = ["ls-remote", "{args...}"]
+params    = { args = { type = "string", list = true } }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "2m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name          = "ref push"
+class         = "program"
+purpose       = "Publish a release commit or tag that origin does not hold yet, refused by origin when it is not a fast-forward."
+program       = "path:git"
+args          = ["push", "--no-verify", "{remote}", "{refspec}"]
+params        = { remote = "string", refspec = "string" }
+dir           = "repo:cwd"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin         = "none"
+output        = "captured"
+unbounded     = true
+deadline      = "5m"
+consequential = true
+answer        = "exit-and-output"
+
+[[capability.effect]]
+name          = "ref lease-push"
+class         = "program"
+purpose       = "Move or delete a ref on origin only while origin still holds the value observed before the rewrite."
+program       = "path:git"
+args          = ["push", "--no-verify", "--force-with-lease={lease}", "{remote}", "{refspec}"]
+params        = { lease = "string", remote = "string", refspec = "string" }
+dir           = "repo:cwd"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin         = "none"
+output        = "captured"
+unbounded     = true
+deadline      = "5m"
+consequential = true
+answer        = "exit-and-output"
+
+[[capability]]
+name     = "release-checkout"
+purpose  = "Build, check, and commit each release in a private checkout of the branch's committed tip, so uncommitted work never ships."
+commands = ["monorepo absorb", "monorepo release run", "release resume", "release run"]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.resource]]
+name     = "home-directory"
+class    = "env"
+purpose  = "Let the program find its own login state and settings under the user's home directory."
+modes    = ["read"]
+variable = "HOME"
+
+[[capability.resource]]
+name    = "rlsbl-scratch"
+class   = "directory"
+purpose = "Hold the release checkout, the release's own binaries, the secret scan's unpacked artifacts, and an absorb's rewritten clone."
+scope   = "gitdir:cwd/rlsbl"
+match   = "subtree"
+modes   = ["read", "list", "stat", "create", "replace", "overwrite", "delete", "rename", "mkdir", "chmod"]
+
+[[capability.effect]]
+name      = "worktree add"
+class     = "program"
+purpose   = "Create the release checkout at the branch tip the release pinned."
+program   = "path:git"
+args      = ["worktree", "add", "--force", "--detach", "--quiet", "{path}", "{commit}"]
+params    = { path = "string", commit = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "worktree remove"
+class     = "program"
+purpose   = "Drop a release checkout an earlier version of rlsbl left where the new layout needs the path."
+program   = "path:git"
+args      = ["worktree", "remove", "--force", "--force", "{path}"]
+params    = { path = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "checkout reset"
+class     = "program"
+purpose   = "Point an existing release checkout at the commit this release starts from."
+program   = "path:git"
+args      = ["checkout", "--detach", "--force", "--quiet", "{commit}"]
+params    = { commit = "string" }
+dir       = "gitdir:cwd/rlsbl/release-checkout"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "leftovers clean"
+class     = "program"
+purpose   = "Discard whatever an earlier release left untracked in the checkout."
+program   = "path:git"
+args      = ["clean", "-ffdq"]
+dir       = "gitdir:cwd/rlsbl/release-checkout"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "submodules update"
+class     = "program"
+purpose   = "Give the checkout the submodule commits its tree records."
+program   = "path:git"
+args      = ["submodule", "update", "--init", "--recursive", "--force"]
+dir       = "gitdir:cwd/rlsbl/release-checkout"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "10m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "paths stage"
+class     = "program"
+purpose   = "Stage what the release itself wrote in the checkout, which no other session shares."
+program   = "path:git"
+args      = ["add", "--", "{paths...}"]
+params    = { paths = { type = "string", list = true } }
+dir       = "gitdir:cwd/rlsbl/release-checkout"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "snapshot commit"
+class     = "program"
+purpose   = "Record the version bump, selfdoc's output, or the finalized changelog as the release's own commit."
+program   = "path:git"
+args      = ["commit", "-q", "--trailer", "Autogenerated: true", "-m", "{message}"]
+params    = { message = "string" }
+dir       = "gitdir:cwd/rlsbl/release-checkout"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.read]]
+name       = "checkout-status show"
+class      = "program"
+purpose    = "Find what selfdoc and the version writes changed in the checkout."
+vocabulary = "git"
+args       = ["status", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "gitdir:cwd/rlsbl/release-checkout"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "checkout-files list"
+class      = "program"
+purpose    = "List the checkout's tracked files the release builds and scans."
+vocabulary = "git"
+args       = ["ls-files", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "gitdir:cwd/rlsbl/release-checkout"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "checkout-head resolve"
+class      = "program"
+purpose    = "Read the commit the checkout's last release commit made."
+vocabulary = "git"
+args       = ["rev-parse", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "gitdir:cwd/rlsbl/release-checkout"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "checkout-ignores check"
+class      = "program"
+purpose    = "Leave lockfiles the project ignores out of the release's commit."
+vocabulary = "git"
+args       = ["check-ignore", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "gitdir:cwd/rlsbl/release-checkout"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability]]
+name     = "safegit-commits"
+purpose  = "Commit what rlsbl wrote without taking another session's staged work with it, marked machine-made where changelog coverage should exempt it."
+commands = [
+  "commit", "scaffold", "changelog add", "changelog amend", "changelog edit", "changelog generate",
+  "changelog remap", "changelog remove", "confidential hit approve", "confidential hit dismiss",
+  "records migrate", "monorepo absorb", "monorepo add", "monorepo residue remove", "monorepo extract",
+  "monorepo init", "monorepo releasable rename", "monorepo sync", "monorepo release init",
+  "monorepo release run", "options set", "release abandon", "release backfill", "release deprecate",
+  "release init", "release reconcile", "release resume", "release retract", "release run", "release scrub",
+  "release undo", "release yank", "project-name rewrite", "transition classify", "transition declassify",
+  "transition identity add", "transition minimal-record init", "transition license change",
+  "transition lifecycle change", "transition unversioned-tag add",
+]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.resource]]
+name     = "home-directory"
+class    = "env"
+purpose  = "Let the program find its own login state and settings under the user's home directory."
+modes    = ["read"]
+variable = "HOME"
+
+[[capability.effect]]
+name      = "generated-files commit"
+class     = "program"
+purpose   = "Commit records and generated files with the trailer that exempts them from changelog coverage."
+program   = "path:safegit"
+args      = [
+  "commit", "--no-amend", "--no-allow-empty", "--no-allow-non-portable-targets", "--trailer",
+  "Autogenerated: true", "-m", "{message}", "--", "{paths...}",
+]
+params    = { message = "string", paths = { type = "string", list = true } }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "authored-files commit"
+class     = "program"
+purpose   = "Commit a rename or declaration change that changelog coverage must still ask an entry for."
+program   = "path:safegit"
+args      = [
+  "commit", "--no-amend", "--no-allow-empty", "--no-allow-non-portable-targets", "-m", "{message}", "--",
+  "{paths...}",
+]
+params    = { message = "string", paths = { type = "string", list = true } }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "program version"
+class     = "program"
+purpose   = "Refuse a history rewrite when the installed safegit predates the machine document rlsbl reads."
+program   = "path:safegit"
+args      = ["--version"]
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15s"
+answer    = "exit-and-output"
+
+[[capability]]
+name     = "history-rewriting"
+purpose  = "Rewrite the repository's history through safegit, whose journal and commit map rlsbl then repairs every record from."
+commands = ["changelog remap", "release reconcile", "release scrub", "transition declassify"]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.resource]]
+name     = "home-directory"
+class    = "env"
+purpose  = "Let the program find its own login state and settings under the user's home directory."
+modes    = ["read"]
+variable = "HOME"
+
+[[capability.resource]]
+name    = "rewrite-journal"
+class   = "file"
+purpose = "Map every commit the last rewrite replaced to its replacement, so changelog ids and release commits follow the rewrite."
+scope   = "gitdir:cwd/safegit/rewrite-maps.jsonl"
+match   = "exact"
+modes   = ["read"]
+
+[[capability.effect]]
+name      = "pattern-scrub preview"
+class     = "program"
+purpose   = "Count what a pattern scrub would rewrite and obtain safegit's approval token for exactly that run."
+program   = "path:safegit"
+args      = [
+  "scrub", "pattern", "rewrite", "--json", "--dry-run", "--pattern", "{pattern}", "{substitution...}",
+  "{range...}", "{remap...}", "--reason", "{reason}",
+]
+params    = { pattern = "string", substitution = { type = "string", list = true }, range = { type = "string", list = true }, remap = { type = "string", list = true }, reason = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "30m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name          = "pattern-scrub apply"
+class         = "program"
+purpose       = "Replace every match of the pattern throughout the chosen history."
+program       = "path:safegit"
+args          = [
+  "scrub", "pattern", "rewrite", "--json", "--approve-consequential={token}", "--pattern", "{pattern}",
+  "{substitution...}", "{range...}", "{remap...}", "--reason", "{reason}",
+]
+params        = { pattern = "string", substitution = { type = "string", list = true }, range = { type = "string", list = true }, remap = { type = "string", list = true }, reason = "string", token = "string" }
+dir           = "repo:cwd"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin         = "none"
+output        = "captured"
+unbounded     = true
+deadline      = "2h"
+consequential = true
+answer        = "exit-and-output"
+
+[[capability.effect]]
+name      = "file-scrub preview"
+class     = "program"
+purpose   = "Count what a file scrub would rewrite and obtain safegit's approval token for exactly that run."
+program   = "path:safegit"
+args      = [
+  "scrub", "file", "rewrite", "--json", "--dry-run", "{replacement...}", "{file}", "{range...}", "{remap...}",
+  "--reason", "{reason}",
+]
+params    = { replacement = { type = "string", list = true }, file = "string", range = { type = "string", list = true }, remap = { type = "string", list = true }, reason = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "30m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name          = "file-scrub apply"
+class         = "program"
+purpose       = "Replace or remove one file in every commit of the chosen history."
+program       = "path:safegit"
+args          = [
+  "scrub", "file", "rewrite", "--json", "--approve-consequential={token}", "{replacement...}", "{file}",
+  "{range...}", "{remap...}", "--reason", "{reason}",
+]
+params        = { replacement = { type = "string", list = true }, file = "string", range = { type = "string", list = true }, remap = { type = "string", list = true }, reason = "string", token = "string" }
+dir           = "repo:cwd"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin         = "none"
+output        = "captured"
+unbounded     = true
+deadline      = "2h"
+consequential = true
+answer        = "exit-and-output"
+
+[[capability.effect]]
+name      = "recipe-scrub preview"
+class     = "program"
+purpose   = "Count what a scrub recipe would rewrite and obtain safegit's approval token for exactly that run."
+program   = "path:safegit"
+args      = [
+  "scrub", "run", "--json", "--dry-run", "--no-diff", "--limit", "0", "{recipe}", "{range...}", "{remap...}",
+  "--reason", "{reason}",
+]
+params    = { recipe = "string", range = { type = "string", list = true }, remap = { type = "string", list = true }, reason = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "30m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name          = "recipe-scrub apply"
+class         = "program"
+purpose       = "Run every operation of a scrub recipe over the chosen history in one pass."
+program       = "path:safegit"
+args          = [
+  "scrub", "run", "--json", "--approve-consequential={token}", "--no-diff", "--limit", "0", "{recipe}",
+  "{range...}", "{remap...}", "--reason", "{reason}",
+]
+params        = { recipe = "string", range = { type = "string", list = true }, remap = { type = "string", list = true }, reason = "string", token = "string" }
+dir           = "repo:cwd"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin         = "none"
+output        = "captured"
+unbounded     = true
+deadline      = "2h"
+consequential = true
+answer        = "exit-and-output"
+
+[[capability.effect]]
+name      = "squash preview"
+class     = "program"
+purpose   = "Show which commits a proprietary period's squash folds and obtain safegit's approval token for it."
+program   = "path:safegit"
+args      = [
+  "scrub", "squash", "--json", "--dry-run", "--first", "{first}", "--last", "{last}", "--message", "{message}",
+  "--reason", "{reason}",
+]
+params    = { first = "string", last = "string", message = "string", reason = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "30m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name          = "squash apply"
+class         = "program"
+purpose       = "Fold one proprietary period's commits into a single commit that names no confidential term."
+program       = "path:safegit"
+args          = [
+  "scrub", "squash", "--json", "--approve-consequential={token}", "--first", "{first}", "--last", "{last}",
+  "--message", "{message}", "--reason", "{reason}",
+]
+params        = { first = "string", last = "string", message = "string", reason = "string", token = "string" }
+dir           = "repo:cwd"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin         = "none"
+output        = "captured"
+unbounded     = true
+deadline      = "2h"
+consequential = true
+answer        = "exit-and-output"
+
+[[capability]]
+name     = "saferm-deletion"
+purpose  = "Delete files and directories with an audit trail and an undo, never with a plain removal."
+commands = [
+  "scaffold", "records migrate", "monorepo absorb", "monorepo add", "monorepo residue remove",
+  "monorepo extract", "monorepo init", "monorepo releasable rename", "monorepo sync",
+]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.resource]]
+name     = "home-directory"
+class    = "env"
+purpose  = "Let the program find its own login state and settings under the user's home directory."
+modes    = ["read"]
+variable = "HOME"
+
+[[capability.effect]]
+name      = "file delete"
+class     = "program"
+purpose   = "Archive a workflow file the routers no longer use, refusing when it is already gone."
+program   = "path:saferm"
+args      = [
+  "delete", "--no-recursive", "--no-ignore-missing", "--no-interactive", "--no-update-git-index",
+  "--description", "{description}", "--on-error", "abort", "--", "{path}",
+]
+params    = { description = "string", path = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "leftover delete"
+class     = "program"
+purpose   = "Archive a scaffolded file, merge base, or validation cache that may already be gone."
+program   = "path:saferm"
+args      = [
+  "delete", "--no-recursive", "--ignore-missing", "--no-interactive", "--no-update-git-index", "--description",
+  "{description}", "--on-error", "abort", "--", "{path}",
+]
+params    = { description = "string", path = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "tree delete"
+class     = "program"
+purpose   = "Archive the old layout's directories a conversion replaced."
+program   = "path:saferm"
+args      = [
+  "delete", "--recursive", "--no-ignore-missing", "--no-interactive", "--no-update-git-index", "--description",
+  "{description}", "--on-error", "abort", "--", "{path}",
+]
+params    = { description = "string", path = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "leftover-tree delete"
+class     = "program"
+purpose   = "Archive old-layout residue directories that may already be gone."
+program   = "path:saferm"
+args      = [
+  "delete", "--recursive", "--ignore-missing", "--no-interactive", "--no-update-git-index", "--description",
+  "{description}", "--on-error", "abort", "--", "{path}",
+]
+params    = { description = "string", path = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "program version"
+class     = "program"
+purpose   = "Refuse a conversion before anything is written when saferm cannot be run."
+program   = "path:saferm"
+args      = ["--version"]
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15s"
+answer    = "exit-and-output"
+
+[[capability]]
+name     = "docs-generation"
+purpose  = "Ship each release with documentation selfdoc generated and checked for the version being released."
+commands = ["monorepo release run", "release resume", "release run"]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.resource]]
+name     = "home-directory"
+class    = "env"
+purpose  = "Let the program find its own login state and settings under the user's home directory."
+modes    = ["read"]
+variable = "HOME"
+
+[[capability.effect]]
+name      = "docs generate"
+class     = "program"
+purpose   = "Generate the member's documentation stamped with the version the release is about to ship."
+program   = "path:selfdoc"
+args      = ["gen", "--no-auto-commit", "--version-override", "{version}"]
+params    = { version = "string", member = "string" }
+dir       = "gitdir:cwd/rlsbl/release-checkout"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "15m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "docs check"
+class     = "program"
+purpose   = "Stop the release before anything is committed when the member's documentation fails selfdoc's checks."
+program   = "path:selfdoc"
+args      = ["check", "--version-override", "{version}"]
+params    = { version = "string", member = "string" }
+dir       = "gitdir:cwd/rlsbl/release-checkout"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "15m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "program version"
+class     = "program"
+purpose   = "Refuse a release that declares documentation when selfdoc cannot be run."
+program   = "path:selfdoc"
+args      = ["--version"]
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15s"
+answer    = "exit-and-output"
+
+[[capability]]
+name     = "github-reading"
+purpose  = "Read releases, workflow runs, repository settings, and visibility from GitHub through gh, which keeps the credential to itself."
+commands = [
+  "check", "failing-checks list", "discover", "scaffold", "watch", "changelog amend", "changelog edit",
+  "changelog remove", "records migrate", "monorepo absorb", "monorepo add", "monorepo extract", "monorepo init",
+  "monorepo releasable rename", "monorepo sync", "monorepo release run", "release abandon", "release backfill",
+  "release deprecate", "release edit", "release reconcile", "release resume", "release retract",
+  "release retry", "release run", "release scrub", "release undo", "release yank", "secrets npm-token sync",
+  "transition classify", "transition declassify", "transition show",
+]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.resource]]
+name     = "home-directory"
+class    = "env"
+purpose  = "Let the program find its own login state and settings under the user's home directory."
+modes    = ["read"]
+variable = "HOME"
+
+[[capability.effect]]
+name      = "api get"
+class     = "program"
+purpose   = "Read repository metadata, topics, permissions, secrets' presence, run jobs, and search results from GitHub's REST API."
+program   = "path:gh"
+args      = ["api", "--method", "GET", "{args...}"]
+params    = { args = { type = "string", list = true } }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "2m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "release show"
+class     = "program"
+purpose   = "Read one GitHub Release's tag, body, author, or publication time."
+program   = "path:gh"
+args      = ["release", "view", "{args...}"]
+params    = { args = { type = "string", list = true } }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "2m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "releases list"
+class     = "program"
+purpose   = "List the GitHub Releases a reconcile or undo judges against the records."
+program   = "path:gh"
+args      = ["release", "list", "{args...}"]
+params    = { args = { type = "string", list = true } }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "2m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "runs list"
+class     = "program"
+purpose   = "Find the workflow runs a commit or tag started."
+program   = "path:gh"
+args      = ["run", "list", "{args...}"]
+params    = { args = { type = "string", list = true } }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "2m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "run show"
+class     = "program"
+purpose   = "Read one workflow run's state and conclusion."
+program   = "path:gh"
+args      = ["run", "view", "{args...}"]
+params    = { args = { type = "string", list = true } }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "2m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "run watch"
+class     = "program"
+purpose   = "Wait for one workflow run to conclude before judging the release candidate."
+program   = "path:gh"
+args      = ["run", "watch", "{run-id}", "--repo", "{repo}", "--exit-status"]
+params    = { run-id = "string", repo = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "1h"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "workflows list"
+class     = "program"
+purpose   = "List the workflows a retry may dispatch."
+program   = "path:gh"
+args      = ["workflow", "list", "{args...}"]
+params    = { args = { type = "string", list = true } }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "2m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "credential check"
+class     = "program"
+purpose   = "Refuse early when gh holds no valid credential for github.com."
+program   = "path:gh"
+args      = ["auth", "status", "--hostname", "github.com"]
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "30s"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "program version"
+class     = "program"
+purpose   = "Refuse early when the gh command line cannot be run."
+program   = "path:gh"
+args      = ["--version"]
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15s"
+answer    = "exit-and-output"
+
+[[capability]]
+name     = "github-writing"
+purpose  = "Make GitHub's releases, workflow runs, topics, secrets, and visibility agree with what the records say was released."
+commands = [
+  "scaffold", "watch", "changelog amend", "changelog edit", "changelog remove", "monorepo absorb",
+  "monorepo add", "monorepo extract", "monorepo release run", "release deprecate", "release edit",
+  "release reconcile", "release resume", "release retract", "release retry", "release run", "release scrub",
+  "release undo", "release yank", "secrets npm-token sync", "transition declassify",
+]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.resource]]
+name     = "home-directory"
+class    = "env"
+purpose  = "Let the program find its own login state and settings under the user's home directory."
+modes    = ["read"]
+variable = "HOME"
+
+[[capability.effect]]
+name          = "release create"
+class         = "program"
+purpose       = "Publish the GitHub Release of a version from the notes its changelog holds."
+program       = "path:gh"
+args          = [
+  "release", "create", "{tag}", "--repo", "{repo}", "--title", "{title}", "--notes-file", "-", "--verify-tag",
+  "{flags...}",
+]
+params        = { tag = "string", repo = "string", title = "string", flags = { type = "string", list = true }, notes = "string" }
+dir           = "repo:cwd"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin         = "param:notes"
+output        = "passed"
+unbounded     = true
+deadline      = "2m"
+consequential = true
+answer        = "exit"
+
+[[capability.effect]]
+name      = "release edit"
+class     = "program"
+purpose   = "Rewrite a GitHub Release's notes, notices, and pre-release flag from the record."
+program   = "path:gh"
+args      = ["release", "edit", "{tag}", "--repo", "{repo}", "--notes-file", "-", "{flags...}"]
+params    = { tag = "string", repo = "string", flags = { type = "string", list = true }, notes = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "param:notes"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name          = "release delete"
+class         = "program"
+purpose       = "Take down the GitHub Release of a version that was undone or retracted."
+program       = "path:gh"
+args          = ["release", "delete", "{tag}", "--repo", "{repo}", "--yes"]
+params        = { tag = "string", repo = "string" }
+dir           = "repo:cwd"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin         = "none"
+output        = "passed"
+unbounded     = true
+deadline      = "2m"
+consequential = true
+answer        = "exit"
+
+[[capability.effect]]
+name      = "run rerun"
+class     = "program"
+purpose   = "Run a workflow run again, or only its failed jobs, after a failure outside the project."
+program   = "path:gh"
+args      = ["run", "rerun", "{run-id}", "--repo", "{repo}", "{flags...}"]
+params    = { run-id = "string", repo = "string", flags = { type = "string", list = true } }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name          = "workflow dispatch"
+class         = "program"
+purpose       = "Start a publish workflow again at the release tag for a release whose publishing never ran."
+program       = "path:gh"
+args          = ["workflow", "run", "{workflow}", "--repo", "{repo}", "--ref", "{ref}", "{inputs...}"]
+params        = { workflow = "string", repo = "string", ref = "string", inputs = { type = "string", list = true } }
+dir           = "repo:cwd"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin         = "none"
+output        = "passed"
+unbounded     = true
+deadline      = "2m"
+consequential = true
+answer        = "exit"
+
+[[capability.effect]]
+name      = "topics replace"
+class     = "program"
+purpose   = "Tag the repository with the rlsbl topic so the ecosystem's repositories can be discovered."
+program   = "path:gh"
+args      = ["api", "--method", "PUT", "{path}", "{fields...}"]
+params    = { path = "string", fields = { type = "string", list = true } }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name          = "secret set"
+class         = "program"
+purpose       = "Replace a repository's Actions secret with the token CI publishes with, piped so it never appears in an argument."
+program       = "path:gh"
+args          = ["secret", "set", "{name}", "--repo", "{repo}"]
+params        = { name = "string", repo = "string", value = { type = "string", secret = true } }
+dir           = "repo:cwd"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin         = "param:value"
+output        = "passed"
+unbounded     = true
+deadline      = "2m"
+consequential = true
+answer        = "exit"
+
+[[capability.effect]]
+name          = "visibility change"
+class         = "program"
+purpose       = "Make a declassified repository public once its proprietary history is squashed and pushed."
+program       = "path:gh"
+args          = ["repo", "edit", "{repo}", "--visibility", "public", "--accept-visibility-change-consequences"]
+params        = { repo = "string" }
+dir           = "repo:cwd"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin         = "none"
+output        = "passed"
+unbounded     = true
+deadline      = "2m"
+consequential = true
+answer        = "exit"
+
+[[capability]]
+name     = "registry-reading"
+purpose  = "Ask npm, PyPI, and the Go module proxy what they list, through the package-level documents that never name one unpublished version."
+commands = [
+  "check", "failing-checks list", "name check", "name claim", "status show", "monorepo names check",
+  "monorepo release run", "release resume", "release run", "release undo", "release yank",
+  "uv-path-sources rewrite",
+]
+
+[[capability.effect]]
+name               = "npm-package fetch"
+class              = "http"
+purpose            = "Learn which versions of an npm package exist, or that the name is unregistered."
+method             = "GET"
+url                = "https://registry.npmjs.org/{name}"
+params             = { name = "string" }
+headers            = [
+  { name = "Accept", value = "application/vnd.npm.install-v1+json" },
+]
+error-status-fails = false
+read               = true
+deadline           = "30s"
+answer             = "registry-answer"
+
+[[capability.effect]]
+name               = "npm-names search"
+class              = "http"
+purpose            = "Find registered npm names that collide with a candidate after normalization."
+method             = "GET"
+url                = "https://registry.npmjs.org/-/v1/search?text={text}&size=20"
+params             = { text = "string" }
+error-status-fails = false
+read               = true
+deadline           = "30s"
+answer             = "registry-answer"
+
+[[capability.effect]]
+name               = "pypi-project fetch"
+class              = "http"
+purpose            = "Learn which releases of a PyPI project exist and whether their files are yanked."
+method             = "GET"
+url                = "https://pypi.org/pypi/{name}/json"
+params             = { name = "string" }
+error-status-fails = false
+read               = true
+deadline           = "30s"
+answer             = "registry-answer"
+
+[[capability.effect]]
+name               = "pypi-index fetch"
+class              = "http"
+purpose            = "Learn whether a PyPI name is registered even when it has no release."
+method             = "GET"
+url                = "https://pypi.org/simple/{name}/"
+params             = { name = "string" }
+error-status-fails = false
+read               = true
+deadline           = "30s"
+answer             = "registry-answer"
+
+[[capability.effect]]
+name               = "go-versions list"
+class              = "http"
+purpose            = "Learn which versions of a Go module the proxy serves."
+method             = "GET"
+url                = "https://proxy.golang.org/{module}/@v/list"
+params             = { module = "string" }
+error-status-fails = false
+read               = true
+deadline           = "30s"
+answer             = "registry-answer"
+
+[[capability.effect]]
+name               = "go-module-file fetch"
+class              = "http"
+purpose            = "Read the go.mod of a version the proxy already lists."
+method             = "GET"
+url                = "https://proxy.golang.org/{module}/@v/{version}.mod"
+params             = { module = "string", version = "string" }
+error-status-fails = false
+read               = true
+deadline           = "30s"
+answer             = "registry-answer"
+
+[[capability.effect]]
+name    = "rate-limit wait"
+class   = "timer"
+purpose = "Wait out a registry's rate limit before asking it again."
+
+[[capability.effect]]
+name    = "request-spacing wait"
+class   = "timer"
+purpose = "Space consecutive name checks so a registry is not asked faster than the caller allowed."
+
+[[capability]]
+name     = "go-proxy-publishing"
+purpose  = "Publish a retraction by making the Go module proxy fetch the new version, which it then serves for good."
+commands = ["release retract"]
+
+[[capability.effect]]
+name               = "go-version request"
+class              = "http"
+purpose            = "Make the proxy fetch the retraction version whose tag was just pushed, which publishes the retraction."
+method             = "GET"
+url                = "https://proxy.golang.org/{module}/@v/{version}.info"
+params             = { module = "string", version = "string" }
+error-status-fails = false
+read               = false
+deadline           = "2m"
+consequential      = true
+answer             = "registry-answer"
+
+[[capability]]
+name     = "npm-credentials"
+purpose  = "Use the npm token kept in the user's npm login file without ever printing it or passing it as an argument."
+commands = [
+  "check", "failing-checks list", "name claim", "monorepo release run", "release resume", "release run",
+  "secrets npm-token sync",
+]
+
+[[capability.resource]]
+name    = "npm-login"
+class   = "file"
+purpose = "Take the registry token npm itself publishes with from the user's login file."
+scope   = "home/.npmrc"
+match   = "exact"
+modes   = ["read"]
+secret  = true
+
+[[capability.resource]]
+name     = "npm-token"
+class    = "env"
+purpose  = "Prefer the npm token the caller exported over the one in the login file."
+modes    = ["read"]
+variable = "NPM_TOKEN"
+secret   = true
+
+[[capability.effect]]
+name               = "npm-user show"
+class              = "http"
+purpose            = "Refuse to copy or publish with a token npm does not accept, naming the user it authenticates."
+method             = "GET"
+url                = "https://registry.npmjs.org/-/whoami"
+headers            = [
+  { name = "Authorization", secret = "env:NPM_TOKEN" },
+]
+error-status-fails = false
+read               = true
+deadline           = "30s"
+answer             = "registry-answer"
+
+[[capability]]
+name     = "pypi-credentials"
+purpose  = "Publish a placeholder to PyPI with the token the caller exported or keeps in the PyPI login file."
+commands = ["name claim"]
+
+[[capability.resource]]
+name    = "pypi-login"
+class   = "file"
+purpose = "Take the PyPI token from the user's login file when none is exported."
+scope   = "home/.pypirc"
+match   = "exact"
+modes   = ["read"]
+secret  = true
+
+[[capability.resource]]
+name     = "uv-publish-token"
+class    = "env"
+purpose  = "Prefer the token uv's own variable names."
+modes    = ["read"]
+variable = "UV_PUBLISH_TOKEN"
+secret   = true
+
+[[capability.resource]]
+name     = "pypi-token"
+class    = "env"
+purpose  = "Accept the token under the name CI conventionally exports it."
+modes    = ["read"]
+variable = "PYPI_TOKEN"
+secret   = true
+
+[[capability]]
+name     = "package-publishing"
+purpose  = "Publish a released version to the registries the releasable's local pipelines name, or withdraw it the way each registry allows."
+commands = ["monorepo release run", "release resume", "release run", "release yank"]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.resource]]
+name     = "home-directory"
+class    = "env"
+purpose  = "Let the program find its own login state and settings under the user's home directory."
+modes    = ["read"]
+variable = "HOME"
+
+[[capability.effect]]
+name          = "npm-package publish"
+class         = "program"
+purpose       = "Publish the member's npm package for the version just tagged."
+program       = "path:npm"
+args          = ["publish", "--access", "public"]
+params        = { member = "string", token = { type = "string", secret = true } }
+dir           = "repo:cwd"
+dir-below     = "param:member"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+  { name = "NPM_TOKEN", from = "param:token" },
+]
+stdin         = "none"
+output        = "passed"
+unbounded     = true
+deadline      = "5m"
+consequential = true
+answer        = "exit"
+
+[[capability.effect]]
+name      = "python-package build"
+class     = "program"
+purpose   = "Build the member's sdist and wheel that the PyPI upload sends."
+program   = "path:uv"
+args      = ["build"]
+params    = { member = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "5m"
+answer    = "exit"
+
+[[capability.effect]]
+name          = "python-package publish"
+class         = "program"
+purpose       = "Upload the member's built distributions to PyPI, skipping files PyPI already holds."
+program       = "path:uv"
+args          = ["publish", "--check-url", "https://pypi.org/simple/"]
+params        = { member = "string", token = { type = "string", secret = true } }
+dir           = "repo:cwd"
+dir-below     = "param:member"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+  { name = "UV_PUBLISH_TOKEN", from = "param:token" },
+]
+stdin         = "none"
+output        = "passed"
+unbounded     = true
+deadline      = "5m"
+consequential = true
+answer        = "exit"
+
+[[capability.effect]]
+name          = "go-proxy notify"
+class         = "program"
+purpose       = "Make the Go module proxy fetch the version just tagged so it is served at once."
+program       = "path:go"
+args          = ["list", "-json", "-m", "{ref}"]
+params        = { member = "string", ref = "string" }
+dir           = "repo:cwd"
+dir-below     = "param:member"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+  { name = "GOPROXY", value = "proxy.golang.org" },
+]
+stdin         = "none"
+output        = "passed"
+unbounded     = true
+deadline      = "5m"
+consequential = true
+answer        = "exit"
+
+[[capability.effect]]
+name      = "go-binaries install"
+class     = "program"
+purpose   = "Install the released main packages on this machine as the go pipeline declares."
+program   = "path:go"
+args      = ["install", "{package}"]
+params    = { member = "string", package = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "5m"
+answer    = "exit"
+
+[[capability.effect]]
+name          = "npm-version deprecate"
+class         = "program"
+purpose       = "Mark a yanked npm version deprecated with the yank notice."
+program       = "path:npm"
+args          = ["deprecate", "{spec}", "{message}"]
+params        = { member = "string", spec = "string", message = "string" }
+dir           = "repo:cwd"
+dir-below     = "param:member"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin         = "none"
+output        = "passed"
+unbounded     = true
+deadline      = "2m"
+consequential = true
+answer        = "exit"
+
+[[capability]]
+name     = "name-claiming"
+purpose  = "Hold a package name on npm or PyPI by publishing a version 0.0.0 placeholder built in a scratch directory."
+commands = ["name claim"]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.resource]]
+name     = "home-directory"
+class    = "env"
+purpose  = "Let the program find its own login state and settings under the user's home directory."
+modes    = ["read"]
+variable = "HOME"
+
+[[capability.resource]]
+name    = "placeholder-package"
+class   = "directory"
+purpose = "Build the placeholder's manifest and module where nothing of the user's is touched."
+scope   = "tmp"
+match   = "subtree"
+modes   = ["mkdir", "create", "delete"]
+
+[[capability.effect]]
+name          = "npm-placeholder publish"
+class         = "program"
+purpose       = "Register the name on npm with a placeholder nobody can take back."
+program       = "path:npm"
+args          = ["publish", "--access", "public"]
+params        = { package = "string", token = { type = "string", secret = true } }
+dir           = "tmp"
+dir-below     = "param:package"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+  { name = "NPM_TOKEN", from = "param:token" },
+]
+stdin         = "none"
+output        = "passed"
+unbounded     = true
+deadline      = "10m"
+consequential = true
+answer        = "exit"
+
+[[capability.effect]]
+name      = "pypi-placeholder build"
+class     = "program"
+purpose   = "Build the placeholder's distributions for the PyPI upload."
+program   = "path:uv"
+args      = ["build"]
+params    = { package = "string" }
+dir       = "tmp"
+dir-below = "param:package"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "10m"
+answer    = "exit"
+
+[[capability.effect]]
+name          = "pypi-placeholder publish"
+class         = "program"
+purpose       = "Register the name on PyPI with a placeholder nobody can take back."
+program       = "path:uv"
+args          = ["publish"]
+params        = { package = "string", token = { type = "string", secret = true } }
+dir           = "tmp"
+dir-below     = "param:package"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+  { name = "UV_PUBLISH_TOKEN", from = "param:token" },
+]
+stdin         = "none"
+output        = "passed"
+unbounded     = true
+deadline      = "10m"
+consequential = true
+answer        = "exit"
+
+[[capability]]
+name     = "build-verification"
+purpose  = "Verify before anything is pushed that every member builds, packs, tidies, lints, and tests the way CI and the registries will."
+commands = ["check", "failing-checks list", "monorepo release run", "release resume", "release run"]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.resource]]
+name     = "home-directory"
+class    = "env"
+purpose  = "Let the program find its own login state and settings under the user's home directory."
+modes    = ["read"]
+variable = "HOME"
+
+[[capability.resource]]
+name    = "build-scratch"
+class   = "directory"
+purpose = "Hold the distributions an upload check builds and inspects, apart from the project."
+scope   = "tmp"
+match   = "subtree"
+modes   = ["read", "list", "stat", "mkdir", "create", "delete"]
+
+[[capability.effect]]
+name      = "python-sync preview"
+class     = "program"
+purpose   = "Learn whether the members' Python environment resolves from the lockfile without changing it."
+program   = "path:uv"
+args      = ["sync", "{scope...}", "--dry-run"]
+params    = { member = "string", scope = { type = "string", list = true } }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "npm-pack preview"
+class     = "program"
+purpose   = "List the files an npm upload would carry so private paths are refused before publishing."
+program   = "path:npm"
+args      = ["pack", "--dry-run", "--json", "--ignore-scripts", "--offline", "--logs-max=0"]
+params    = { member = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "python-artifacts build"
+class     = "program"
+purpose   = "Build the distributions a PyPI upload would carry so private paths are refused before publishing."
+program   = "path:uv"
+args      = ["build", "--out-dir", "{out}"]
+params    = { member = "string", out = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "15m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "go-packages list"
+class     = "program"
+purpose   = "Find the main packages and strictcli programs a Go module holds."
+program   = "path:go"
+args      = ["list", "-e", "-f", "{{.Name}}\t{{.ImportPath}}\t{{.Dir}}", "./..."]
+params    = { member = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "go-build-list show"
+class     = "program"
+purpose   = "Read the module graph a Go member builds with, to check its requirements' versions."
+program   = "path:go"
+args      = ["list", "-m", "-json", "all"]
+params    = { member = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "go-dependencies list"
+class     = "program"
+purpose   = "List what a published Go binary links, to refuse private paths it would carry."
+program   = "path:go"
+args      = ["list", "-deps", "-json", "{packages...}"]
+params    = { member = "string", packages = { type = "string", list = true } }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "go-tidy preview"
+class     = "program"
+purpose   = "Refuse a release whose go.mod or go.sum is not tidy."
+program   = "path:go"
+args      = ["mod", "tidy", "-diff"]
+params    = { member = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "go-module show"
+class     = "program"
+purpose   = "Read a member's go.mod as Go itself parses it."
+program   = "path:go"
+args      = ["mod", "edit", "-json"]
+params    = { member = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "2m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "go-workspace show"
+class     = "program"
+purpose   = "Read the go.work the repository tracks as Go itself parses it."
+program   = "path:go"
+args      = ["work", "edit", "-json"]
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "2m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "strictcode-rules list"
+class     = "program"
+purpose   = "Learn which strictcode rules the strictcode check judges."
+program   = "path:strictcode"
+args      = ["registry", "rules", "--json"]
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "strictcode analysis run"
+class     = "program"
+purpose   = "Run the project's strictcode rules and report their findings as a check."
+program   = "path:strictcode"
+args      = ["analyze", "{root}", "--json"]
+params    = { root = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "npm-tokens list"
+class     = "program"
+purpose   = "Learn when the npm token was created, to judge whether CI's secret is older."
+program   = "path:npm"
+args      = ["token", "list", "--json"]
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "2m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "external-check run"
+class     = "program"
+purpose   = "Run a check command the releasables file declares for a member."
+program   = "path:sh"
+args      = ["-c", "{command}"]
+params    = { member = "string", command = "string", root = "string", last-tag = "string", range = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+  { name = "RLSBL_PROJECT_ROOT", from = "param:root" },
+  { name = "RLSBL_LAST_TAG", from = "param:last-tag" },
+  { name = "RLSBL_UNRELEASED_RANGE", from = "param:range" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "test-suite run"
+class     = "program"
+purpose   = "Run a member's tests the way its test runner declaration says, before a release."
+program   = "path:sh"
+args      = ["-c", "{command}"]
+params    = { member = "string", command = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "15m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "artifact secrets scan"
+class     = "program"
+purpose   = "Refuse to push or publish built artifacts that carry a secret."
+program   = "path:gitleaks"
+args      = ["dir", "{dir}", "{config...}"]
+params    = { dir = "string", config = { type = "string", list = true } }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "uv version"
+class     = "program"
+purpose   = "Name the uv the release ran with in the release's record."
+program   = "path:uv"
+args      = ["--version"]
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15s"
+answer    = "exit-and-output"
+
+[[capability]]
+name     = "lockfile-refresh"
+purpose  = "Keep every tracked lockfile in step with the manifests the release just changed, before the release commit."
+commands = ["monorepo release run", "release resume", "release run"]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.resource]]
+name     = "home-directory"
+class    = "env"
+purpose  = "Let the program find its own login state and settings under the user's home directory."
+modes    = ["read"]
+variable = "HOME"
+
+[[capability.effect]]
+name      = "uv-lock refresh"
+class     = "program"
+purpose   = "Record the bumped versions of workspace members in uv.lock."
+program   = "path:uv"
+args      = ["lock"]
+params    = { member = "string" }
+dir       = "gitdir:cwd/rlsbl/release-checkout"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "5m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "npm-lock refresh"
+class     = "program"
+purpose   = "Record the bumped versions in package-lock.json without installing anything."
+program   = "path:npm"
+args      = ["install", "--package-lock-only", "--ignore-scripts"]
+params    = { member = "string" }
+dir       = "gitdir:cwd/rlsbl/release-checkout"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "5m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "go-sum refresh"
+class     = "program"
+purpose   = "Keep go.sum in step with the requirements the release changed."
+program   = "path:go"
+args      = ["mod", "tidy"]
+params    = { member = "string" }
+dir       = "gitdir:cwd/rlsbl/release-checkout"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "5m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "go-work-sum refresh"
+class     = "program"
+purpose   = "Keep go.work.sum in step with the workspace's modules."
+program   = "path:go"
+args      = ["work", "sync"]
+params    = { member = "string" }
+dir       = "gitdir:cwd/rlsbl/release-checkout"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "5m"
+answer    = "exit-and-output"
+
+[[capability]]
+name     = "help-documents"
+purpose  = "Ship the strictcli help document of every member that is a strictcli program, stamped with the version being released."
+commands = ["monorepo release run", "release resume", "release run"]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.resource]]
+name     = "home-directory"
+class    = "env"
+purpose  = "Let the program find its own login state and settings under the user's home directory."
+modes    = ["read"]
+variable = "HOME"
+
+[[capability.effect]]
+name      = "python-help-document print"
+class     = "program"
+purpose   = "Print a Python strictcli program's help document for the release to commit."
+program   = "path:uv"
+args      = ["run", "{entry}", "help", "--json"]
+params    = { member = "string", entry = "string" }
+dir       = "gitdir:cwd/rlsbl/release-checkout"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "go-help-document print"
+class     = "program"
+purpose   = "Print a Go strictcli program's help document for the release to commit."
+program   = "path:go"
+args      = ["run", "{entry}", "help", "--json"]
+params    = { member = "string", entry = "string" }
+dir       = "gitdir:cwd/rlsbl/release-checkout"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "typescript-help-document print"
+class     = "program"
+purpose   = "Print a TypeScript strictcli program's help document for the release to commit."
+program   = "path:node"
+args      = ["{entry}", "help", "--json"]
+params    = { member = "string", entry = "string" }
+dir       = "gitdir:cwd/rlsbl/release-checkout"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15m"
+answer    = "exit-and-output"
+
+[[capability]]
+name     = "release-hooks"
+purpose  = "Run the commands the releasables file declares at a release's hook points and for a server's deploy."
+commands = ["monorepo release run", "release resume", "release run"]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.resource]]
+name     = "home-directory"
+class    = "env"
+purpose  = "Let the program find its own login state and settings under the user's home directory."
+modes    = ["read"]
+variable = "HOME"
+
+[[capability.effect]]
+name      = "hook run"
+class     = "program"
+purpose   = "Run one declared hook with the release's environment at its point of the release."
+program   = "path:bash"
+args      = ["-c", "{command}"]
+params    = { member = "string", command = "string", version = "string", bump = "string", previous = "string", description = "string", package = "string", release-bin = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+  { name = "RLSBL_VERSION", from = "param:version" },
+  { name = "RLSBL_BUMP_TYPE", from = "param:bump" },
+  { name = "RLSBL_PREV_VERSION", from = "param:previous" },
+  { name = "RLSBL_DESCRIPTION", from = "param:description" },
+  { name = "RLSBL_PACKAGE", from = "param:package" },
+  { name = "RLSBL_RELEASE_BIN", from = "param:release-bin" },
+  { name = "GOWORK", value = "off" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "24h"
+answer    = "exit"
+
+[[capability.effect]]
+name          = "deploy run"
+class         = "program"
+purpose       = "Deploy a server releasable's released version with the command its declaration names."
+program       = "path:env"
+args          = ["{command...}"]
+params        = { command = { type = "string", list = true } }
+dir           = "repo:cwd"
+env           = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin         = "none"
+output        = "passed"
+unbounded     = true
+deadline      = "15m"
+consequential = true
+answer        = "exit"
+
+[[capability]]
+name     = "developer-installs"
+purpose  = "Install projects for local development the way their release targets install them, and overlay editable sibling checkouts."
+commands = ["dev install", "dev sync"]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.resource]]
+name     = "home-directory"
+class    = "env"
+purpose  = "Let the program find its own login state and settings under the user's home directory."
+modes    = ["read"]
+variable = "HOME"
+
+[[capability.resource]]
+name     = "uv-no-sync"
+class    = "env"
+purpose  = "Refuse to overlay checkouts that a bare uv run would immediately sync away."
+modes    = ["read"]
+variable = "UV_NO_SYNC"
+
+[[capability.resource]]
+name     = "uv-environment"
+class    = "env"
+purpose  = "Find the member's environment where uv was told to keep it."
+modes    = ["read"]
+variable = "UV_PROJECT_ENVIRONMENT"
+
+[[capability.effect]]
+name      = "python-tool install"
+class     = "program"
+purpose   = "Install a Python project as an editable tool on this machine."
+program   = "path:uv"
+args      = ["tool", "install", "-e", "."]
+params    = { member = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "5m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "python-tool uninstall"
+class     = "program"
+purpose   = "Remove a Python tool an earlier global install put on this machine."
+program   = "path:uv"
+args      = ["tool", "uninstall", "{name}"]
+params    = { member = "string", name = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "5m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "python-environment sync"
+class     = "program"
+purpose   = "Install the project into its own locked environment, leaving overlaid packages out when overlays are kept."
+program   = "path:uv"
+args      = ["sync", "{options...}"]
+params    = { member = "string", options = { type = "string", list = true }, environment = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+  { name = "VIRTUAL_ENV", from = "param:environment" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "5m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "editable-checkout install"
+class     = "program"
+purpose   = "Overlay one sibling checkout as an editable package in the member's environment."
+program   = "path:uv"
+args      = ["pip", "install", "-e", "{checkout}"]
+params    = { member = "string", checkout = "string", environment = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+  { name = "VIRTUAL_ENV", from = "param:environment" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "5m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "npm-package link"
+class     = "program"
+purpose   = "Make an npm package's commands available on this machine from its checkout."
+program   = "path:npm"
+args      = ["link"]
+params    = { member = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "5m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "npm-package unlink"
+class     = "program"
+purpose   = "Remove the global link an earlier npm link made."
+program   = "path:npm"
+args      = ["unlink"]
+params    = { member = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "5m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "npm-dependencies install"
+class     = "program"
+purpose   = "Install an npm package's dependencies into its own node_modules."
+program   = "path:npm"
+args      = ["install"]
+params    = { member = "string" }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "5m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "go-programs install"
+class     = "program"
+purpose   = "Install a Go module's declared main packages on this machine."
+program   = "path:go"
+args      = ["install", "{packages...}"]
+params    = { member = "string", packages = { type = "string", list = true } }
+dir       = "repo:cwd"
+dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "5m"
+answer    = "exit"
+
+[[capability]]
+name     = "history-absorption"
+purpose  = "Move an outside project's history into the workspace through git-filter-repo on a private clone, leaving the source repository unchanged."
+commands = ["monorepo absorb"]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.resource]]
+name     = "home-directory"
+class    = "env"
+purpose  = "Let the program find its own login state and settings under the user's home directory."
+modes    = ["read"]
+variable = "HOME"
+
+[[capability.resource]]
+name    = "source-repository"
+class   = "directory"
+purpose = "Read the absorbed project's records, manifests, and version, which move into the workspace."
+scope   = "repo:arg:source-repo"
+match   = "subtree"
+modes   = ["read", "list", "stat"]
+
+[[capability.effect]]
+name      = "repository clone"
+class     = "program"
+purpose   = "Copy the history to rewrite into a clone that shares no objects with its source."
+program   = "path:git"
+args      = ["clone", "--quiet", "--no-local", "--", "{from}", "{to}"]
+params    = { from = "string", to = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "10m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "clone-identity set"
+class     = "program"
+purpose   = "Give the clone the committer identity its source has, which a clone does not carry."
+program   = "path:git"
+args      = ["config", "{key}", "{value}"]
+params    = { key = "string", value = "string", clone = "string" }
+dir       = "gitdir:cwd/rlsbl"
+dir-below = "param:clone"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "1m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "clone rewrite"
+class     = "program"
+purpose   = "Move the absorbed history under the member's directory in the private clone."
+program   = "path:git-filter-repo"
+args      = ["--to-subdirectory-filter", "{dest}", "--force"]
+params    = { dest = "string", clone = "string" }
+dir       = "gitdir:cwd/rlsbl"
+dir-below = "param:clone"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "1h"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "absorbed-history fetch"
+class     = "program"
+purpose   = "Bring the rewritten history into this repository without its tags."
+program   = "path:git"
+args      = ["fetch", "--quiet", "--no-tags", "{clone}"]
+params    = { clone = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "10m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "absorbed-history merge"
+class     = "program"
+purpose   = "Join the rewritten history to this one with trailers that let an interrupted absorb find the merge."
+program   = "path:git"
+args      = ["merge", "--quiet", "--allow-unrelated-histories", "-m", "{message}", "FETCH_HEAD"]
+params    = { message = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "10m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "filter-repo version"
+class     = "program"
+purpose   = "Refuse an absorb before anything is written when git-filter-repo is not installed."
+program   = "path:git-filter-repo"
+args      = ["--version"]
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15s"
+answer    = "exit-and-output"
+
+[[capability.read]]
+name       = "source-status inspect"
+class      = "program"
+purpose    = "Refuse to absorb a source repository with uncommitted changes."
+vocabulary = "git"
+args       = ["status", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:arg:source-repo"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "source-history show"
+class      = "program"
+purpose    = "Read the absorbed project's root commit and version tags."
+vocabulary = "git"
+args       = ["log", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:arg:source-repo"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "source-refs list"
+class      = "program"
+purpose    = "List the absorbed project's tags to recreate them under the releasable's scheme."
+vocabulary = "git"
+args       = ["for-each-ref", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "repo:arg:source-repo"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "source-settings show"
+class      = "program"
+purpose    = "Carry the source's committer identity into the clone."
+vocabulary = "git"
+args       = ["config", "--get", "{key}"]
+params     = { key = "string" }
+dir        = "repo:arg:source-repo"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability]]
+name     = "history-extraction"
+purpose  = "Move a releasable's history out of the workspace into a new repository through git-filter-repo on a fresh clone."
+commands = ["monorepo extract"]
+
+[[capability.resource]]
+name     = "search-path"
+class    = "env"
+purpose  = "Find the program by name the way a shell started from this session finds it."
+modes    = ["read"]
+variable = "PATH"
+
+[[capability.resource]]
+name     = "home-directory"
+class    = "env"
+purpose  = "Let the program find its own login state and settings under the user's home directory."
+modes    = ["read"]
+variable = "HOME"
+
+[[capability.resource]]
+name    = "extracted-repository"
+class   = "directory"
+purpose = "Write the extracted releasable's declarations, records, and moved files into the new repository."
+scope   = "arg:target-path"
+match   = "subtree"
+modes   = ["read", "list", "stat", "create", "replace", "overwrite", "delete", "rename", "mkdir", "chmod"]
+
+[[capability.effect]]
+name      = "repository clone"
+class     = "program"
+purpose   = "Copy this repository's history into the new repository's directory to rewrite there."
+program   = "path:git"
+args      = ["clone", "--quiet", "--no-local", "--", "{from}", "{to}"]
+params    = { from = "string", to = "string" }
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "10m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "target-identity set"
+class     = "program"
+purpose   = "Give the extracted repository the committer identity this one has."
+program   = "path:git"
+args      = ["config", "{key}", "{value}"]
+params    = { key = "string", value = "string" }
+dir       = "arg:target-path"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "1m"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "target rewrite"
+class     = "program"
+purpose   = "Keep only the departing members' history in the new repository, hoisting a lone member to its root."
+program   = "path:git-filter-repo"
+args      = ["{args...}", "--force"]
+params    = { args = { type = "string", list = true } }
+dir       = "arg:target-path"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "1h"
+answer    = "exit-and-output"
+
+[[capability.effect]]
+name      = "target-ref create"
+class     = "program"
+purpose   = "Create the extracted releasable's tags under the new repository's scheme."
+program   = "path:git"
+args      = ["update-ref", "{ref}", "{object}", "{absent}"]
+params    = { ref = "string", object = "string", absent = "string" }
+dir       = "arg:target-path"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "target-ref delete"
+class     = "program"
+purpose   = "Delete from the new repository the tags of releasables that stay behind."
+program   = "path:git"
+args      = ["update-ref", "-d", "{ref}", "{expected}"]
+params    = { ref = "string", expected = "string" }
+dir       = "arg:target-path"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "target-files commit"
+class     = "program"
+purpose   = "Commit the extracted releasable's declarations and records in the new repository."
+program   = "path:safegit"
+args      = [
+  "commit", "--no-amend", "--no-allow-empty", "--no-allow-non-portable-targets", "-m", "{message}", "--",
+  "{paths...}",
+]
+params    = { message = "string", paths = { type = "string", list = true } }
+dir       = "arg:target-path"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "2m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "filter-repo version"
+class     = "program"
+purpose   = "Refuse an extract before anything is written when git-filter-repo is not installed."
+program   = "path:git-filter-repo"
+args      = ["--version"]
+dir       = "repo:cwd"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "captured"
+unbounded = true
+deadline  = "15s"
+answer    = "exit-and-output"
+
+[[capability.read]]
+name       = "target-refs list"
+class      = "program"
+purpose    = "List the new repository's tags after the rewrite to rename or delete them."
+vocabulary = "git"
+args       = ["for-each-ref", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "arg:target-path"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability.read]]
+name       = "target-revisions resolve"
+class      = "program"
+purpose    = "Map each departing commit to its rewritten id in the new repository."
+vocabulary = "git"
+args       = ["rev-parse", "{args...}"]
+params     = { args = { type = "string", list = true } }
+dir        = "arg:target-path"
+env        = [
+  { name = "PATH", from = "env:PATH" },
+]
+answer     = "exit-and-output"
+
+[[capability]]
+name     = "committed-files"
+purpose  = "Commit only files that lie in the repository and that git does not ignore."
+commands = ["commit"]
+
+[[capability.resource]]
+name    = "named-files"
+class   = "file"
+purpose = "Refuse a named file outside the repository or one git ignores before safegit commits it."
+scope   = "arg:files"
+match   = "exact"
+modes   = ["stat"]
+
+[[capability]]
+name     = "commit-map-input"
+purpose  = "Repair changelog commit ids from the old-to-new map a rewrite printed."
+commands = ["changelog remap"]
+
+[[capability.resource]]
+name    = "map-file"
+class   = "file"
+purpose = "Take the old-to-new commit map from the file the caller names."
+scope   = "arg:map-file"
+match   = "exact"
+modes   = ["read"]
+
+[[capability]]
+name     = "license-mapping"
+purpose  = "Give every releasable a license the conversion can record, where its manifests state none."
+commands = ["records migrate"]
+
+[[capability.resource]]
+name    = "licenses-file"
+class   = "file"
+purpose = "Take the licenses the manifests do not state from the caller's mapping."
+scope   = "arg:licenses"
+match   = "exact"
+modes   = ["read"]
+
+[[capability]]
+name     = "description-overrides"
+purpose  = "Give reconstructed release archives the descriptions a person reviewed."
+commands = ["release backfill"]
+
+[[capability.resource]]
+name    = "overrides-file"
+class   = "file"
+purpose = "Take the reviewed descriptions of versions whose archives a backfill reconstructs."
+scope   = "arg:overrides"
+match   = "exact"
+modes   = ["read"]
+
+[[capability]]
+name     = "scrub-recipe"
+purpose  = "Refuse a recipe scrub whose recipe is missing before safegit is started."
+commands = ["release scrub"]
+
+[[capability.resource]]
+name    = "recipe-file"
+class   = "file"
+purpose = "Confirm the recipe the caller names exists and is a file."
+scope   = "arg:recipe"
+match   = "exact"
+modes   = ["stat"]
+
+[[capability]]
+name     = "graph-output"
+purpose  = "Leave the rendered dependency graph where the caller asked for it."
+commands = ["monorepo graph render"]
+
+[[capability.resource]]
+name    = "graph-file"
+class   = "file"
+purpose = "Write the DOT or tree rendering to the file the caller names."
+scope   = "arg:output"
+match   = "exact"
+modes   = ["create", "overwrite"]
+
+[[capability]]
+name     = "confidential-terms"
+purpose  = "Refuse to publish anything carrying a term of the owner's confidential-term list, decrypted in memory only."
+commands = [
+  "check", "failing-checks list", "changelog amend", "changelog edit", "changelog remove",
+  "confidential hit approve", "confidential hit dismiss", "monorepo release run", "release deprecate",
+  "release edit", "release reconcile", "release resume", "release retract", "release run", "release scrub",
+  "release yank", "transition declassify",
+]
+
+[[capability.resource]]
+name    = "term-list"
+class   = "file"
+purpose = "Load the age-encrypted list of terms that must not appear in anything public."
+scope   = "config:confidential-term-list"
+match   = "exact"
+modes   = ["read"]
+secret  = true
+
+[[capability.resource]]
+name    = "age-identity"
+class   = "file"
+purpose = "Decrypt the confidential-term list with the owner's age identity."
+scope   = "home/.age-key.txt"
+match   = "exact"
+modes   = ["read"]
+secret  = true
+
+[[capability]]
+name     = "utc-clock"
+purpose  = "Date the records, periods, archives, and run files every command writes or judges against today."
+commands = [
+  "check", "failing-checks list", "discover", "scaffold", "status show", "watch", "changelog add",
+  "changelog amend", "changelog edit", "changelog remove", "confidential hit approve",
+  "confidential hit dismiss", "records migrate", "monorepo absorb", "monorepo add", "monorepo extract",
+  "monorepo init", "monorepo releasable rename", "monorepo status show", "monorepo sync",
+  "monorepo release init", "monorepo release run", "release deprecate", "release edit", "release reconcile",
+  "release resume", "release retract", "release retry", "release run", "release scrub", "release undo",
+  "release yank", "project-name rewrite", "transition classify", "transition declassify",
+  "transition identity add", "transition license change", "transition lifecycle change", "transition show",
+  "transition unversioned-tag add",
+]
+
+[[capability.resource]]
+name    = "utc-clock"
+class   = "clock"
+purpose = "Learn today's date and the current time for lifecycle periods, archive names, and CI waits."
+modes   = ["read"]
+zone    = "utc"
+
+[[capability]]
+name     = "randomness"
+purpose  = "Mint identifiers no two runs or entries share."
+commands = [
+  "name claim", "changelog add", "changelog amend", "changelog edit", "changelog remove", "records migrate",
+  "monorepo absorb", "monorepo release run", "release resume", "release run",
+]
+
+[[capability.resource]]
+name    = "random-source"
+class   = "random"
+purpose = "Give changelog entries, transition events, and scratch package names identifiers that never collide."
+modes   = ["read"]
+
+[[capability]]
+name     = "hook-input"
+purpose  = "Take what git's hooks hand rlsbl, so the pre-push checks and the post-rewrite remap act on the refs and commits git names."
+commands = ["check", "failing-checks list", "changelog remap"]
+
+[[capability.resource]]
+name    = "post-rewrite-map"
+class   = "stdin"
+purpose = "Read the old-to-new commit lines git's post-rewrite hook pipes in."
+modes   = ["read"]
+
+[[capability.resource]]
+name     = "pushed-refs"
+class    = "env"
+purpose  = "Read the ref lines git gave the pre-push hook, which the push checks judge."
+modes    = ["read"]
+variable = "RLSBL_PUSH_STDIN"
+
+[[capability]]
+name     = "ci-waiting"
+purpose  = "Wait between looks at GitHub until workflow runs appear and conclude, or until registries list a published version."
+commands = ["watch", "monorepo release run", "release resume", "release retry", "release run"]
+
+[[capability.effect]]
+name    = "poll wait"
+class   = "timer"
+purpose = "Pause before asking GitHub or a registry again about a run or a version not visible yet."
+
+[[capability]]
+name     = "dev-overlays"
+purpose  = "Compare the overlays a member records with what its Python environment actually holds."
+commands = ["dev status show"]
+
+[[capability.resource]]
+name    = "member-environment"
+class   = "directory"
+purpose = "Read the dist-info metadata of overlaid packages in the member's virtual environment."
+scope   = "repo:cwd"
+match   = "subtree"
+modes   = ["read", "list", "stat"]
+
+[[capability.resource]]
+name     = "uv-environment"
+class    = "env"
+purpose  = "Find the member's environment where uv was told to keep it."
+modes    = ["read"]
+variable = "UV_PROJECT_ENVIRONMENT"
+
+[[budget]]
+command   = "check"
+allocated = "2GiB"
+effects   = 2000
+
+[[budget]]
+command   = "failing-checks list"
+allocated = "2GiB"
+effects   = 2000
+
+[[budget]]
+command   = "name check"
+allocated = "256MiB"
+effects   = 5000
+
+[[budget]]
+command   = "name claim"
+allocated = "256MiB"
+effects   = 200
+
+[[budget]]
+command   = "commit"
+allocated = "256MiB"
+effects   = 5
+
+[[budget]]
+command   = "discover"
+allocated = "256MiB"
+effects   = 20
+
+[[budget]]
+command   = "scaffold"
+allocated = "256MiB"
+effects   = 5000
+
+[[budget]]
+command   = "status show"
+allocated = "256MiB"
+effects   = 40
+
+[[budget]]
+command   = "targets list"
+allocated = "256MiB"
+effects   = 1
+
+[[budget]]
+command   = "unreleased-commits list"
+allocated = "512MiB"
+effects   = 1
+
+[[budget]]
+command   = "watch"
+allocated = "256MiB"
+effects   = 5000
+
+[[budget]]
+command   = "changelog add"
+allocated = "256MiB"
+effects   = 5
+
+[[budget]]
+command   = "changelog amend"
+allocated = "256MiB"
+effects   = 10
+
+[[budget]]
+command   = "changelog edit"
+allocated = "256MiB"
+effects   = 10
+
+[[budget]]
+command   = "changelog generate"
+allocated = "256MiB"
+effects   = 10
+
+[[budget]]
+command   = "changelog remap"
+allocated = "512MiB"
+effects   = 10
+
+[[budget]]
+command   = "changelog remove"
+allocated = "256MiB"
+effects   = 10
+
+[[budget]]
+command   = "confidential hit approve"
+allocated = "256MiB"
+effects   = 5
+
+[[budget]]
+command   = "confidential hit dismiss"
+allocated = "256MiB"
+effects   = 5
+
+[[budget]]
+command   = "dev install"
+allocated = "256MiB"
+effects   = 200
+
+[[budget]]
+command   = "dev status show"
+allocated = "256MiB"
+effects   = 1
+
+[[budget]]
+command   = "dev sync"
+allocated = "256MiB"
+effects   = 100
+
+[[budget]]
+command   = "records migrate"
+allocated = "1GiB"
+effects   = 2000
+
+[[budget]]
+command   = "monorepo absorb"
+allocated = "2GiB"
+effects   = 10000
+
+[[budget]]
+command   = "monorepo add"
+allocated = "256MiB"
+effects   = 5000
+
+[[budget]]
+command   = "monorepo names check"
+allocated = "256MiB"
+effects   = 5000
+
+[[budget]]
+command   = "monorepo residue remove"
+allocated = "256MiB"
+effects   = 500
+
+[[budget]]
+command   = "monorepo extract"
+allocated = "2GiB"
+effects   = 10000
+
+[[budget]]
+command   = "monorepo graph render"
+allocated = "256MiB"
+effects   = 2
+
+[[budget]]
+command   = "monorepo impact show"
+allocated = "256MiB"
+effects   = 1
+
+[[budget]]
+command   = "monorepo init"
+allocated = "256MiB"
+effects   = 20
+
+[[budget]]
+command   = "monorepo list"
+allocated = "256MiB"
+effects   = 1
+
+[[budget]]
+command   = "monorepo dependencies list"
+allocated = "256MiB"
+effects   = 1
+
+[[budget]]
+command   = "monorepo remove"
+allocated = "256MiB"
+effects   = 2
+
+[[budget]]
+command   = "monorepo releasable rename"
+allocated = "256MiB"
+effects   = 500
+
+[[budget]]
+command   = "monorepo status show"
+allocated = "512MiB"
+effects   = 1
+
+[[budget]]
+command   = "monorepo sync"
+allocated = "256MiB"
+effects   = 500
+
+[[budget]]
+command   = "monorepo release init"
+allocated = "256MiB"
+effects   = 5
+
+[[budget]]
+command   = "monorepo release order show"
+allocated = "256MiB"
+effects   = 1
+
+[[budget]]
+command   = "monorepo release run"
+allocated = "4GiB"
+effects   = 100000
+
+[[budget]]
+command   = "options registry show"
+allocated = "256MiB"
+effects   = 1
+
+[[budget]]
+command   = "options set"
+allocated = "256MiB"
+effects   = 5
+
+[[budget]]
+command   = "release abandon"
+allocated = "256MiB"
+effects   = 10
+
+[[budget]]
+command   = "release backfill"
+allocated = "256MiB"
+effects   = 5000
+
+[[budget]]
+command   = "release deprecate"
+allocated = "256MiB"
+effects   = 10
+
+[[budget]]
+command   = "release edit"
+allocated = "256MiB"
+effects   = 10
+
+[[budget]]
+command   = "release init"
+allocated = "256MiB"
+effects   = 5
+
+[[budget]]
+command   = "release reconcile"
+allocated = "256MiB"
+effects   = 10000
+
+[[budget]]
+command   = "release resume"
+allocated = "2GiB"
+effects   = 20000
+
+[[budget]]
+command   = "release retract"
+allocated = "256MiB"
+effects   = 500
+
+[[budget]]
+command   = "release retry"
+allocated = "256MiB"
+effects   = 3000
+
+[[budget]]
+command   = "release run"
+allocated = "2GiB"
+effects   = 20000
+
+[[budget]]
+command   = "release scrub"
+allocated = "2GiB"
+effects   = 20000
+
+[[budget]]
+command   = "release undo"
+allocated = "256MiB"
+effects   = 300
+
+[[budget]]
+command   = "release yank"
+allocated = "256MiB"
+effects   = 200
+
+[[budget]]
+command   = "go-module-path rewrite"
+allocated = "1GiB"
+effects   = 20000
+
+[[budget]]
+command   = "project-name rewrite"
+allocated = "1GiB"
+effects   = 20000
+
+[[budget]]
+command   = "uv-path-sources rewrite"
+allocated = "256MiB"
+effects   = 500
+
+[[budget]]
+command   = "secrets npm-token sync"
+allocated = "256MiB"
+effects   = 10000
+
+[[budget]]
+command   = "transition classify"
+allocated = "256MiB"
+effects   = 10
+
+[[budget]]
+command   = "transition declassify"
+allocated = "2GiB"
+effects   = 20000
+
+[[budget]]
+command   = "transition identity add"
+allocated = "256MiB"
+effects   = 5
+
+[[budget]]
+command   = "transition minimal-record init"
+allocated = "256MiB"
+effects   = 5
+
+[[budget]]
+command   = "transition license change"
+allocated = "256MiB"
+effects   = 5
+
+[[budget]]
+command   = "transition lifecycle change"
+allocated = "256MiB"
+effects   = 5
+
+[[budget]]
+command   = "transition show"
+allocated = "256MiB"
+effects   = 10
+
+[[budget]]
+command   = "transition unversioned-tag add"
+allocated = "256MiB"
+effects   = 5
+
+[[budget]]
+command   = "upstream tags adopt"
+allocated = "256MiB"
+effects   = 5000
