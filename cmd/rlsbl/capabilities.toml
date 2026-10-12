@@ -2154,6 +2154,35 @@ scope   = "tmp"
 match   = "subtree"
 modes   = ["read", "list", "stat", "mkdir", "create", "delete"]
 
+[[capability.resource]]
+name    = "releasables-declarations"
+class   = "structured"
+purpose = "Find the programs a member's external checks and declared Go test command name, which the declarations hold."
+scope   = "repo:cwd/.strictmetadata/releasables/releasables.toml"
+match   = "exact"
+modes   = ["read"]
+format  = "toml"
+
+[[capability.read]]
+name        = "check-program resolve"
+class       = "structured"
+purpose     = "Resolve the program an external check runs from the first element of its command list."
+resource    = "releasables-declarations"
+key         = "members.external_checks.command"
+answer      = "path"
+relative-to = "repo:cwd"
+resolves    = true
+
+[[capability.read]]
+name        = "test-program resolve"
+class       = "structured"
+purpose     = "Resolve the program a member's declared Go test command runs from the first element of its go_command list."
+resource    = "releasables-declarations"
+key         = "members.test.go_command"
+answer      = "path"
+relative-to = "repo:cwd"
+resolves    = true
+
 [[capability.effect]]
 name      = "python-sync preview"
 class     = "program"
@@ -2379,9 +2408,9 @@ answer    = "exit-and-output"
 name      = "external-check run"
 class     = "program"
 purpose   = "Run a check command the releasables file declares for a member."
-program   = "path:sh"
-args      = ["-c", "{command}"]
-params    = { member = "string", command = "string", root = "string", last-tag = "string", range = "string" }
+program   = "read:build-verification.check-program resolve"
+args      = ["{arguments...}"]
+params    = { member = "string", arguments = { type = "string", list = true }, root = "string", last-tag = "string", range = "string" }
 dir       = "repo:cwd"
 dir-below = "param:member"
 env       = [
@@ -2400,10 +2429,10 @@ answer    = "exit-and-output"
 [[capability.effect]]
 name      = "test-suite run"
 class     = "program"
-purpose   = "Run a member's tests the way its test runner declaration says, before a release."
-program   = "path:sh"
-args      = ["-c", "{command}"]
-params    = { member = "string", command = "string" }
+purpose   = "Run a member's tests with the Go test command its declarations name, before a release."
+program   = "read:build-verification.test-program resolve"
+args      = ["{arguments...}"]
+params    = { member = "string", arguments = { type = "string", list = true } }
 dir       = "repo:cwd"
 dir-below = "param:member"
 env       = [
@@ -2644,7 +2673,7 @@ variable = "HOME"
 [[capability.resource]]
 name    = "releasables-declarations"
 class   = "structured"
-purpose = "Find the program a server releasable's deploy_command names, which the declarations hold."
+purpose = "Find the programs a server releasable's deploy_command and the declared hooks name, which the declarations hold."
 scope   = "repo:cwd/.strictmetadata/releasables/releasables.toml"
 match   = "exact"
 modes   = ["read"]
@@ -2660,13 +2689,23 @@ answer      = "path"
 relative-to = "repo:cwd"
 resolves    = true
 
+[[capability.read]]
+name        = "hook-program resolve"
+class       = "structured"
+purpose     = "Resolve the program a declared hook runs from the first element of its command list."
+resource    = "releasables-declarations"
+key         = "members.hooks.pre_release"
+answer      = "path"
+relative-to = "repo:cwd"
+resolves    = true
+
 [[capability.effect]]
 name      = "hook run"
 class     = "program"
 purpose   = "Run one declared hook with the release's environment at its point of the release."
-program   = "path:bash"
-args      = ["-c", "{command}"]
-params    = { member = "string", command = "string", version = "string", bump = "string", previous = "string", description = "string", package = "string", release-bin = "string" }
+program   = "read:release-hooks.hook-program resolve"
+args      = ["{arguments...}"]
+params    = { member = "string", arguments = { type = "string", list = true }, version = "string", bump = "string", previous = "string", description = "string", package = "string", release-bin = "string" }
 dir       = "repo:cwd"
 dir-below = "param:member"
 env       = [
