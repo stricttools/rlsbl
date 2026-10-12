@@ -12,3 +12,4 @@
 {"format_version":2,"id":"18dd810540f286b879d7701f60f147b18d5a184826d8be17","commits":["6ab059d5fc40dd457706c80929ad80bf2c4663aa"],"user_facing":true,"description":"`rlsbl release retract` requests the retraction version from the Go module proxy right after pushing its tag, and reports success only once the proxy returns it, so the retraction is published to every consumer; a run the proxy stopped is finished by running the same command again.","type":"feature"}
 {"format_version":2,"id":"18ddc1e37bbf8ecdd7d006feebcd4cc1bd98530a13f83d8d","commits":["9ee482c1d9cbfd3f7fce1fb7eaa921979ab0556e"],"user_facing":false}
 {"format_version":2,"id":"18ddc23480af3d87b6cf4788f6054df680144e6be187d6be","commits":["1535194c3171aa803b23ae2c30eaf5b7537e1f96"],"user_facing":false}
+{"format_version":2,"id":"18ddd4349db2f3b697f7be4ef3e74069886c8938f9253df4","commits":["570d50ee09d8f67b03dfa08e4e716ed7b3f22679"],"user_facing":false}
