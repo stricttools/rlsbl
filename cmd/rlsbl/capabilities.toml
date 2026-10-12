@@ -940,7 +940,7 @@ modes   = ["read"]
 [[capability.effect]]
 name      = "pattern-scrub preview"
 class     = "program"
-purpose   = "Count what a pattern scrub would rewrite and obtain safegit's approval token for exactly that run."
+purpose   = "Count what a pattern scrub would rewrite and obtain safegit's approval token for that one run."
 program   = "path:safegit"
 args      = [
   "scrub", "pattern", "rewrite", "--json", "--dry-run", "--pattern", "{pattern}", "{substitution...}",
@@ -983,7 +983,7 @@ answer        = "exit-and-output"
 [[capability.effect]]
 name      = "file-scrub preview"
 class     = "program"
-purpose   = "Count what a file scrub would rewrite and obtain safegit's approval token for exactly that run."
+purpose   = "Count what a file scrub would rewrite and obtain safegit's approval token for that one run."
 program   = "path:safegit"
 args      = [
   "scrub", "file", "rewrite", "--json", "--dry-run", "{replacement...}", "{file}", "{range...}", "{remap...}",
@@ -1026,7 +1026,7 @@ answer        = "exit-and-output"
 [[capability.effect]]
 name      = "recipe-scrub preview"
 class     = "program"
-purpose   = "Count what a scrub recipe would rewrite and obtain safegit's approval token for exactly that run."
+purpose   = "Count what a scrub recipe would rewrite and obtain safegit's approval token for that one run."
 program   = "path:safegit"
 args      = [
   "scrub", "run", "--json", "--dry-run", "--no-diff", "--limit", "0", "{recipe}", "{range...}", "{remap...}",
@@ -1279,6 +1279,40 @@ args      = ["check", "--version-override", "{version}"]
 params    = { version = "string", member = "string" }
 dir       = "gitdir:cwd/rlsbl/release-checkout"
 dir-below = "param:member"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "15m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "root-docs generate"
+class     = "program"
+purpose   = "Generate the documentation a workspace's unversioned root member declares before a batch releases anything."
+program   = "path:selfdoc"
+args      = ["gen", "--no-auto-commit"]
+dir       = "gitdir:cwd/rlsbl/release-checkout"
+env       = [
+  { name = "PATH", from = "env:PATH" },
+  { name = "HOME", from = "env:HOME" },
+]
+stdin     = "none"
+output    = "passed"
+unbounded = true
+deadline  = "15m"
+answer    = "exit"
+
+[[capability.effect]]
+name      = "root-docs check"
+class     = "program"
+purpose   = "Stop a batch release before anything is released when the root member's documentation fails selfdoc's checks."
+program   = "path:selfdoc"
+args      = ["check"]
+dir       = "gitdir:cwd/rlsbl/release-checkout"
 env       = [
   { name = "PATH", from = "env:PATH" },
   { name = "HOME", from = "env:HOME" },
@@ -2166,7 +2200,7 @@ name      = "go-packages list"
 class     = "program"
 purpose   = "Find the main packages and strictcli programs a Go module holds."
 program   = "path:go"
-args      = ["list", "-e", "-f", "{{.Name}}\t{{.ImportPath}}\t{{.Dir}}", "./..."]
+args      = ["list", "-e", "-json", "./..."]
 params    = { member = "string" }
 dir       = "repo:cwd"
 dir-below = "param:member"
