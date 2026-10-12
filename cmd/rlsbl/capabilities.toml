@@ -448,7 +448,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -466,7 +466,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -484,7 +484,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -503,7 +503,7 @@ env       = [
   { name = "GIT_LITERAL_PATHSPECS", value = "1" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -521,7 +521,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "param:content"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit-and-output"
@@ -541,7 +541,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit-and-output"
@@ -558,7 +558,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit-and-output"
@@ -576,7 +576,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit-and-output"
@@ -594,7 +594,7 @@ env           = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin         = "none"
-output        = "captured"
+output        = { stdout = "captured", stderr = "captured" }
 unbounded     = true
 deadline      = "5m"
 consequential = true
@@ -613,7 +613,7 @@ env           = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin         = "none"
-output        = "captured"
+output        = { stdout = "captured", stderr = "captured" }
 unbounded     = true
 deadline      = "5m"
 consequential = true
@@ -659,7 +659,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -677,7 +677,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -695,7 +695,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -712,7 +712,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -729,7 +729,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "10m"
 answer    = "exit"
@@ -747,7 +747,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -765,7 +765,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -867,7 +867,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -888,7 +888,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -905,7 +905,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15s"
 answer    = "exit-and-output"
@@ -953,7 +953,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "30m"
 answer    = "exit-and-output"
@@ -974,7 +974,7 @@ env           = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin         = "none"
-output        = "captured"
+output        = { stdout = "captured", stderr = "captured" }
 unbounded     = true
 deadline      = "2h"
 consequential = true
@@ -996,7 +996,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "30m"
 answer    = "exit-and-output"
@@ -1017,7 +1017,7 @@ env           = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin         = "none"
-output        = "captured"
+output        = { stdout = "captured", stderr = "captured" }
 unbounded     = true
 deadline      = "2h"
 consequential = true
@@ -1039,7 +1039,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "30m"
 answer    = "exit-and-output"
@@ -1060,7 +1060,7 @@ env           = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin         = "none"
-output        = "captured"
+output        = { stdout = "captured", stderr = "captured" }
 unbounded     = true
 deadline      = "2h"
 consequential = true
@@ -1082,7 +1082,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "30m"
 answer    = "exit-and-output"
@@ -1103,7 +1103,7 @@ env           = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin         = "none"
-output        = "captured"
+output        = { stdout = "captured", stderr = "captured" }
 unbounded     = true
 deadline      = "2h"
 consequential = true
@@ -1147,7 +1147,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -1168,7 +1168,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -1189,7 +1189,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -1210,7 +1210,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -1227,7 +1227,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15s"
 answer    = "exit-and-output"
@@ -1265,7 +1265,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit"
@@ -1284,7 +1284,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit"
@@ -1301,7 +1301,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit"
@@ -1318,7 +1318,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit"
@@ -1335,7 +1335,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15s"
 answer    = "exit-and-output"
@@ -1379,7 +1379,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit-and-output"
@@ -1397,7 +1397,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit-and-output"
@@ -1415,7 +1415,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit-and-output"
@@ -1433,7 +1433,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit-and-output"
@@ -1451,7 +1451,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit-and-output"
@@ -1469,7 +1469,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "1h"
 answer    = "exit-and-output"
@@ -1487,7 +1487,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit-and-output"
@@ -1504,7 +1504,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "30s"
 answer    = "exit-and-output"
@@ -1521,7 +1521,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15s"
 answer    = "exit-and-output"
@@ -1566,7 +1566,7 @@ env           = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin         = "param:notes"
-output        = "passed"
+output        = { stdout = "passed", stderr = "passed" }
 unbounded     = true
 deadline      = "2m"
 consequential = true
@@ -1585,7 +1585,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "param:notes"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -1603,7 +1603,7 @@ env           = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin         = "none"
-output        = "passed"
+output        = { stdout = "passed", stderr = "passed" }
 unbounded     = true
 deadline      = "2m"
 consequential = true
@@ -1622,7 +1622,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -1640,7 +1640,7 @@ env           = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin         = "none"
-output        = "passed"
+output        = { stdout = "passed", stderr = "passed" }
 unbounded     = true
 deadline      = "2m"
 consequential = true
@@ -1659,7 +1659,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -1677,7 +1677,7 @@ env           = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin         = "param:value"
-output        = "passed"
+output        = { stdout = "passed", stderr = "passed" }
 unbounded     = true
 deadline      = "2m"
 consequential = true
@@ -1696,7 +1696,7 @@ env           = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin         = "none"
-output        = "passed"
+output        = { stdout = "passed", stderr = "passed" }
 unbounded     = true
 deadline      = "2m"
 consequential = true
@@ -1917,7 +1917,7 @@ env           = [
   { name = "NPM_TOKEN", from = "param:token" },
 ]
 stdin         = "none"
-output        = "passed"
+output        = { stdout = "passed", stderr = "passed" }
 unbounded     = true
 deadline      = "5m"
 consequential = true
@@ -1937,7 +1937,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "5m"
 answer    = "exit"
@@ -1957,7 +1957,7 @@ env           = [
   { name = "UV_PUBLISH_TOKEN", from = "param:token" },
 ]
 stdin         = "none"
-output        = "passed"
+output        = { stdout = "passed", stderr = "passed" }
 unbounded     = true
 deadline      = "5m"
 consequential = true
@@ -1978,7 +1978,7 @@ env           = [
   { name = "GOPROXY", value = "proxy.golang.org" },
 ]
 stdin         = "none"
-output        = "passed"
+output        = { stdout = "passed", stderr = "passed" }
 unbounded     = true
 deadline      = "5m"
 consequential = true
@@ -1998,7 +1998,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "5m"
 answer    = "exit"
@@ -2017,7 +2017,7 @@ env           = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin         = "none"
-output        = "passed"
+output        = { stdout = "passed", stderr = "passed" }
 unbounded     = true
 deadline      = "2m"
 consequential = true
@@ -2065,7 +2065,7 @@ env           = [
   { name = "NPM_TOKEN", from = "param:token" },
 ]
 stdin         = "none"
-output        = "passed"
+output        = { stdout = "passed", stderr = "passed" }
 unbounded     = true
 deadline      = "10m"
 consequential = true
@@ -2085,7 +2085,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "10m"
 answer    = "exit"
@@ -2105,7 +2105,7 @@ env           = [
   { name = "UV_PUBLISH_TOKEN", from = "param:token" },
 ]
 stdin         = "none"
-output        = "passed"
+output        = { stdout = "passed", stderr = "passed" }
 unbounded     = true
 deadline      = "10m"
 consequential = true
@@ -2152,7 +2152,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit-and-output"
@@ -2171,7 +2171,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit-and-output"
@@ -2190,7 +2190,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit"
@@ -2209,7 +2209,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit-and-output"
@@ -2228,7 +2228,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit-and-output"
@@ -2247,7 +2247,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit-and-output"
@@ -2266,7 +2266,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit-and-output"
@@ -2285,7 +2285,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit-and-output"
@@ -2302,7 +2302,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit-and-output"
@@ -2319,7 +2319,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit-and-output"
@@ -2337,7 +2337,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit-and-output"
@@ -2354,7 +2354,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit-and-output"
@@ -2376,7 +2376,7 @@ env       = [
   { name = "RLSBL_UNRELEASED_RANGE", from = "param:range" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit-and-output"
@@ -2395,7 +2395,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit"
@@ -2413,7 +2413,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit-and-output"
@@ -2430,7 +2430,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15s"
 answer    = "exit-and-output"
@@ -2468,7 +2468,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "5m"
 answer    = "exit-and-output"
@@ -2487,7 +2487,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "5m"
 answer    = "exit-and-output"
@@ -2506,7 +2506,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "5m"
 answer    = "exit-and-output"
@@ -2525,7 +2525,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "5m"
 answer    = "exit-and-output"
@@ -2563,7 +2563,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit-and-output"
@@ -2582,7 +2582,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit-and-output"
@@ -2601,7 +2601,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15m"
 answer    = "exit-and-output"
@@ -2646,7 +2646,7 @@ env       = [
   { name = "GOWORK", value = "off" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "24h"
 answer    = "exit"
@@ -2664,7 +2664,7 @@ env           = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin         = "none"
-output        = "passed"
+output        = { stdout = "passed", stderr = "passed" }
 unbounded     = true
 deadline      = "15m"
 consequential = true
@@ -2717,7 +2717,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "5m"
 answer    = "exit"
@@ -2736,7 +2736,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "5m"
 answer    = "exit"
@@ -2756,7 +2756,7 @@ env       = [
   { name = "VIRTUAL_ENV", from = "param:environment" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "5m"
 answer    = "exit"
@@ -2776,7 +2776,7 @@ env       = [
   { name = "VIRTUAL_ENV", from = "param:environment" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "5m"
 answer    = "exit"
@@ -2795,7 +2795,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "5m"
 answer    = "exit"
@@ -2814,7 +2814,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "5m"
 answer    = "exit"
@@ -2833,7 +2833,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "5m"
 answer    = "exit"
@@ -2852,7 +2852,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "5m"
 answer    = "exit"
@@ -2897,7 +2897,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "10m"
 answer    = "exit-and-output"
@@ -2916,7 +2916,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "1m"
 answer    = "exit-and-output"
@@ -2935,7 +2935,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "1h"
 answer    = "exit-and-output"
@@ -2953,7 +2953,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "10m"
 answer    = "exit-and-output"
@@ -2971,7 +2971,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "10m"
 answer    = "exit-and-output"
@@ -2988,7 +2988,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15s"
 answer    = "exit-and-output"
@@ -3085,7 +3085,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "10m"
 answer    = "exit-and-output"
@@ -3103,7 +3103,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "1m"
 answer    = "exit-and-output"
@@ -3121,7 +3121,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "1h"
 answer    = "exit-and-output"
@@ -3139,7 +3139,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -3157,7 +3157,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -3178,7 +3178,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "passed"
+output    = { stdout = "passed", stderr = "passed" }
 unbounded = true
 deadline  = "2m"
 answer    = "exit"
@@ -3195,7 +3195,7 @@ env       = [
   { name = "HOME", from = "env:HOME" },
 ]
 stdin     = "none"
-output    = "captured"
+output    = { stdout = "captured", stderr = "captured" }
 unbounded = true
 deadline  = "15s"
 answer    = "exit-and-output"
