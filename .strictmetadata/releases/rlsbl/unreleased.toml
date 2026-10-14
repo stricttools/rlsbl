@@ -1,9 +1,9 @@
 # The next release of rlsbl. Fill in bump and description, then run `rlsbl release run --watch`.
 format_version = 2
 # How the release moves the version: patch, minor, major, or infra (moved as a patch, recorded as infra).
-bump = ""
+bump = "minor"
 # What this release is, in a sentence or two. Required.
-description = ""
+description = "Retiring a releasable now takes it out of the workspace in one commit (declarations, release hooks, scaffold state, and CI entries), several releasables retire together with a repeated `--subject`, and `rlsbl release retract` retracts released Go versions. A never-released releasable is `unreleased` until the owner records it active, `on-hold` is renamed `non-releasing`, the confidential-term list is found through the family settings file, and several commands require flags they used to fill in."
 # Why these changes were made. Optional.
 context = ""
 # The targets released, and the ones left out; between them they name every target of the releasable's members.
