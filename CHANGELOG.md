@@ -2,6 +2,31 @@
 
 # Changelog
 
+## 0.134.0
+
+Retiring a releasable now takes it out of the workspace in one commit (declarations, release hooks, scaffold state, and CI entries), several releasables retire together with a repeated `--subject`, and `rlsbl release retract` retracts released Go versions. A never-released releasable is `unreleased` until the owner records it active, `on-hold` is renamed `non-releasing`, the confidential-term list is found through the family settings file, and several commands require flags they used to fill in.
+
+### Breaking
+
+- **A releasable that has never been released is `unreleased`, and its releases are refused until the owner records it active.** The status is derived, never recorded: with no lifecycle period in effect, a releasable is active when its release archives record a release and unreleased when they do not. `release run`, `release resume`, `release retry`, and `monorepo release init` refuse an unreleased releasable, naming `rlsbl transition lifecycle --subject <name> --status active`, which allows its first release. `monorepo init`, `monorepo add`, `monorepo absorb`, and `migrate records` no longer open an active lifecycle period for a releasable; `transition lifecycle --status unreleased` is refused; and `status`, `monorepo status`, and `transition show` print each releasable's lifecycle status, recorded or derived.
+- **Breaking.** `rlsbl release edit` requires the version argument; `rlsbl changelog amend` requires `--user-facing` or `--no-user-facing`; `rlsbl dev install` requires `--uninstall` or `--no-uninstall`; `rlsbl discover` requires `--mine` or `--no-mine`; and `rlsbl secrets sync-npm-token` requires `--all` or `--no-all`. None of them is filled in when left out.
+- **Breaking.** The lifecycle status that refuses a releasable's releases is `non-releasing`, no longer `on-hold`: `rlsbl transition lifecycle --status non-releasing`, `rlsbl status --json`, and every refusal name it, and a lifecycle-and-license record holding `on-hold` is refused.
+- **Breaking.** The confidential-term list is read from the path the `confidential_term_list` setting names in the family's settings file, `stricttools/config.toml` under the user's configuration directory, instead of a fixed place under the home directory. A missing settings file or setting refuses only what reads the list (the `confidential-terms` check, a release, the commands that rewrite a GitHub Release, and `transition declassify`), naming what to write; a missing list at that path still holds no terms.
+
+### Features
+
+- **The lifecycle-and-license guide and the release workflow describe the derived `unreleased` status.**
+- **The help of `monorepo release init`, `release retry`, and `release resume`, and the monorepo guide, name the `unreleased` refusal.**
+- **Retracted versions in the release record.** A release archive may record `retracted_by` (and the retraction version's own archive `retracts`): a retracted version keeps its tags, has no GitHub Release (`unpublished-refs` and `release reconcile` demand none, and a history rewrite writes none), is marked retracted in `CHANGELOG.md`, and does not count as a release, so a releasable whose every version is retracted is unreleased and its first release ships the version files' version. A bump landing on a retracted number is refused, naming the version-files value that bumps past it.
+- **`rlsbl release retract --versions <version> --reason <text>`** retracts released versions of a Go module through the next free version: it commits one `retract [low, new]` go.mod line on the release branch, records every covered version retracted, tags the new version and pushes only its tags (no branch, no GitHub Release), and deletes the retracted versions' GitHub Releases, keeping their tags. It works on an unreleased releasable, asks no registry about any version, and a run that stops is finished by running it again.
+- `rlsbl release retract` requests the retraction version from the Go module proxy right after pushing its tag, and reports success only once the proxy returns it, so the retraction is published to every consumer; a run the proxy stopped is finished by running the same command again.
+- **Retiring a releasable takes it out of the workspace in one commit.** `rlsbl transition lifecycle --subject <releasable> --status retired` now also removes the releasable and its members from `releasables.toml`, closes their open identities, deletes their release hooks, drops their files from the scaffold state, and regenerates the routers and the root `CHANGELOG.md`; its changelog and release history stay in place and are no longer reported as residue. Retiring a standalone repository's releasable is refused: archive the repository instead.
+- **`rlsbl transition lifecycle --status retired` takes a repeated `--subject`.** `--subject a --subject b` retires several declared releasables of a workspace in one commit, regenerating the routers once for what remains, so two releasables whose directories are both gone, each blocking the other's retirement, retire together. A repeated `--subject` with `active` or `non-releasing`, or naming a member or an undeclared subject, is refused.
+
+### Fixes
+
+- **`rlsbl monorepo remove` accepts a retired member, and its refusal names the retirement.** A member with open lifecycle-and-license entries is refused with `rlsbl transition lifecycle --subject <member> --status retired` as the fix; once retired, the remove goes through.
+
 ## 0.133.0
 
 Releases scan what they push and publish against the age-encrypted confidential-term list, report every hit at once, and refuse a hit until it is judged a false positive or approved by the owner with the new confidential commands; the archive records each resolution used. The machine-local confidential-name index and transition public-client are gone.
