@@ -45,7 +45,9 @@ const transitionLifecycleHelp = "Close a releasable's or member's lifecycle peri
 	"their open identities close (so the tags they owned are accounted for), their release hook directories under .strictmetadata/release-hooks/ " +
 	"and the releasable's changelog validation cache are deleted through saferm, the scaffold state stops managing the members' files, and the " +
 	"routers and the root CHANGELOG.md are regenerated without them; the releasable's changelog and release directories stay where they are, " +
-	"as its closed history. Refused before anything is written: the releasable of a standalone repository (the whole repository is archived " +
+	"as its closed history. --subject repeats with --status retired only, each one a declared releasable: they retire together in that one " +
+	"commit, the routers regenerated once without all of them, which retires releasables that block each other's retirement (each one's " +
+	"publish workflow gone with its directory, so the routers cannot be regenerated while another is still declared). Refused before anything is written: the releasable of a standalone repository (the whole repository is archived " +
 	"instead), a releasable holding the root member, a member that stays depending on one that leaves, an options entry scoped to a leaving " +
 	"member, a release in progress, and an uncommitted change to a path the retirement writes."
 
@@ -121,7 +123,7 @@ func registerTransition(r *commandSet) {
 		// A lifecycle decides whether a releasable may release at all.
 		consequential: true,
 		flags: []strictcli.Flag{
-			strictcli.StringFlag("subject", "The releasable or member whose lifecycle changes", strictcli.Required()),
+			strictcli.StringFlag("subject", "The releasable or member whose lifecycle changes; repeatable with --status retired only, once per declared releasable retired in the same commit", strictcli.Required(), strictcli.Repeatable(), strictcli.Unique(true)),
 			strictcli.StringFlag("status", "The status from today", strictcli.Required(), strictcli.Choices(
 				strictcli.Ch(string(lifecycle.StatusActive), "released as usual; for an unreleased releasable, its first release is allowed"),
 				strictcli.Ch(string(lifecycle.StatusNonReleasing), "its releases are refused until it is active again"),
@@ -130,7 +132,7 @@ func registerTransition(r *commandSet) {
 			reason,
 		},
 		run: func(ctx *strictcli.Context, kw map[string]any) (any, error) {
-			return nil, runPeriod(ctx, kw, "status", lifecycleops.Invocation.Lifecycle)
+			return nil, runLifecycle(ctx, kw)
 		},
 	})
 	r.add(command{
@@ -286,7 +288,28 @@ func transitionRouters(ctx *strictcli.Context) func(*workspace.Workspace) (workf
 	}
 }
 
-// runPeriod runs a lifecycle or license change, the value read from flag.
+// runLifecycle runs `transition lifecycle` for every --subject given.
+func runLifecycle(ctx *strictcli.Context, kw map[string]any) error {
+	if err := requireNonEmpty(kw, "status", "reason"); err != nil {
+		return err
+	}
+	subjects, err := stringList(kw["subject"])
+	if err != nil {
+		return err
+	}
+	for _, s := range subjects {
+		if s == "" {
+			return fmt.Errorf("--subject must not be empty")
+		}
+	}
+	inv, dir, err := transitionInvocation(ctx)
+	if err != nil {
+		return err
+	}
+	return inv.Lifecycle(lifecycleops.LifecycleRequest{Dir: dir, Subjects: subjects, Status: strictcli.Get[string](kw, "status"), Reason: strictcli.Get[string](kw, "reason")})
+}
+
+// runPeriod runs a license change, the value read from flag.
 func runPeriod(ctx *strictcli.Context, kw map[string]any, flag string, change func(lifecycleops.Invocation, lifecycleops.PeriodRequest) error) error {
 	if err := requireNonEmpty(kw, "subject", flag, "reason"); err != nil {
 		return err

@@ -13,8 +13,8 @@ import (
 	"github.com/stricttools/rlsbl/internal/releaserecord"
 )
 
-// PeriodRequest is a `transition lifecycle` or `transition license`: the
-// subject, the value its new period holds (a status or a license), and why.
+// PeriodRequest is a `transition license`: the subject, the license its
+// new period holds, and why.
 type PeriodRequest struct {
 	// Dir is the working directory, absolute.
 	Dir     string
@@ -23,43 +23,76 @@ type PeriodRequest struct {
 	Reason  string
 }
 
-// Lifecycle closes the subject's lifecycle period on the command's date and
-// opens one with the new status. The subject is a releasable or member the
-// declarations declare, or one the record already holds a lifecycle period
-// of (a subject retired after it left the declarations).
-func (inv Invocation) Lifecycle(req PeriodRequest) error {
+// LifecycleRequest is a `transition lifecycle`: the subjects, the status
+// their new periods hold, and why. Several subjects are allowed only for
+// retired, and only when every one is a declared releasable: they retire
+// together, in one commit.
+type LifecycleRequest struct {
+	// Dir is the working directory, absolute.
+	Dir      string
+	Subjects []string
+	Status   string
+	Reason   string
+}
+
+// Lifecycle closes each subject's lifecycle period on the command's date
+// and opens one with the new status. A subject is a releasable or member
+// the declarations declare, or one the record already holds a lifecycle
+// period of (a subject retired after it left the declarations).
+func (inv Invocation) Lifecycle(req LifecycleRequest) error {
 	m, err := inv.openManaged(req.Dir)
 	if err != nil {
 		return err
 	}
-	status := lifecycle.Status(req.Value)
+	status := lifecycle.Status(req.Status)
 	switch status {
 	case lifecycle.StatusActive, lifecycle.StatusNonReleasing, lifecycle.StatusRetired:
 	case lifecycle.StatusUnreleased:
 		return fmt.Errorf("unreleased is never recorded: a releasable whose archives record no release and that has no lifecycle period in effect is unreleased; the statuses a period records are %s, %s, and %s", lifecycle.StatusActive, lifecycle.StatusNonReleasing, lifecycle.StatusRetired)
 	default:
-		return fmt.Errorf("%q is not a lifecycle status; the statuses are %s, %s, and %s", req.Value, lifecycle.StatusActive, lifecycle.StatusNonReleasing, lifecycle.StatusRetired)
+		return fmt.Errorf("%q is not a lifecycle status; the statuses are %s, %s, and %s", req.Status, lifecycle.StatusActive, lifecycle.StatusNonReleasing, lifecycle.StatusRetired)
 	}
-	if !m.knownSubject(req.Subject) {
-		return fmt.Errorf("%q is neither a releasable or member the declarations declare nor a subject the record holds a lifecycle period of; the declared subjects are %s", req.Subject, strings.Join(m.ws.Declarations.SubjectNames(), ", "))
+	if len(req.Subjects) == 0 {
+		return fmt.Errorf("name the subject whose lifecycle changes with --subject")
+	}
+	several := len(req.Subjects) > 1
+	if several && status != lifecycle.StatusRetired {
+		return fmt.Errorf("--subject repeats only with --status %s, which takes several declared releasables out of the workspace in one commit; record %s with one command per subject; nothing was written", lifecycle.StatusRetired, status)
+	}
+	seen := map[string]bool{}
+	for _, subject := range req.Subjects {
+		if seen[subject] {
+			return fmt.Errorf("--subject %s is given more than once; name each subject once; nothing was written", subject)
+		}
+		seen[subject] = true
+		if several {
+			if err := m.requireReleasable(subject); err != nil {
+				return fmt.Errorf("%w; a repeated --subject retires declared releasables only, so retire a member or an undeclared subject with its own command; nothing was written", err)
+			}
+		} else if !m.knownSubject(subject) {
+			return fmt.Errorf("%q is neither a releasable or member the declarations declare nor a subject the record holds a lifecycle period of; the declared subjects are %s", subject, strings.Join(m.ws.Declarations.SubjectNames(), ", "))
+		}
 	}
 	on := inv.Now()
 	rec := m.record
-	if current, ok := rec.LifecycleOn(req.Subject, on); ok && current.Status == status {
-		return fmt.Errorf("%q is already %s (since %s); nothing was written", req.Subject, status, day(current.From))
+	for _, subject := range req.Subjects {
+		if current, ok := rec.LifecycleOn(subject, on); ok && current.Status == status {
+			return fmt.Errorf("%q is already %s (since %s); nothing was written", subject, status, day(current.From))
+		}
+		if err := closeOpen(rec, lifecycle.TableLifecycle, subject, on); err != nil {
+			return err
+		}
+		if err := rec.OpenPeriod(lifecycle.TableLifecycle, subject, string(status), on, req.Reason); err != nil {
+			return err
+		}
 	}
-	if err := closeOpen(rec, lifecycle.TableLifecycle, req.Subject, on); err != nil {
-		return err
+	if status == lifecycle.StatusRetired && isReleasable(m, req.Subjects[0]) {
+		return inv.retireReleasables(m, rec, req.Subjects, on)
 	}
-	if err := rec.OpenPeriod(lifecycle.TableLifecycle, req.Subject, string(status), on, req.Reason); err != nil {
-		return err
-	}
-	if status == lifecycle.StatusRetired && isReleasable(m, req.Subject) {
-		return inv.retireReleasable(m, rec, req, on)
-	}
-	done := fmt.Sprintf("%s is %s from %s.", req.Subject, status, day(on))
-	if status == lifecycle.StatusActive && isReleasable(m, req.Subject) {
-		released, err := releaserecord.HasRelease(m.ws.Root, req.Subject)
+	subject := req.Subjects[0]
+	done := fmt.Sprintf("%s is %s from %s.", subject, status, day(on))
+	if status == lifecycle.StatusActive && isReleasable(m, subject) {
+		released, err := releaserecord.HasRelease(m.ws.Root, subject)
 		if err != nil {
 			return err
 		}
@@ -67,7 +100,7 @@ func (inv Invocation) Lifecycle(req PeriodRequest) error {
 			done += " Its archives record no release, so its first release is allowed from now on."
 		}
 	}
-	return inv.save(m, rec, on, fmt.Sprintf("transition: %s is %s", req.Subject, status), outcome{done, fmt.Sprintf("Would record %s as %s from %s.", req.Subject, status, day(on))})
+	return inv.save(m, rec, on, fmt.Sprintf("transition: %s is %s", subject, status), outcome{done, fmt.Sprintf("Would record %s as %s from %s.", subject, status, day(on))})
 }
 
 // isReleasable reports whether the declarations declare subject as a

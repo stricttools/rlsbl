@@ -48,7 +48,7 @@ func TestLifecycleClosesThePeriodAndOpensTheNewOne(t *testing.T) {
 	f := newFixture(t, mitSince)
 	testsupport.FakeSafegit(t)
 	r := f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
-		return inv.Lifecycle(lifecycleops.PeriodRequest{Dir: dir, Subject: "portal", Value: "non-releasing", Reason: "paused"})
+		return inv.Lifecycle(lifecycleops.LifecycleRequest{Dir: dir, Subjects: []string{"portal"}, Status: "non-releasing", Reason: "paused"})
 	})
 	requireExit(t, r, 0)
 	rec, err := lifecycle.Parse([]byte(f.record(t)))
@@ -65,12 +65,12 @@ func TestLifecycleClosesThePeriodAndOpensTheNewOne(t *testing.T) {
 	f.clean(t)
 
 	r = f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
-		return inv.Lifecycle(lifecycleops.PeriodRequest{Dir: dir, Subject: "portal", Value: "non-releasing", Reason: "again"})
+		return inv.Lifecycle(lifecycleops.LifecycleRequest{Dir: dir, Subjects: []string{"portal"}, Status: "non-releasing", Reason: "again"})
 	})
 	requireExit(t, r, 1)
 	requireContains(t, r.Stderr, "already non-releasing")
 	r = f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
-		return inv.Lifecycle(lifecycleops.PeriodRequest{Dir: dir, Subject: "nobody", Value: "active", Reason: "typo"})
+		return inv.Lifecycle(lifecycleops.LifecycleRequest{Dir: dir, Subjects: []string{"nobody"}, Status: "active", Reason: "typo"})
 	})
 	requireExit(t, r, 1)
 	requireContains(t, r.Stderr, `"nobody" is neither`)
@@ -83,12 +83,12 @@ func TestAnActivePeriodForAnUnreleasedReleasableAllowsItsFirstRelease(t *testing
 	f := newFixture(t, "format_version = 1\n\n[[licenses]]\nsubject = \"portal\"\nlicense = \"MIT\"\nfrom = 2026-01-01\nreason = \"open\"\n"+portalName)
 	testsupport.FakeSafegit(t)
 	r := f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
-		return inv.Lifecycle(lifecycleops.PeriodRequest{Dir: dir, Subject: "portal", Value: "unreleased", Reason: "never released"})
+		return inv.Lifecycle(lifecycleops.LifecycleRequest{Dir: dir, Subjects: []string{"portal"}, Status: "unreleased", Reason: "never released"})
 	})
 	requireExit(t, r, 1)
 	requireContains(t, r.Stderr, "unreleased is never recorded")
 	r = f.run(t, false, func(inv lifecycleops.Invocation, dir string) error {
-		return inv.Lifecycle(lifecycleops.PeriodRequest{Dir: dir, Subject: "portal", Value: "active", Reason: "ready for its first release"})
+		return inv.Lifecycle(lifecycleops.LifecycleRequest{Dir: dir, Subjects: []string{"portal"}, Status: "active", Reason: "ready for its first release"})
 	})
 	requireExit(t, r, 0)
 	requireContains(t, r.Stdout, "portal is active from 2026-06-01", "its first release is allowed")
@@ -107,7 +107,7 @@ func TestADryRunWritesNoRecordAndNoIndex(t *testing.T) {
 	before := f.record(t)
 	head := f.repo.Head()
 	r := f.run(t, true, func(inv lifecycleops.Invocation, dir string) error {
-		return inv.Lifecycle(lifecycleops.PeriodRequest{Dir: dir, Subject: "portal", Value: "non-releasing", Reason: "paused"})
+		return inv.Lifecycle(lifecycleops.LifecycleRequest{Dir: dir, Subjects: []string{"portal"}, Status: "non-releasing", Reason: "paused"})
 	})
 	requireExit(t, r, 0)
 	requireContains(t, r.Stdout, "Would commit")
@@ -390,7 +390,7 @@ func TestARecordValidationRefusesBeforeAnySuccessLineIsPrinted(t *testing.T) {
 	f.repo.Git("remote", "add", "origin", "https://github.com/acme/portal.git")
 	for name, fn := range map[string]func(inv lifecycleops.Invocation, dir string) error{
 		"lifecycle": func(inv lifecycleops.Invocation, dir string) error {
-			return inv.Lifecycle(lifecycleops.PeriodRequest{Dir: dir, Subject: "portal", Value: "non-releasing", Reason: "paused"})
+			return inv.Lifecycle(lifecycleops.LifecycleRequest{Dir: dir, Subjects: []string{"portal"}, Status: "non-releasing", Reason: "paused"})
 		},
 		"unversioned tag": func(inv lifecycleops.Invocation, dir string) error {
 			return inv.UnversionedTag(dir, "nightly", "a moving tag")

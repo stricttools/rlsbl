@@ -92,7 +92,7 @@ A command that opens a period closes the subject's period in effect on the comma
 | Command | What it records |
 | --- | --- |
 | `rlsbl transition show` | Nothing: prints the record and every rule's verdict. Works without declarations and without a record. |
-| `rlsbl transition lifecycle --subject <name> --status active\|non-releasing\|retired --reason <text>` | A lifecycle period. `non-releasing` refuses the subject's releases; `retired` makes its release history a record, and for a declared releasable of a workspace takes it out of the repository ([retiring a releasable](#retiring-a-releasable)); `active` for an unreleased releasable allows its first release. `unreleased` is refused: it is never recorded. |
+| `rlsbl transition lifecycle --subject <name>... --status active\|non-releasing\|retired --reason <text>` | A lifecycle period. `non-releasing` refuses the subject's releases; `retired` makes its release history a record, and for a declared releasable of a workspace takes it out of the repository ([retiring a releasable](#retiring-a-releasable)); `active` for an unreleased releasable allows its first release. `unreleased` is refused: it is never recorded. |
 | `rlsbl transition license --subject <releasable> --license <SPDX> --reason <text>` | A license period. `proprietary` is refused (use `classify`), and so is a change that would leave no releasable proprietary in a confidential repository (use `declassify`). |
 | `rlsbl transition identity --subject <name> --facet <facet> --value <value> [--registry <registry>] [--tag-pattern <glob>]... [--from <date> [--until <date>]] --reason <text>` | An identity period. Without `--from` it starts on the command's date and closes the subject's open identity of the facet (in the same registry, for a `package-name`); with `--from` (and `--until`) it is recorded as given, which is how a dead identity's tags become accounted for. In a tag pattern `*` matches any run of characters, slashes included. |
 | `rlsbl transition unversioned-tag --tag <tag> --reason <text>` | A tag that releases no version (a nightly marker, an imported vendor tag), so the backfill, the reconcile, and the tag checks account for it. |
@@ -111,6 +111,8 @@ A command that opens a period closes the subject's period in effect on the comma
 - regenerates the routers and the root `CHANGELOG.md` without them.
 
 The members' own files, their license periods, and their registry names stay. The releasable's changelog and release directories stay where its releases wrote them: the `retired` period marks them as its closed history, and `releasable-residue` does not report them.
+
+`--subject` repeats with `--status retired` only, each one a declared releasable: `--subject py-widget --subject ts-widget` retires both in the same single commit, regenerating the routers once for what remains. Two releasables whose directories are both gone need this: each one's publish workflow went with its directory, so the routers of the workspace without one of them cannot be regenerated while the other is still declared, and each retirement alone is refused. A repeated `--subject` with `active` or `non-releasing`, or naming a member or an undeclared subject, is refused: those are recorded with one command per subject.
 
 The releasable of a standalone repository is refused: a finished standalone repository is archived as a whole, outside rlsbl. The other refusals, all made before anything is written, are listed by `rlsbl transition lifecycle --help`, and each names its way out.
 
