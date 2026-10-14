@@ -49,7 +49,8 @@ const monorepoAddHelp = "Declare the directory at <path> (relative to the reposi
 const monorepoRemoveHelp = "Delete the declaration of the member at <path>, the path as releasables.toml writes it, character for character (any other spelling is " +
 	"refused, naming every member's path), and write the declarations. The member's files are left on disk and nothing is committed. Refused: the " +
 	"root member, the only member of a releasable (which would then release nothing), a member another member's depends_on names, and a member " +
-	"the lifecycle-and-license record holds an open or pending entry for."
+	"the lifecycle-and-license record holds an open or pending entry for, unless its open lifecycle period is retired; that refusal names " +
+	"`rlsbl transition lifecycle --subject <member> --status retired`. Retiring a releasable that way takes it out of the declarations with its members."
 
 const monorepoListHelp = "List every member the workspace declares, in declaration order: its name, its path, the releasable it is versioned under " +
 	"(empty for none), and the flags it declares (library, dev-only, test-only)."

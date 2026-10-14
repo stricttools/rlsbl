@@ -18,8 +18,9 @@ import (
 // releasables.toml writes it) and writes the declarations. The member's
 // files are left on disk. The root member, the last member of a releasable,
 // a member another member's depends_on names, and a member the
-// lifecycle-and-license record holds open or pending entries for are
-// refused, each naming its way out.
+// lifecycle-and-license record holds open or pending entries for (unless
+// its open lifecycle period is retired) are refused, each naming its way
+// out.
 func Remove(e *strictcli.Effects, ws *workspace.Workspace, path string) (declarations.Member, error) {
 	m, ok := ws.Declarations.MemberAt(path)
 	if !ok {
@@ -51,7 +52,12 @@ func Remove(e *strictcli.Effects, ws *workspace.Workspace, path string) (declara
 		return declarations.Member{}, err
 	}
 	if entries := openEntriesOf(rec, m.Name); len(entries) > 0 {
-		return declarations.Member{}, fmt.Errorf("%s holds %s of the member %q, and an open or pending entry names a declared subject; close or delete them first", lifecycle.RecordFile, strings.Join(entries, " and "), m.Name)
+		retire := fmt.Sprintf("`rlsbl transition lifecycle --subject %s --status retired --reason <why>`", m.Name)
+		fix := fmt.Sprintf("Retire the member with %s, since a retired subject's entries need no declaration, then run this again", retire)
+		if _, ok := ws.Declarations.Releasable(m.Name); ok {
+			fix = fmt.Sprintf("The entries are those of the releasable %q: retire it with %s, which takes it out of %s together with every member versioned under it", m.Name, retire, declarations.ReleasablesFile)
+		}
+		return declarations.Member{}, fmt.Errorf("%s holds %s of the member %q, and an open or pending entry names a declared subject. %s; nothing was written", lifecycle.RecordFile, strings.Join(entries, " and "), m.Name, fix)
 	}
 	data, err := os.ReadFile(filepath.Join(ws.Root, filepath.FromSlash(declarations.ReleasablesFile)))
 	if err != nil {
@@ -75,8 +81,14 @@ func Remove(e *strictcli.Effects, ws *workspace.Workspace, path string) (declara
 }
 
 // openEntriesOf describes the record's open and pending entries whose
-// subject is subject.
+// subject is subject, none when its open lifecycle period is retired: a
+// retired subject's entries need no declaration.
 func openEntriesOf(rec *lifecycle.Record, subject string) []string {
+	for _, l := range rec.Lifecycle() {
+		if l.Subject == subject && l.Open() && l.Status == lifecycle.StatusRetired {
+			return nil
+		}
+	}
 	var out []string
 	for _, l := range rec.Lifecycle() {
 		if l.Subject == subject && l.Open() {

@@ -113,13 +113,13 @@ func TestRemoveRefusesTheOnlyMemberOfAReleasable(t *testing.T) {
 }
 
 // A member the lifecycle-and-license record holds an open period of is
-// refused until the period is closed.
+// refused, naming the retirement, until the period is closed.
 func TestRemoveRefusesAMemberTheRecordHoldsOpenEntriesOf(t *testing.T) {
 	hygiene.Isolate(t)
 	record := "format_version = 1\n\n[[lifecycle]]\nsubject = \"gadget\"\nstatus = \"active\"\nfrom = 2026-01-01\nreason = \"a member with a lifecycle of its own\"\n"
 	repo := newWorkspace(t, sharedWidget, sharedWidgetFiles)
 	repo.Write(lifecycle.RecordFile, record)
-	mustFail(t, strictcli.EffectMutating, false, removing(repo, "apps/gadget"), lifecycle.RecordFile, "an open lifecycle period", "close or delete them first")
+	mustFail(t, strictcli.EffectMutating, false, removing(repo, "apps/gadget"), lifecycle.RecordFile, "an open lifecycle period", "`rlsbl transition lifecycle --subject gadget --status retired --reason <why>`")
 	repo.Write(lifecycle.RecordFile, strings.Replace(record, "from = 2026-01-01\n", "from = 2026-01-01\nuntil = 2026-10-07\n", 1))
 	mustRun(t, strictcli.EffectMutating, false, removing(repo, "apps/gadget"))
 }
