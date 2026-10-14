@@ -1,5 +1,5 @@
 +++
-description = "The rlsbl release flow: the release file, validation, the release checkout, preflight, the steps, the CI verdict, resume, version fates, and past releases."
+description = "The rlsbl release flow: the release file, validation, the release checkout, preflight, the steps, the CI verdict, resume, version fates, and past releases, including retracting Go module versions."
 +++
 
 # Release workflow

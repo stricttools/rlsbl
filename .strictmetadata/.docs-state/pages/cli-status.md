@@ -1,6 +1,6 @@
 +++
 title = "rlsbl status"
-description = "rlsbl status: a member's package and version, branch, latest release, changelog coverage since it, workflows, and with --registry the published version."
+description = "rlsbl status: a member's package and version, branch, lifecycle status, latest release, changelog coverage since it, workflows, and with --registry the published version."
 generated = true
 nav_group = "CLI Reference"
 nav_order = 17

@@ -1,6 +1,6 @@
 +++
 title = "rlsbl release"
-description = "rlsbl release: write the release file, release on a CI-verified candidate, resume or abandon a stopped release, and act on past releases."
+description = "rlsbl release: write the release file, release on a CI-verified candidate, resume or abandon a stopped release, act on past releases, and retract released Go module versions."
 generated = true
 nav_group = "CLI Reference"
 nav_order = 13

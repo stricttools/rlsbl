@@ -1,5 +1,5 @@
 +++
-description = "The confidential-term list a release scans what it pushes and publishes against: hits, their ids, the confidential-terms check, false-positive judgments and owner approvals, and the release record."
+description = "The confidential-term list a release scans what it pushes and publishes against: the setting naming where it lives, hits, their ids, the confidential-terms check, false-positive judgments and owner approvals, and the release record."
 +++
 
 # Confidential terms

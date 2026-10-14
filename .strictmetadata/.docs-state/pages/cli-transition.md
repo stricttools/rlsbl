@@ -1,6 +1,6 @@
 +++
 title = "rlsbl transition"
-description = "rlsbl transition: show and write the lifecycle-and-license record's lifecycle, license, and identity periods and unversioned tags, and classify or declassify."
+description = "rlsbl transition: show and write the lifecycle-and-license record's lifecycle, license, and identity periods and unversioned tags, retire releasables out of a workspace, and classify or declassify."
 generated = true
 nav_group = "CLI Reference"
 nav_order = 19

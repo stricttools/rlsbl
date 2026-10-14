@@ -1,6 +1,6 @@
 +++
 title = "internal/registry"
-description = "Questions to the package registries: name availability on npm, PyPI, and Go, published versions, deprecation notices, name claims, and the npm token."
+description = "Questions to the package registries: name availability on npm, PyPI, and Go, published versions, deprecation notices, name claims, the npm token, and the Go module proxy request that publishes a pushed version."
 generated = true
 nav_group = "API Reference"
 nav_order = 21
