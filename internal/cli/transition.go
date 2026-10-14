@@ -11,8 +11,13 @@ import (
 	"github.com/stricttools/strictspec/go/confidential"
 	"github.com/stricttools/strictspec/go/lifecycle"
 
+	"github.com/stricttools/rlsbl/internal/declarations"
+	"github.com/stricttools/rlsbl/internal/github"
 	"github.com/stricttools/rlsbl/internal/historyrewrite"
 	"github.com/stricttools/rlsbl/internal/lifecycleops"
+	"github.com/stricttools/rlsbl/internal/scaffold"
+	"github.com/stricttools/rlsbl/internal/workflows"
+	"github.com/stricttools/rlsbl/internal/workspace"
 )
 
 const transitionGroupHelp = "The lifecycle-and-license record, .strictmetadata/lifecycle-and-license/lifecycle-and-license.toml: each " +
@@ -35,7 +40,14 @@ const transitionLifecycleHelp = "Close a releasable's or member's lifecycle peri
 	"non-releasing (its releases are refused), or retired (its release history is a record). A releasable without a lifecycle period in effect has " +
 	"a derived status, never recorded: active when its release archives record a release, and unreleased when they do not, which refuses its " +
 	"releases. Recording active for an unreleased releasable is the owner's decision that allows its first release. The subject is declared, " +
-	"or one the record already holds a lifecycle period of. A status its lifecycle period in effect already holds is refused."
+	"or one the record already holds a lifecycle period of. A status its lifecycle period in effect already holds is refused. Retiring a declared " +
+	"releasable of a workspace is one commit: besides the period, the releasable and every member versioned under it leave releasables.toml, " +
+	"their open identities close (so the tags they owned are accounted for), their release hook directories under .strictmetadata/release-hooks/ " +
+	"and the releasable's changelog validation cache are deleted through saferm, the scaffold state stops managing the members' files, and the " +
+	"routers and the root CHANGELOG.md are regenerated without them; the releasable's changelog and release directories stay where they are, " +
+	"as its closed history. Refused before anything is written: the releasable of a standalone repository (the whole repository is archived " +
+	"instead), a releasable holding the root member, a member that stays depending on one that leaves, an options entry scoped to a leaving " +
+	"member, a release in progress, and an uncommitted change to a path the retirement writes."
 
 const transitionLicenseHelp = "Close a releasable's license period on today's date and open one under --license, an SPDX identifier. " +
 	"proprietary is refused (`transition classify` makes a releasable proprietary), and so is a change that would leave no releasable " +
@@ -113,7 +125,7 @@ func registerTransition(r *commandSet) {
 			strictcli.StringFlag("status", "The status from today", strictcli.Required(), strictcli.Choices(
 				strictcli.Ch(string(lifecycle.StatusActive), "released as usual; for an unreleased releasable, its first release is allowed"),
 				strictcli.Ch(string(lifecycle.StatusNonReleasing), "its releases are refused until it is active again"),
-				strictcli.Ch(string(lifecycle.StatusRetired), "its release history is closed, a record nothing releases from"),
+				strictcli.Ch(string(lifecycle.StatusRetired), "its release history is closed, a record nothing releases from; a declared releasable leaves the declarations"),
 			)),
 			reason,
 		},
@@ -246,7 +258,32 @@ func transitionInvocation(ctx *strictcli.Context) (lifecycleops.Invocation, stri
 	if err != nil {
 		return lifecycleops.Invocation{}, "", err
 	}
-	return lifecycleops.Invocation{E: ctx.Effects(), DryRun: ctx.DryRun(), Say: ctx.Out, Now: time.Now}, dir, nil
+	return lifecycleops.Invocation{E: ctx.Effects(), DryRun: ctx.DryRun(), Say: ctx.Out, Now: time.Now, RouterInputs: transitionRouters(ctx)}, dir, nil
+}
+
+// transitionRouters are the inputs `monorepo sync` regenerates a
+// workspace's routers with, for a retirement that takes a releasable out of
+// the declarations. GitHub is asked only for a root member publishing from
+// CI.
+func transitionRouters(ctx *strictcli.Context) func(*workspace.Workspace) (workflows.SyncInputs, error) {
+	return func(w *workspace.Workspace) (workflows.SyncInputs, error) {
+		actions, err := scaffold.ActionVersions()
+		if err != nil {
+			return workflows.SyncInputs{}, err
+		}
+		now := time.Now()
+		return workflows.SyncInputs{
+			Actions: actions,
+			RootPublishWorkflow: func(root declarations.Member) (string, error) {
+				gh, err := github.New(ctx.Effects())
+				if err != nil {
+					return "", err
+				}
+				return scaffold.MemberPublishWorkflow(ctx.Effects(), w, root, gh, now)
+			},
+			DryRun: ctx.DryRun(),
+		}, nil
+	}
 }
 
 // runPeriod runs a lifecycle or license change, the value read from flag.

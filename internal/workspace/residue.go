@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/stricttools/strictspec/go/lifecycle"
+
 	"github.com/stricttools/rlsbl/internal/declarations"
 )
 
@@ -16,8 +18,9 @@ import (
 // the old layout (.rlsbl/, .rlsbl-monorepo/), a member's own CHANGELOG.md
 // in a workspace (a workspace releasable's changelog is generated under
 // .strictmetadata/changelog/), or the release state of a subject the
-// declarations do not hold. A retired subject's release state lives under
-// .strictmetadata/retired-release-histories/ and is never residue.
+// declarations do not hold. A retired subject's release state, under
+// .strictmetadata/retired-release-histories/ or where its releases wrote
+// it, is never residue.
 type Residue struct {
 	// Path is repository-relative.
 	Path      string
@@ -199,12 +202,24 @@ func (w *Workspace) entries(rel string) ([]os.DirEntry, error) {
 }
 
 // undeclaredState is the per-releasable state of names no releasable is
-// declared with.
+// declared with. The changelog and release directories of a subject the
+// lifecycle-and-license record holds a retired period of are its closed
+// history, left where its releases wrote them, and are not residue.
 func (w *Workspace) undeclaredState() ([]Residue, error) {
 	var out []Residue
 	declared := func(name string) bool {
 		_, ok := w.Declarations.Releasable(name)
 		return ok
+	}
+	rec, err := lifecycle.Load(w.Root)
+	if err != nil {
+		return nil, err
+	}
+	retired := map[string]bool{}
+	for _, l := range rec.Lifecycle() {
+		if l.Status == lifecycle.StatusRetired {
+			retired[l.Subject] = true
+		}
 	}
 	for _, root := range []string{declarations.ChangelogRoot, declarations.ReleasesRoot} {
 		list, err := w.entries(root)
@@ -212,7 +227,7 @@ func (w *Workspace) undeclaredState() ([]Residue, error) {
 			return nil, err
 		}
 		for _, entry := range list {
-			if !entry.IsDir() || declared(entry.Name()) {
+			if !entry.IsDir() || declared(entry.Name()) || retired[entry.Name()] {
 				continue
 			}
 			out = append(out, Residue{

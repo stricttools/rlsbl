@@ -27,6 +27,7 @@ import (
 	"github.com/stricttools/strictspec/go/lifecycle"
 
 	"github.com/stricttools/rlsbl/internal/git"
+	"github.com/stricttools/rlsbl/internal/workflows"
 	"github.com/stricttools/rlsbl/internal/workspace"
 )
 
@@ -45,6 +46,10 @@ type Invocation struct {
 	// (confidential.ConfiguredLocation in the binary), which what a command
 	// publishes is scanned against.
 	TermList confidential.Location
+	// RouterInputs are what a workspace's routers are regenerated with, for
+	// the workspace given: retiring a releasable regenerates them without
+	// it.
+	RouterInputs func(*workspace.Workspace) (workflows.SyncInputs, error)
 }
 
 // managed is a repository rlsbl manages, as a command reads it.

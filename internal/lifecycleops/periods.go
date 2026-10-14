@@ -54,6 +54,9 @@ func (inv Invocation) Lifecycle(req PeriodRequest) error {
 	if err := rec.OpenPeriod(lifecycle.TableLifecycle, req.Subject, string(status), on, req.Reason); err != nil {
 		return err
 	}
+	if status == lifecycle.StatusRetired && isReleasable(m, req.Subject) {
+		return inv.retireReleasable(m, rec, req, on)
+	}
 	done := fmt.Sprintf("%s is %s from %s.", req.Subject, status, day(on))
 	if status == lifecycle.StatusActive && isReleasable(m, req.Subject) {
 		released, err := releaserecord.HasRelease(m.ws.Root, req.Subject)

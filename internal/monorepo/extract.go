@@ -395,22 +395,54 @@ func originOrPath(repo git.Repo) (string, error) {
 // departing members on members that stay.
 func (dep *departure) observeEdges() error {
 	ws := dep.ws
+	g, err := completeGraph(ws, "the extract")
+	if err != nil {
+		return err
+	}
+	if problems := stayingDependents(ws, g, dep.members); len(problems) > 0 {
+		return fmt.Errorf("members that stay depend on members that would leave:\n%s\nSever each dependency first (the extract never rewrites a manifest itself), then run this again", strings.Join(problems, "\n"))
+	}
+	leaving := map[string]bool{}
+	for _, m := range dep.members {
+		leaving[m.Name] = true
+	}
+	for _, m := range dep.members {
+		for _, d := range g.Dependencies(m.Name) {
+			if !leaving[d.Name] {
+				dep.outbound = append(dep.outbound, fmt.Sprintf("%s depends on %s (%s, scope %s), which stays: the new repository resolves it from a registry", m.Name, d.Name, d.Form, d.Scope))
+			}
+		}
+	}
+	return nil
+}
+
+// completeGraph is the workspace's dependency graph, refused when a
+// manifest could not be read: a dependency nobody can see would be left
+// pointing at nothing. operation names what needs the graph, for the
+// refusal.
+func completeGraph(ws *workspace.Workspace, operation string) (*workspace.Graph, error) {
 	g := workspace.NewGraph(ws)
 	if len(g.ScanErrors) > 0 {
 		var lines []string
 		for _, s := range g.ScanErrors {
 			lines = append(lines, "  - "+s.Error())
 		}
-		return fmt.Errorf("the workspace's dependency graph is incomplete: a manifest could not be read, so the dependencies into and out of the releasable cannot be established, and one the extract cannot see would be left pointing at nothing. Fix each manifest, then run this again:\n%s", strings.Join(lines, "\n"))
+		return nil, fmt.Errorf("the workspace's dependency graph is incomplete: a manifest could not be read, so the dependencies into and out of the releasable cannot be established, and one %s cannot see would be left pointing at nothing. Fix each manifest, then run this again:\n%s", operation, strings.Join(lines, "\n"))
 	}
-	leaving := map[string]bool{}
-	for _, m := range dep.members {
-		leaving[m.Name] = true
+	return g, nil
+}
+
+// stayingDependents describes each dependency a member outside leaving has
+// on a member of leaving, each followed by the edits that sever it.
+func stayingDependents(ws *workspace.Workspace, g *workspace.Graph, leaving []declarations.Member) []string {
+	names := map[string]bool{}
+	for _, m := range leaving {
+		names[m.Name] = true
 	}
 	var problems []string
-	for _, m := range dep.members {
+	for _, m := range leaving {
 		for _, name := range g.Dependents(m.Name) {
-			if leaving[name] {
+			if names[name] {
 				continue
 			}
 			stayer, _ := ws.Declarations.Member(name)
@@ -423,16 +455,8 @@ func (dep *departure) observeEdges() error {
 			problems = append(problems, fmt.Sprintf("  - %q depends on %q (%s, scope %s)", name, m.Name, edge.Form, edge.Scope))
 			problems = append(problems, severingEdits(ws, stayer, m, edge)...)
 		}
-		for _, d := range g.Dependencies(m.Name) {
-			if !leaving[d.Name] {
-				dep.outbound = append(dep.outbound, fmt.Sprintf("%s depends on %s (%s, scope %s), which stays: the new repository resolves it from a registry", m.Name, d.Name, d.Form, d.Scope))
-			}
-		}
 	}
-	if len(problems) > 0 {
-		return fmt.Errorf("members that stay depend on members that would leave:\n%s\nSever each dependency first (the extract never rewrites a manifest itself), then run this again", strings.Join(problems, "\n"))
-	}
-	return nil
+	return problems
 }
 
 // spellings are every name the departing member m may be depended on by:

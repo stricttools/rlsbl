@@ -107,14 +107,14 @@ func TestADryRunWritesNoRecordAndNoIndex(t *testing.T) {
 	before := f.record(t)
 	head := f.repo.Head()
 	r := f.run(t, true, func(inv lifecycleops.Invocation, dir string) error {
-		return inv.Lifecycle(lifecycleops.PeriodRequest{Dir: dir, Subject: "portal", Value: "retired", Reason: "done"})
+		return inv.Lifecycle(lifecycleops.PeriodRequest{Dir: dir, Subject: "portal", Value: "non-releasing", Reason: "paused"})
 	})
 	requireExit(t, r, 0)
 	requireContains(t, r.Stdout, "Would commit")
 	// What the dry run says names what it would record, never a state it
 	// did not bring about.
-	requireContains(t, r.Stdout, "Would record portal as retired from")
-	if strings.Contains(r.Stdout, "portal is retired from") {
+	requireContains(t, r.Stdout, "Would record portal as non-releasing from")
+	if strings.Contains(r.Stdout, "portal is non-releasing from") {
 		t.Fatalf("a dry run reports the period as recorded:\n%s", r.Stdout)
 	}
 	if f.record(t) != before || f.repo.Head() != head {
