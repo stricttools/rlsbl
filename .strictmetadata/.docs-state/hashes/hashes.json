@@ -97,9 +97,9 @@
     "schema_hash": "8ec11c80f2ba2db1ea6f1ccdb6d2f8aebce1c0386f499a42919083e4215beb23"
   },
   "en/cli-release.md": {
-    "content": "6dcbe557a206db729dac71b86a1e5e412830541448cd1e837983586deb450654",
-    "description": "3f21e797cff20ec76b1803e2b59ac11572ad4b024a6315bcf327951d2785b9be",
-    "schema_hash": "00fd2ff42a796273f1e435cbf8b61fc4b7eec2ffab8877d81447f39083be61e7"
+    "content": "e42107e4ce3bbae964d65b4becadc9db9f200416bcd5a514d05199a7bce48bf5",
+    "description": "b605a4e49fa9a02429028468696e5651bd5c763f72a947b1b2369ca78bb728b1",
+    "schema_hash": "1194d6edc8ec562de3acfe76b67cfae6b5cec81d39914bbc76239adb79b7455f"
   },
   "en/cli-rewrite.md": {
     "content": "9d2c25461ba86f47460e7203ab1115d74a144ca1d195d40e57a956d588a4f411",
@@ -119,9 +119,9 @@
     "seed_hash": "ec4e0109f8f2cba6cdcd10d3d92f1558a9b22565562a1b6ecba851c6a4da9e69"
   },
   "en/cli-status.md": {
-    "content": "2973352018e667c2c401b09fd49b9769b32320af49bad8edb07fd230282ee0ec",
-    "description": "83036465fc3f15732ed4e7accf1f6af437dc136991d694a1942b005e035a1843",
-    "schema_hash": "537a637248fca5a37697ba7c1562427ece994f36565d032823240163d6558e61"
+    "content": "fb7a07d6c0c918d12b5ba3ed2a2b49cb0ed92b3af07b7392a8248a8908066214",
+    "description": "63e5a4e080e81841e4740e99f916693784fafbe85076fa0fb41e82f74d3bc87b",
+    "schema_hash": "6e12e4dfaa246f4e5b3b68ad9bb125ec678786d10aabc95e3bb08f315c5ceab4"
   },
   "en/cli-targets.md": {
     "content": "c38c0a62ed0cbe1e3ce87ace755ae5d59be9b6cecf083bed51a704749dd924dd",
@@ -129,9 +129,9 @@
     "schema_hash": "1c4197adb9f4ea6264e8d3504fea11d6f47afe9c5383f15b3d122c17fc77c306"
   },
   "en/cli-transition.md": {
-    "content": "fb7bb48ee044341bf374de1ddc63ce12b37e063254b35c4c59a35a68a3bb5e0d",
-    "description": "b3c480567e84e0bcec346b7cad27e17c0f3522bc0e3fa8fe38e1f6fac1566170",
-    "schema_hash": "fda71d279383aabc7ab71732f2b0986426fc94bfd9c4457611133b591f69b585"
+    "content": "54a8f3eea84b75fed31e3c71078890b1eb4fdb5958d39e65d4e0f7c910ccd9d6",
+    "description": "0a7caa3cfbf1a49fff3df5cd9050e7caebbf59775409f55ee6f8ed1053e22c19",
+    "schema_hash": "2945b95c735231a5c363724cb74e19d2e278edb998291f381604c92e0de8ee1b"
   },
   "en/cli-unreleased.md": {
     "content": "382d5f84514e848c168f7d7c1d489d846a0a8f34ccfbc637f65092bb611bafc3",
@@ -155,8 +155,8 @@
     "source_docstring": "2703990b10cd383a0f761f078f4a930cecfaa83037f5cba14ce7f66cf4ae78b3"
   },
   "en/confidential-terms.md": {
-    "content": "556d23f1693b35403a92f3075746437dc0a85f82edea413edc6c0bba3929724e",
-    "description": "93860836a1e05a783a2b7ef14b22e63413a1673e7b960ee09bba7c7933cfeec8"
+    "content": "462a09084838db00e50c7a10be850b0e6bf107dc763ffc7e9dc9e48ad0ec2334",
+    "description": "ea8294b137ded4a7cba081055e7a6bf6e6f370f64195bfbd23e3cd11ed9efbd8"
   },
   "en/configuration.md": {
     "content": "9ee91618f84f7cfc28c2e6c3799f80e976d240b5212de1963f8cc56fb69aa01f",
@@ -296,8 +296,8 @@
   },
   "en/internal-registry.md": {
     "content": "54ffac50c72a04822c539a0e7c59bda6a5bea01fbea5e58b9ab15dba60968af8",
-    "description": "e875fd39bf39760883139589a3c4ab8f7809cbdd83ba6f387da86410ee932e2c",
-    "source_docstring": "6ee0d0630a879764371d904d29ccb3c381793501cf6f2eda79db5ea58d507252"
+    "description": "8200bc90016fc88d3dfe91169b10a897292590b24f199db7e404e95f9bae207e",
+    "source_docstring": "e9356d9e6b95ececb81f382e4e8b2e4bbbfeb5b945cf9b8c5548abc82fa8f4d5"
   },
   "en/internal-release.md": {
     "content": "dbd1247cc2daca49ac2b4e11caa0a996549354aabef80e7ace5f8a8c5e69ac65",
@@ -378,8 +378,8 @@
     "description": "a1f0cfcb22389d01c5dab80b9b6be0783a0b97223ffc56dd9c0d8d3be71646b3"
   },
   "en/lifecycle-and-license.md": {
-    "content": "09877c9f35f151046d604e88a1dd0b7d4bb05835c2e112bfda3862c5fe620577",
-    "description": "7cf467d322fc40b22055330a45e97b4c3d96341706e65bdb255f4726f65f6ea2"
+    "content": "21cf66bdecfa950319c5602978f0a0a12686b79acbb382ae070146afd852e59a",
+    "description": "ff221e39312eaef485f3ecc9e27769495ffa9362f5570a056dfe02d6b3cd4239"
   },
   "en/monorepo.md": {
     "content": "1e3ff170bb9475a75d485adfb7186c47dbbad1bae05e77e8109c458c4b398fbf",
@@ -398,8 +398,8 @@
     "description": "1e60980500cf8659e13d37c6b3bc9a0a0bdf4bc144800db154380b0d563a001c"
   },
   "en/release-workflow.md": {
-    "content": "1cc15d78ab2d853b3229a6604be57ec1fb93cb446eab49330f9d96cffbe794ab",
-    "description": "54609d8c503ae0ee3db4abbfb359b07926acfe05809f413acaaced9d561dadf8"
+    "content": "9f2cff0c35ce16aa2c8e87a0c99cb165eb8be31367d1d92640a5a3214c1ff30e",
+    "description": "556882b75ee55c62e9a1f750b4c76774325283d9fcd07a9ba0032c3d3f5a01b0"
   },
   "en/rlsbl-anchor_remap.md": {
     "content": "a3c2fcf2569f3f796dbe1eea746e7189759119263003d48af08b87f285768418",

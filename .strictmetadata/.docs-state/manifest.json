@@ -5169,6 +5169,11 @@
         },
         {
           "level": 3,
+          "text": "`LifecycleRequest`",
+          "anchor": "lifecyclerequest"
+        },
+        {
+          "level": 3,
           "text": "`IdentityRequest`",
           "anchor": "identityrequest"
         },
@@ -5458,6 +5463,11 @@
         },
         {
           "level": 3,
+          "text": "`RetireTouches`",
+          "anchor": "retiretouches"
+        },
+        {
+          "level": 3,
           "text": "`AbsorbRequest`",
           "anchor": "absorbrequest"
         },
@@ -5540,6 +5550,16 @@
           "level": 3,
           "text": "`Renamed`",
           "anchor": "renamed"
+        },
+        {
+          "level": 3,
+          "text": "`Retirement`",
+          "anchor": "retirement"
+        },
+        {
+          "level": 3,
+          "text": "`RetireResult`",
+          "anchor": "retireresult"
         },
         {
           "level": 3,
@@ -5663,6 +5683,16 @@
         },
         {
           "level": 3,
+          "text": "`PlanRetirement`",
+          "anchor": "planretirement"
+        },
+        {
+          "level": 3,
+          "text": "`JoinWords`",
+          "anchor": "joinwords"
+        },
+        {
+          "level": 3,
           "text": "`ReadStatus`",
           "anchor": "readstatus"
         },
@@ -5680,6 +5710,26 @@
           "level": 3,
           "text": "`recordWriter.MkdirAll`",
           "anchor": "recordwritermkdirall"
+        },
+        {
+          "level": 3,
+          "text": "`Retirement.Names`",
+          "anchor": "retirementnames"
+        },
+        {
+          "level": 3,
+          "text": "`Retirement.Subjects`",
+          "anchor": "retirementsubjects"
+        },
+        {
+          "level": 3,
+          "text": "`Retirement.DeclaredSubjects`",
+          "anchor": "retirementdeclaredsubjects"
+        },
+        {
+          "level": 3,
+          "text": "`Retirement.Apply`",
+          "anchor": "retirementapply"
         }
       ]
     },
@@ -11235,6 +11285,11 @@
         },
         {
           "level": 3,
+          "text": "Retiring a releasable",
+          "anchor": "retiring-a-releasable"
+        },
+        {
+          "level": 3,
           "text": "Declassifying",
           "anchor": "declassifying"
         }
@@ -11672,7 +11727,7 @@
       ]
     }
   ],
-  "last_gen": "2026-10-11T14:48:11.181230+00:00",
+  "last_gen": "2026-10-14T21:31:16.187219+00:00",
   "theme": "minimal",
   "vocabulary": {
     "accepted": [
